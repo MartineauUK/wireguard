@@ -38,14 +38,14 @@ Use the GUI to generate the rules using a spare VPN Client and simply copy'n'pas
 
     vpn_client?_clientlist etc.
     
-The contents of the configuration file will be used when 'w13.conf' is activated - assuming that you have used say the appropriate Wireguard Web configuratr such as Mullvads to create the Local IP address and Public/Private key-pair for th remote Peer.
+The contents of the configuration file will be used when 'w13.conf' is activated - assuming that you have used say the appropriate WireGuard Web configurator such as Mullvads' to create the Local IP address and Public/Private key-pair for the remote Peer.
  e.g
  
     /jffs/scripts/S50wireguard start client 3
     
  The script supports several commands:
     
-    S50wireguard   {start|stop|restart|check|CreateConfig} [ [client [policy] |server]} [wg_instance] ]
+    S50wireguard   {start|stop|restart|check|install} [ [client [policy] |server]} [wg_instance] ]
     S50wireguard   start 0
                    Initialises remote peer 'client' 'wg0'
     S50wireguard   start client 0
