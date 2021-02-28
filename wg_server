@@ -1,0 +1,100 @@
+#!/bin/sh
+VER="v0.01b"
+#============================================================================================ © 2021 Martineau v0.01b
+#############################################################################EIC Hack 1 of 2################
+# shellcheck disable=SC2034
+ANSIColours() {
+    cRESET="\e[0m";cBLA="\e[30m";cRED="\e[31m";cGRE="\e[32m";cYEL="\e[33m";cBLU="\e[34m";cMAG="\e[35m";cCYA="\e[36m";cGRA="\e[37m"
+    cBGRA="\e[90m";cBRED="\e[91m";cBGRE="\e[92m";cBYEL="\e[93m";cBBLU="\e[94m";cBMAG="\e[95m";cBCYA="\e[96m";cBWHT="\e[97m"
+    aBOLD="\e[1m";aDIM="\e[2m";aUNDER="\e[4m";aBLINK="\e[5m";aREVERSE="\e[7m"
+    cWRED="\e[41m";cWGRE="\e[42m";cWYEL="\e[43m";cWBLU="\e[44m";cWMAG="\e[45m";cWCYA="\e[46m";cWGRA="\e[47m"
+}
+Firewall_delete() {
+
+    iptables -t mangle -D PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 2>/dev/null
+    iptables -t mangle -D FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 2>/dev/null
+    iptables -t mangle -D FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null
+    iptables -t mangle -D FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null
+
+    iptables -D INPUT -p udp --dport $wgport -j ACCEPT 2>/dev/null
+    iptables -D INPUT -i $VPN_ID -j ACCEPT 2>/dev/null
+    iptables -D FORWARD -i $VPN_ID -j ACCEPT 2>/dev/null
+    iptables -D FORWARD -o $VPN_ID -j ACCEPT 2>/dev/null
+    iptables -D OUTPUT -o $VPN_ID -j ACCEPT 2>/dev/null
+    iptables -t nat -D PREROUTING -p udp --dport $wgport -j ACCEPT 2>/dev/null
+}
+
+#For verbose debugging, uncomment the following two lines, and uncomment the last line of this script
+#set -x
+#(
+
+Main() { true; }            # Syntax that is Atom Shellchecker compatible!
+
+ANSIColours
+############################################################################################################
+modprobe xt_set
+#############################################################################EIC Hack 2 of 3################
+#insmod /opt/lib/modules/wireguard
+VPN_ID=$1
+[ -z "$1" ] && VPN_ID="wg21"
+#logger -st "wireguard-server${VPN_ID:2:1}" "Configuring Wireguard VPN Server ($VPN_ID) on Port:"$wgport
+insmod /opt/lib/modules/wireguard 2> /dev/null
+############################################################################################################
+wgport=$(awk '/Listen/ {print $3}' /opt/etc/wireguard/${VPN_ID}.conf)
+SOCKET=$(nvram get wan_gateway)":"$wgport
+
+if [ "$2" != "disable" ];then
+    wgport=$(awk '/Listen/ {print $3}' /opt/etc/wireguard/${VPN_ID}.conf)
+    if [ "$VPN_ID" == "wg1" ];then
+        WG_INTERFACE="wg1"
+        Subnet=10.50.1.1/24
+        #wgport="1151"
+    else
+        WG_INTERFACE=$1
+        Subnet=10.50.${VPN_ID:3:1}.1/24
+        #wgport="115"${VPN_ID:3:1}
+    fi
+
+
+    logger -st "wireguard-server${VPN_ID:3:1}" "Configuring Wireguard VPN 'Server' Peer ($VPN_ID) on $SOCKET"
+    ip link del dev $VPN_ID 2>/dev/null
+    ip link add dev $VPN_ID type wireguard
+    wg setconf $VPN_ID /opt/etc/wireguard/$VPN_ID.conf
+    ip address add dev $VPN_ID $Subnet
+    ip link set up dev $VPN_ID
+    ifconfig $VPN_ID mtu 1380
+    ifconfig $VPN_ID txqueuelen 1000
+
+    Firewall_delete
+
+    iptables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+    iptables -t mangle -I FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+    iptables -t mangle -I FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7
+    iptables -t mangle -I PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7
+
+    iptables -I INPUT -p udp --dport $wgport -j ACCEPT
+    iptables -I INPUT -i $VPN_ID -j ACCEPT
+    iptables -I FORWARD -i $VPN_ID -j ACCEPT
+    iptables -I FORWARD -o $VPN_ID -j ACCEPT
+    iptables -I OUTPUT -o $VPN_ID -j ACCEPT
+    iptables -t nat -I PREROUTING -p udp --dport $wgport -j ACCEPT
+
+    ###############################################################EIC Hack 5 of 5##############################
+    #logger -st "($(basename $0))" "Configuring Wireguard to VPN Client (pass-thru)"
+    [ -n "$(wg show interfaces | grep -E "wg[0-1]")" ] && iptables -I POSTROUTING -t nat -s $Subnet -o wg1+ -j MASQUERADE
+    echo -en $cBGRE"\t"
+    logger -st "wireguard-server${VPN_ID:3:1}" "Initialisation complete."
+    echo -e $cRESET
+    ############################################################################################################
+else
+    ip link del dev $VPN_ID 2>/dev/null
+    Firewall_delete
+    echo -en $cBGRE"\t"
+    logger -st "wireguard-server${VPN_ID:3:1}" "Wireguard VPN 'Server' Peer ($VPN_ID) on" $SOCKET "DELETED"
+    echo -e $cRESET
+fi
+
+
+############################################################################EIC Hack 3 of 3####################################
+#) 2>&1 | logger -t $(basename $0)"[$$_***DEBUG]"
+###############################################################################################################################
