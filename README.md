@@ -25,9 +25,11 @@ In lieu of the NVRAM variables that can retain OpenVPN Client/Server configurati
 As this is a beta, the layout of the file includes placeholders, but currently, the first column is significant and is used as a primary lookup key and only the 'Auto' and 'Annotation Comment' fileds are extracted/used to determine the actions taken by the script.
 
 e.g.
+
     wg13    P      xxx.xxx.xxx.xxx/32    103.231.88.18:51820    193.138.218.74    # Mullvad Oz, Melbourne
 
 is used to auto-start Wireguard VPN 'client' Peer 3 ('wg13')' in Policy mode, where the associated Policy rules are defined as
+
     rp13    <Dummy VPN 3>172.16.1.3>>VPN<Plex>172.16.1.123>1.1.1.1>VPN<Router>172.16.1.1>>WAN<All LAN>172.16.1.0/24>>VPN
 
 which happens to be in the same format as the Policy rules created by the GUI for OpenVPN clients i.e.
