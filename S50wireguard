@@ -1,6 +1,6 @@
 #!/bin/sh
-VER="v0.01b"
-#============================================================================================ © 2021 Martineau v0.01b
+VER="v0.01b2"
+#============================================================================================ © 2021 Martineau v0.01b2
 #
 #       S50wireguard   {start|stop|restart|check|CreateConfig} [ [client [policy] |server]} [wg_instance] ]
 #
@@ -424,6 +424,9 @@ case $ACTION in
         ) >> /opt/etc/wireguard/wg21.conf
 
         Create_Sample_Config
+
+        curl --retry 3 "https://raw.githubusercontent.com/MartineauUK/wireguard/main/wg_manager.sh" -o "/opt/etc/wireguard/wg_manager" && chmod 755 "/opt/etc/wireguard/wg_manager"
+        curl --retry 3 "https://raw.githubusercontent.com/MartineauUK/wireguard/main/wg_server"     -o "/opt/etc/wireguard/wg_server"  && chmod 755 "/opt/etc/wireguard/wg_server"
     ;;
     loadmodules)
 
@@ -437,6 +440,9 @@ case $ACTION in
         echo -e $cBGRA
         dmesg | grep -a WireGuard | tail -n 1
         echo -e $cBWHT
+
+        curl --retry 3 "https://raw.githubusercontent.com/MartineauUK/wireguard/main/wg_manager.sh" -o "/opt/etc/wireguard/wg_manager" && chmod 755 "/opt/etc/wireguard/wg_manager"
+        curl --retry 3 "https://raw.githubusercontent.com/MartineauUK/wireguard/main/wg_server"     -o "/opt/etc/wireguard/wg_server"  && chmod 755 "/opt/etc/wireguard/wg_server"
     ;;
     usedns)
         #cp /opt/etc/wireguard/S50wireguard /opt/etc/init.d
