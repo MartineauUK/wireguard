@@ -1,6 +1,6 @@
 #!/bin/sh
-VER="v0.01b4"
-#============================================================================================ © 2021 Martineau v0.01b4
+VER="v0.01b5"
+#============================================================================================ © 2021 Martineau v0.01b5
 #
 #       S50wireguard   {start|stop|restart|check|CreateConfig} [ [client [policy] |server]} [wg_instance] ]
 #
@@ -426,13 +426,14 @@ case $ACTION in
         Create_Sample_Config
 
         if [ -d /opt/etc/ ];then
+            [ ! -d /opt/etc/wireguard ] && mkdir -p /opt/etc/wireguard
             curl --retry 3 "https://raw.githubusercontent.com/MartineauUK/wireguard/main/wg_manager.sh" -o "/opt/etc/wireguard/wg_manager.sh" && chmod 755 "/opt/etc/wireguard/wg_manager.sh"
             curl --retry 3 "https://raw.githubusercontent.com/MartineauUK/wireguard/main/wg_server"     -o "/opt/etc/wireguard/wg_server"  && chmod 755 "/opt/etc/wireguard/wg_server"
         fi
     ;;
     loadmodules)
 
-        echo -e $cBGRE"Loading Wireguard Kernel module and Userspace Tools"$cRESET
+        echo -e $cBGRE"Loading Wireguard Kernel module and Userspace Tools for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
         for MODULE in $(ls /tmp/wireguard/*.ipk)
             do
                 opkg install $MODULE
