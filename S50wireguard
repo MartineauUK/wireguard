@@ -1,0 +1,470 @@
+#!/bin/sh
+VER="v0.01b"
+#============================================================================================ © 2021 Martineau v0.01b
+#
+#       S50wireguard   {start|stop|restart|check|CreateConfig} [ [client [policy] |server]} [wg_instance] ]
+#
+#       S50wireguard   start 0
+#                      Initialises remote peer 'client' 'wg0'
+#       S50wireguard   start client 0
+#                      Initialises remote peer 'client' 'wg0'
+#       S50wireguard   start 1
+#                      Initialises local peer 'server' 'wg1'
+#       S50wireguard   start server 1
+#                      Initialises local peer 'server' 'wg21'
+#       S50wireguard   start client 1
+#                      Initialises remote peer 'client' 'wg11' uses interface naming convention as per OpenVPN e.g. tun11
+#       S50wireguard   start client 1 policy
+#                      Initialises remote peer 'client' 'wg11' in 'policy' Selective Routing mode
+#       S50wireguard   stop client 3
+#                      Terminates remote peer 'client' 'wg13'
+#       S50wireguard   stop 1
+#                      Terminates local peer 'server' 'wg21'
+
+
+#Mode=client   #server or client
+
+#server
+#export Subnet=   #e.g.)10.50.50.1/24
+#export wgport=
+
+#client
+#export LocalIP=  #e.g.)10.50.50.2
+
+#Route=default   #default or policy
+#export wgdns=
+#export Nipset=wgvpn
+
+Say(){
+   echo -e $$ $@ | logger -st "($(basename $0))"
+}
+SayT(){
+   echo -e $$ $@ | logger -t "($(basename $0))"
+}
+# shellcheck disable=SC2034
+ANSIColours() {
+    cRESET="\e[0m";cBLA="\e[30m";cRED="\e[31m";cGRE="\e[32m";cYEL="\e[33m";cBLU="\e[34m";cMAG="\e[35m";cCYA="\e[36m";cGRA="\e[37m"
+    cBGRA="\e[90m";cBRED="\e[91m";cBGRE="\e[92m";cBYEL="\e[93m";cBBLU="\e[94m";cBMAG="\e[95m";cBCYA="\e[96m";cBWHT="\e[97m"
+    aBOLD="\e[1m";aDIM="\e[2m";aUNDER="\e[4m";aBLINK="\e[5m";aREVERSE="\e[7m"
+    cWRED="\e[41m";cWGRE="\e[42m";cWYEL="\e[43m";cWBLU="\e[44m";cWMAG="\e[45m";cWCYA="\e[46m";cWGRA="\e[47m"
+}
+Is_HND() {
+    # Use the following at the command line otherwise 'return X' makes the SSH session terminate!
+    #[ -n "$(uname -m | grep "aarch64")" ] && echo Y || echo N
+    [ -n "$(uname -m | grep "aarch64")" ] && { echo Y; return 0; } || { echo N; return 1; }
+}
+Is_AX() {
+    # Kernel is '4.1.52+' (i.e. isn't '2.6.36*') and it isn't HND
+    # Use the following at the command line otherwise 'return X' makes the SSH session terminate!
+    # [ -n "$(uname -r | grep "^4")" ] && [ -z "$(uname -m | grep "aarch64")" ] && echo Y || echo N
+    [ -n "$(uname -r | grep "^4")" ] && [ -z "$(uname -m | grep "aarch64")" ] && { echo Y; return 0; } || { echo N; return 1; }
+}
+Get_Router_Model() {
+
+    # Contribution by @thelonelycoder as odmpid is blank for non SKU hardware,
+    local HARDWARE_MODEL
+    [ -z "$(nvram get odmpid)" ] && HARDWARE_MODEL=$(nvram get productid) || HARDWARE_MODEL=$(nvram get odmpid)
+
+    echo $HARDWARE_MODEL
+
+    return 0
+}
+Create_Sample_Config() {
+
+    if [ -f /jffs/configs/WireguardVPN_map ];then
+        echo -e $cBYEL"\a\n\tWarning: WireGuard configuration file '/jffs/configs/WireguardVPN_map' already exists!...renamed to 'WireguardVPN_map.$TS'"
+        mv /jffs/configs/WireguardVPN_map /jffs/configs/WireguardVPN_map.$TS
+    fi
+    echo -e $cBGRE"\a\n\tCreating WireGuard configuration file '/jffs/configs/WireguardVPN_map'"
+
+
+    cat > /jffs/configs/WireguardVPN_map << EOF
+# NOTE: Auto=Y  Command 'S50wireguard start' will auto-start this Peer
+#       Auto=P  Command 'S50wireguard start' will auto-start this Peer using it's Selective Routing RPDB Policy rules if defined e.g 'rp11'
+#
+#
+# VPN   Auto   Local Peer IP         Remote Peer Socket     DNS               Annotation Comment
+wg11    N      xxx.xxx.xxx.xxx/32    86.106.143.93:51820    193.138.218.74    # Mullvad USA, New York
+wg12    N      xxx.xxx.xxx.xxx/32    209.58.188.180:51820   193.138.218.74    # Mullvad China, Hong Kong
+wg13    P      xxx.xxx.xxx.xxx/32    103.231.88.18:51820    193.138.218.74    # Mullvad Oz, Melbourne
+wg14    N      xxx.xxx.xxx.xxx/32    193.32.126.66:51820    193.138.218.74    # Mullvad France, Paris
+wg15
+
+wg21    Y      xxx.50.1.1/24                                                  # Martineau Host Peer 1
+wg22    N      xxx.50.2.1/24                                                  # Martineau Host Peer 2
+
+# The following default 'wg0' interface retained for backward compatibility!
+wg0     N      xxx.xxx.xxx.xxx/32     86.106.143.93:51820    193.138.218.74    # Mullvad USA, New York
+
+#       RPDB Selection Routing rules same format as 'nvram get vpn_clientX_clientlist'
+#       < Desciption > Source IP/CIDR > [Target IP/CIDR] > WAN_or_VPN[...]
+rp11    <>
+rp12    <Router>192.168.1.0/24>>VPN<LAN>192.168.1.1>>WAN
+rp13    <Dummy VPN 3>172.16.1.3>>VPN<Plex>172.16.1.123>1.1.1.1>VPN<Router>172.16.1.1>>WAN<All LAN>172.16.1.0/24>>VPN
+rp14
+rp15
+
+EOF
+    return 0
+}
+
+#For verbose debugging, uncomment the following two lines, and uncomment the last line of this script
+#set -x
+#(
+
+Main() { true; }            # Syntax that is Atom Shellchecker compatible!
+
+PATH=/opt/sbin:/opt/bin:/opt/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+ANSIColours
+
+FIRMWARE=$(echo $(nvram get buildno) | awk 'BEGIN { FS = "." } {printf("%03d%02d",$1,$2)}')
+HARDWARE_MODEL=$(Get_Router_Model)
+# v384.13+ NVRAM variable 'lan_hostname' supersedes 'computer_name'
+[ -n "$(nvram get computer_name)" ] && MYROUTER=$(nvram get computer_name) || MYROUTER=$(nvram get lan_hostname)
+BUILDNO=$(nvram get buildno)
+
+TS=$(date +"%Y%m%d-%H%M%S")    # current date and time 'yyyymmdd-hhmmss'
+
+if [ "$(nvram get ntp_ready)" = "0" ];then              # Ensure event 'restart_diskmon' triggers the actual start of WireGuard.
+    FN="/jffs/scripts/service-event-end"
+    [ ! -f $FN ] && { echo "#!/bin/sh" > $FN; chmod +x $FN; }
+    [ -z "$(grep "wireguard" $FN)" ] && echo -e "if [ "\$2" = "diskmon" ]; then { sh /opt/etc/init.d/S50wireguard start & } ; fi # wireguard" >> $FN
+    Say "$VER WireGuard delayed for NTP synch event trigger 'restart_diskmon' [$@]"
+    exit 99
+#else
+    #Say "$VER $1 WireGuard NTP is Ready"
+fi
+
+ACTION=$1
+TYPE=$2
+
+# Non-standard SxxScript should normally call '. /opt/etc/init.d/rc.func'
+[ "$(echo $2 | grep -o "post-mount")" == "post-mount" ] && shift
+
+[ -z "$TYPE" ] && TYPE="client"
+
+case $TYPE in
+    server|1)
+        Mode="server"
+        if [ -z "$3" ];then
+            WG_INTERFACE="wg1"
+            export $WG_INTERFACE
+            export Subnet=10.50.1.1/24
+            export wgport=1150
+        else
+            WG_INTERFACE="wg2"$3
+            export $WG_INTERFACE
+            export Subnet=10.50.$3.1/24
+            export wgport="115"$3
+        fi
+    ;;
+    *)
+        Mode=client
+
+        if [ -z "$2" ] || [ "$2" == "0" ] || [ "$3" == "0" ];then
+            WG_INTERFACE="wg0"
+            export $WG_INTERFACE
+            #export LocalIP=10.160.107.63/8  # Martineau https://tunsafe.com/vpn  Account Number    57937020164277392089
+            Route=default
+        else
+            if [ "$2" == "client" ];then
+                INDEX=$3
+            else
+                INDEX=$2
+            fi
+            case $INDEX in
+                1|2|3|4|5)
+                            WG_INTERFACE="wg1"$INDEX
+                            #export WG_INTERFACE=$WG_INTERFACE
+                            export Subnet=10.50.$INDEX.1/24
+                            export wgport="115"$INDEX
+
+            ;;
+            *)
+                echo -en $cRED"\a\n\t";Say "$VER Missing/Invalid VPN ID '$INDEX' e.g. range 0 - 5 ";echo -e $cRESET
+                exit 99
+            ;;
+            esac
+        fi
+
+        # Read the Remote peer config to set the LOCAL peer endpoint
+        if [ -f /jffs/configs/WireguardVPN_map ];then
+            LOCALIP=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' /jffs/configs/WireguardVPN_map)
+            export LocalIP=$LOCALIP
+            SOCKET=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $4}' /jffs/configs/WireguardVPN_map)
+            DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' /jffs/configs/WireguardVPN_map | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
+        fi
+
+        if [ "$3" == "policy" ] || [ "$3" == "policy" ];then
+            Route="policy"
+        fi
+
+    ;;
+esac
+
+##################################################################################################################
+case $ACTION in
+    start|BOOT)
+
+        if [ -z "$2" ];then
+            WG_INTERFACE=
+            # The AUTO flag may be 'Y' or 'P' to indicate if auto policy is required
+            AUTO_PEERS=$(awk '$2 == "Y" || $2 =="P" {print $1}' /jffs/configs/WireguardVPN_map| tr '\n#' ' ')
+            echo -e
+            [ -n "$AUTO_PEERS" ] && { Say "$VER Requesting WireGuard VPN Peer auto-start ($AUTO_PEERS)"; echo -e; }
+        else
+            echo -en $cBCYA
+            Say "$VER Requesting WireGuard VPN '$Mode' Peer ('$WG_INTERFACE') $DESC."
+            echo -en $cRESET
+        fi
+        ########################################################################################### Martineau Hack 2 of 5
+
+        #logger "Starting WireGuard service."
+        #if ifconfig wg0 >/dev/null 2>&1 ; then
+        #if ! /opt/bin/wg show $WG_INTERFACE >/dev/null 2>&1 ;then
+        for WG_INTERFACE in $AUTO_PEERS $WG_INTERFACE
+            do
+                [ "$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' /jffs/configs/WireguardVPN_map)" == "P" ] && Route="policy" || Route="default"
+
+                if [ -n "$(ifconfig | grep -E "^$WG_INTERFACE")" ];then
+                    echo -en $cBWHT
+                    Say "Initialising Wireguard VPN $MODE Peer ($VPN_ID) ${POLICY_MODE}${TXT} $SOCKET ($DESC)";echo -en $cRESET
+                    echo -en $cRED"\a\t";Say "WireGuard VPN '$Mode' Peer ('$WG_INTERFACE') ALREADY ACTIVE";echo -e $cRESET
+                else
+                    if [ -f /opt/etc/wireguard/${WG_INTERFACE}.conf ];then
+                        [ "${WG_INTERFACE:0:3}" == "wg2" ] && Mode="server"
+                        ##################################################################################################################
+                        if [ "$Mode" == "server" ] ; then
+                            /opt/etc/wireguard/wg_server $WG_INTERFACE
+
+                            elif [ "$Mode" == "client" ] && [ "$Route" != "policy" ] ; then
+                                /opt/etc/wireguard/wg_manager.sh $WG_INTERFACE
+                            else
+                                /opt/etc/wireguard/wg_manager.sh $WG_INTERFACE "policy"
+                        fi
+                    else
+                        echo -en $cBRED"\a\n\t";Say "WireGuard VPN '$Mode' Peer ('$WG_INTERFACE') config NOT found?....skipping start request"
+                        echo -e $cRESET
+                    fi
+
+                fi
+            done
+        echo -e $cBCYA"\tStatus:\n"$cRESET
+        /opt/bin/wg show all
+    ;;
+    stop)
+        ########################################################################################### Martineau Hack 3 of 5
+        #logger -s "Stopping WireGuard service."
+
+        if [ -z "$2" ];then
+            AUTO_PEERS=$(wg show interfaces)
+            if [ -n "$AUTO_PEERS" ];then
+                WG_INTERFACE=
+                echo -en $cBWHT"\n";Say "$VER Requesting termination of Active WireGuard VPN Peers ($AUTO_PEERS)"
+                echo -e $cRESET
+            else
+                echo -en $cRED"\a\n\t"
+                Say "No WireGuard VPN peers Active"
+                echo -e
+                exit 97
+            fi
+        fi
+
+        for WG_INTERFACE in $AUTO_PEERS $WG_INTERFACE
+            do
+                #/opt/etc/wireguard/wg-down
+                [ "${WG_INTERFACE:0:3}" == "wg2" ] && Mode="server"
+                DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' /jffs/configs/WireguardVPN_map | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
+                Say "$VER Requesting termination of WireGuard VPN '$Mode' Peer ('$WG_INTERFACE') $DESC."
+
+                if [ -z "$(ifconfig | grep -E "^$WG_INTERFACE")" ];then
+                    echo -e $cRED"\a\t";Say "WireGuard VPN '$Mode' Peer ('$WG_INTERFACE') NOT ACTIVE";echo -e
+                else
+                    if [ "$Mode" == "server" ]; then
+
+                            /opt/etc/wireguard/wg_server $WG_INTERFACE "disable"
+
+                            elif [ "$Mode" == "client" ] && [ "$Route" != "policy" ] ; then
+
+                                #wg show $WG_INTERFACE >/dev/null 2>&1 && /opt/etc/wireguard/wg-down $WG_INTERFACE || Say "WireGuard $Mode service ('$WG_INTERFACE') NOT running."
+                                /opt/bin/wg show $WG_INTERFACE >/dev/null 2>&1 && /opt/etc/wireguard/wg_manager.sh $WG_INTERFACE "disable" || Say "WireGuard $Mode service ('$WG_INTERFACE') NOT running."
+                            else
+                                /opt/bin/wg show $WG_INTERFACE >/dev/null 2>&1 && /opt/etc/wireguard/wg_manager.sh $WG_INTERFACE "disable" "policy" || Say "WireGuard $Mode (Policy) service ('$WG_INTERFACE') NOT running."
+                    fi
+
+                fi
+            done
+
+        /opt/bin/wg show all
+        ##################################################################################################################
+    ;;
+    restart)
+        ########################################################################################### Martineau Hack 4 of 5
+        #logger "Restarting WireGuard service."
+        #/opt/etc/wireguard/wg-down
+        #sleep 2
+        [ -n "$(ifconfig $WG_INTERFACE | grep inet)" ] && { Say "$VER Restarting WireGuard VPN '$Mode' Peer ('$WG_INTERFACE') $DESC"; /opt/etc/wireguard/wg_server $WG_INTERFACE "disable"; sleep 1; }
+        ##################################################################################################################
+        if [ "$Mode" == "server" ] ; then
+            ################################################################################### Martineau Hack x of y
+            #/opt/etc/wireguard/wg_server
+            /opt/etc/wireguard/wg_server $WG_INTERFACE "disable"
+            /opt/etc/wireguard/wg_server $WG_INTERFACE
+            ##################################################################################################################
+
+            elif [ "$Mode" == "client" ] && [ "$Route" != "policy" ] ; then
+                /opt/etc/wireguard/wg_manager.sh $WG_INTERFACE "disable"
+                /opt/etc/wireguard/wg_manager.sh $WG_INTERFACE
+            else
+                Say "...in Policy mode"
+                /opt/etc/wireguard/wg_manager.sh $WG_INTERFACE "disable" "policy"
+                /opt/etc/wireguard/wg_manager.sh $WG_INTERFACE "policy"
+        fi
+    ########################################################################################### Martineau Hack 5 of 5
+        /opt/bin/wg show all
+    ;;
+    check|checkdebug)
+        echo -e
+        Say "$VER WireGuard VPN Status check....."
+        if [ -n "$(which wg)" ];then
+            #REPORT=$(/opt/bin/wg show all | sed "s/\(interface\)/\\$cBMAG\1/;s/\(peer\)/\\$cBYEL\1/; s/\(endpoint\:.*$\)/\1\ - $DESC\\$cBCYA/")
+            #echo -e "$REPORT"
+            /opt/bin/wg show all > /tmp/WireGuard.txt
+            echo -e
+            if [ $(wc -l < /tmp/WireGuard.txt) -ne 0 ];then
+                while IFS='' read -r LINE || [ -n "$LINE" ]; do
+
+                    COLOR=$cBCYA
+                    # interface: wg11
+                    if [ -n "$(echo $LINE | grep -E "interface:")" ];then
+                        TAB="\t"
+                        COLOR=$cBMAG
+                        WG_INTERFACE=$(echo $LINE | awk '{print $2}')
+                        # Read the Remote peer config to set the LOCAL peer endpoint
+                        if [ -f /jffs/configs/WireguardVPN_map ];then
+                            LOCALIP=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' /jffs/configs/WireguardVPN_map)
+                            SOCKET=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $4}' /jffs/configs/WireguardVPN_map)
+                            DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' /jffs/configs/WireguardVPN_map | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
+                        fi
+                        LINE=${COLOR}$LINE" ${cBMAG}\t("$DESC")"
+                    else
+                        TAB="\t\t"
+                        [ -n "$(echo $LINE | grep -E "transfer:")" ] && COLOR=$cBWHT
+                    fi
+
+                    # endpoint: 209.58.188.180:51820
+                    if [ -n "$(echo $LINE | grep -iE "endpoint:" )" ];then
+                        # Don't get the description based on interface, but the IP socket?
+                        #SOCKET=$(echo $LINE | awk '{print $2}')
+                        #DESC=$(awk -v pattern="$SOCKET" 'match($0,pattern) {print $0}' /jffs/configs/WireguardVPN_map | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
+                        #LINE=${COLOR}$LINE" ${cBMAG}\t\t\t("$DESC")"
+                        :
+                    fi
+
+                    echo -e ${TAB}${COLOR}$LINE
+
+
+                done < /tmp/WireGuard.txt
+            else
+                SayT "No WireGuard Peers active"
+                echo -e "\tNo WireGuard Peers active\n"
+            fi
+            if [ "$1" == "checkdebug" ];then
+                #echo -e $cBWHT"\n\tDEBUG: Routing Table main\n";ip route | grep "wg.";for WG_INTERFACE in $(wg show interfaces);do I=${WG_INTERFACE:3:1};echo -e "\n\tDEBUG: Routing Table 12$I";ip route show table 12$I;done
+                echo -e $cBWHT"\n\tDEBUG: Routing Table main\n"
+                ip route | grep "wg."
+                for WG_INTERFACE in $(wg show interfaces)
+                    do I=${WG_INTERFACE:3:1}
+                        [ "${WG_INTERFACE:0:3}" != "wg2" ] && echo -e "\n\tDEBUG: Routing Table 12$I"
+                        ip route show table 12$I
+                    done
+
+                echo -e $cBWHT"\n\tDEBUG: RPDB rules"
+                #ip rule | grep -E "lookup 12[1-5]"
+                ip rule
+                echo -e $cRESET
+            fi
+        else
+            echo -e $cRED"\a\t";Say "Wireguard VPN module 'wg' NOT installed (use 'install')\n"$cRESET
+        fi
+    ;;
+    install)
+
+        if [ "$(Is_AX)" == "N" ] && [ "$(Is_HND)" == "N" ];then
+            echo -e $cBRED"\a\n\tERROR: Router $HARDWARE_MODEL (v$BUILDNO) is not currently compatible with WireGuard!"
+            exit 96
+        fi
+
+        mkdir -p /tmp/wireguard
+
+        # Kernel module
+        if [ "$(Is_AX)" == "Y" ];then
+            curl -# https://github.com/odkrys/entware-makefile-for-merlin/blob/main/wireguard-kernel_1.0.20210124-ax86_aarch64-3.10.ipk -o /tmp/wireguard/wireguard-kernel_1.0.20210124-ax86_aarch64-3.10.ipk
+        else
+            [ "$(Is_HND)" == "Y" ] && curl -# https://github.com/odkrys/entware-makefile-for-merlin/blob/main/wireguard-kernel_1.0.20210124-ac_aarch64-3.10.ipk -o /tmp/wireguard/wireguard-kernel_1.0.20210124-ac_aarch64-3.10.ipk
+        fi
+
+        # User Space Tools
+        curl -# https://github.com/odkrys/entware-makefile-for-merlin/raw/main/wireguard-tools_1.0.20200827-1_aarch64-3.10.ipk -o /tmp/wireguard/wireguard-tools_1.0.20200827-1_aarch64-3.10.ipk
+
+        if [ -z "$(grep "S50wireguard" /jffs/configs/profile.add)" ];then
+            echo "alias wgstart='/opt/etc/init.d/S50wireguard start'"               >>/jffs/configs/profile.add
+            echo "alias wgstop='/opt/etc/init.d/S50wireguard stop'"                 >>/jffs/configs/profile.add
+            echo "alias wgr='/opt/etc/init.d/S50wireguard check'"                   >>/jffs/configs/profile.add
+            echo "alias wgd='/opt/etc/init.d/S50wireguard checkdebug'"              >>/jffs/configs/profile.add
+        fi
+
+        # Create 'server' Peer wg21
+        (umask 077 && printf "[Interface]\nPrivateKey = " | tee /opt/etc/wireguard/wg21.conf > /dev/null)
+        wg genkey | tee -a /opt/etc/wireguard/wg21.conf | wg pubkey | tee /opt/etc/wireguard/server21-publickey
+        ( echo "ListenPort = 1151"
+          echo -e "\n\n\AllowedIPs = 10.50.1.1/32"
+          echo -en "PublicKey = "
+        ) >> /opt/etc/wireguard/wg21.conf
+
+        Create_Sample_Config
+    ;;
+    loadmodules)
+
+        echo -e $cBGRE"Loading Wireguard Kernel module and Userspace Tools"$cRESET
+        for MODULE in $(ls /tmp/wireguard/*.ipk)
+            do
+                opkg install $MODULE
+            done
+        insmod /opt/lib/modules/wireguard 2>/dev/null
+
+        echo -e $cBGRA
+        dmesg | grep -a WireGuard | tail -n 1
+        echo -e $cBWHT
+    ;;
+    usedns)
+        #cp /opt/etc/wireguard/S50wireguard /opt/etc/init.d
+
+        # Allow dnmsasq to listen on Wireguard interfaces for DNS
+        if [ -z "$(grep -E "^interface=wg\*" /jffs/configs/dnsmasq.conf.add)" ];then
+            echo -e $cBGRE"Adding 'wg*' interfaces to DNSMasq"$cRESET
+            echo -e "interface=wg*" >> /jffs/configs/dnsmasq.conf.add
+            service restart_dnsmasq
+        fi
+    ;;
+    createconfig)
+
+        Create_Sample_Config
+
+    ;;
+    uninstall)
+        [ -f /opt/etc/init.d/S50wireguard ] && rm /opt/etc/init.d/S50wireguard
+        #opkg remove wireguard-kernel wireguard-tools
+        #[ -d /opt/etc/wireguard ] && rm -rf /opt/etc/wireguard
+        #[ -f /jffs/configs/WireguardVPN_map ] && rm /jffs/configs/WireguardVPN_map
+        #sed -i '/S50wireguard/d' /tmp/home/root/.profile
+        rm -fr /tmp/wireguard
+    ;;
+    ##################################################################################################################
+    *)
+        echo "Usage: $0 {start | stop | check | restart |}"
+    ;;
+esac
+
+#) 2>&1 | logger -t $(basename $0)"[$$_***DEBUG]"
