@@ -445,7 +445,7 @@ case $ACTION in
 
         # User Space Tools
         echo -e $cBCYA"\n\tRetrieving WireGuard User space Tools for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
-        curl -L --retry 3 https://github.com/odkrys/entware-makefile-for-merlin/raw/main/wireguard-tools_1.0.20200827-1_aarch64-3.10.ipk -o /tmp/wireguard-tools_1.0.20200827-1_aarch64-3.10.ipk
+        curl -L --retry 3 https://github.com/odkrys/entware-makefile-for-merlin/raw/main/wireguard-tools_1.0.20210223-1_aarch64-3.10.ipk -o /tmp/wireguard/wireguard-tools_1.0.20200827-1_aarch64-3.10.ipk
 
         if [ -z "$(grep "S50wireguard" /jffs/configs/profile.add)" ];then
             echo "alias wgstart='/opt/etc/init.d/S50wireguard start'"               >>/jffs/configs/profile.add
@@ -509,9 +509,9 @@ AllowedIPs = 10.50.1.1/32
 EOF
         #fi
 
-    if  [ -n "$(which wg)" ];then
+    if  [ -n "$(which wg)" ] && [ "$ROUTER_COMPATIBLE" == "Y" ];then
         echo -e $cBWHT"\n\tWireGuard install COMPLETED.\n"$cRESET
-        rm -rF /tmp/wireguard
+        rm -rf /tmp/wireguard
         [ -f /jffs/scripts/S50wireguard ] && { cp /jffs/scripts/S50wireguard /opt/etc/init.d/S50wireguard; rm /jffs/scripts/S50wireguard;  }
         wg
     else
