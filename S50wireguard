@@ -1,6 +1,6 @@
 #!/bin/sh
-VER="v1.01b2"
-#============================================================================================ © 2021 Martineau v1.01b2
+VER="v1.01b3"
+#============================================================================================ © 2021 Martineau v1.01b3
 #
 #       S50wireguard   {start|stop|restart|check|CreateConfig} [ [client [policy] |server]} [wg_instance] ]
 #
@@ -90,8 +90,8 @@ wg13    N      xxx.xxx.xxx.xxx/32    103.231.88.18:51820    193.138.218.74    # 
 wg14    N      xxx.xxx.xxx.xxx/32    193.32.126.66:51820    193.138.218.74    # Mullvad France, Paris
 wg15
 
-wg21    Y      xxx.50.1.1/24                                                  # Your Local Host Peer 1
-wg22    N      xxx.50.2.1/24                                                  # Your Local Host Peer 2
+wg21    Y      xxx.50.1.1/24                                                  # $HARDWARE_MODEL Local Host Peer 1
+wg22    N      xxx.50.2.1/24                                                  # $HARDWARE_MODEL Local Host Peer 2
 
 # The following default 'wg0' interface retained for backward compatibility!
 wg0     N      xxx.xxx.xxx.xxx/32     86.106.143.93:51820    193.138.218.74    # Mullvad USA, New York
@@ -106,6 +106,16 @@ rp15    <Router>192.168.1.0/24>>VPN<LAN>192.168.1.1>>WAN
 
 EOF
     return 0
+}
+
+_quote() {
+  echo "$1" | sed 's/[]\/()$*.^|[]/\\&/g'
+}
+Convert_Key() {
+    local KEY="$1"
+    #[ -n "$(echo "$1" | grep -F "/" )" ] && local KEY=$(_quote "$KEY")
+
+    echo "$KEY"
 }
 
 #For verbose debugging, uncomment the following two lines, and uncomment the last line of this script
@@ -144,65 +154,66 @@ TYPE=$2
 
 [ -z "$TYPE" ] && TYPE="client"
 
-case $TYPE in
-    server|1)
-        Mode="server"
-        if [ -z "$3" ];then
-            WG_INTERFACE="wg1"
-            export $WG_INTERFACE
-            export Subnet=10.50.1.1/24
-            export wgport=1150
-        else
-            WG_INTERFACE="wg2"$3
-            export $WG_INTERFACE
-            export Subnet=10.50.$3.1/24
-            export wgport="115"$3
-        fi
-    ;;
-    *)
-        Mode=client
-
-        if [ -z "$2" ] || [ "$2" == "0" ] || [ "$3" == "0" ];then
-            WG_INTERFACE="wg0"
-            export $WG_INTERFACE
-            #export LocalIP=10.160.107.63/8  # Martineau https://tunsafe.com/vpn  Account Number    57937020164277392089
-            Route=default
-        else
-            if [ "$2" == "client" ];then
-                INDEX=$3
+if [ "$ACTION" != "genkeys" ];then
+    case $TYPE in
+        server|1)
+            Mode="server"
+            if [ -z "$3" ];then
+                WG_INTERFACE="wg1"
+                export $WG_INTERFACE
+                export Subnet=10.50.1.1/24
+                export wgport=1150
             else
-                INDEX=$2
+                WG_INTERFACE="wg2"$3
+                export $WG_INTERFACE
+                export Subnet=10.50.$3.1/24
+                export wgport="115"$3
             fi
-            case $INDEX in
-                1|2|3|4|5)
-                            WG_INTERFACE="wg1"$INDEX
-                            #export WG_INTERFACE=$WG_INTERFACE
-                            export Subnet=10.50.$INDEX.1/24
-                            export wgport="115"$INDEX
+        ;;
+        *)
+            Mode=client
 
-            ;;
-            *)
-                echo -en $cRED"\a\n\t";Say "$VER Missing/Invalid VPN ID '$INDEX' e.g. range 0 - 5 ";echo -e $cRESET
-                exit 99
-            ;;
-            esac
-        fi
+            if [ -z "$2" ] || [ "$2" == "0" ] || [ "$3" == "0" ];then
+                WG_INTERFACE="wg0"
+                export $WG_INTERFACE
+                #export LocalIP=10.160.107.63/8  # Martineau https://tunsafe.com/vpn  Account Number    57937020164277392089
+                Route=default
+            else
+                if [ "$2" == "client" ];then
+                    INDEX=$3
+                else
+                    INDEX=$2
+                fi
+                case $INDEX in
+                    1|2|3|4|5)
+                                WG_INTERFACE="wg1"$INDEX
+                                #export WG_INTERFACE=$WG_INTERFACE
+                                export Subnet=10.50.$INDEX.1/24
+                                export wgport="115"$INDEX
 
-        # Read the Remote peer config to set the LOCAL peer endpoint
-        if [ -f /jffs/configs/WireguardVPN_map ];then
-            LOCALIP=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' /jffs/configs/WireguardVPN_map)
-            export LocalIP=$LOCALIP
-            SOCKET=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $4}' /jffs/configs/WireguardVPN_map)
-            DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' /jffs/configs/WireguardVPN_map | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
-        fi
+                ;;
+                *)
+                    echo -en $cRED"\a\n\t";Say "$VER Missing/Invalid VPN ID '$INDEX' e.g. range 0 - 5 ";echo -e $cRESET
+                    exit 99
+                ;;
+                esac
+            fi
 
-        if [ "$3" == "policy" ] || [ "$3" == "policy" ];then
-            Route="policy"
-        fi
+            # Read the Remote peer config to set the LOCAL peer endpoint
+            if [ -f /jffs/configs/WireguardVPN_map ];then
+                LOCALIP=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' /jffs/configs/WireguardVPN_map)
+                export LocalIP=$LOCALIP
+                SOCKET=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $4}' /jffs/configs/WireguardVPN_map)
+                DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' /jffs/configs/WireguardVPN_map | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
+            fi
 
-    ;;
-esac
+            if [ "$3" == "policy" ] || [ "$3" == "policy" ];then
+                Route="policy"
+            fi
 
+        ;;
+    esac
+fi
 ##################################################################################################################
 case $ACTION in
     start|BOOT)
@@ -456,81 +467,98 @@ case $ACTION in
 
         echo -e $cBCYA"\n\tLoading WireGuard Kernel module and Userspace Tools for $HARDWARE_MODEL (v$BUILDNO)\n"$cRESET
 
-        #if [ "$ROUTER_COMPATIBLE" == "Y" ];then
-           for MODULE in $(ls /tmp/wireguard/*.ipk)
-              do
+        for MODULE in $(ls /tmp/wireguard/*.ipk)
+            do
                 opkg install $MODULE
-              done
-           insmod /opt/lib/modules/wireguard 2>/dev/null
+            done
+        insmod /opt/lib/modules/wireguard 2>/dev/null
 
-           echo -e $cBGRA
-           dmesg | grep -a WireGuard | tail -n 1
-           echo -e $cBWHT
-        #fi
+        echo -e $cBGRA
+        dmesg | grep -a WireGuard | tail -n 1
+        echo -e $cBWHT
 
         # Create the Sample/template parameter file '/jffs/configs/WireguardVPN_map'
         Create_Sample_Config
 
-        # Create 'server' Peer wg21
-        echo -e $cBCYA"\n\tCreating WireGuard 'Client' Peer and 'Server' templates 'wg11.conf' and wg21.conf'"$cRESET
-        # if [ -n "$(which wg)" ];then
-
-            # (umask 077 && printf "[Interface]\nPrivateKey = " | tee /opt/etc/wireguard/wg21.conf > /dev/null)
-            # wg genkey | tee -a /opt/etc/wireguard/wg21.conf | wg pubkey | tee /opt/etc/wireguard/server21-publickey
-            # ( echo "ListenPort = 1151"
-              # echo -e "\n\n\AllowedIPs = 10.50.1.1/32"
-              # echo -en "PublicKey = "
-            # ) >> /opt/etc/wireguard/wg11.conf
-        # else
-            # Client template
-            cat > /opt/etc/wireguard/wg11.conf << EOF
+        # Create dummy 'Client' and 'Server' templates
+        echo -e $cBCYA"\n\tCreating WireGuard 'Client' and 'Server' Peer templates 'wg11.conf' and wg21.conf'"$cRESET
+        cat > /opt/etc/wireguard/wg11.conf << EOF
 [Interface]
-Address = 10.10.10.2/24
-DNS = 10.10.10.1
+#Address = 10.10.10.2/24
+#DNS = 10.10.10.1
 PrivateKey = This_should_be_replaced_with_YOUR_Private_Key
 
 [Peer]
-PublicKey = This_should_be_replaced_with_the Remote_Peer_Public_Key
+Endpoint = edit.this.IP.address:51820
+PublicKey = This_should_be_replaced_with_the_Remote_Peer_Public_Key
 AllowedIPs = 0.0.0.0/0
-Endpoint = 12.34.56.78:51820
 PersistentKeepalive = 25
 EOF
 
-            # Server template
-            cat > /opt/etc/wireguard/wg21.conf << EOF
+        # Create Server template
+        cat > /opt/etc/wireguard/wg21.conf << EOF
 [Interface]
-Address = 10.10.10.1/24
+PrivateKey = This_should_be_replaced_with_$HARDWARE_MODEL_Private_Key
 ListenPort = 51820
-PrivateKey = This_should_be_replaced_with_YOUR_Private_Key
 
+# e.g. Accept a WireGuard connection from say YOUR mobile device to the router
+# see '/opt/etc/wireguard/mobilephone_private.key'
 [Peer]
-PublicKey = AYQJf6HbkQ0X0Xyt+cTMTuJe3RFwbuCMF46LKgTwzz4=
+PublicKey = This_should_be_replaced_with_the_Public_Key_of_YOUR_mobile_device
 AllowedIPs = 10.50.1.1/32
 EOF
-        #fi
 
-    if  [ -n "$(which wg)" ] && [ "$ROUTER_COMPATIBLE" == "Y" ];then
-        echo -e $cBWHT"\n\tWireGuard install COMPLETED.\n"$cRESET
-        rm -rf /tmp/wireguard
+        # Create 'server' Peer wg21
+        echo -e $cBCYA"\n\tCreating WireGuard Private/Public key-pairs for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
+        if [ -n "$(which wg)" ];then
+            for I in 1 2 3 4 5
+                do
+                    wg genkey | tee /opt/etc/wireguard/client1${I}_private.key | wg pubkey | tee /opt/etc/wireguard/client1${I}_public.key
+                done
+            for I in 1 2
+                do
+                    wg genkey | tee /opt/etc/wireguard/server2${I}_private.key | wg pubkey | tee /opt/etc/wireguard/server2${I}_public.key
+                done
 
-        if [ -f /jffs/scripts/S50wireguard ];then
-            [ -f /opt/etc/init.d/S50wireguard ] && mv /opt/etc/init.d/S50wireguard /opt/etc/init.d/S50wireguard.$TS
-            cp /jffs/scripts/S50wireguard /opt/etc/init.d/S50wireguard
-            rm /jffs/scripts/S50wireguard
+            # Update the Sample Peer templates with the router's real keys
+            PRIV_KEY=$(cat /opt/etc/wireguard/client11_private.key)
+            PRIV_KEY=$(Convert_Key "$PRIV_KEY")
+            sed -i "/^PrivateKey/ s~[^ ]*[^ ]~$PRIV_KEY~3" /opt/etc/wireguard/wg11.conf
+
+            PRIV_KEY=$(cat /opt/etc/wireguard/server21_private.key)
+            PRIV_KEY=$(Convert_Key "$PRIV_KEY")
+            sed -i "/^PrivateKey/ s~[^ ]*[^ ]~$PRIV_KEY~3" /opt/etc/wireguard/wg21.conf
+
+            # Create a Private/Public key-pair for your mobile phone
+            wg genkey | tee /opt/etc/wireguard/mobilephone_private.key | wg pubkey | tee /opt/etc/wireguard/mobilephone_public.key
+            PUB_KEY=$(cat /opt/etc/wireguard/mobilephone_public.key)
+            PUB_KEY=$(Convert_Key "$PUB_KEY")
+            sed -i "/^PublicKey/ s~[^ ]*[^ ]~$PUB_KEY~3" /opt/etc/wireguard/wg21.conf
+
         fi
 
-        # Test the alias against the non-working Peers (wg11 and Wg21)
-        echo -e $cBGRE"\n\tTest Initialising the Sample WireGuard 'client' and 'server' Peers, BUT ONLY the Sample 'server' will start up!! :-).\n"$cRESET
-        /opt/etc/init.d/S50wireguard start
-        # Test the checkdebug report
-        echo -e $cBGRE"\n\tTest WireGuard Peer Status (in verbose DEBUG mode to show RPDB rules"
-        /opt/etc/init.d/S50wireguard checkdebug
-        echo -e $cBGRE"\n\tTerminating ACTIVE WireGuard Peers...\n"$cRESET
-        /opt/etc/init.d/S50wireguard stop
-    else
-        echo -e $cBRED"\n\t***ERROR: WireGuard install FAILED!\n"$cRESET
-        # rm -rF /tmp/wireguard
-    fi
+        if  [ -n "$(which wg)" ] && [ "$ROUTER_COMPATIBLE" == "Y" ];then
+            echo -e $cBWHT"\n\tWireGuard install COMPLETED.\n"$cRESET
+            rm -rf /tmp/wireguard
+
+            if [ -f /jffs/scripts/S50wireguard ];then
+                [ -f /opt/etc/init.d/S50wireguard ] && mv /opt/etc/init.d/S50wireguard /opt/etc/init.d/S50wireguard.$TS
+                cp /jffs/scripts/S50wireguard /opt/etc/init.d/S50wireguard
+                rm /jffs/scripts/S50wireguard
+            fi
+
+            # Test the this script against the two Sample Peers (wg11 and Wg21)
+            echo -e $cBGRE"\n\tTest Initialising the Sample WireGuard 'client' and 'server' Peers, BUT ONLY the Sample 'server' will start up!! :-).\n"$cRESET
+            /opt/etc/init.d/S50wireguard start
+            # Test the checkdebug report
+            echo -e $cBGRE"\n\tTest WireGuard Peer Status (in verbose DEBUG mode to show RPDB rules"
+            /opt/etc/init.d/S50wireguard checkdebug
+            echo -e $cBGRE"\n\tTerminating ACTIVE WireGuard Peers...\n"$cRESET
+            /opt/etc/init.d/S50wireguard stop
+        else
+            echo -e $cBRED"\n\t***ERROR: WireGuard install FAILED!\n"$cRESET
+            # rm -rF /tmp/wireguard
+        fi
     ;;
     loadmodules)
 
@@ -581,6 +609,16 @@ EOF
 
         echo -e $cBGRE"\n\tWireGuard Uninstall complete for $HARDWARE_MODEL (v$BUILDNO)\n"$cRESET
 
+    ;;
+    genkeys)
+        # Create a Private/Public key-pair for your mobile phone etc.
+        if [ -n "$2" ];then
+            echo -e $cBCYA"\n\tCreating Wireguard Private/Public key pair for device ''"$cBYEL
+            wg genkey | tee /opt/etc/wireguard/${2}_private.key | wg pubkey | tee /opt/etc/wireguard/${2}_public.key
+            echo -e $cBYEL"\n\tDevice '"$2"' Public key="$(cat /opt/etc/wireguard/${2}_public.key)"\n"$cRESET
+        else
+            echo -e $cBRED"\a\n\t***ERROR Missing name of client device\n"$cRESET
+        fi
     ;;
     ##################################################################################################################
     *)
