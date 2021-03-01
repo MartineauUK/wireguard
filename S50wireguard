@@ -1,6 +1,6 @@
 #!/bin/sh
-VER="v0.01b6"
-#============================================================================================ © 2021 Martineau v0.01b6
+VER="v0.01b9"
+#============================================================================================ © 2021 Martineau v0.01b9
 #
 #       S50wireguard   {start|stop|restart|check|CreateConfig} [ [client [policy] |server]} [wg_instance] ]
 #
@@ -386,7 +386,8 @@ case $ACTION in
                 echo -e $cRESET
             fi
         else
-            echo -e $cRED"\a\t";Say "Wireguard VPN module 'wg' NOT installed (use 'install')\n"$cRESET
+            echo -en $cRED"\a\n\t";Say "Wireguard VPN module 'wg' NOT installed (use 'install')"$cRESET
+            echo -e
         fi
     ;;
     install)
@@ -396,29 +397,55 @@ case $ACTION in
             exit 96
         fi
 
+        # Temporary directory if '/opt/etc/wireguard' doesn't exist
         mkdir -p /tmp/wireguard
+        if [ -d /opt/etc/ ];then
+           [ ! -d /opt/etc/wireguard ] && mkdir -p /opt/etc/wireguard
+        else
+            echo -e $cBRED"\a\n\t***ERROR: Entware directory '${cRESET}/opt/etc/${cBRED}' not found? - Please install Entware (amtm Diversion)\n"$cRESET
+            exit 95
+        fi
+
+        if [ -d /opt/etc/wireguard ];then
+            echo -e $cBCYA"\n\tRetrieving scripts 'wg_manager.sh/wg_server'\n"$cRESET
+            curl -# -L --retry 3 "https://raw.githubusercontent.com/MartineauUK/wireguard/main/wg_manager.sh" -o "/opt/etc/wireguard/wg_manager.sh" && chmod 755 "/opt/etc/wireguard/wg_manager.sh"
+            curl -# -L --retry 3 "https://raw.githubusercontent.com/MartineauUK/wireguard/main/wg_server"     -o "/opt/etc/wireguard/wg_server"  && chmod 755 "/opt/etc/wireguard/wg_server"
+        fi
 
         # Kernel module
         echo -e $cBCYA"\n\tRetrieving Wireguard Kernel module for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
+
+        ROUTER_COMPATIBLE="Y"
+
         case $HARDWARE_MODEL in
 
             RT-AC86U|GT-AC2900)     # RT-AC86U, GT-AC2900 - 4.1.27
-                curl -L https://github.com/odkrys/entware-makefile-for-merlin/raw/main/wireguard-kernel_1.0.20210219-k27_aarch64-3.10.ipk -o /tmp/wireguard/wireguard-kernel_1.0.20210219-k27_aarch64-3.10.ipk
+                curl -L --retry 3 https://github.com/odkrys/entware-makefile-for-merlin/raw/main/wireguard-kernel_1.0.20210219-k27_aarch64-3.10.ipk -o /tmp/wireguard/wireguard-kernel_1.0.20210219-k27_aarch64-3.10.ipk
             ;;
             RT-AX88U|GT-AX11000)    # RT-AX88U, GT-AX11000 - 4.1.51
-                curl -L https://github.com/odkrys/entware-makefile-for-merlin/raw/main/wireguard-kernel_1.0.20210219-k51_aarch64-3.10.ipk -o /tmp/wireguard/wireguard-kernel_1.0.20210219-k51_aarch64-3.10.ipk
+                curl -L --retry 3 https://github.com/odkrys/entware-makefile-for-merlin/raw/main/wireguard-kernel_1.0.20210219-k51_aarch64-3.10.ipk -o /tmp/wireguard/wireguard-kernel_1.0.20210219-k51_aarch64-3.10.ipk
             ;;
             RT-AX68U|RT-AX86U)      # RT-AX68U, RT-AX86U - 4.1.52
-                curl -L https://github.com/odkrys/entware-makefile-for-merlin/raw/main/wireguard-kernel_1.0.20210219-k52_aarch64-3.10.ipk -o /tmp/wireguard/wireguard-kernel_1.0.20210219-k52_aarch64-3.10.ipk
+                curl -L --retry 3 https://github.com/odkrys/entware-makefile-for-merlin/raw/main/wireguard-kernel_1.0.20210219-k52_aarch64-3.10.ipk -o /tmp/wireguard/wireguard-kernel_1.0.20210219-k52_aarch64-3.10.ipk
             ;;
             *)
-                echo -e $cBRED"\a\n\tERROR: Unable to find Wireguard Kernel module for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
+                echo -e $cBRED"\a\n\tERROR: Unable to find Wireguard Kernel module for $HARDWARE_MODEL (v$BUILDNO)\n"$cRESET
+                # Deliberately Download an incompatible file simply so that an error message is produced by 'opkg install*.ipk'
+                #
+                #       Unknown package 'wireguard-kernel'.
+                #       Collected errors:
+                #        * pkg_hash_fetch_best_installation_candidate: Packages for wireguard-kernel found, but incompatible with the architectures configured
+                #        * opkg_install_cmd: Cannot install package wireguard-kernel.
+
+                #
+                curl -SL --retry 3 https://github.com/odkrys/entware-makefile-for-merlin/raw/main/wireguard-kernel_1.0.20210219-k27_aarch64-3.10.ipk -o /tmp/wireguard/wireguard-kernel_1.0.20210219-k27_aarch64-3.10.ipk
+                ROUTER_COMPATIBLE="N"
             ;;
         esac
 
         # User Space Tools
-        echo -e $cBCYA"\n\tRetrieving Wireguard User space Tools for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
-        curl -L https://github.com/odkrys/entware-makefile-for-merlin/raw/main/wireguard-tools_1.0.20200827-1_aarch64-3.10.ipk -o /tmp/wireguard-tools_1.0.20200827-1_aarch64-3.10.ipk
+        echo -e $cBCYA"\n\tRetrieving WireGuard User space Tools for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
+        curl -L --retry 3 https://github.com/odkrys/entware-makefile-for-merlin/raw/main/wireguard-tools_1.0.20200827-1_aarch64-3.10.ipk -o /tmp/wireguard-tools_1.0.20200827-1_aarch64-3.10.ipk
 
         if [ -z "$(grep "S50wireguard" /jffs/configs/profile.add)" ];then
             echo "alias wgstart='/opt/etc/init.d/S50wireguard start'"               >>/jffs/configs/profile.add
@@ -427,29 +454,74 @@ case $ACTION in
             echo "alias wgd='/opt/etc/init.d/S50wireguard checkdebug'"              >>/jffs/configs/profile.add
         fi
 
-        # Create 'server' Peer wg21
-        if [ -n "$(which wg)" ];then
-            echo -e $cBWHT"\n\tCreating WireGuard 'server' Peer () template 'wg21.conf'"$cRESET
-            (umask 077 && printf "[Interface]\nPrivateKey = " | tee /opt/etc/wireguard/wg21.conf > /dev/null)
-            wg genkey | tee -a /opt/etc/wireguard/wg21.conf | wg pubkey | tee /opt/etc/wireguard/server21-publickey
-            ( echo "ListenPort = 1151"
-              echo -e "\n\n\AllowedIPs = 10.50.1.1/32"
-              echo -en "PublicKey = "
-            ) >> /opt/etc/wireguard/wg21.conf
-        fi
+        echo -e $cBCYA"\n\tLoading WireGuard Kernel module and Userspace Tools for $HARDWARE_MODEL (v$BUILDNO)\n"$cRESET
 
+        #if [ "$ROUTER_COMPATIBLE" == "Y" ];then
+           for MODULE in $(ls /tmp/wireguard/*.ipk)
+              do
+                opkg install $MODULE
+              done
+           insmod /opt/lib/modules/wireguard 2>/dev/null
+
+           echo -e $cBGRA
+           dmesg | grep -a WireGuard | tail -n 1
+           echo -e $cBWHT
+        #fi
+
+        # Create the Sample/template parameter file '/jffs/configs/WireguardVPN_map'
         Create_Sample_Config
 
-        if [ -d /opt/etc/ ];then
-            [ ! -d /opt/etc/wireguard ] && mkdir -p /opt/etc/wireguard
-            echo -e $cBCYA"\n\tRetrieving scripts 'wg_manager.sh/wg_server'\n"$cRESET
-            curl --retry 3 "https://raw.githubusercontent.com/MartineauUK/wireguard/main/wg_manager.sh" -o "/opt/etc/wireguard/wg_manager.sh" && chmod 755 "/opt/etc/wireguard/wg_manager.sh"
-            curl --retry 3 "https://raw.githubusercontent.com/MartineauUK/wireguard/main/wg_server"     -o "/opt/etc/wireguard/wg_server"  && chmod 755 "/opt/etc/wireguard/wg_server"
-        fi
+        # Create 'server' Peer wg21
+        echo -e $cBCYA"\n\tCreating WireGuard 'Client' Peer and 'Server' templates 'wg11.conf' and wg21.conf'"$cRESET
+        # if [ -n "$(which wg)" ];then
+
+            # (umask 077 && printf "[Interface]\nPrivateKey = " | tee /opt/etc/wireguard/wg21.conf > /dev/null)
+            # wg genkey | tee -a /opt/etc/wireguard/wg21.conf | wg pubkey | tee /opt/etc/wireguard/server21-publickey
+            # ( echo "ListenPort = 1151"
+              # echo -e "\n\n\AllowedIPs = 10.50.1.1/32"
+              # echo -en "PublicKey = "
+            # ) >> /opt/etc/wireguard/wg11.conf
+        # else
+            # Client template
+            cat > /opt/etc/wireguard/wg11.conf << EOF
+[Interface]
+Address = 10.10.10.2/24
+DNS = 10.10.10.1
+PrivateKey = This_should_be_replaced_with_YOUR_Private_Key
+
+[Peer]
+PublicKey = This_should_be_replaced_with_the Remote_Peer_Public_Key
+AllowedIPs = 0.0.0.0/0
+Endpoint = 12.34.56.78:51820
+PersistentKeepalive = 25
+EOF
+
+            # Server template
+            cat > /opt/etc/wireguard/wg21.conf << EOF
+[Interface]
+Address = 10.10.10.1/24
+ListenPort = 51820
+PrivateKey = This_should_be_replaced_with_YOUR_Private_Key
+
+[Peer]
+PublicKey = AYQJf6HbkQ0X0Xyt+cTMTuJe3RFwbuCMF46LKgTwzz4=
+AllowedIPs = 10.50.1.1/32
+EOF
+        #fi
+
+    if  [ -n "$(which wg)" ];then
+        echo -e $cBWHT"\n\tWireGuard install COMPLETED.\n"$cRESET
+        rm -rF /tmp/wireguard
+        [ -f /jffs/scripts/S50wireguard ] && { cp /jffs/scripts/S50wireguard /opt/etc/init.d/S50wireguard; rm /jffs/scripts/S50wireguard;  }
+        wg
+    else
+        echo -e $cBRED"\n\t***ERROR: WireGuard install FAILED!\n"$cRESET
+        # rm -rF /tmp/wireguard
+    fi
     ;;
     loadmodules)
 
-        echo -e $cBGRE"Loading Wireguard Kernel module and Userspace Tools for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
+        echo -e $cBCYA"\n\tLoading WireGuard Kernel module and Userspace Tools for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
         for MODULE in $(ls /tmp/wireguard/*.ipk)
             do
                 opkg install $MODULE
@@ -460,16 +532,6 @@ case $ACTION in
         dmesg | grep -a WireGuard | tail -n 1
         echo -e $cBWHT
 
-        if [ -d /opt/etc/ ];then
-            if [ -d /opt/etc/wireguard ];then
-                curl --retry 3 "https://raw.githubusercontent.com/MartineauUK/wireguard/main/wg_manager.sh" -o "/opt/etc/wireguard/wg_manager.sh" && chmod 755 "/opt/etc/wireguard/wg_manager.sh"
-                curl --retry 3 "https://raw.githubusercontent.com/MartineauUK/wireguard/main/wg_server"     -o "/opt/etc/wireguard/wg_server"  && chmod 755 "/opt/etc/wireguard/wg_server"
-            else
-                echo -e $cBRED"\a\tERROR: Entware directory '/opt/etc/wireguard' not found? - Did 'opkg install *.ipk' actually install the Wireguide Kernal module?\n"$cRESET
-            fi
-        else
-            echo -e $cBRED"\a\n\tERROR: Entware directory '/opt/etc/' not found? - Please install Entware (amtm Diversion)\n"$cRESET
-        fi
     ;;
     usedns)
         #cp /opt/etc/wireguard/S50wireguard /opt/etc/init.d
@@ -487,12 +549,25 @@ case $ACTION in
 
     ;;
     uninstall)
+
+        echo -e $cBCYA"\n\tUninstalling Wireguard Kernel module and Userspace Tools for $HARDWARE_MODEL (v$BUILDNO)"$cBRED
+        opkg remove wireguard-kernel wireguard-tools
+        echo -e $cBCYA"\n\tDeleting Wireguard install directories and files"$cRESET
         [ -f /opt/etc/init.d/S50wireguard ] && rm /opt/etc/init.d/S50wireguard
-        #opkg remove wireguard-kernel wireguard-tools
-        #[ -d /opt/etc/wireguard ] && rm -rf /opt/etc/wireguard
-        #[ -f /jffs/configs/WireguardVPN_map ] && rm /jffs/configs/WireguardVPN_map
-        #sed -i '/S50wireguard/d' /tmp/home/root/.profile
-        rm -fr /tmp/wireguard
+        [ -f /jffs/scripts/S50wireguard ] && rm /jffs/scripts/S50wireguard
+        [ -f /jffs/configs/WireguardVPN_map ] && rm /jffs/configs/WireguardVPN_map
+        sed -i '/S50wireguard/d' /tmp/home/root/.profile
+        rm -rf /tmp/wireguard
+
+        echo -e "\tPress$cBRED Y$cRESET to$cBRED delete ALL WireGuard DATA files (Peer *.config etc.) $cRESET('/opt/etc/wireguard') or press$cBGRE [Enter] to keep custom WireGuard DATA files."
+        read -r "CONFIRM_DATA_DELETE"
+        if [ "$CONFIRM_DATA_DELETE" == "Y" ];then
+           echo -e $cBCYA"\n\tDeleting $cRESET'/opt/etc/wireguard'\n"
+           [ -d /opt/etc/wireguard ] && rm -rf /opt/etc/wireguard
+        fi
+
+        echo -e $cBGRE"\n\tWireGuard Uninstall complete for $HARDWARE_MODEL (v$BUILDNO)\n"$cRESET
+
     ;;
     ##################################################################################################################
     *)
