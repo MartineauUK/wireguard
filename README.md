@@ -59,7 +59,7 @@ The contents of the configuration file will be used when 'w13.conf' is activated
                    Terminates local peer 'server' 'wg21'
     S50wireguard   stop
                    Terminates ALL ACTIVE peers (wg1* and wg2*)
-    S50wireguard   starts
+    S50wireguard   start
                    Initialises ALL peers (wg1* and wg2*) defined in the configuration file where Auto=Y or Auto=P
                  
 and if the install is successful, there should now be simple aliases
