@@ -42,13 +42,13 @@ The contents of the configuration file will be used when 'w13.conf' is activated
     
     S50wireguard   {start|stop|restart|check|install} [ [client [policy] |server]} [wg_instance] ]
     S50wireguard   start 0
-                   Initialises remote peer 'client' 'wg0'
+                   Initialises remote peer 'client' 'wg0' solely to remain backwards compatibilty with original
     S50wireguard   start client 0
                    Initialises remote peer 'client' 'wg0'
     S50wireguard   start 1
-                   Initialises local peer 'server' 'wg1'
+                   Initialises local peer 'server' 'wg1' solely to remain backwards compatibilty with original
     S50wireguard   start server 1
-                   Initialises local peer 'server' 'wg21'
+                   Initialises local peer 'server' 'wg21' uses interface naming convention as per OpenVPN e.g. tun21
     S50wireguard   start client 1
                    Initialises remote peer 'client' 'wg11' uses interface naming convention as per OpenVPN e.g. tun11
     S50wireguard   start client 1 policy
@@ -57,6 +57,10 @@ The contents of the configuration file will be used when 'w13.conf' is activated
                    Terminates remote peer 'client' 'wg13'
     S50wireguard   stop 1
                    Terminates local peer 'server' 'wg21'
+    S50wireguard   stop
+                   Terminates ALL ACTIVE peers (wg1* and wg2*)
+    S50wireguard   starts
+                   Initialises ALL peers (wg1* and wg2*) defined in the configuration file where Auto=Y or Auto=P
                  
 and if the install is successful, there should now be simple aliases
 
