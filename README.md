@@ -13,11 +13,6 @@ Enable SSH on router, then use your preferred SSH Client e.g. Xshell6,MobaXterm,
     
     curl --retry 3 "https://raw.githubusercontent.com/MartineauUK/wireguard/main/S50wireguard" -o "/jffs/scripts/S50wireguard" && chmod 755 "/jffs/scripts/S50wireguard" && /jffs/scripts/S50wireguard install
 
-
-The script does not auto-install the Wireguard Kernel modules but the brave may now attempt
-     
-    /jffs/scripts/S50wireguard loadmodules
-
 In lieu of the NVRAM variables that can retain OpenVPN Client/Server configurations across reboots, this script uses 
 
 '/jffs/configs/WireguardVPN_map' for the WireGuard directives.
@@ -63,12 +58,7 @@ The contents of the configuration file will be used when 'w13.conf' is activated
     S50wireguard   stop 1
                    Terminates local peer 'server' 'wg21'
                  
-and if the testing is satisfactory, the script should now be copied to allow it to auto execute during the boot process
-
-    cp /jffs/scripts/S50wireguard /opt/etc/init.d/S50wireguard
-    rm /jffs/scripts/S50wireguard
-    
-and there should now be simple aliases
+and if the install is successful, there should now be simple aliases
 
 e.g.
 
