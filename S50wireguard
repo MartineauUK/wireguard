@@ -1,6 +1,6 @@
 #!/bin/sh
-VER="v1.01b"
-#============================================================================================ © 2021 Martineau v1.01b
+VER="v0.01b9"
+#============================================================================================ © 2021 Martineau v0.01b9
 #
 #       S50wireguard   {start|stop|restart|check|CreateConfig} [ [client [policy] |server]} [wg_instance] ]
 #
@@ -84,14 +84,14 @@ Create_Sample_Config() {
 #
 #
 # VPN   Auto   Local Peer IP         Remote Peer Socket     DNS               Annotation Comment
-wg11    P      xxx.xxx.xxx.xxx/32    86.106.143.93:51820    193.138.218.74    # Mullvad USA, New York
+wg11    P      xxx.xxx.xxx.xxx/32    86.106.143.93:51820    193.138.218.74    # Mullvad USA, New York (maybe!)
 wg12    N      xxx.xxx.xxx.xxx/32    209.58.188.180:51820   193.138.218.74    # Mullvad China, Hong Kong
 wg13    N      xxx.xxx.xxx.xxx/32    103.231.88.18:51820    193.138.218.74    # Mullvad Oz, Melbourne
 wg14    N      xxx.xxx.xxx.xxx/32    193.32.126.66:51820    193.138.218.74    # Mullvad France, Paris
 wg15
 
-wg21    Y      xxx.50.1.1/24                                                  # Martineau Host Peer 1
-wg22    N      xxx.50.2.1/24                                                  # Martineau Host Peer 2
+wg21    Y      xxx.50.1.1/24                                                  # Your Local Host Peer 1
+wg22    N      xxx.50.2.1/24                                                  # Your Local Host Peer 2
 
 # The following default 'wg0' interface retained for backward compatibility!
 wg0     N      xxx.xxx.xxx.xxx/32     86.106.143.93:51820    193.138.218.74    # Mullvad USA, New York
@@ -517,6 +517,9 @@ EOF
         # Test the alias against the non-working Peers (wg11 and Wg21)
         echo -e $cBGRE"\n\tTest Initialising the Sample WireGuard 'client' and 'server' Peers, BUT ONLY the Sample 'server' will start up!! :-).\n"$cRESET
         /opt/etc/init.d/S50wireguard start
+        # Test the checkdebug report
+        echo -e $cBGRE"\n\tTest WireGuard Peer Status (in verbose DEBUG mode to show RPDB rules"
+        /opt/etc/init.d/S50wireguard checkdebug
         echo -e $cBGRE"\n\tTerminating ACTIVE WireGuard Peers...\n"$cRESET
         /opt/etc/init.d/S50wireguard stop
     else
