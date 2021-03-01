@@ -445,7 +445,7 @@ case $ACTION in
 
         # User Space Tools
         echo -e $cBCYA"\n\tRetrieving WireGuard User space Tools for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
-        curl -L --retry 3 https://github.com/odkrys/entware-makefile-for-merlin/raw/main/wireguard-tools_1.0.20210223-1_aarch64-3.10.ipk -o /tmp/wireguard/wireguard-tools_1.0.20200827-1_aarch64-3.10.ipk
+        curl -L --retry 3 https://github.com/odkrys/entware-makefile-for-merlin/raw/main/wireguard-tools_1.0.20210223-1_aarch64-3.10.ipk -o /tmp/wireguard/wireguard-tools_1.0.20210223-1_aarch64-3.10.ipk
 
         if [ -z "$(grep "S50wireguard" /jffs/configs/profile.add)" ];then
             echo "alias wgstart='/opt/etc/init.d/S50wireguard start'"               >>/jffs/configs/profile.add
