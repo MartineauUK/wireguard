@@ -1,6 +1,6 @@
 #!/bin/sh
-VER="v0.01b9"
-#============================================================================================ © 2021 Martineau v0.01b9
+VER="v1.01b2"
+#============================================================================================ © 2021 Martineau v1.01b2
 #
 #       S50wireguard   {start|stop|restart|check|CreateConfig} [ [client [policy] |server]} [wg_instance] ]
 #
@@ -512,7 +512,12 @@ EOF
     if  [ -n "$(which wg)" ] && [ "$ROUTER_COMPATIBLE" == "Y" ];then
         echo -e $cBWHT"\n\tWireGuard install COMPLETED.\n"$cRESET
         rm -rf /tmp/wireguard
-        [ -f /jffs/scripts/S50wireguard ] && { cp /jffs/scripts/S50wireguard /opt/etc/init.d/S50wireguard; rm /jffs/scripts/S50wireguard;  }
+
+        if [ -f /jffs/scripts/S50wireguard ];then
+            [ -f /opt/etc/init.d/S50wireguard ] && mv /opt/etc/init.d/S50wireguard /opt/etc/init.d/S50wireguard.$TS
+            cp /jffs/scripts/S50wireguard /opt/etc/init.d/S50wireguard
+            rm /jffs/scripts/S50wireguard
+        fi
 
         # Test the alias against the non-working Peers (wg11 and Wg21)
         echo -e $cBGRE"\n\tTest Initialising the Sample WireGuard 'client' and 'server' Peers, BUT ONLY the Sample 'server' will start up!! :-).\n"$cRESET
