@@ -1,5 +1,6 @@
 #!/bin/sh
-VER="v0.9b"
+VER="v1.01b"
+#============================================================================================ © 2021 Martineau v1.01b
 #############################################################################EIC Hack 1 of 2################
 #For verbose debugging, uncomment the following two lines, and uncomment the last line of this script
 #set -x
@@ -178,7 +179,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
             ip route add 0/1 dev $VPN_ID 2>/dev/null
             ip route add 128/1 dev $VPN_ID 2>/dev/null
         else
-            ip rule add from $(nvram get lan_ipaddr | cut -d"." -f1-3).0/24 table 12$VPN_NUM prio 992$VPN_NUM
+            #ip rule add from $(nvram get lan_ipaddr | cut -d"." -f1-3).0/24 table 12$VPN_NUM prio 99$VPN_NUM"9"
             VPN_IP_LIST=$(awk -v pattern="${VPN_NUM}" 'match($0,"^rp1"pattern) {print $0}' /jffs/configs/WireguardVPN_map | grep -oE "<.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
 
             create_client_list
