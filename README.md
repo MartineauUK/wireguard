@@ -12,6 +12,43 @@ Enable SSH on router, then use your preferred SSH Client e.g. Xshell6,MobaXterm,
 (TIP: Triple-click the install command below) to copy'n'paste into your router's SSH session:
     
     curl --retry 3 "https://raw.githubusercontent.com/MartineauUK/wireguard/main/S50wireguard" -o "/jffs/scripts/S50wireguard" && chmod 755 "/jffs/scripts/S50wireguard" && /jffs/scripts/S50wireguard install
+    
+Example successful install.....
+
+	Retrieving scripts 'wg_manager.sh/wg_server'
+
+    <snip> 100.0%
+    <snip> 100.0%
+
+	Retrieving Wireguard Kernel module for RT-AC86U (v386.2)
+    
+    % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+    100   190  100   190    0     0    822      0 --:--:-- --:--:-- --:--:--   833
+    100 57251  100 57251    0     0   166k      0 --:--:-- --:--:-- --:--:--  166k
+
+	Retrieving WireGuard User space Tools for RT-AC86U (v386.2)
+    
+    % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed                            
+    100   187  100   187    0     0    820      0 --:--:-- --:--:-- --:--:--   834
+    100 46503  100 46503    0     0  98315      0 --:--:-- --:--:-- --:--:-- 98315
+
+	Loading WireGuard Kernel module and Userspace Tools for RT-AC86U (v386.2)
+
+    Installing wireguard-kernel (1.0.20210219-k27) to root...
+    Configuring wireguard-kernel.
+
+    Installing wireguard-tools (1.0.20210223-1) to root...
+    Configuring wireguard-tools.
+
+    wireguard: WireGuard 1.0.20210219 loaded. See www.wireguard.com for information.
+
+	Creating WireGuard configuration file '/jffs/configs/WireguardVPN_map'
+
+	Creating WireGuard 'Client' Peer and 'Server' templates 'wg11.conf' and wg21.conf'
+
+	WireGuard install COMPLETED.
 
 In lieu of the NVRAM variables that can retain OpenVPN Client/Server configurations across reboots, this script uses 
 
