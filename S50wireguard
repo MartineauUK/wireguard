@@ -1,6 +1,6 @@
 #!/bin/sh
-VER="v1.01b3"
-#============================================================================================ © 2021 Martineau v1.01b3
+VER="v1.01b4"
+#============================================================================================ © 2021 Martineau v1.01b4
 #
 #       S50wireguard   {start|stop|restart|check|CreateConfig} [ [client [policy] |server]} [wg_instance] ]
 #
@@ -103,6 +103,13 @@ rp12
 rp13
 rp14
 rp15    <Router>192.168.1.0/24>>VPN<LAN>192.168.1.1>>WAN
+
+# Optionally define the 'server' Peer 'clients' so they can be identified by name in the enhanced WireGuard Peer status report
+# Public Key                                      DHCP IP             Annotation Comment
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=      10.50.1.1           # A Cell phone
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=      10.50.1.88          # Samsung Galaxy S8
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=      10.50.2.22          # Dummy Device 1
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=      10.50.1.89          # Device iPhone12
 
 EOF
     return 0
@@ -337,7 +344,7 @@ case $ACTION in
     ;;
     check|checkdebug)
         echo -e
-        Say "$VER WireGuard VPN Status check....."
+        Say "$VER WireGuard VPN Peer Status check....."
         if [ -n "$(which wg)" ];then
             #REPORT=$(/opt/bin/wg show all | sed "s/\(interface\)/\\$cBMAG\1/;s/\(peer\)/\\$cBYEL\1/; s/\(endpoint\:.*$\)/\1\ - $DESC\\$cBCYA/")
             #echo -e "$REPORT"
@@ -347,11 +354,15 @@ case $ACTION in
                 while IFS='' read -r LINE || [ -n "$LINE" ]; do
 
                     COLOR=$cBCYA
-                    # interface: wg11
-                    if [ -n "$(echo $LINE | grep -E "interface:")" ];then
+
+                    # interface: wg1? or wg2?
+                    if [ -n "$(echo "$LINE" | grep -E "interface:")" ];then
                         TAB="\t"
                         COLOR=$cBMAG
                         WG_INTERFACE=$(echo $LINE | awk '{print $2}')
+
+                        [ "${WG_INTERFACE:0:3}" == "wg2" ] && TYPE="server" || TYPE="client"
+
                         # Read the Remote peer config to set the LOCAL peer endpoint
                         if [ -f /jffs/configs/WireguardVPN_map ];then
                             LOCALIP=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' /jffs/configs/WireguardVPN_map)
@@ -361,16 +372,23 @@ case $ACTION in
                         LINE=${COLOR}$LINE" ${cBMAG}\t("$DESC")"
                     else
                         TAB="\t\t"
-                        [ -n "$(echo $LINE | grep -E "transfer:")" ] && COLOR=$cBWHT
+                        [ -n "$(echo "$LINE" | grep -E "transfer:")" ] && COLOR=$cBWHT
                     fi
 
                     # endpoint: 209.58.188.180:51820
-                    if [ -n "$(echo $LINE | grep -iE "endpoint:" )" ];then
+                    if [ -n "$(echo "$LINE" | grep -iE "endpoint:" )" ];then
                         # Don't get the description based on interface, but the IP socket?
                         #SOCKET=$(echo $LINE | awk '{print $2}')
                         #DESC=$(awk -v pattern="$SOCKET" 'match($0,pattern) {print $0}' /jffs/configs/WireguardVPN_map | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
                         #LINE=${COLOR}$LINE" ${cBMAG}\t\t\t("$DESC")"
                         :
+                    fi
+
+                    if [ -n "$(echo "$LINE" | grep -iE "peer:" )" ] && [ "$TYPE" == "server" ];then
+                        PUB_KEY=$(echo "$LINE" | awk '{print $2}')
+                        DESC=$(grep -F "$PUB_KEY" /jffs/configs/WireguardVPN_map | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
+                        [ -z "$DESC" ] && DESC="?"
+                        LINE=${COLOR}$LINE" ${cBMAG}\t("$DESC")"
                     fi
 
                     echo -e ${TAB}${COLOR}$LINE
@@ -404,7 +422,7 @@ case $ACTION in
     install)
 
         if [ "$(Is_AX)" == "N" ] && [ "$(Is_HND)" == "N" ];then
-            echo -e $cBRED"\a\n\tERROR: Router $HARDWARE_MODEL (v$BUILDNO) is not currently compatible with WireGuard!"
+            echo -e $cBRED"\a\n\tERROR: Router$cRESET $HARDWARE_MODEL (v$BUILDNO)$cBRED is not currently compatible with WireGuard!\n"
             exit 96
         fi
 
@@ -541,6 +559,7 @@ EOF
             echo -e $cBWHT"\n\tWireGuard install COMPLETED.\n"$cRESET
             rm -rf /tmp/wireguard
 
+            # Backup the legacy original if it exists
             if [ -f /jffs/scripts/S50wireguard ];then
                 [ -f /opt/etc/init.d/S50wireguard ] && mv /opt/etc/init.d/S50wireguard /opt/etc/init.d/S50wireguard.$TS
                 cp /jffs/scripts/S50wireguard /opt/etc/init.d/S50wireguard
@@ -601,8 +620,8 @@ EOF
         rm -rf /tmp/wireguard
 
         echo -e "\tPress$cBRED Y$cRESET to$cBRED delete ALL WireGuard DATA files (Peer *.config etc.) $cRESET('/opt/etc/wireguard') or press$cBGRE [Enter] to keep custom WireGuard DATA files."
-        read -r "CONFIRM_DATA_DELETE"
-        if [ "$CONFIRM_DATA_DELETE" == "Y" ];then
+        read -r "ANS"
+        if [ "$ANS" == "Y" ];then
            echo -e $cBCYA"\n\tDeleting $cRESET'/opt/etc/wireguard'\n"
            [ -d /opt/etc/wireguard ] && rm -rf /opt/etc/wireguard
         fi
@@ -612,12 +631,45 @@ EOF
     ;;
     genkeys)
         # Create a Private/Public key-pair for your mobile phone etc.
-        if [ -n "$2" ];then
-            echo -e $cBCYA"\n\tCreating Wireguard Private/Public key pair for device ''"$cBYEL
+        DEVICE_NAME=$2
+        if [ -n "$DEVICE_NAME" ];then
+            echo -e $cBCYA"\n\tCreating Wireguard Private/Public key pair for device '$DEVICE_NAME'"$cBYEL
             wg genkey | tee /opt/etc/wireguard/${2}_private.key | wg pubkey | tee /opt/etc/wireguard/${2}_public.key
-            echo -e $cBYEL"\n\tDevice '"$2"' Public key="$(cat /opt/etc/wireguard/${2}_public.key)"\n"$cRESET
+            echo -e $cBYEL"\n\tDevice '"$DEVICE_NAME"' Public key="$(cat /opt/etc/wireguard/${2}_public.key)"\n"$cRESET
+            echo -e "\tPress$cBRED y$cRESET to$cBRED ADD device '$DEVICE_NAME' ${cRESET}to 'server' Peer (wg21) or press$cBGRE [Enter] to SKIP."
+            read -r "ANS"
+            if [ "$ANS" == "y" ];then
+                echo -e $cBCYA"\n\tAdding device Peer '$DEVICE_NAME' to $HARDWARE_MODEL 'server' (wg21) and WireGuard config\n"
+                if [ -z "$(grep "$DEVICE_NAME" /opt/etc/wireguard/wg21.conf)" ];then
+
+                    PUB_KEY=$(cat /opt/etc/wireguard/${DEVICE_NAME}_public.key)
+                    PUB_KEY=$(Convert_Key "$PUB_KEY")
+
+                    DHCP_POOL=$(awk '/^wg21/ {print $3}' /jffs/configs/WireguardVPN_map | tr '/' ' ' | awk '{print $1}')
+                    DHCP_POOL_SUBNET=${DHCP_POOL%.*}
+                    IP=$(grep -F "$DHCP_POOL_SUBNET." /jffs/configs/WireguardVPN_map | grep -Ev "^#" | grep -v "wg21" | awk '{print $2}' | sed 's~/32.*$~~g' | sort -n -t . -k 1,1 -k 2,2 -k 3,3 -k 4,4 | tail -n 1)
+                    IP=${IP##*.}        # 4th octet
+                    IP=$((IP+1))
+                    [ $IP -le 254 ] && IP=$DHCP_POOL_SUBNET"."$IP"/32"
+                    echo -e >> /opt/etc/wireguard/wg21.conf
+                    cat >> /opt/etc/wireguard/wg21.conf << EOF
+#$DEVICE_NAME
+[Peer]
+PublicKey = $PUB_KEY
+AllowedIPs = $IP
+EOF
+                    tail -n 4 /opt/etc/wireguard/wg21.conf
+
+                    # Add identifier to config
+                    IP=$(echo "$IP" | sed 's~/32.*$~~')
+                    [ -z "$(grep "$PUB_KEY" /jffs/configs/WireguardVPN_map)" ] && echo -e "$PUB_KEY      $IP     # Device $DEVICE_NAME" >> /jffs/configs/WireguardVPN_map
+                    tail -n 1 /jffs/configs/WireguardVPN_map
+                else
+                    echo -e $cBRED"\a\n\t***ERROR 'client' Peer device$cRESET '$DEVICE_NAME'$cBRED already defined in ${cRESET}'server' (wg21)\n"$cRESET
+                fi
+            fi
         else
-            echo -e $cBRED"\a\n\t***ERROR Missing name of client device\n"$cRESET
+            echo -e $cBRED"\a\n\t***ERROR Missing name of client Peer device\n"$cRESET
         fi
     ;;
     ##################################################################################################################
