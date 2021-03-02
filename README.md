@@ -54,13 +54,13 @@ In lieu of the NVRAM variables that can retain OpenVPN Client/Server configurati
 
 '/jffs/configs/WireguardVPN_map' for the WireGuard directives.
 
-As this is a beta, the layout of the file includes placeholders, but currently, the first column is significant and is used as a primary lookup key and only the 'Auto' and 'Annotation Comment' fileds are extracted/used to determine the actions taken by the script.
+As this is a beta, the layout of the file includes placeholders, but currently, the first column is significant and is used as a primary lookup key and only the 'Auto' and 'Annotation Comment' fields are extracted/used to determine the actions taken by the script.
 
 e.g.
 
     wg13    P      xxx.xxx.xxx.xxx/32    103.231.88.18:51820    193.138.218.74    # Mullvad Oz, Melbourne
 
-is used to auto-start Wireguard VPN 'client' Peer 3 ('wg13')' in Policy mode, where the associated Policy rules are defined as
+is used to auto-start WireGuard VPN 'client' Peer 3 ('wg13')' in Policy mode, where the associated Policy rules are defined as
 
     rp13    <Dummy VPN 3>172.16.1.3>>VPN<Plex>172.16.1.123>1.1.1.1>VPN<Router>172.16.1.1>>WAN<All LAN>172.16.1.0/24>>VPN
 
@@ -70,10 +70,10 @@ Use the GUI to generate the rules using a spare VPN Client and simply copy'n'pas
 
     vpn_client?_clientlist etc.
     
-The contents of the configuration file will be used when 'w13.conf' is activated - assuming that you have used say the appropriate WireGuard Web configurator such as Mullvads' to create the Local IP address and Public/Private key-pair for the remote Peer.
+The contents of the WireGuard configuration file will be used when 'wg13.conf' is activated - assuming that you have used say the appropriate WireGuard Web configurator such as Mullvads' to create the Local IP address and Public/Private key-pair for the remote Peer.
  e.g
  
-    /jffs/scripts/S50wireguard start client 3
+    S50wireguard start client 3
     
  The script supports several commands:
     
@@ -109,11 +109,49 @@ e.g.
     wgd
     
 where the top two aliases allow quickly Starting/Stopping all of the Defined/Active WireGuard Peers, and the bottom two generate a report of active Peers (either with or without DEBUG iptables/RPDB rules)
+
+An example of the enhanced WireGuard Peer Status report showing the names of the Peers rather than just their cryptic Public Keys
+
+    wgr
+
+    (S50wireguard): 15024 v1.01b4 WireGuard VPN Peer Status check.....
+
+	interface: wg21 	(# Martineau Host Peer 1)
+		 public key: j+aNKC0yA7+hFyH7cA9gISJ9+Ms05G3q4kYG/JkBwAU=
+		 private key: (hidden)
+		 listening port: 1151
+		
+		peer: wML+L6hN7D4wx+E1SA0K4/5x1cMjlpYzeTOPYww2WSM= 	(# Samsung Galaxy S8)
+		 allowed ips: 10.50.1.88/32
+		
+		peer: LK5/fu1iX1puR7+I/njj6W88Cr6/tDZhuaKp3XKM/R4= 	(# Device iPhone12)
+		 allowed ips: 10.50.1.90/32
  
 NOTE: Currently, if you start say three WireGuard remote Peers concurrently and none of which are designated as Policy Peers, ALL traffic will be forced via the most recent connection, so if you then terminate that Peer, then the least oldest of the previous Peers will then have ALL traffic directed through it.
 Very crude fall-over configuration but may be useful. 
 
+For hosting a 'server' Peer (wg21) you can use the following command to generate a Private/Public key-pair and auto add it to the 'wg21.conf' and to the WireGuard config '/jffs/configs/WireGuardVPN_map'
 
+    S50wireguard genkeys GoldstrikeriPhone3GSSupreme24K
+
+	Creating Wireguard Private/Public key pair for device 'GoldstrikeriPhone3GSSupreme24K'
+
+	Device 'GoldstrikeriPhone3GSSupreme24K' Public key=uAMVeM6DNsj9rEsz9rjDJ7WZEiJjEp98CDfDhSFL0W0=
+
+	Press y to ADD device 'GoldstrikeriPhone3GSSupreme24K' to 'server' Peer (wg21) or press [Enter] to SKIP.
+        y
+	Adding device Peer 'GoldstrikeriPhone3GSSupreme24K' to RT-AC86U 'server' (wg21) and WireGuard config
+and the resulting entry in the WireGuard 'server' Peer config 'wg21.conf' - where 10.50.1.125 is derived from the DHCP pool for the 'server' Peer
+
+e.g. WireGuard configuration contains
+
+    wg21    Y      10.50.1.1/24                                                 # Martineau Host Peer 1
+
+    #GoldstrikeriPhone3GSSupreme24K
+    [Peer]
+    PublicKey = uAMVeM6DNsj9rEsz9rjDJ7WZEiJjEp98CDfDhSFL0W0=
+    AllowedIPs = 10.50.1.125/32
+    uAMVeM6DNsj9rEsz9rjDJ7WZEiJjEp98CDfDhSFL0W0=      10.50.1.125     # Device GoldstrikeriPhone3GSSupreme24K
 
     
 
