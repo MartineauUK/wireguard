@@ -795,7 +795,7 @@ EOF
                 [ "$2" == "dev" ] && DEV="dev" || DEV="main"
                 [ "$ACTION" == "uf" ] && echo -e ${cRESET}$cWRED"\nForced Update"$cRESET"\n"
 
-                #download_file /opt/etc/init.d S50wireguard martineau $DEV dos2unix
+                download_file /opt/etc/init.d S50wireguard martineau $DEV dos2unix
                 download_file "${CONFIG_DIR}" wg_manager.sh martineau $DEV dos2unix
                 download_file "${CONFIG_DIR}" wg_server martineau $DEV dos2unix
 
