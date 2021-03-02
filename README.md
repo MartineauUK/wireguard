@@ -46,7 +46,7 @@ Example successful install.....
 
 	Creating WireGuard configuration file '/jffs/configs/WireguardVPN_map'
 
-	Creating WireGuard 'Client' Peer and 'Server' templates 'wg11.conf' and wg21.conf'
+	Creating WireGuard 'Client' and 'Server' Peer templates 'wg11.conf' and wg21.conf'
 
 	WireGuard install COMPLETED.
 
