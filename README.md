@@ -139,19 +139,30 @@ For hosting a 'server' Peer (wg21) you can use the following command to generate
 	Device 'GoldstrikeriPhone3GSSupreme24K' Public key=uAMVeM6DNsj9rEsz9rjDJ7WZEiJjEp98CDfDhSFL0W0=
 
 	Press y to ADD device 'GoldstrikeriPhone3GSSupreme24K' to 'server' Peer (wg21) or press [Enter] to SKIP.
-        y
+    y
 	Adding device Peer 'GoldstrikeriPhone3GSSupreme24K' to RT-AC86U 'server' (wg21) and WireGuard config
 and the resulting entry in the WireGuard 'server' Peer config 'wg21.conf' - where 10.50.1.125 is derived from the DHCP pool for the 'server' Peer
 
-e.g. WireGuard configuration contains
+e.g. WireGuard configuration 'WireguardVPN_map' contains
 
     wg21    Y      10.50.1.1/24                                                 # Martineau Host Peer 1
+
+and the next avaiable IP with DHCP pool prefix '10.60.1' .125 is chosen as .124 is aleady assigned when the Peer is appended to 'wg21.conf'
 
     #GoldstrikeriPhone3GSSupreme24K
     [Peer]
     PublicKey = uAMVeM6DNsj9rEsz9rjDJ7WZEiJjEp98CDfDhSFL0W0=
     AllowedIPs = 10.50.1.125/32
-    uAMVeM6DNsj9rEsz9rjDJ7WZEiJjEp98CDfDhSFL0W0=      10.50.1.125     # Device GoldstrikeriPhone3GSSupreme24K
+  
+and the cosmetic Annotation identification for the device '# Device GoldstrikeriPhone3GSSupreme24K' is appended to the WireGuard configuration 'WireguardVPN_map'  
+
+    # Optionally define the 'server' Peer 'clients' so they can be identified by name in the enhanced WireGuard Peer status report
+    # Public Key                                      DHCP IP             Annotation Comment
+    <snip>
+    xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=      10.50.1.124         # A Cell phone
+    snip>
+    
+    uAMVeM6DNsj9rEsz9rjDJ7WZEiJjEp98CDfDhSFL0W0=      10.50.1.125         # Device GoldstrikeriPhone3GSSupreme24K
 
     
 
