@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v1.03"
-#============================================================================================ © 2021 Martineau v1.03
+VERSION="v1.04"
+#============================================================================================ © 2021 Martineau v1.04
 #
 #       S50wireguard   {start|stop|restart|check|CreateConfig} [ [client [policy] |server]} [wg_instance] ]
 #
@@ -188,48 +188,55 @@ Check_Version_Update() {
 
 }
 Download_Modules() {                                                    # v1.03
-
+_Get_File() {
+    local WEBFILE=$1
+    [ -z "$2" ] && echo -e $cBCYA"\n\tDownloading WireGuard Kernel module ${cBWHT}'$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO)..."$cRESET
+    echo -e $cBGRA
+    curl -# -fL --retry 3 https://github.com/odkrys/entware-makefile-for-merlin/raw/main/${WEBFILE} -o ${DIR}${WEBFILE}
+}
     local ROUTER=$1
     local DIR="/tmp/wireguard/"
 
     [ ! -d $DIR ] && mkdir $DIR
 
-    local FILES=$(curl -#${SILENT}fL https://www.snbforums.com/threads/experimental-wireguard-for-hnd-platform-4-1-x-kernels.46164/ | grep "<a href=.*odkrys.*wireguard" | grep -oE "wireguard.*") | tr '\n' ' '
+    local WEBFILE_NAMES=$(curl -${SILENT}fL https://www.snbforums.com/threads/experimental-wireguard-for-hnd-platform-4-1-x-kernels.46164/ | grep "<a href=.*odkrys.*wireguard" | grep -oE "wireguard.*" | sed 's/\"//g' | tr '\n' ' ')
 
+    # The file list MAY NOT ALWAYS be in the correct Router Model order for the following 'case' statement?
     case $ROUTER in
 
         RT-AC86U|GT-AC2900)     # RT-AC86U, GT-AC2900 - 4.1.27
-            curl -#${SILENT}fL --retry 3 https://github.com/odkrys/entware-makefile-for-merlin/raw/main/wireguard-kernel_1.0.20210219-k27_aarch64-3.10.ipk -o ${DIR}wireguard-kernel_1.0.20210219-k27_aarch64-3.10.ipk
+            _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $1}')"
             ;;
         RT-AX88U|GT-AX11000)    # RT-AX88U, GT-AX11000 - 4.1.51
-            curl -#${SILENT}fL --retry 3 https://github.com/odkrys/entware-makefile-for-merlin/raw/main/wireguard-kernel_1.0.20210219-k51_aarch64-3.10.ipk -o ${DIR}wireguard-kernel_1.0.20210219-k51_aarch64-3.10.ipk
+            _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $2}')"
             ;;
         RT-AX68U|RT-AX86U)      # RT-AX68U, RT-AX86U - 4.1.52
-            curl -#${SILENT}fL --retry 3 https://github.com/odkrys/entware-makefile-for-merlin/raw/main/wireguard-kernel_1.0.20210219-k52_aarch64-3.10.ipk -o ${DIR}wireguard-kernel_1.0.20210219-k52_aarch64-3.10.ipk
+            _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $3}')"
             ;;
         *)
-            echo -e $cBRED"\a\n\tERROR: Unable to find Wireguard Kernel module for $ROUTER (v$BUILDNO)\n"$cRESET
+            echo -e $cBRED"\a\n\t***ERROR: Unable to find WireGuard Kernel module for $ROUTER (v$BUILDNO)\n"$cRESET
             # Deliberately Download an incompatible file simply so that an error message is produced by 'opkg install*.ipk'
             #
             #       Unknown package 'wireguard-kernel'.
             #       Collected errors:
             #        * pkg_hash_fetch_best_installation_candidate: Packages for wireguard-kernel found, but incompatible with the architectures configured
             #        * opkg_install_cmd: Cannot install package wireguard-kernel.
-
             #
-            curl -#${SILENT}fL --retry 3 https://github.com/odkrys/entware-makefile-for-merlin/raw/main/wireguard-kernel_1.0.20210219-k27_aarch64-3.10.ipk -o ${DIR}wireguard-kernel_1.0.20210219-k27_aarch64-3.10.ipk
+            #
+            _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $1}')"
             ROUTER_COMPATIBLE="N"
             ;;
     esac
 
 # User Space Tools
-echo -e $cBCYA"\n\tRetrieving WireGuard User space Tools for $ROUTER (v$BUILDNO)"$cRESET
-curl -#${SILENT}fL --retry 3 https://github.com/odkrys/entware-makefile-for-merlin/raw/main/wireguard-tools_1.0.20210223-1_aarch64-3.10.ipk -o /tmp/wireguard/wireguard-tools_1.0.20210223-1_aarch64-3.10.ipk
+WEBFILE=$(echo "$WEBFILE_NAMES" | awk '{print $4}')
+echo -e $cBCYA"\n\tDownloading WireGuard User space Tools$cBWHT '$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO)"$cRESET
+_Get_File  "$WEBFILE" "NOMSG"
 }
 Load_Module_UserspaceTool() {                                           # v1.03
     if [ ! -d /tmp/wireguard ];then
         echo -e $cRED"\a\n\tNo modules found - '/tmp/wireguard doesn't exist'\n"
-        echo -e "\tPress$cBRED y$cRESET to$cBRED retrieve WireGuard Kernel and Userspace Tools modules ${cRESET} or press$cBGRE [Enter] to SKIP."
+        echo -e "\tPress$cBRED y$cRESET to$cBRED DOWNLOAD WireGuard Kernel and Userspace Tools modules ${cRESET} or press$cBGRE [Enter] to SKIP."
             read -r "ANS"
             if [ "$ANS" == "y" ];then
                 Download_Modules $HARDWARE_MODEL
@@ -258,7 +265,7 @@ Load_Module_UserspaceTool() {                                           # v1.03
         echo -e $cBGRA"\t"$(dmesg | grep -a "wireguard: Copyright")"\n"$cRESET
         return 0
     else
-        echo -e $cBRED"\a\n\t***ERROR: Unable to retrieve WireGuard Kernel and Userspace Tools modules\n"
+        echo -e $cBRED"\a\n\t***ERROR: Unable to DOWNLOAD WireGuard Kernel and Userspace Tools modules\n"
         return 1
     fi
 
@@ -279,9 +286,18 @@ Check_Module_Versions() {
     echo -e $cBGRA"\t"$(dmesg | grep -a "WireGuard")
     echo -e $cBGRA"\t"$(dmesg | grep -a "wireguard: Copyright")"\n"$cRESET
 
+    # Without a BOOT, there may be a mismatch
+    local BOOTLOADED=$(dmesg | grep -a WireGuard | awk '{print $3}')
+    local WGKERNEL=$(opkg list-installed | grep "wireguard-kernel" | awk '{print $3}' | sed 's/\-.*$//')
+    local WGTOOLS=$(opkg list-installed | grep "wireguard-tools" | awk '{print $3}' | sed 's/\-.*$//')
+
+    if [ -n "$WGKERNEL" ];then                  # v1.04
+        [ "$WGKERNEL" != "$BOOTLOADED" ] && echo -e $cRED"\a\n\tWarning Reboot required for (dmesg) WireGuard $WGKERNEL $BOOTLOADED\n"
+    fi
+
     Show_MD5
-    [ -z "$(echo "$FILES" | grep -F "$(awk '{print $2}' ${CONFIG_DIR}wireguard-kernel.md5)")" ] && { echo -e $cBYEL"\t\tKernel UPDATE available" $FILE; local UPDATES="Y"; }
-    [ -z "$(echo "$FILES" | grep -F "$(awk '{print $2}' ${CONFIG_DIR}wireguard-tools.md5)")"  ] && { echo -e $cBYEL"\t\tTools UPDATE available" $FILE; local UPDATES="Y"; }
+    [ -z "$(echo "$FILES" | grep -F "$WGKERNEL")" ] && { echo -e $cBYEL"\t\tKernel UPDATE available" $FILE; local UPDATES="Y"; }
+    [ -z "$(echo "$FILES" | grep -F "$WGTOOLS")" ] && { echo -e $cBYEL"\t\tUserspace Tools UPDATE available" $FILE; local UPDATES="Y"; }
 
     if [ "$UPDATES" == "Y" ];then
         echo -e $cRESET"\n\tPress$cBRED y$cRESET to$cBRED Update WireGuard Kernel and Userspace Tools${cRESET} or press$cBGRE [Enter] to SKIP."
@@ -674,13 +690,13 @@ case "$ACTION" in
         fi
 
         if [ -d /opt/etc/wireguard ];then
-            echo -e $cBCYA"\n\tRetrieving scripts 'wg_manager.sh/wg_server'\n"$cRESET
+            echo -e $cBCYA"\n\tDownloading scripts 'wg_manager.sh/wg_server'\n"$cRESET
             curl -# -L --retry 3 "https://raw.githubusercontent.com/MartineauUK/wireguard/main/wg_manager.sh" -o "${CONFIG_DIR}wg_manager.sh" && chmod 755 "${CONFIG_DIR}wg_manager.sh"
             curl -# -L --retry 3 "https://raw.githubusercontent.com/MartineauUK/wireguard/main/wg_server"     -o "${CONFIG_DIR}wg_server"  && chmod 755 "${CONFIG_DIR}wg_server"
         fi
 
         # Kernel module
-        echo -e $cBCYA"\n\tRetrieving Wireguard Kernel module for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
+        echo -e $cBCYA"\n\tDownloading Wireguard Kernel module for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
 
         ROUTER_COMPATIBLE="Y"
 
@@ -779,10 +795,13 @@ EOF
             echo "alias wgd='/opt/etc/init.d/S50wireguard checkdebug'"              >>/jffs/configs/profile.add
         fi
         ;;
+    getmodules)
+
+        Download_Modules $HARDWARE_MODEL
+        ;;
     loadmodules)
 
-        Load_Modules
-
+        Load_Module_UserspaceTool
         ;;
     usedns)
         #cp ${CONFIG_DIR}S50wireguard /opt/etc/init.d
@@ -870,6 +889,7 @@ EOF
 
         case "$ACTION" in
             "?")
+                echo -e $cBWHT"\n$VERSION $(basename $0) WireGuard Session Manager"$cRESET  # v1.04
                 echo -e $cBWHT"\n\tChecking GitHub for software updates...."$cRESET
                 Check_Version_Update
                 echo -e $cRESET
