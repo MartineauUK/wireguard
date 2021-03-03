@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v1.03b2"
-#============================================================================================ © 2021 Martineau v1.03b2
+VERSION="v1.03"
+#============================================================================================ © 2021 Martineau v1.03
 #
 #       S50wireguard   {start|stop|restart|check|CreateConfig} [ [client [policy] |server]} [wg_instance] ]
 #
@@ -626,7 +626,7 @@ case "$ACTION" in
                         PUB_KEY=$(echo "$LINE" | awk '{print $2}')
                         DESC=$(grep -F "$PUB_KEY" /jffs/configs/WireguardVPN_map | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
                         [ -z "$DESC" ] && DESC="?"
-                        LINE=${COLOR}$LINE" ${cBMAG}\t('$TYPE' $DESC)"
+                        LINE=${COLOR}$LINE" ${cBMAG}\t('$TYPE client'  $DESC)"
                     fi
 
                     echo -e ${TAB}${COLOR}$LINE
