@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v1.03b1"
-#============================================================================================ © 2021 Martineau v1.03b1
+VERSION="v1.03b2"
+#============================================================================================ © 2021 Martineau v1.03b2
 #
 #       S50wireguard   {start|stop|restart|check|CreateConfig} [ [client [policy] |server]} [wg_instance] ]
 #
@@ -179,8 +179,8 @@ Check_Version_Update() {
     fi
 
     if [ -n "$UPDATE_SCRIPT_ALERT" ];then                                                       # v1.03
-        echo -e "\a\n\t"$UPDATE_SCRIPT_ALERT
-        return 1
+        echo -e "\a\n\t"$UPDATE_SCRIPT_ALERT"\n"
+        [ -n "$(echo "$UPDATE_SCRIPT_ALERT" | grep -o "Push to Github")" ] && return 2 || return 1 # v1.03
     else
         echo -e $cBGRE"\n\tNo updates available - you have the latest version"              # v1.03
         return 0
@@ -819,8 +819,10 @@ EOF
 
         echo -e $cBGRE"\n\tWireGuard Uninstall complete for $HARDWARE_MODEL (v$BUILDNO)\n"$cRESET
         ;;
-    genkeys)
+    genkeys)                                                            # {name} [{tag="desciption{"}}]     # v1.03
         # Create a Private/Public key-pair for your mobile phone etc.
+        #           e.g. genkeys   Nokia6310 tag="Best phone ever!"
+        #
         DEVICE_NAME=$2
         if [ -n "$DEVICE_NAME" ];then
             echo -e $cBCYA"\n\tCreating Wireguard Private/Public key pair for device '$DEVICE_NAME'"$cBYEL
@@ -852,7 +854,9 @@ EOF
 
                     # Add identifier to config
                     IP=$(echo "$IP" | sed 's~/32.*$~~')
-                    [ -z "$(grep "$PUB_KEY" /jffs/configs/WireguardVPN_map)" ] && echo -e "$PUB_KEY      $IP     # Device $DEVICE_NAME" >> /jffs/configs/WireguardVPN_map
+                    TAG=$(echo "$@" | sed -n "s/^.*tag=//p" | awk '{print $0}')
+                    [ -z "$TAG" ] && TAG="Device"                                   # v1.03
+                    [ -z "$(grep "$PUB_KEY" /jffs/configs/WireguardVPN_map)" ] && echo -e "$PUB_KEY      $IP     # $DEVICE_NAME $TAG" >> /jffs/configs/WireguardVPN_map     # v.03
                     tail -n 1 /jffs/configs/WireguardVPN_map
                     else
                         echo -e $cBRED"\a\n\t***ERROR 'client' Peer device$cRESET '$DEVICE_NAME'$cBRED already defined in ${cRESET}'server' (wg21)\n"$cRESET
@@ -862,7 +866,7 @@ EOF
                 echo -e $cBRED"\a\n\t***ERROR Missing name of client Peer device\n"$cRESET
             fi
         ;;
-    "?"|u|u" "*)
+    "?"|u|u" "*|uf|uf" "*)
 
         case "$ACTION" in
             "?")
@@ -874,11 +878,21 @@ EOF
                 ;;
             *)
                 [ "$2" == "dev" ] && DEV="dev" || DEV="main"
-                [ "$ACTION" == "u" ] && echo -e ${cRESET}$cWRED"\nForced Update"$cRESET"\n"
+                DOWNLOAD="N"
+                if [ "$ACTION" == "uf" ];then
+                    echo -e ${cRESET}$cWRED"\n\tForced Update"$cRESET"\n"
+                    DOWNLOAD="Y"
+                else
+                    Check_Version_Update
+                    [ $? -eq 1 ] && DOWNLOAD="Y"        # '2' means 'Push to GitHub' pending! ;-;
+                fi
 
-                download_file /opt/etc/init.d S50wireguard martineau $DEV dos2unix
-                download_file "${CONFIG_DIR}" wg_manager.sh martineau $DEV dos2unix
-                download_file "${CONFIG_DIR}" wg_server martineau $DEV dos2unix
+                if [ "$DOWNLOAD" == "Y" ];then
+                    download_file /opt/etc/init.d S50wireguard martineau $DEV dos2unix
+                    download_file "${CONFIG_DIR}" wg_manager.sh martineau $DEV dos2unix
+                    download_file "${CONFIG_DIR}" wg_server martineau $DEV dos2unix
+                    echo -e
+                fi
 
                 Check_Module_Versions
 
