@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v1.03b"
-#============================================================================================ © 2021 Martineau v1.03b
+VERSION="v1.03b1"
+#============================================================================================ © 2021 Martineau v1.03b1
 #
 #       S50wireguard   {start|stop|restart|check|CreateConfig} [ [client [policy] |server]} [wg_instance] ]
 #
@@ -254,8 +254,8 @@ Load_Module_UserspaceTool() {                                           # v1.03
     if [ "$STATUS" -eq 0 ];then
         insmod /opt/lib/modules/wireguard 2>/dev/null
 
-        echo -e $cBGRA"\t"$(dmesg | grep "WireGuard")
-        echo -e $cBGRA"\t"$(dmesg | grep "wireguard: Copyright")"\n"$cRESET
+        echo -e $cBGRA"\t"$(dmesg | grep -a "WireGuard")
+        echo -e $cBGRA"\t"$(dmesg | grep -a "wireguard: Copyright")"\n"$cRESET
         return 0
     else
         echo -e $cBRED"\a\n\t***ERROR: Unable to retrieve WireGuard Kernel and Userspace Tools modules\n"
@@ -276,8 +276,8 @@ Check_Module_Versions() {
     # Check if Kernel and User Tools Update available
     echo -e $cBWHT"\tChecking for WireGuard Kernel and Userspace Tool updates..."
 
-    echo -e $cBGRA"\t"$(dmesg | grep "WireGuard")
-    echo -e $cBGRA"\t"$(dmesg | grep "wireguard: Copyright")"\n"$cRESET
+    echo -e $cBGRA"\t"$(dmesg | grep -a "WireGuard")
+    echo -e $cBGRA"\t"$(dmesg | grep -a "wireguard: Copyright")"\n"$cRESET
 
     Show_MD5
     [ -z "$(echo "$FILES" | grep -F "$(awk '{print $2}' ${CONFIG_DIR}wireguard-kernel.md5)")" ] && { echo -e $cBYEL"\t\tKernel UPDATE available" $FILE; local UPDATES="Y"; }
@@ -386,199 +386,201 @@ TYPE=$2
 # Non-standard SxxScript should normally call '. /opt/etc/init.d/rc.func'
 [ "$(echo $2 | grep -o "post-mount")" == "post-mount" ] && shift
 
-case $ACTION in
-    start|stop|restart)
+if [ -n "$(echo "start|stop|restart" | grep -o "$ACTION")" ];then
 
-        if [ -z "$TYPE" ];then
-            TYPE="client"
-        else
-            if [ -f "${CONFIG_DIR}${TYPE}.conf" ];then          # Is it an interface name? e.g. 'SGS8' or 'wg-client0'
-                WG_INTERFACE=$TYPE
-                [ -z "$(grep -E "^Endpoint" ${CONFIG_DIR}${WG_INTERFACE}.conf)" ] && TYPE="server" || TYPE="client"
-            fi
+    if [ -z "$TYPE" ];then
+        TYPE="client"
+    else
+        if [ -f "${CONFIG_DIR}${TYPE}.conf" ];then          # Is it an interface name? e.g. 'SGS8' or 'wg-client0'
+            WG_INTERFACE=$TYPE
+            [ -z "$(grep -E "^Endpoint" ${CONFIG_DIR}${WG_INTERFACE}.conf)" ] && TYPE="server" || TYPE="client"
         fi
+    fi
 
-        case $TYPE in
-            server|1)
-                Mode="server"
-                if [ -z "$WG_INTERFACE" ];then
-                    if [ -z "$3" ];then
-                        WG_INTERFACE="wg1"
-                        export $WG_INTERFACE
-                        export Subnet=10.50.1.1/24
-                        export wgport=1150
-                    else
-                        WG_INTERFACE="wg2"$3
-                        export $WG_INTERFACE
-                        export Subnet=10.50.$3.1/24
-                        export wgport="115"$3
-                    fi
-                fi
-                ;;
-            *)
-                Mode=client
-
-                if [ -z "$WG_INTERFACE" ];then
-                    if [ -z "$2" ] || [ "$2" == "0" ] || [ "$3" == "0" ];then
-                        WG_INTERFACE="wg0"
-                        export $WG_INTERFACE
-                        #export LocalIP=10.160.107.63/8  # Martineau https://tunsafe.com/vpn  Account Number    57937020164277392089
-                        Route=default
-                    else
-                        if [ "$2" == "client" ];then
-                            INDEX=$3
-                        else
-                            INDEX=$2
-                        fi
-                        case $INDEX in
-                            1|2|3|4|5)
-                                        WG_INTERFACE="wg1"$INDEX
-                                        #export WG_INTERFACE=$WG_INTERFACE
-                                        export Subnet=10.50.$INDEX.1/24
-                                        export wgport="115"$INDEX
-
-                        ;;
-                        *)
-                            echo -en $cRED"\a\n\t";Say "$VERSION Missing/Invalid VPN ID '$INDEX' e.g. range 0 - 5 ";echo -e $cRESET
-                            exit 99
-                        ;;
-                        esac
-                    fi
-                fi
-
-                # Read the Remote peer config to set the LOCAL peer endpoint
-                if [ -f /jffs/configs/WireguardVPN_map ];then
-                    LOCALIP=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' /jffs/configs/WireguardVPN_map)
-                    export LocalIP=$LOCALIP
-                    SOCKET=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $4}' /jffs/configs/WireguardVPN_map)
-                    DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' /jffs/configs/WireguardVPN_map | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
-                fi
-
-                if [ "$3" == "policy" ] || [ "$3" == "policy" ];then
-                    Route="policy"
-                fi
-
-            ;;
-        esac
-
-        case $ACTION in
-            start)
-
-                if [ -z "$2" ];then
-                    WG_INTERFACE=
-                    # The AUTO flag may be 'Y' or 'P' to indicate if auto policy is required
-                    AUTO_PEERS=$(awk '$2 == "Y" || $2 =="P" {print $1}' /jffs/configs/WireguardVPN_map| tr '\n#' ' ')
-                    echo -e
-                    [ -n "$AUTO_PEERS" ] && { Say "$VERSION Requesting WireGuard VPN Peer auto-start ($AUTO_PEERS)"; echo -e; }
+    case "$TYPE" in
+        server|1)
+            Mode="server"
+            if [ -z "$WG_INTERFACE" ];then
+                if [ -z "$3" ];then
+                    WG_INTERFACE="wg1"
+                    export $WG_INTERFACE
+                    export Subnet=10.50.1.1/24
+                    export wgport=1150
                 else
-                    echo -en $cBCYA
-                    Say "$VERSION Requesting WireGuard VPN '$Mode' Peer ('$WG_INTERFACE') $DESC."
-                    echo -en $cRESET
+                    WG_INTERFACE="wg2"$3
+                    export $WG_INTERFACE
+                    export Subnet=10.50.$3.1/24
+                    export wgport="115"$3
                 fi
-
-                for WG_INTERFACE in $AUTO_PEERS $WG_INTERFACE
-                    do
-                        [ "$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' /jffs/configs/WireguardVPN_map)" == "P" ] && Route="policy" || Route="default"
-
-                        if [ -n "$(ifconfig | grep -E "^$WG_INTERFACE")" ];then
-                            echo -en $cBWHT
-                            Say "Initialising Wireguard VPN $MODE Peer ($VPN_ID) ${POLICY_MODE}${TXT} $SOCKET ($DESC)";echo -en $cRESET
-                            echo -en $cRED"\a\t";Say "WireGuard VPN '$Mode' Peer ('$WG_INTERFACE') ALREADY ACTIVE";echo -e $cRESET
-                        else
-                            if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
-
-                                # Rather than rely on naming convention; verify the content
-                                [ -z "$(grep -E "^Endpoint" ${CONFIG_DIR}${WG_INTERFACE}.conf)" ] && Mode="server" || Mode="client"
-
-                                if [ "$Mode" == "server" ] ; then
-                                    ${CONFIG_DIR}wg_server $WG_INTERFACE
-
-                                    elif [ "$Mode" == "client" ] && [ "$Route" != "policy" ] ; then
-                                        ${CONFIG_DIR}wg_manager.sh $WG_INTERFACE
-                                    else
-                                        ${CONFIG_DIR}wg_manager.sh $WG_INTERFACE "policy"
-                                fi
-                            else
-                                echo -en $cBRED"\a\n\t";Say "WireGuard VPN '$Mode' Peer ('$WG_INTERFACE') config NOT found?....skipping start request"
-                                echo -e $cRESET
-                            fi
-
-                        fi
-                    done
-                echo -e $cBCYA"\tStatus:\n"$cRESET
-                /opt/bin/wg show all
-                ;;
-            stop)
-
-                #logger -s "Stopping WireGuard service."
-
-                if [ -z "$2" ];then
-                    AUTO_PEERS=$(wg show interfaces)
-                    if [ -n "$AUTO_PEERS" ];then
-                        WG_INTERFACE=
-                        echo -en $cBWHT"\n";Say "$VERSION Requesting termination of Active WireGuard VPN Peers ($AUTO_PEERS)"
-                        echo -e $cRESET
-                    else
-                        echo -en $cRED"\a\n\t"
-                        Say "No WireGuard VPN peers Active"
-                        echo -e
-                        exit 97
-                    fi
-                fi
-
-                for WG_INTERFACE in $AUTO_PEERS $WG_INTERFACE
-                    do
-                        #${CONFIG_DIR}/wg-down
-                        [ -z "$(grep -E "^Endpoint" ${CONFIG_DIR}${WG_INTERFACE}.conf)" ] && Mode="server" || Mode="client"
-
-                        DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' /jffs/configs/WireguardVPN_map | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
-                        Say "$VERSION Requesting termination of WireGuard VPN '$Mode' Peer ('$WG_INTERFACE') $DESC."
-
-                        if [ -z "$(ifconfig | grep -E "^$WG_INTERFACE")" ];then
-                            echo -e $cRED"\a\t";Say "WireGuard VPN '$Mode' Peer ('$WG_INTERFACE') NOT ACTIVE";echo -e
-                        else
-                            if [ "$Mode" == "server" ]; then
-
-                                    ${CONFIG_DIR}wg_server $WG_INTERFACE "disable"
-
-                                    elif [ "$Mode" == "client" ] && [ "$Route" != "policy" ] ; then
-
-                                        #wg show $WG_INTERFACE >/dev/null 2>&1 && ${CONFIG_DIR}wg-down $WG_INTERFACE || Say "WireGuard $Mode service ('$WG_INTERFACE') NOT running."
-                                        /opt/bin/wg show $WG_INTERFACE >/dev/null 2>&1 && ${CONFIG_DIR}wg_manager.sh $WG_INTERFACE "disable" || Say "WireGuard $Mode service ('$WG_INTERFACE') NOT running."
-                                    else
-                                        /opt/bin/wg show $WG_INTERFACE >/dev/null 2>&1 && ${CONFIG_DIR}wg_manager.sh $WG_INTERFACE "disable" "policy" || Say "WireGuard $Mode (Policy) service ('$WG_INTERFACE') NOT running."
-                            fi
-
-                        fi
-                    done
-
-                /opt/bin/wg show all
-
-                ;;
-            restart)
-
-                [ -n "$(ifconfig $WG_INTERFACE 2>/dev/null | grep inet)" ] && { Say "$VERSION Restarting WireGuard VPN '$Mode' Peer ('$WG_INTERFACE') $DESC"; ${CONFIG_DIR}wg_server $WG_INTERFACE "disable"; sleep 1; }
-
-                if [ "$Mode" == "server" ] ; then
-
-                    ${CONFIG_DIR}wg_server $WG_INTERFACE "disable"
-                    ${CONFIG_DIR}wg_server $WG_INTERFACE
-
-                    elif [ "$Mode" == "client" ] && [ "$Route" != "policy" ] ; then
-                        ${CONFIG_DIR}wg_manager.sh $WG_INTERFACE "disable"
-                        ${CONFIG_DIR}wg_manager.sh $WG_INTERFACE
-                    else
-                        Say "...in Policy mode"
-                        ${CONFIG_DIR}wg_manager.sh $WG_INTERFACE "disable" "policy"
-                        ${CONFIG_DIR}wg_manager.sh $WG_INTERFACE "policy"
-                fi
-
-                /opt/bin/wg show all
-                ;;
-            esac
+            fi
             ;;
-        esac
+        *)
+            Mode=client
 
+            if [ -z "$WG_INTERFACE" ];then
+                if [ -z "$2" ] || [ "$2" == "0" ] || [ "$3" == "0" ];then
+                    WG_INTERFACE="wg0"
+                    export $WG_INTERFACE
+                    #export LocalIP=10.160.107.63/8  # Martineau https://tunsafe.com/vpn  Account Number    57937020164277392089
+                    Route=default
+                else
+                    if [ "$2" == "client" ];then
+                        INDEX=$3
+                    else
+                        INDEX=$2
+                    fi
+                    case $INDEX in
+                        1|2|3|4|5)
+                                    WG_INTERFACE="wg1"$INDEX
+                                    #export WG_INTERFACE=$WG_INTERFACE
+                                    export Subnet=10.50.$INDEX.1/24
+                                    export wgport="115"$INDEX
+
+                    ;;
+                    *)
+                        echo -en $cRED"\a\n\t";Say "$VERSION Missing/Invalid VPN ID '$INDEX' e.g. range 0 - 5 ";echo -e $cRESET
+                        exit 99
+                    ;;
+                    esac
+                fi
+            fi
+
+            # Read the Remote peer config to set the LOCAL peer endpoint
+            if [ -f /jffs/configs/WireguardVPN_map ];then
+                LOCALIP=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' /jffs/configs/WireguardVPN_map)
+                export LocalIP=$LOCALIP
+                SOCKET=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $4}' /jffs/configs/WireguardVPN_map)
+                DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' /jffs/configs/WireguardVPN_map | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
+            fi
+
+            if [ "$3" == "policy" ] || [ "$3" == "policy" ];then
+                Route="policy"
+            fi
+
+            ;;
+    esac
+
+    case "$ACTION" in
+        start)
+
+            if [ -z "$2" ];then
+                WG_INTERFACE=
+                # The AUTO flag may be 'Y' or 'P' to indicate if auto policy is required
+                AUTO_PEERS=$(awk '$2 == "Y" || $2 =="P" {print $1}' /jffs/configs/WireguardVPN_map| tr '\n#' ' ')
+                echo -e
+                [ -n "$AUTO_PEERS" ] && { Say "$VERSION Requesting WireGuard VPN Peer auto-start ($AUTO_PEERS)"; echo -e; }
+            else
+                echo -en $cBCYA
+                Say "$VERSION Requesting WireGuard VPN '$Mode' Peer ('$WG_INTERFACE') $DESC."
+                echo -en $cRESET
+            fi
+
+            for WG_INTERFACE in $AUTO_PEERS $WG_INTERFACE
+                do
+                    [ "$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' /jffs/configs/WireguardVPN_map)" == "P" ] && Route="policy" || Route="default"
+
+                    if [ -n "$(ifconfig | grep -E "^$WG_INTERFACE")" ];then
+                        echo -en $cBWHT
+                        Say "Initialising Wireguard VPN $MODE Peer ($VPN_ID) ${POLICY_MODE}${TXT} $SOCKET ($DESC)";echo -en $cRESET
+                        echo -en $cRED"\a\t";Say "WireGuard VPN '$Mode' Peer ('$WG_INTERFACE') ALREADY ACTIVE";echo -e $cRESET
+                    else
+                        if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
+
+                            # Rather than rely on naming convention; verify the content
+                            [ -z "$(grep -E "^Endpoint" ${CONFIG_DIR}${WG_INTERFACE}.conf)" ] && Mode="server" || Mode="client"
+
+                            if [ "$Mode" == "server" ] ; then
+                                ${CONFIG_DIR}wg_server $WG_INTERFACE
+
+                                elif [ "$Mode" == "client" ] && [ "$Route" != "policy" ] ; then
+                                    ${CONFIG_DIR}wg_manager.sh $WG_INTERFACE
+                                else
+                                    ${CONFIG_DIR}wg_manager.sh $WG_INTERFACE "policy"
+                            fi
+                        else
+                            echo -en $cBRED"\a\n\t";Say "WireGuard VPN '$Mode' Peer ('$WG_INTERFACE') config NOT found?....skipping start request"
+                            echo -e $cRESET
+                        fi
+
+                    fi
+                done
+            echo -e $cBCYA"\tStatus:\n"$cRESET
+            /opt/bin/wg show all
+            ;;
+        stop)
+
+            #logger -s "Stopping WireGuard service."
+
+            if [ -z "$2" ];then
+                AUTO_PEERS=$(wg show interfaces)
+                if [ -n "$AUTO_PEERS" ];then
+                    WG_INTERFACE=
+                    echo -en $cBWHT"\n";Say "$VERSION Requesting termination of Active WireGuard VPN Peers ($AUTO_PEERS)"
+                    echo -e $cRESET
+                else
+                    echo -en $cRED"\a\n\t"
+                    Say "No WireGuard VPN peers Active"
+                    echo -e
+                    exit 97
+                fi
+            fi
+
+            for WG_INTERFACE in $AUTO_PEERS $WG_INTERFACE
+                do
+                    #${CONFIG_DIR}/wg-down
+                    [ -z "$(grep -E "^Endpoint" ${CONFIG_DIR}${WG_INTERFACE}.conf)" ] && Mode="server" || Mode="client"
+
+                    DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' /jffs/configs/WireguardVPN_map | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
+                    Say "$VERSION Requesting termination of WireGuard VPN '$Mode' Peer ('$WG_INTERFACE') $DESC."
+
+                    if [ -z "$(ifconfig | grep -E "^$WG_INTERFACE")" ];then
+                        echo -e $cRED"\a\t";Say "WireGuard VPN '$Mode' Peer ('$WG_INTERFACE') NOT ACTIVE";echo -e
+                    else
+                        if [ "$Mode" == "server" ]; then
+
+                                ${CONFIG_DIR}wg_server $WG_INTERFACE "disable"
+
+                                elif [ "$Mode" == "client" ] && [ "$Route" != "policy" ] ; then
+
+                                    #wg show $WG_INTERFACE >/dev/null 2>&1 && ${CONFIG_DIR}wg-down $WG_INTERFACE || Say "WireGuard $Mode service ('$WG_INTERFACE') NOT running."
+                                    /opt/bin/wg show $WG_INTERFACE >/dev/null 2>&1 && ${CONFIG_DIR}wg_manager.sh $WG_INTERFACE "disable" || Say "WireGuard $Mode service ('$WG_INTERFACE') NOT running."
+                                else
+                                    /opt/bin/wg show $WG_INTERFACE >/dev/null 2>&1 && ${CONFIG_DIR}wg_manager.sh $WG_INTERFACE "disable" "policy" || Say "WireGuard $Mode (Policy) service ('$WG_INTERFACE') NOT running."
+                        fi
+
+                    fi
+                done
+
+            /opt/bin/wg show all
+
+            ;;
+        restart)
+
+            [ -n "$(ifconfig $WG_INTERFACE 2>/dev/null | grep inet)" ] && { Say "$VERSION Restarting WireGuard VPN '$Mode' Peer ('$WG_INTERFACE') $DESC"; ${CONFIG_DIR}wg_server $WG_INTERFACE "disable"; sleep 1; }
+
+            if [ "$Mode" == "server" ] ; then
+
+                ${CONFIG_DIR}wg_server $WG_INTERFACE "disable"
+                ${CONFIG_DIR}wg_server $WG_INTERFACE
+
+                elif [ "$Mode" == "client" ] && [ "$Route" != "policy" ] ; then
+                    ${CONFIG_DIR}wg_manager.sh $WG_INTERFACE "disable"
+                    ${CONFIG_DIR}wg_manager.sh $WG_INTERFACE
+                else
+                    Say "...in Policy mode"
+                    ${CONFIG_DIR}wg_manager.sh $WG_INTERFACE "disable" "policy"
+                    ${CONFIG_DIR}wg_manager.sh $WG_INTERFACE "policy"
+            fi
+
+            /opt/bin/wg show all
+            ;;
+    esac
+
+    exit 0
+fi
+
+# Process ALL other CMD line requests
+#####################################
 case "$ACTION" in
     check|checkdebug)
         echo -e
@@ -881,14 +883,15 @@ EOF
                 Check_Module_Versions
 
                 echo -e $cRESET
-            ;;
+                ;;
         esac
         ;;
     "-h"|help)
+
             ShowHelp
         ;;
     *)
         ShowHelp
-    ;;
+        ;;
 esac
 #) 2>&1 | logger -t $(basename $0)"[$$_***DEBUG]"
