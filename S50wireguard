@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v1.03b2"
-#============================================================================================ © 2021 Martineau v1.03b2
+VERSION="v1.03"
+#============================================================================================ © 2021 Martineau v1.03
 #
 #       S50wireguard   {start|stop|restart|check|CreateConfig} [ [client [policy] |server]} [wg_instance] ]
 #
