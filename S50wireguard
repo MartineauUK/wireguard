@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v1.06b2"
-#============================================================================================ © 2021 Martineau v1.06b2
+VERSION="v1.07b"
+#============================================================================================ © 2021 Martineau v1.07b
 #
 #       S50wireguard   {start|stop|restart|check|create} [ [client [policy] |server]} [wg_instance] ]
 #
@@ -422,7 +422,7 @@ Display_QRCode() {
 
     if [ -f $FN ];then                                          # v1.05
         if [ -z "$ANS" ];then
-            echo -e $cBWHT"\tPress$cBRED y$cRESET to Display QRCode for EXPORT to device '$DEVICE_NAME' ${cRESET}or press$cBGRE [Enter] to SKIP."
+            echo -e $cBWHT"\tPress$cBRED y$cRESET to Display QR Code for EXPORT to device '$DEVICE_NAME' ${cRESET}or press$cBGRE [Enter] to SKIP."
             read -r "ANS"
         fi
         [ "$ANS" == "y" ] && { clear; qrencode -t ANSIUTF8 < $FN; }             # v1.05
@@ -788,6 +788,7 @@ EOF
 
         # Create Server template
         cat > ${CONFIG_DIR}wg21.conf << EOF
+# $HARDWARE_MODEL 'server' Peer #1 (wg21)
 [Interface]
 PrivateKey = This_should_be_replaced_with_$HARDWARE_MODEL_Private_Key
 ListenPort = 51820
@@ -795,6 +796,7 @@ ListenPort = 51820
 # e.g. Accept a WireGuard connection from say YOUR mobile device to the router
 # see '${CONFIG_DIR}mobilephone_private.key'
 
+# Example
 [Peer]
 PublicKey = This_should_be_replaced_with_the_Public_Key_of_YOUR_mobile_device
 AllowedIPs = 10.50.1.1/32
@@ -920,9 +922,11 @@ EOF
         # Create a Private/Public key-pair for your mobile phone etc.
         #           e.g. create   Nokia6310 tag="Best phone ever!"
         #
-        #  Default Allowed IP is 0.0.0.0/0 but 'createlanonly' uses enforces say 192.68.0.0/16
+        #  Default Allowed IP is 0.0.0.0/0 which forces ALL traffic via the remote 'server' Peer
+        #  but 'createlanonly' routes only the 'server' Per LAN e.g. LAN 192.68.0.0/16
 
         [ "$ACTION" == "createlanonly" ] && LAN_ONLY="Y"                        # v1.06
+        [ "$(nvram get ipv6_service)" != "disabled" ] && IPV6="Y"               # v1.07
 
         DEVICE_NAME=$2
         if [ -n "$DEVICE_NAME" ];then
@@ -963,12 +967,51 @@ EOF
                 [ "$ANS" != "y" ] && CREATE_DEVICE_CONFIG="N"
             fi
 
+            # Default route ALL traffic vi the remote 'server' Peer
             ALLOWED_IPS="0.0.0.0/0"
+            SPLIT_TXT=$(echo -e "\t\t# ALL Traffic")
 
             # Should the Peer ONLY have access to LAN ? e.g. 192.168.0.0/16         # v1.06
             LAN_ADDR=$(nvram get lan_ipaddr)
             LAN_SUBNET=${LAN_ADDR%.*}
-            [ "$LAN_ONLY" == "Y" ] && ALLOWED_IPS=$LAN_SUBNET".0/16"                # v1.06
+            if [ "$LAN_ONLY" == "Y" ];then
+
+                IP=
+                # Reuse the IP if device already exists in '/jffs/configs/WireguardVPN_map'
+                if [ -z "$(grep -F "# $DEVICE_NAME $TAG" /jffs/configs/WireguardVPN_map)" ];then
+                    DHCP_POOL=$(awk -v pattern="$SERVER_PEER" 'match($0,"^"pattern) {print $3}' /jffs/configs/WireguardVPN_map | tr '/' ' ' | awk '{print $1}') # v1.06
+                else
+                    IP=$(grep -w "$DEVICE_NAME" /jffs/configs/WireguardVPN_map | awk '{print $2}')  # v1.06
+                    sed -i "/# $DEVICE_NAME $TAG/d" /jffs/configs/WireguardVPN_map  # v1.06
+                fi
+                if [ -n "$DHCP_POOL" ] || [ -n "$IP" ];then                                     # v1.06 Hack
+
+                    if [ -z "$IP" ];then
+                        DHCP_POOL_SUBNET=${DHCP_POOL%.*}
+                        IP=$(grep -F "$DHCP_POOL_SUBNET." /jffs/configs/WireguardVPN_map | grep -Ev "^#" | grep -v "$SERVER_PEER" | awk '{print $2}' | sed 's~/32.*$~~g' | sort -n -t . -k 1,1 -k 2,2 -k 3,3 -k 4,4 | tail -n 1)
+                        IP=${IP##*.}        # 4th octet
+                        IP=$((IP+1))
+                    else
+                        IP=$(echo "$IP" | cut -d'.' -f3)
+                    fi
+
+                    if [ $IP -le 254 ];then
+                        [ "$IPV6" == "Y" ] && IPV6=", fc00:23:5::${IP}/128"     # v1.07
+                        IP=$DHCP_POOL_SUBNET"."$IP"/32"
+                    else
+                        echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) subnet MAX 254 reached '/jffs/configs/WireguardVPN_map'"
+                        exit 92
+                    fi
+
+                else
+                    echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) subnet NOT defined in '/jffs/configs/WireguardVPN_map'"
+                    exit 91
+                fi
+
+                SPLIT_TXT=$(echo -e "\t\t# Split Traffic LAN Only")
+            fi
+
+            ALLOWED_IPS=${IP}","$LAN_SUBNET".0/16"${IPV6}                # v1.07
 
             if [ "$CREATE_DEVICE_CONFIG" == "Y" ];then
                 cat > ${CONFIG_DIR}${DEVICE_NAME}.conf << EOF
@@ -981,7 +1024,7 @@ DNS = 1.1.1.1
 # $HARDWARE_MODEL 'server' ($SERVER_PEER)
 [Peer]
 PublicKey = $PUB_SERVER_KEY
-AllowedIPs = $ALLOWED_IPS
+AllowedIPs = $ALLOWED_IPS${SPLIT_TXT}
 Endpoint = $ROUTER_DDNS:51820
 PersistentKeepalive = 25
 EOF
@@ -992,41 +1035,21 @@ EOF
             echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED ADD device '$DEVICE_NAME' ${cRESET}to 'server' Peer ($SERVER_PEER) or press$cBGRE [Enter] to SKIP."
             read -r "ANS"
             if [ "$ANS" == "y" ];then
-                echo -e $cBCYA"\n\tAdding device Peer '$DEVICE_NAME' to $HARDWARE_MODEL 'server' (SERVER_PEER) and WireGuard config\n"
+                echo -e $cBCYA"\n\tAdding device Peer '$DEVICE_NAME' to $HARDWARE_MODEL 'server' ($SERVER_PEER) and WireGuard config\n"
                 if [ -z "$(grep "$DEVICE_NAME" ${CONFIG_DIR}${SERVER_PEER}.conf)" ];then
 
                     PUB_KEY=$(Convert_Key "$PUB_KEY")
-
-                    IP=
-                    # Reuse the IP if device already exists in '/jffs/configs/WireguardVPN_map'
-                    if [ -z "$(grep -F "# $DEVICE_NAME $TAG" /jffs/configs/WireguardVPN_map)" ];then
-                        DHCP_POOL=$(awk -v pattern="$SERVER_PEER" 'match($0,"^"pattern) {print $3}' /jffs/configs/WireguardVPN_map | tr '/' ' ' | awk '{print $1}') # v1.06
-                    else
-                        IP=$(grep -w "$DEVICE_NAME" /jffs/configs/WireguardVPN_map | awk '{print $2}')  # v1.06
-                        sed -i "/# $DEVICE_NAME $TAG/d" /jffs/configs/WireguardVPN_map  # v1.06
-                    fi
-                    if [ -n "$DHCP_POOL" ];then                                     # v1.06 Hack
-                        DHCP_POOL_SUBNET=${DHCP_POOL%.*}
-                        IP=$(grep -F "$DHCP_POOL_SUBNET." /jffs/configs/WireguardVPN_map | grep -Ev "^#" | grep -v "SERVER_PEER" | awk '{print $2}' | sed 's~/32.*$~~g' | sort -n -t . -k 1,1 -k 2,2 -k 3,3 -k 4,4 | tail -n 1)
-                        IP=${IP##*.}        # 4th octet
-                        IP=$((IP+1))
-
-                        [ $IP -le 254 ] && IP=$DHCP_POOL_SUBNET"."$IP"/32"
-                    else
-                        [ -z "$IP" ] && IP="0.0.0.0"                                                # v1.06
-                    fi
 
                     echo -e >> ${CONFIG_DIR}${SERVER_PEER}.conf
                     cat >> ${CONFIG_DIR}${SERVER_PEER}.conf << EOF
 # $DEVICE_NAME
 [Peer]
 PublicKey = $PUB_KEY
-AllowedIPs = $IP
+AllowedIPs = $ALLOWED_IPS${IPV6}
 EOF
                     tail -n 4 ${CONFIG_DIR}${SERVER_PEER}.conf
 
-                    # Add identifier to config
-                    IP=$(echo "$IP" | sed 's~/32.*$~~')
+                    # Add device IP address and identifier to config
                     TAG=$(echo "$@" | sed -n "s/^.*tag=//p" | awk '{print $0}')
                     [ -z "$TAG" ] && TAG="Device"                                   # v1.03
 
