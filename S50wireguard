@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v1.06b"
-#============================================================================================ © 2021 Martineau v1.06b
+VERSION="v1.06b2"
+#============================================================================================ © 2021 Martineau v1.06b2
 #
 #       S50wireguard   {start|stop|restart|check|create} [ [client [policy] |server]} [wg_instance] ]
 #
@@ -228,10 +228,10 @@ _Get_File() {
             ;;
     esac
 
-# User Space Tools
-WEBFILE=$(echo "$WEBFILE_NAMES" | awk '{print $4}')
-echo -e $cBCYA"\n\tDownloading WireGuard User space Tools$cBWHT '$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO)"$cRESET
-_Get_File  "$WEBFILE" "NOMSG"
+    # User Space Tools
+    WEBFILE=$(echo "$WEBFILE_NAMES" | awk '{print $4}')
+    echo -e $cBCYA"\n\tDownloading WireGuard User space Tools$cBWHT '$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO)"$cRESET
+    _Get_File  "$WEBFILE" "NOMSG"
 }
 Load_Module_UserspaceTool() {                                           # v1.03
     if [ ! -d /tmp/wireguard ];then
@@ -425,7 +425,7 @@ Display_QRCode() {
             echo -e $cBWHT"\tPress$cBRED y$cRESET to Display QRCode for EXPORT to device '$DEVICE_NAME' ${cRESET}or press$cBGRE [Enter] to SKIP."
             read -r "ANS"
         fi
-        [ "$ANS" == "y" ] && { clear; qrencode -t ansiutf8 < $FN; }             # v1.05
+        [ "$ANS" == "y" ] && { clear; qrencode -t ANSIUTF8 < $FN; }             # v1.05
     fi
 }
 
@@ -794,6 +794,7 @@ ListenPort = 51820
 
 # e.g. Accept a WireGuard connection from say YOUR mobile device to the router
 # see '${CONFIG_DIR}mobilephone_private.key'
+
 [Peer]
 PublicKey = This_should_be_replaced_with_the_Public_Key_of_YOUR_mobile_device
 AllowedIPs = 10.50.1.1/32
@@ -915,10 +916,14 @@ EOF
 
         echo -e $cBGRE"\n\tWireGuard Uninstall complete for $HARDWARE_MODEL (v$BUILDNO)\n"$cRESET
         ;;
-    create)                                                            # {name} [{tag="desciption{"}}]     # v1.03
+    create|createlanonly)                                                            # {name} [{tag="desciption{"}}]     # v1.03
         # Create a Private/Public key-pair for your mobile phone etc.
-        #           e.g. genkeys   Nokia6310 tag="Best phone ever!"
+        #           e.g. create   Nokia6310 tag="Best phone ever!"
         #
+        #  Default Allowed IP is 0.0.0.0/0 but 'createlanonly' uses enforces say 192.68.0.0/16
+
+        [ "$ACTION" == "createlanonly" ] && LAN_ONLY="Y"                        # v1.06
+
         DEVICE_NAME=$2
         if [ -n "$DEVICE_NAME" ];then
             echo -e $cBCYA"\n\tCreating Wireguard Private/Public key pair for device '$DEVICE_NAME'"$cBYEL
@@ -928,12 +933,12 @@ EOF
             # Generate the Peer config to be imported into the device
             PUB_KEY=$(cat ${CONFIG_DIR}${DEVICE_NAME}_public.key)
             # Use the first 'server' Peer if it is ACTIVE
-            ACTIVE_SERVER_PEER="$(wg show interfaces | awk '{print $1}')"
+            SERVER_PEER="$(wg show interfaces | awk '{print $1}')"
             PUB_SERVER_KEY=
             # Use the Public key of the ACTIVE 'server' Peer for instant testing! although the 'server' Peer needs to be restarted? # v1.06
-            if [ -n "$ACTIVE_SERVER_PEER" ];then
-                PUB_SERVER_KEY=$(wg show "$ACTIVE_SERVER_PEER" | awk '/public key:/ {print $3}')        # v1.06
-                echo -e $cBCYA"\tUsing 'server' Peer '"$ACTIVE_SERVER_PEER"'\n"
+            if [ -n "$SERVER_PEER" ];then
+                PUB_SERVER_KEY=$(wg show "$SERVER_PEER" | awk '/public key:/ {print $3}')        # v1.06
+                echo -e $cBCYA"\tUsing 'server' Peer '"$SERVER_PEER"'\n"
             else
                 # Extract the Public keys from the first 'server' Peer Public key file  # v1.06
                 for I in 1 2
@@ -941,6 +946,7 @@ EOF
                         if [ -f ${CONFIG_DIR}server2${I}_public.key ];then
                             PUB_SERVER_KEY=$(awk '{print $1}' ${CONFIG_DIR}server2${I}_public.key)  #v1.06
                             echo -e $cBCYA"\tUsing 'server' Peer 'wg2"${I}"'s Public\n"
+                            SERVER_PEER="wg2"${I}                                   # v1.06
                             break
                         fi
                     done
@@ -950,66 +956,84 @@ EOF
             ROUTER_DDNS=$(nvram get ddns_hostname_x)
             [ -z "$ROUTER_DDNS" ] && ROUTER_DDNS="DDNS_of_YOUR_home_$HARDWARE_MODEL"
             CREATE_DEVICE_CONFIG="Y"
-            if [ ! -f ${CONFIG_DIR}${DEVICE_NAME}.conf ];then
+            if [ -f ${CONFIG_DIR}${DEVICE_NAME}.conf ];then
                 echo -e $cRED"\a\tWarning: Peer device ${cBMAG}'$DEVICE_NAME'${cRESET}${cRED} WireGuard config already EXISTS!"
                 echo -e $cRESET"\tPress$cBRED y$cRESET to$cBRED ${aBOLD}CONFIRM${cRESET}${cBRED} Overwriting Peer device ${cBMAG}'$DEVICE_NAME.config'${cRESET} or press$cBGRE [Enter] to SKIP."
-            read -r "ANS"
+                read -r "ANS"
                 [ "$ANS" != "y" ] && CREATE_DEVICE_CONFIG="N"
             fi
+
+            ALLOWED_IPS="0.0.0.0/0"
+
+            # Should the Peer ONLY have access to LAN ? e.g. 192.168.0.0/16         # v1.06
+            LAN_ADDR=$(nvram get lan_ipaddr)
+            LAN_SUBNET=${LAN_ADDR%.*}
+            [ "$LAN_ONLY" == "Y" ] && ALLOWED_IPS=$LAN_SUBNET".0/16"                # v1.06
+
             if [ "$CREATE_DEVICE_CONFIG" == "Y" ];then
                 cat > ${CONFIG_DIR}${DEVICE_NAME}.conf << EOF
-#$DEVICE_NAME
+# $DEVICE_NAME
 [Interface]
 PrivateKey = $PRI_KEY
 Address = 10.81.196.55/24
 DNS = 1.1.1.1
 
+# $HARDWARE_MODEL 'server' ($SERVER_PEER)
 [Peer]
 PublicKey = $PUB_SERVER_KEY
-AllowedIPs = 0.0.0.0/0
+AllowedIPs = $ALLOWED_IPS
 Endpoint = $ROUTER_DDNS:51820
 PersistentKeepalive = 25
 EOF
 
+            echo -e $cBGRE"\n\tWireGuard config for Peer device '${DEVICE_NAME}' created (Allowed IP's $ALLOWED_IPS)\n"$cRESET
             fi
 
-            echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED ADD device '$DEVICE_NAME' ${cRESET}to 'server' Peer ($ACTIVE_SERVER_PEER) or press$cBGRE [Enter] to SKIP."
+            echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED ADD device '$DEVICE_NAME' ${cRESET}to 'server' Peer ($SERVER_PEER) or press$cBGRE [Enter] to SKIP."
             read -r "ANS"
             if [ "$ANS" == "y" ];then
-                echo -e $cBCYA"\n\tAdding device Peer '$DEVICE_NAME' to $HARDWARE_MODEL 'server' (ACTIVE_SERVER_PEER) and WireGuard config\n"
-                if [ -z "$(grep "$DEVICE_NAME" ${CONFIG_DIR}${ACTIVE_SERVER_PEER}.conf)" ];then
+                echo -e $cBCYA"\n\tAdding device Peer '$DEVICE_NAME' to $HARDWARE_MODEL 'server' (SERVER_PEER) and WireGuard config\n"
+                if [ -z "$(grep "$DEVICE_NAME" ${CONFIG_DIR}${SERVER_PEER}.conf)" ];then
 
                     PUB_KEY=$(Convert_Key "$PUB_KEY")
 
-                    DHCP_POOL=$(awk -v pattern="$ACTIVE_SERVER_PEER" '/^pattern/ {print $3}' /jffs/configs/WireguardVPN_map | tr '/' ' ' | awk '{print $1}')
-
+                    IP=
+                    # Reuse the IP if device already exists in '/jffs/configs/WireguardVPN_map'
+                    if [ -z "$(grep -F "# $DEVICE_NAME $TAG" /jffs/configs/WireguardVPN_map)" ];then
+                        DHCP_POOL=$(awk -v pattern="$SERVER_PEER" 'match($0,"^"pattern) {print $3}' /jffs/configs/WireguardVPN_map | tr '/' ' ' | awk '{print $1}') # v1.06
+                    else
+                        IP=$(grep -w "$DEVICE_NAME" /jffs/configs/WireguardVPN_map | awk '{print $2}')  # v1.06
+                        sed -i "/# $DEVICE_NAME $TAG/d" /jffs/configs/WireguardVPN_map  # v1.06
+                    fi
                     if [ -n "$DHCP_POOL" ];then                                     # v1.06 Hack
                         DHCP_POOL_SUBNET=${DHCP_POOL%.*}
-                        IP=$(grep -F "$DHCP_POOL_SUBNET." /jffs/configs/WireguardVPN_map | grep -Ev "^#" | grep -v "ACTIVE_SERVER_PEER" | awk '{print $2}' | sed 's~/32.*$~~g' | sort -n -t . -k 1,1 -k 2,2 -k 3,3 -k 4,4 | tail -n 1)
+                        IP=$(grep -F "$DHCP_POOL_SUBNET." /jffs/configs/WireguardVPN_map | grep -Ev "^#" | grep -v "SERVER_PEER" | awk '{print $2}' | sed 's~/32.*$~~g' | sort -n -t . -k 1,1 -k 2,2 -k 3,3 -k 4,4 | tail -n 1)
                         IP=${IP##*.}        # 4th octet
                         IP=$((IP+1))
 
                         [ $IP -le 254 ] && IP=$DHCP_POOL_SUBNET"."$IP"/32"
                     else
-                        IP="0.0.0.0"
+                        [ -z "$IP" ] && IP="0.0.0.0"                                                # v1.06
                     fi
-                    echo -e >> ${CONFIG_DIR}${ACTIVE_SERVER_PEER}.conf
-                    cat >> ${CONFIG_DIR}${ACTIVE_SERVER_PEER}.conf << EOF
-#$DEVICE_NAME
+
+                    echo -e >> ${CONFIG_DIR}${SERVER_PEER}.conf
+                    cat >> ${CONFIG_DIR}${SERVER_PEER}.conf << EOF
+# $DEVICE_NAME
 [Peer]
 PublicKey = $PUB_KEY
 AllowedIPs = $IP
 EOF
-                    tail -n 4 ${CONFIG_DIR}${ACTIVE_SERVER_PEER}.conf
+                    tail -n 4 ${CONFIG_DIR}${SERVER_PEER}.conf
 
                     # Add identifier to config
                     IP=$(echo "$IP" | sed 's~/32.*$~~')
                     TAG=$(echo "$@" | sed -n "s/^.*tag=//p" | awk '{print $0}')
                     [ -z "$TAG" ] && TAG="Device"                                   # v1.03
+
                     [ -z "$(grep "$PUB_KEY" /jffs/configs/WireguardVPN_map)" ] && echo -e "$PUB_KEY      $IP     # $DEVICE_NAME $TAG" >> /jffs/configs/WireguardVPN_map     # v.03
                     tail -n 1 /jffs/configs/WireguardVPN_map
                     else
-                        echo -e $cBRED"\a\n\t***ERROR 'client' Peer device$cRESET '$DEVICE_NAME'$cBRED already defined in ${cRESET}'server' ($ACTIVE_SERVER_PEER)\n"$cRESET
+                        echo -e $cBRED"\a\n\t***ERROR 'client' Peer device$cRESET '$DEVICE_NAME'$cBRED already defined in ${cRESET}'server' ($SERVER_PEER)\n"$cRESET
                     fi
                 fi
 
