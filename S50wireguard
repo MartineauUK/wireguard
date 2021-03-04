@@ -1,8 +1,8 @@
 #!/bin/sh
-VERSION="v1.03"
-#============================================================================================ © 2021 Martineau v1.03
+VERSION="v1.06b"
+#============================================================================================ © 2021 Martineau v1.06b
 #
-#       S50wireguard   {start|stop|restart|check|CreateConfig} [ [client [policy] |server]} [wg_instance] ]
+#       S50wireguard   {start|stop|restart|check|create} [ [client [policy] |server]} [wg_instance] ]
 #
 #       S50wireguard   start 0
 #                      Initialises remote peer 'client' 'wg0'
@@ -24,7 +24,7 @@ VERSION="v1.03"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 03-Mar-2021
+# Last Updated Date: 04-Mar-2021
 #
 # Description:
 #
@@ -188,48 +188,55 @@ Check_Version_Update() {
 
 }
 Download_Modules() {                                                    # v1.03
-
+_Get_File() {
+    local WEBFILE=$1
+    [ -z "$2" ] && echo -e $cBCYA"\n\tDownloading WireGuard Kernel module ${cBWHT}'$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO)..."$cRESET
+    echo -e $cBGRA
+    curl -# -fL --retry 3 https://github.com/odkrys/entware-makefile-for-merlin/raw/main/${WEBFILE} -o ${DIR}${WEBFILE}
+}
     local ROUTER=$1
     local DIR="/tmp/wireguard/"
 
     [ ! -d $DIR ] && mkdir $DIR
 
-    local FILES=$(curl -#${SILENT}fL https://www.snbforums.com/threads/experimental-wireguard-for-hnd-platform-4-1-x-kernels.46164/ | grep "<a href=.*odkrys.*wireguard" | grep -oE "wireguard.*") | tr '\n' ' '
+    local WEBFILE_NAMES=$(curl -${SILENT}fL https://www.snbforums.com/threads/experimental-wireguard-for-hnd-platform-4-1-x-kernels.46164/ | grep "<a href=.*odkrys.*wireguard" | grep -oE "wireguard.*" | sed 's/\"//g' | tr '\n' ' ')
 
+    # The file list MAY NOT ALWAYS be in the correct Router Model order for the following 'case' statement?
     case $ROUTER in
 
         RT-AC86U|GT-AC2900)     # RT-AC86U, GT-AC2900 - 4.1.27
-            curl -#${SILENT}fL --retry 3 https://github.com/odkrys/entware-makefile-for-merlin/raw/main/wireguard-kernel_1.0.20210219-k27_aarch64-3.10.ipk -o ${DIR}wireguard-kernel_1.0.20210219-k27_aarch64-3.10.ipk
+            _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $1}')"
             ;;
         RT-AX88U|GT-AX11000)    # RT-AX88U, GT-AX11000 - 4.1.51
-            curl -#${SILENT}fL --retry 3 https://github.com/odkrys/entware-makefile-for-merlin/raw/main/wireguard-kernel_1.0.20210219-k51_aarch64-3.10.ipk -o ${DIR}wireguard-kernel_1.0.20210219-k51_aarch64-3.10.ipk
+            _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $2}')"
             ;;
         RT-AX68U|RT-AX86U)      # RT-AX68U, RT-AX86U - 4.1.52
-            curl -#${SILENT}fL --retry 3 https://github.com/odkrys/entware-makefile-for-merlin/raw/main/wireguard-kernel_1.0.20210219-k52_aarch64-3.10.ipk -o ${DIR}wireguard-kernel_1.0.20210219-k52_aarch64-3.10.ipk
+            _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $3}')"
             ;;
         *)
-            echo -e $cBRED"\a\n\tERROR: Unable to find Wireguard Kernel module for $ROUTER (v$BUILDNO)\n"$cRESET
+            echo -e $cBRED"\a\n\t***ERROR: Unable to find WireGuard Kernel module for $ROUTER (v$BUILDNO)\n"$cRESET
             # Deliberately Download an incompatible file simply so that an error message is produced by 'opkg install*.ipk'
             #
             #       Unknown package 'wireguard-kernel'.
             #       Collected errors:
             #        * pkg_hash_fetch_best_installation_candidate: Packages for wireguard-kernel found, but incompatible with the architectures configured
             #        * opkg_install_cmd: Cannot install package wireguard-kernel.
-
             #
-            curl -#${SILENT}fL --retry 3 https://github.com/odkrys/entware-makefile-for-merlin/raw/main/wireguard-kernel_1.0.20210219-k27_aarch64-3.10.ipk -o ${DIR}wireguard-kernel_1.0.20210219-k27_aarch64-3.10.ipk
+            #
+            _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $1}')"
             ROUTER_COMPATIBLE="N"
             ;;
     esac
 
 # User Space Tools
-echo -e $cBCYA"\n\tRetrieving WireGuard User space Tools for $ROUTER (v$BUILDNO)"$cRESET
-curl -#${SILENT}fL --retry 3 https://github.com/odkrys/entware-makefile-for-merlin/raw/main/wireguard-tools_1.0.20210223-1_aarch64-3.10.ipk -o /tmp/wireguard/wireguard-tools_1.0.20210223-1_aarch64-3.10.ipk
+WEBFILE=$(echo "$WEBFILE_NAMES" | awk '{print $4}')
+echo -e $cBCYA"\n\tDownloading WireGuard User space Tools$cBWHT '$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO)"$cRESET
+_Get_File  "$WEBFILE" "NOMSG"
 }
 Load_Module_UserspaceTool() {                                           # v1.03
     if [ ! -d /tmp/wireguard ];then
         echo -e $cRED"\a\n\tNo modules found - '/tmp/wireguard doesn't exist'\n"
-        echo -e "\tPress$cBRED y$cRESET to$cBRED retrieve WireGuard Kernel and Userspace Tools modules ${cRESET} or press$cBGRE [Enter] to SKIP."
+        echo -e "\tPress$cBRED y$cRESET to$cBRED DOWNLOAD WireGuard Kernel and Userspace Tools modules ${cRESET} or press$cBGRE [Enter] to SKIP."
             read -r "ANS"
             if [ "$ANS" == "y" ];then
                 Download_Modules $HARDWARE_MODEL
@@ -258,7 +265,7 @@ Load_Module_UserspaceTool() {                                           # v1.03
         echo -e $cBGRA"\t"$(dmesg | grep -a "wireguard: Copyright")"\n"$cRESET
         return 0
     else
-        echo -e $cBRED"\a\n\t***ERROR: Unable to retrieve WireGuard Kernel and Userspace Tools modules\n"
+        echo -e $cBRED"\a\n\t***ERROR: Unable to DOWNLOAD WireGuard Kernel and Userspace Tools modules\n"
         return 1
     fi
 
@@ -279,9 +286,18 @@ Check_Module_Versions() {
     echo -e $cBGRA"\t"$(dmesg | grep -a "WireGuard")
     echo -e $cBGRA"\t"$(dmesg | grep -a "wireguard: Copyright")"\n"$cRESET
 
+    # Without a BOOT, there may be a mismatch
+    local BOOTLOADED=$(dmesg | grep -a WireGuard | awk '{print $3}')
+    local WGKERNEL=$(opkg list-installed | grep "wireguard-kernel" | awk '{print $3}' | sed 's/\-.*$//')
+    local WGTOOLS=$(opkg list-installed | grep "wireguard-tools" | awk '{print $3}' | sed 's/\-.*$//')
+
+    if [ -n "$WGKERNEL" ];then                  # v1.04
+        [ "$WGKERNEL" != "$BOOTLOADED" ] && echo -e $cRED"\a\n\tWarning Reboot required for (dmesg) WireGuard $WGKERNEL $BOOTLOADED\n"
+    fi
+
     Show_MD5
-    [ -z "$(echo "$FILES" | grep -F "$(awk '{print $2}' ${CONFIG_DIR}wireguard-kernel.md5)")" ] && { echo -e $cBYEL"\t\tKernel UPDATE available" $FILE; local UPDATES="Y"; }
-    [ -z "$(echo "$FILES" | grep -F "$(awk '{print $2}' ${CONFIG_DIR}wireguard-tools.md5)")"  ] && { echo -e $cBYEL"\t\tTools UPDATE available" $FILE; local UPDATES="Y"; }
+    [ -z "$(echo "$FILES" | grep -F "$WGKERNEL")" ] && { echo -e $cBYEL"\t\tKernel UPDATE available" $FILE; local UPDATES="Y"; }
+    [ -z "$(echo "$FILES" | grep -F "$WGTOOLS")" ] && { echo -e $cBYEL"\t\tUserspace Tools UPDATE available" $FILE; local UPDATES="Y"; }
 
     if [ "$UPDATES" == "Y" ];then
         echo -e $cRESET"\n\tPress$cBRED y$cRESET to$cBRED Update WireGuard Kernel and Userspace Tools${cRESET} or press$cBGRE [Enter] to SKIP."
@@ -295,6 +311,53 @@ Check_Module_Versions() {
     else
         echo -e $cBWHT"\n\tWireGuard Kernel and Userspace Tool up to date.\n"$cRESET
     fi
+}
+Manage_alias() {
+
+    case $1 in
+        del)
+            echo -e $cBWHT"\n\tDeleting aliases for $SCRIPT_NAME\n"$cRESET
+            sed -i "/$SCRIPT_NAME/d" /jffs/configs/profile.add
+            unalias "wgstart"
+            unalias "wgstop"
+            unalias "wgr"
+            unalias "wgd"
+            unalias "wgm"
+            echo -e $cRESET
+        ;;
+        "?")
+            # type wgstart
+            # type wgstop
+            # type wgr
+            # type wgd
+            # type wgm
+            # alias | grep $SCRIPT_NAME
+            echo -e $cRESET"\n\tAlias info not available\n"
+
+        ;;
+        *)
+        # Create Alias
+            if [ -z "$(grep "$SCRIPT_NAME" /jffs/configs/profile.add)" ];then
+                echo -e $cBWHT"\n\tCreating aliases and shell functions for $SCRIPT_NAME\n"$cRESET
+                alias wgstart='/opt/etc/init.d/$SCRIPT_NAME start'
+                echo "alias wgstart='/opt/etc/init.d/$SCRIPT_NAME start'"               >>/jffs/configs/profile.add
+
+                alias wgstop='/opt/etc/init.d/$SCRIPT_NAME stop'
+                echo "alias wgstop='/opt/etc/init.d/$SCRIPT_NAME stop'"                 >>/jffs/configs/profile.add
+
+                alias wgr='/opt/etc/init.d/$SCRIPT_NAME check'
+                echo "alias wgr='/opt/etc/init.d/$SCRIPT_NAME check'"                   >>/jffs/configs/profile.add
+
+                alias wgd='/opt/etc/init.d/$SCRIPT_NAME checkdebug'
+                echo "alias wgd='/opt/etc/init.d/$SCRIPT_NAME checkdebug'"              >>/jffs/configs/profile.add
+
+                # Shell function!
+                echo -e "wgm()  { /opt/etc/init.d/$SCRIPT_NAME \$@; }"                  >>/jffs/configs/profile.add
+            else
+                echo -e $cRED"\n\tWarning: Aliases and shell functions for $SCRIPT_NAME already exist\n"$cRESET
+            fi
+        ;;
+    esac
 }
 Create_Sample_Config() {
 
@@ -351,6 +414,20 @@ Convert_Key() {
 
     echo "$KEY"
 }
+Display_QRCode() {
+
+    local FN=$1
+    local ANS=
+    local ANS=$2
+
+    if [ -f $FN ];then                                          # v1.05
+        if [ -z "$ANS" ];then
+            echo -e $cBWHT"\tPress$cBRED y$cRESET to Display QRCode for EXPORT to device '$DEVICE_NAME' ${cRESET}or press$cBGRE [Enter] to SKIP."
+            read -r "ANS"
+        fi
+        [ "$ANS" == "y" ] && { clear; qrencode -t ansiutf8 < $FN; }             # v1.05
+    fi
+}
 
 #For verbose debugging, uncomment the following two lines, and uncomment the last line of this script
 #set -x
@@ -367,6 +444,7 @@ HARDWARE_MODEL=$(Get_Router_Model)
 # v384.13+ NVRAM variable 'lan_hostname' supersedes 'computer_name'
 [ -n "$(nvram get computer_name)" ] && MYROUTER=$(nvram get computer_name) || MYROUTER=$(nvram get lan_hostname)
 BUILDNO=$(nvram get buildno)
+SCRIPT_NAME="${0##*/}"
 
 TS=$(date +"%Y%m%d-%H%M%S")    # current date and time 'yyyymmdd-hhmmss'
 
@@ -379,6 +457,8 @@ if [ "$(nvram get ntp_ready)" = "0" ];then              # Ensure event 'restart_
 #else
     #Say "$VERSION $1 WireGuard NTP is Ready"
 fi
+
+[ "$1" == "debug" ] && { shift; set -x; }
 
 ACTION=$1
 TYPE=$2
@@ -674,13 +754,13 @@ case "$ACTION" in
         fi
 
         if [ -d /opt/etc/wireguard ];then
-            echo -e $cBCYA"\n\tRetrieving scripts 'wg_manager.sh/wg_server'\n"$cRESET
+            echo -e $cBCYA"\n\tDownloading scripts 'wg_manager.sh/wg_server'\n"$cRESET
             curl -# -L --retry 3 "https://raw.githubusercontent.com/MartineauUK/wireguard/main/wg_manager.sh" -o "${CONFIG_DIR}wg_manager.sh" && chmod 755 "${CONFIG_DIR}wg_manager.sh"
             curl -# -L --retry 3 "https://raw.githubusercontent.com/MartineauUK/wireguard/main/wg_server"     -o "${CONFIG_DIR}wg_server"  && chmod 755 "${CONFIG_DIR}wg_server"
         fi
 
         # Kernel module
-        echo -e $cBCYA"\n\tRetrieving Wireguard Kernel module for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
+        echo -e $cBCYA"\n\tDownloading Wireguard Kernel module for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
 
         ROUTER_COMPATIBLE="Y"
 
@@ -692,6 +772,7 @@ case "$ACTION" in
 
         # Create dummy 'Client' and 'Server' templates
         echo -e $cBCYA"\n\tCreating WireGuard 'Client' and 'Server' Peer templates 'wg11.conf' and wg21.conf'"$cRESET
+        opkg install qrencode
         cat > ${CONFIG_DIR}wg11.conf << EOF
 [Interface]
 #Address = 10.10.10.2/24
@@ -771,18 +852,23 @@ EOF
             # rm -rF /tmp/wireguard
         fi
 
-        # Create Alias
-        if [ -z "$(grep "S50wireguard" /jffs/configs/profile.add)" ];then
-            echo "alias wgstart='/opt/etc/init.d/S50wireguard start'"               >>/jffs/configs/profile.add
-            echo "alias wgstop='/opt/etc/init.d/S50wireguard stop'"                 >>/jffs/configs/profile.add
-            echo "alias wgr='/opt/etc/init.d/S50wireguard check'"                   >>/jffs/configs/profile.add
-            echo "alias wgd='/opt/etc/init.d/S50wireguard checkdebug'"              >>/jffs/configs/profile.add
-        fi
+        Display_QRCode "${CONFIG_DIR}wg11.conf"             # v1.05
+
+        Manage_alias
+
+        ;;
+    alias)                                                  # ['del']
+
+        Manage_alias $2                                     # v1.05
+
+        ;;
+    getmodules)
+
+        Download_Modules $HARDWARE_MODEL
         ;;
     loadmodules)
 
-        Load_Modules
-
+        Load_Module_UserspaceTool
         ;;
     usedns)
         #cp ${CONFIG_DIR}S50wireguard /opt/etc/init.d
@@ -797,6 +883,16 @@ EOF
     createconfig)
 
         Create_Sample_Config
+
+        ;;
+    qrcode*)                                                    # {interface[.conf]}
+
+        if [ -n "$2" ];then
+            [ -z "$(echo "$2" | grep -E "\.conf$")" ] && SUFFIX=".conf"
+            [ -f  ${CONFIG_DIR}${2}${SUFFIX} ] && Display_QRCode "${CONFIG_DIR}${2}${SUFFIX}" "y" || echo -e $cBRED"\a\n\t***ERROR Invalid Peer config '${CONFIG_DIR}${2}${SUFFIX}'\n"$cRESET       # v1.05
+        else
+            echo -e $cBRED"\a\n\t***ERROR Missing/invalid Peer config\n"$cRESET
+        fi
 
         ;;
     uninstall)
@@ -819,7 +915,7 @@ EOF
 
         echo -e $cBGRE"\n\tWireGuard Uninstall complete for $HARDWARE_MODEL (v$BUILDNO)\n"$cRESET
         ;;
-    genkeys)                                                            # {name} [{tag="desciption{"}}]     # v1.03
+    create)                                                            # {name} [{tag="desciption{"}}]     # v1.03
         # Create a Private/Public key-pair for your mobile phone etc.
         #           e.g. genkeys   Nokia6310 tag="Best phone ever!"
         #
@@ -828,29 +924,83 @@ EOF
             echo -e $cBCYA"\n\tCreating Wireguard Private/Public key pair for device '$DEVICE_NAME'"$cBYEL
             wg genkey | tee ${CONFIG_DIR}${2}_private.key | wg pubkey | tee ${CONFIG_DIR}${2}_public.key
             echo -e $cBYEL"\n\tDevice '"$DEVICE_NAME"' Public key="$(cat ${CONFIG_DIR}${2}_public.key)"\n"$cRESET
-            echo -e "\tPress$cBRED y$cRESET to$cBRED ADD device '$DEVICE_NAME' ${cRESET}to 'server' Peer (wg21) or press$cBGRE [Enter] to SKIP."
+
+            # Generate the Peer config to be imported into the device
+            PUB_KEY=$(cat ${CONFIG_DIR}${DEVICE_NAME}_public.key)
+            # Use the first 'server' Peer if it is ACTIVE
+            ACTIVE_SERVER_PEER="$(wg show interfaces | awk '{print $1}')"
+            PUB_SERVER_KEY=
+            # Use the Public key of the ACTIVE 'server' Peer for instant testing! although the 'server' Peer needs to be restarted? # v1.06
+            if [ -n "$ACTIVE_SERVER_PEER" ];then
+                PUB_SERVER_KEY=$(wg show "$ACTIVE_SERVER_PEER" | awk '/public key:/ {print $3}')        # v1.06
+                echo -e $cBCYA"\tUsing 'server' Peer '"$ACTIVE_SERVER_PEER"'\n"
+            else
+                # Extract the Public keys from the first 'server' Peer Public key file  # v1.06
+                for I in 1 2
+                    do
+                        if [ -f ${CONFIG_DIR}server2${I}_public.key ];then
+                            PUB_SERVER_KEY=$(awk '{print $1}' ${CONFIG_DIR}server2${I}_public.key)  #v1.06
+                            echo -e $cBCYA"\tUsing 'server' Peer 'wg2"${I}"'s Public\n"
+                            break
+                        fi
+                    done
+            fi
+
+            PRI_KEY=$(cat ${CONFIG_DIR}${DEVICE_NAME}_private.key)
+            ROUTER_DDNS=$(nvram get ddns_hostname_x)
+            [ -z "$ROUTER_DDNS" ] && ROUTER_DDNS="DDNS_of_YOUR_home_$HARDWARE_MODEL"
+            CREATE_DEVICE_CONFIG="Y"
+            if [ ! -f ${CONFIG_DIR}${DEVICE_NAME}.conf ];then
+                echo -e $cRED"\a\tWarning: Peer device ${cBMAG}'$DEVICE_NAME'${cRESET}${cRED} WireGuard config already EXISTS!"
+                echo -e $cRESET"\tPress$cBRED y$cRESET to$cBRED ${aBOLD}CONFIRM${cRESET}${cBRED} Overwriting Peer device ${cBMAG}'$DEVICE_NAME.config'${cRESET} or press$cBGRE [Enter] to SKIP."
+            read -r "ANS"
+                [ "$ANS" != "y" ] && CREATE_DEVICE_CONFIG="N"
+            fi
+            if [ "$CREATE_DEVICE_CONFIG" == "Y" ];then
+                cat > ${CONFIG_DIR}${DEVICE_NAME}.conf << EOF
+#$DEVICE_NAME
+[Interface]
+PrivateKey = $PRI_KEY
+Address = 10.81.196.55/24
+DNS = 1.1.1.1
+
+[Peer]
+PublicKey = $PUB_SERVER_KEY
+AllowedIPs = 0.0.0.0/0
+Endpoint = $ROUTER_DDNS:51820
+PersistentKeepalive = 25
+EOF
+
+            fi
+
+            echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED ADD device '$DEVICE_NAME' ${cRESET}to 'server' Peer ($ACTIVE_SERVER_PEER) or press$cBGRE [Enter] to SKIP."
             read -r "ANS"
             if [ "$ANS" == "y" ];then
-                echo -e $cBCYA"\n\tAdding device Peer '$DEVICE_NAME' to $HARDWARE_MODEL 'server' (wg21) and WireGuard config\n"
-                if [ -z "$(grep "$DEVICE_NAME" ${CONFIG_DIR}wg21.conf)" ];then
+                echo -e $cBCYA"\n\tAdding device Peer '$DEVICE_NAME' to $HARDWARE_MODEL 'server' (ACTIVE_SERVER_PEER) and WireGuard config\n"
+                if [ -z "$(grep "$DEVICE_NAME" ${CONFIG_DIR}${ACTIVE_SERVER_PEER}.conf)" ];then
 
-                    PUB_KEY=$(cat ${CONFIG_DIR}${DEVICE_NAME}_public.key)
                     PUB_KEY=$(Convert_Key "$PUB_KEY")
 
-                    DHCP_POOL=$(awk '/^wg21/ {print $3}' /jffs/configs/WireguardVPN_map | tr '/' ' ' | awk '{print $1}')
-                    DHCP_POOL_SUBNET=${DHCP_POOL%.*}
-                    IP=$(grep -F "$DHCP_POOL_SUBNET." /jffs/configs/WireguardVPN_map | grep -Ev "^#" | grep -v "wg21" | awk '{print $2}' | sed 's~/32.*$~~g' | sort -n -t . -k 1,1 -k 2,2 -k 3,3 -k 4,4 | tail -n 1)
-                    IP=${IP##*.}        # 4th octet
-                    IP=$((IP+1))
-                    [ $IP -le 254 ] && IP=$DHCP_POOL_SUBNET"."$IP"/32"
-                    echo -e >> ${CONFIG_DIR}wg21.conf
-                    cat >> ${CONFIG_DIR}wg21.conf << EOF
+                    DHCP_POOL=$(awk -v pattern="$ACTIVE_SERVER_PEER" '/^pattern/ {print $3}' /jffs/configs/WireguardVPN_map | tr '/' ' ' | awk '{print $1}')
+
+                    if [ -n "$DHCP_POOL" ];then                                     # v1.06 Hack
+                        DHCP_POOL_SUBNET=${DHCP_POOL%.*}
+                        IP=$(grep -F "$DHCP_POOL_SUBNET." /jffs/configs/WireguardVPN_map | grep -Ev "^#" | grep -v "ACTIVE_SERVER_PEER" | awk '{print $2}' | sed 's~/32.*$~~g' | sort -n -t . -k 1,1 -k 2,2 -k 3,3 -k 4,4 | tail -n 1)
+                        IP=${IP##*.}        # 4th octet
+                        IP=$((IP+1))
+
+                        [ $IP -le 254 ] && IP=$DHCP_POOL_SUBNET"."$IP"/32"
+                    else
+                        IP="0.0.0.0"
+                    fi
+                    echo -e >> ${CONFIG_DIR}${ACTIVE_SERVER_PEER}.conf
+                    cat >> ${CONFIG_DIR}${ACTIVE_SERVER_PEER}.conf << EOF
 #$DEVICE_NAME
 [Peer]
 PublicKey = $PUB_KEY
 AllowedIPs = $IP
 EOF
-                    tail -n 4 ${CONFIG_DIR}wg21.conf
+                    tail -n 4 ${CONFIG_DIR}${ACTIVE_SERVER_PEER}.conf
 
                     # Add identifier to config
                     IP=$(echo "$IP" | sed 's~/32.*$~~')
@@ -859,17 +1009,21 @@ EOF
                     [ -z "$(grep "$PUB_KEY" /jffs/configs/WireguardVPN_map)" ] && echo -e "$PUB_KEY      $IP     # $DEVICE_NAME $TAG" >> /jffs/configs/WireguardVPN_map     # v.03
                     tail -n 1 /jffs/configs/WireguardVPN_map
                     else
-                        echo -e $cBRED"\a\n\t***ERROR 'client' Peer device$cRESET '$DEVICE_NAME'$cBRED already defined in ${cRESET}'server' (wg21)\n"$cRESET
+                        echo -e $cBRED"\a\n\t***ERROR 'client' Peer device$cRESET '$DEVICE_NAME'$cBRED already defined in ${cRESET}'server' ($ACTIVE_SERVER_PEER)\n"$cRESET
                     fi
                 fi
-            else
-                echo -e $cBRED"\a\n\t***ERROR Missing name of client Peer device\n"$cRESET
-            fi
+
+            Display_QRCode "${CONFIG_DIR}${DEVICE_NAME}.conf"
+
+        else
+            echo -e $cBRED"\a\n\t***ERROR Missing name of client Peer device\n"$cRESET
+        fi
         ;;
     "?"|u|u" "*|uf|uf" "*)
 
         case "$ACTION" in
             "?")
+                echo -e $cBWHT"\n$VERSION $(basename $0) WireGuard Session Manager"$cRESET  # v1.04
                 echo -e $cBWHT"\n\tChecking GitHub for software updates...."$cRESET
                 Check_Version_Update
                 echo -e $cRESET
@@ -895,6 +1049,7 @@ EOF
                 fi
 
                 Check_Module_Versions
+                Check_Version_Update
 
                 echo -e $cRESET
                 ;;
@@ -905,7 +1060,9 @@ EOF
             ShowHelp
         ;;
     *)
+
         ShowHelp
+        echo -e $cBWHT"$VERSION v1.05 S50wireguard WireGuard Session Manager\n\n\t${cBRED}***ERROR Invalid/missing arg '$ACTION'\n"$cRESET
         ;;
 esac
 #) 2>&1 | logger -t $(basename $0)"[$$_***DEBUG]"
