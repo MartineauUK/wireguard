@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v1.07b"
-#============================================================================================ © 2021 Martineau v1.07b
+VERSION="v1.08b"
+#============================================================================================ © 2021 Martineau v1.08b
 #
 #       S50wireguard   {start|stop|restart|check|create} [ [client [policy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v1.07b"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 04-Mar-2021
+# Last Updated Date: 05-Mar-2021
 #
 # Description:
 #
@@ -280,6 +280,8 @@ Check_Module_Versions() {
 
     local UPDATES="N"
 
+    [ -n "$(lsmod | grep -i wireguard)" ] &&  echo -e $cBGRE"\t[✔] WireGuard Module is LOADED\n"$cRESET || echo -e $cBRED"\t[✖] WireGuard Module is NOT LOADED\n"$cRESET
+
     # Check if Kernel and User Tools Update available
     echo -e $cBWHT"\tChecking for WireGuard Kernel and Userspace Tool updates..."
 
@@ -320,16 +322,16 @@ Manage_alias() {
             sed -i "/$SCRIPT_NAME/d" /jffs/configs/profile.add
             unalias "wgstart"
             unalias "wgstop"
-            unalias "wgr"
-            unalias "wgd"
+            unalias "wgshow"
+            unalias "wgdiag"
             unalias "wgm"
             echo -e $cRESET
         ;;
         "?")
             # type wgstart
             # type wgstop
-            # type wgr
-            # type wgd
+            # type wgshow
+            # type wgdiag
             # type wgm
             # alias | grep $SCRIPT_NAME
             echo -e $cRESET"\n\tAlias info not available\n"
@@ -345,11 +347,11 @@ Manage_alias() {
                 alias wgstop='/opt/etc/init.d/$SCRIPT_NAME stop'
                 echo "alias wgstop='/opt/etc/init.d/$SCRIPT_NAME stop'"                 >>/jffs/configs/profile.add
 
-                alias wgr='/opt/etc/init.d/$SCRIPT_NAME check'
-                echo "alias wgr='/opt/etc/init.d/$SCRIPT_NAME check'"                   >>/jffs/configs/profile.add
+                alias wgshow='/opt/etc/init.d/$SCRIPT_NAME show'
+                echo "alias wgshow='/opt/etc/init.d/$SCRIPT_NAME show'"                   >>/jffs/configs/profile.add
 
-                alias wgd='/opt/etc/init.d/$SCRIPT_NAME checkdebug'
-                echo "alias wgd='/opt/etc/init.d/$SCRIPT_NAME checkdebug'"              >>/jffs/configs/profile.add
+                alias wgdiag='/opt/etc/init.d/$SCRIPT_NAME diag'
+                echo "alias wgdiag='/opt/etc/init.d/$SCRIPT_NAME diag'"                      >>/jffs/configs/profile.add
 
                 # Shell function!
                 echo -e "wgm()  { /opt/etc/init.d/$SCRIPT_NAME \$@; }"                  >>/jffs/configs/profile.add
@@ -422,11 +424,37 @@ Display_QRCode() {
 
     if [ -f $FN ];then                                          # v1.05
         if [ -z "$ANS" ];then
-            echo -e $cBWHT"\tPress$cBRED y$cRESET to Display QR Code for EXPORT to device '$DEVICE_NAME' ${cRESET}or press$cBGRE [Enter] to SKIP."
+            echo -e $cBWHT"\tPress$cBRED y$cRESET to Display QR Code for Scanning into WireGuard App on device $cBMAG'$DEVICE_NAME' ${cRESET}or press$cBGRE [Enter] to SKIP."
             read -r "ANS"
         fi
         [ "$ANS" == "y" ] && { clear; qrencode -t ANSIUTF8 < $FN; }             # v1.05
     fi
+}
+Edit_nat_start() {
+
+    if [ "$1" != "del" ];then
+        if [ -z "$(grep "WireGuard" /jffs/scripts/nat-start)" ];then
+            [ ! -f /jffs/scripts/nat-start ] && { echo -e "#!/bin/sh\n\n"    > /jffs/scripts/nat-start; chmod +x /jffs/scripts/nat-start; }
+            echo -e "/opt/etc/wireguard/wg_firewall            # WireGuard" >> /jffs/scripts/nat-start
+            cat >> /opt/etc/wireguard/wg_firewall << EOF
+#!/bin/sh
+
+# Reinstate WireGuard firewall rules by restarting WireGuard as nat-start has executed
+#
+if [ -n "\$(wg show interfaces)" ];then
+    logger -st "(\$(basename "\$0"))" \$\$ "Restarting WireGuard to reinstate rules"
+    /opt/etc/init.d/\$SCRIPT_NAME restart
+fi
+EOF
+
+            chmod +x /opt/etc/wireguard/wg_firewall
+        fi
+    else
+        rm /opt/etc/wireguard/wg_firewall
+        sed -i '/WireGuard/d' /jffs/scripts/nat-start
+    fi
+    echo -e $cBGRE"\n\tnat-start updated"$cRESET
+    SayT "nat-start updated"
 }
 
 #For verbose debugging, uncomment the following two lines, and uncomment the last line of this script
@@ -445,6 +473,8 @@ HARDWARE_MODEL=$(Get_Router_Model)
 [ -n "$(nvram get computer_name)" ] && MYROUTER=$(nvram get computer_name) || MYROUTER=$(nvram get lan_hostname)
 BUILDNO=$(nvram get buildno)
 SCRIPT_NAME="${0##*/}"
+
+[ "$(nvram get ipv6_service)" != "disabled" ] && USE_IPV6="Y"               # v1.07
 
 TS=$(date +"%Y%m%d-%H%M%S")    # current date and time 'yyyymmdd-hhmmss'
 
@@ -662,7 +692,7 @@ fi
 # Process ALL other CMD line requests
 #####################################
 case "$ACTION" in
-    check|checkdebug)
+    show|diag)
         echo -e
         Say "$VERSION WireGuard VPN Peer Status check....."
         if [ -n "$(which wg)" ];then
@@ -717,7 +747,7 @@ case "$ACTION" in
                 SayT "No WireGuard Peers active"
                 echo -e "\tNo WireGuard Peers active\n"
             fi
-            if [ "$1" == "checkdebug" ];then
+            if [ "$1" == "diag" ];then
                 #echo -e $cBWHT"\n\tDEBUG: Routing Table main\n";ip route | grep "wg.";for WG_INTERFACE in $(wg show interfaces);do I=${WG_INTERFACE:3:1};echo -e "\n\tDEBUG: Routing Table 12$I";ip route show table 12$I;done
                 echo -e $cBWHT"\n\tDEBUG: Routing Table main\n"
                 ip route | grep "wg."
@@ -730,6 +760,13 @@ case "$ACTION" in
                 echo -e $cBWHT"\n\tDEBUG: RPDB rules"
                 #ip rule | grep -E "lookup 12[1-5]"
                 ip rule
+
+                echo -e $cBWHT"\n\tDEBUG: Routing info MTU etc.\n"          # v1.07
+                for WG_INTERFACE in $(wg show interfaces)
+                    do
+                        ip a l $WG_INTERFACE                                # v1.07
+                    done
+
                 echo -e $cRESET
             fi
         else
@@ -796,10 +833,11 @@ ListenPort = 51820
 # e.g. Accept a WireGuard connection from say YOUR mobile device to the router
 # see '${CONFIG_DIR}mobilephone_private.key'
 
-# Example
-[Peer]
-PublicKey = This_should_be_replaced_with_the_Public_Key_of_YOUR_mobile_device
-AllowedIPs = 10.50.1.1/32
+# Peer Example
+#[Peer]
+#PublicKey = This_should_be_replaced_with_the_Public_Key_of_YOUR_mobile_device
+#AllowedIPs = PEER.ip.xxx.xxx/32
+# Peer Example End
 EOF
 
         # Create 'server' Peer wg21
@@ -859,6 +897,8 @@ EOF
 
         Manage_alias
 
+        Edit_nat_start                                      # v1.07
+
         ;;
     alias)                                                  # ['del']
 
@@ -916,28 +956,34 @@ EOF
            [ -d /opt/etc/wireguard ] && rm -rf /opt/etc/wireguard
         fi
 
+        Edit_nat_start "del"
+
         echo -e $cBGRE"\n\tWireGuard Uninstall complete for $HARDWARE_MODEL (v$BUILDNO)\n"$cRESET
         ;;
-    create|createlanonly)                                                            # {name} [{tag="desciption{"}}]     # v1.03
+    createlanonly|create)                                                            # {name} [{tag="desciption{"}}]     # v1.03
         # Create a Private/Public key-pair for your mobile phone etc.
         #           e.g. create   Nokia6310 tag="Best phone ever!"
         #
-        #  Default Allowed IP is 0.0.0.0/0 which forces ALL traffic via the remote 'server' Peer
-        #  but 'createlanonly' routes only the 'server' Per LAN e.g. LAN 192.68.0.0/16
+        #  Default Allowed IP is '0.0.0.0/0, ::/0' which forces ALL traffic via the remote 'server' Peer
+        #  but 'createlanonly' routes only the 'server' Per LAN e.g. LAN 192.68.0.0/24
 
-        [ "$ACTION" == "createlanonly" ] && LAN_ONLY="Y"                        # v1.06
-        [ "$(nvram get ipv6_service)" != "disabled" ] && IPV6="Y"               # v1.07
+        [ "$ACTION" == "createlanonly" ] && LAN_ONLY="Y" || LAN_ONLY="Q. LAN Only"                       # v1.06
 
         DEVICE_NAME=$2
         if [ -n "$DEVICE_NAME" ];then
             echo -e $cBCYA"\n\tCreating Wireguard Private/Public key pair for device '$DEVICE_NAME'"$cBYEL
-            wg genkey | tee ${CONFIG_DIR}${2}_private.key | wg pubkey | tee ${CONFIG_DIR}${2}_public.key
+            wg genkey | tee ${CONFIG_DIR}${2}_private.key | wg pubkey > ${CONFIG_DIR}${2}_public.key
             echo -e $cBYEL"\n\tDevice '"$DEVICE_NAME"' Public key="$(cat ${CONFIG_DIR}${2}_public.key)"\n"$cRESET
 
             # Generate the Peer config to be imported into the device
             PUB_KEY=$(cat ${CONFIG_DIR}${DEVICE_NAME}_public.key)
-            # Use the first 'server' Peer if it is ACTIVE
-            SERVER_PEER="$(wg show interfaces | awk '{print $1}')"
+            # Use the first 'server' Peer if one is found ACTIVE
+            for SERVER_PEER in $(wg show interfaces | grep -vE "^wg1")
+                do
+                    # Is it ACTUALLY a 'server' Peer?                           # v1.08
+                    [ -n "$(grep -E "^Endpoint" ${CONFIG_DIR}${SERVER_PEER}.conf)" ] && continue || break
+                done
+
             PUB_SERVER_KEY=
             # Use the Public key of the ACTIVE 'server' Peer for instant testing! although the 'server' Peer needs to be restarted? # v1.06
             if [ -n "$SERVER_PEER" ];then
@@ -967,16 +1013,11 @@ EOF
                 [ "$ANS" != "y" ] && CREATE_DEVICE_CONFIG="N"
             fi
 
-            # Default route ALL traffic vi the remote 'server' Peer
-            ALLOWED_IPS="0.0.0.0/0"
-            SPLIT_TXT=$(echo -e "\t\t# ALL Traffic")
-
-            # Should the Peer ONLY have access to LAN ? e.g. 192.168.0.0/16         # v1.06
+            # Should the Peer ONLY have access to LAN ? e.g. 192.168.0.0/24         # v1.06
             LAN_ADDR=$(nvram get lan_ipaddr)
             LAN_SUBNET=${LAN_ADDR%.*}
             if [ "$LAN_ONLY" == "Y" ];then
 
-                IP=
                 # Reuse the IP if device already exists in '/jffs/configs/WireguardVPN_map'
                 if [ -z "$(grep -F "# $DEVICE_NAME $TAG" /jffs/configs/WireguardVPN_map)" ];then
                     DHCP_POOL=$(awk -v pattern="$SERVER_PEER" 'match($0,"^"pattern) {print $3}' /jffs/configs/WireguardVPN_map | tr '/' ' ' | awk '{print $1}') # v1.06
@@ -996,7 +1037,7 @@ EOF
                     fi
 
                     if [ $IP -le 254 ];then
-                        [ "$IPV6" == "Y" ] && IPV6=", fc00:23:5::${IP}/128"     # v1.07
+                        [ "$USE_IPV6" == "Y" ] && IPV6=", fc00:23:5::${IP}/128, 2001:db8:23:5::/64"     # v1.07
                         IP=$DHCP_POOL_SUBNET"."$IP"/32"
                     else
                         echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) subnet MAX 254 reached '/jffs/configs/WireguardVPN_map'"
@@ -1008,10 +1049,15 @@ EOF
                     exit 91
                 fi
 
-                SPLIT_TXT=$(echo -e "\t\t# Split Traffic LAN Only")
+                SPLIT_TXT="# Split Traffic LAN Only"
+            else
+                # Default route ALL traffic via the remote 'server' Peer
+                IP="0.0.0.0/0"
+                [ "$USE_IPV6" == "Y" ] && IPV6=", ::/0"
+                SPLIT_TXT="# ALL Traffic"
             fi
 
-            ALLOWED_IPS=${IP}","$LAN_SUBNET".0/16"${IPV6}                # v1.07
+            ALLOWED_IPS=${IP}${IPV6}
 
             if [ "$CREATE_DEVICE_CONFIG" == "Y" ];then
                 cat > ${CONFIG_DIR}${DEVICE_NAME}.conf << EOF
@@ -1024,44 +1070,54 @@ DNS = 1.1.1.1
 # $HARDWARE_MODEL 'server' ($SERVER_PEER)
 [Peer]
 PublicKey = $PUB_SERVER_KEY
-AllowedIPs = $ALLOWED_IPS${SPLIT_TXT}
+AllowedIPs = $ALLOWED_IPS     ${SPLIT_TXT}
 Endpoint = $ROUTER_DDNS:51820
 PersistentKeepalive = 25
+# $DEVICE_NAME End
 EOF
 
-            echo -e $cBGRE"\n\tWireGuard config for Peer device '${DEVICE_NAME}' created (Allowed IP's $ALLOWED_IPS)\n"$cRESET
+            echo -e $cBGRE"\n\tWireGuard config for Peer device '${DEVICE_NAME}' created (Allowed IP's ${ALLOWED_IPS} ${SPLIT_TXT})\n"$cRESET
             fi
+
+            Display_QRCode "${CONFIG_DIR}${DEVICE_NAME}.conf"
 
             echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED ADD device '$DEVICE_NAME' ${cRESET}to 'server' Peer ($SERVER_PEER) or press$cBGRE [Enter] to SKIP."
             read -r "ANS"
             if [ "$ANS" == "y" ];then
                 echo -e $cBCYA"\n\tAdding device Peer '$DEVICE_NAME' to $HARDWARE_MODEL 'server' ($SERVER_PEER) and WireGuard config\n"
-                if [ -z "$(grep "$DEVICE_NAME" ${CONFIG_DIR}${SERVER_PEER}.conf)" ];then
 
-                    PUB_KEY=$(Convert_Key "$PUB_KEY")
+                # Erase 'client' Peer device entry if it exists....
+                [ -n "$(grep "$DEVICE_NAME" ${CONFIG_DIR}${SERVER_PEER}.conf)" ] && sed -i "/# $DEVICE_NAME/,/# $DEVICE_NAME End/d" ${CONFIG_DIR}${SERVER_PEER}.conf    # v1.08
 
-                    echo -e >> ${CONFIG_DIR}${SERVER_PEER}.conf
-                    cat >> ${CONFIG_DIR}${SERVER_PEER}.conf << EOF
+                PUB_KEY=$(Convert_Key "$PUB_KEY")
+
+                echo -e >> ${CONFIG_DIR}${SERVER_PEER}.conf
+                cat >> ${CONFIG_DIR}${SERVER_PEER}.conf << EOF
 # $DEVICE_NAME
 [Peer]
 PublicKey = $PUB_KEY
-AllowedIPs = $ALLOWED_IPS${IPV6}
+AllowedIPs = $ALLOWED_IPS
+# $DEVICE_NAME End
 EOF
-                    tail -n 4 ${CONFIG_DIR}${SERVER_PEER}.conf
+                tail -n 4 ${CONFIG_DIR}${SERVER_PEER}.conf
 
-                    # Add device IP address and identifier to config
-                    TAG=$(echo "$@" | sed -n "s/^.*tag=//p" | awk '{print $0}')
-                    [ -z "$TAG" ] && TAG="Device"                                   # v1.03
+                # Add device IP address and identifier to config
+                TAG=$(echo "$@" | sed -n "s/^.*tag=//p" | awk '{print $0}')
+                [ -z "$TAG" ] && TAG="Device"                                   # v1.03
 
-                    [ -z "$(grep "$PUB_KEY" /jffs/configs/WireguardVPN_map)" ] && echo -e "$PUB_KEY      $IP     # $DEVICE_NAME $TAG" >> /jffs/configs/WireguardVPN_map     # v.03
-                    tail -n 1 /jffs/configs/WireguardVPN_map
-                    else
-                        echo -e $cBRED"\a\n\t***ERROR 'client' Peer device$cRESET '$DEVICE_NAME'$cBRED already defined in ${cRESET}'server' ($SERVER_PEER)\n"$cRESET
-                    fi
-                fi
+                [ -z "$(grep "$PUB_KEY" /jffs/configs/WireguardVPN_map)" ] && echo -e "$PUB_KEY      $IP     # $DEVICE_NAME $TAG" >> /jffs/configs/WireguardVPN_map     # v.03
+                tail -n 1 /jffs/configs/WireguardVPN_map
 
-            Display_QRCode "${CONFIG_DIR}${DEVICE_NAME}.conf"
+                # Need to Restart the Peer (if it is UP) or Start it so it can listen for new 'client' Peer device
+                INSTANCE=${SERVER_PEER:3:1}
 
+                [ -n "$(wg show interfaces | grep "$SERVER_PEER")" ] && CMD="restart" ||  CMD="start"   # v1.08
+                echo -e $cBWHT"\a\n\tWireGuard 'server' Peer needs to be ${CMD}ed to listen for 'client' Peer $DEVICE_NAME $TAG"
+                echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer ($SERVER_PEER) or press$cBGRE [Enter] to SKIP."
+                read -r "ANS"
+                [ "$ANS" == "y" ] && { /opt/etc/init.d/S50wireguard restart server "$INSTANCE"; /opt/etc/init.d/S50wireguard "show"; }
+
+            fi
         else
             echo -e $cBRED"\a\n\t***ERROR Missing name of client Peer device\n"$cRESET
         fi
@@ -1073,9 +1129,17 @@ EOF
                 echo -e $cBWHT"\n$VERSION $(basename $0) WireGuard Session Manager"$cRESET  # v1.04
                 echo -e $cBWHT"\n\tChecking GitHub for software updates...."$cRESET
                 Check_Version_Update
-                echo -e $cRESET
+                echo -en $cRESET
 
                 Check_Module_Versions
+
+                # Check if DNSmasq is listening on ALL wg* interfaces               # v1.07
+                if [ -z "$(grep -F "wg*" /etc/dnsmasq.conf)" ];then
+                    echo -e $cBRED"\t[✖]${cBWHT} DNSmasq is not listening on any WireGuard interfaces 'wg*'\n"$cRESET
+                else
+                    echo -e $cBGRE"\t[✔]${cBWHT} DNSmasq is listening on ALL WireGuard interfaces 'wg*'\n"$cRESET
+                fi
+
                 ;;
             *)
                 [ "$2" == "dev" ] && DEV="dev" || DEV="main"
@@ -1101,6 +1165,11 @@ EOF
                 echo -e $cRESET
                 ;;
         esac
+        ;;
+    natstart*)
+
+        Edit_nat_start "$2"
+
         ;;
     "-h"|help)
 
