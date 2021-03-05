@@ -1,7 +1,18 @@
 #!/bin/sh
-VER="v0.01b"
-#============================================================================================ © 2021 Martineau v0.01b
-#############################################################################EIC Hack 1 of 2################
+VERSION="v1.02"
+#============================================================================================ © 2021 Martineau v1.02
+#
+
+# Maintainer: Martineau
+# Last Updated Date: 05-Mar-2021
+#
+# Description:
+#
+# Acknowledgement:
+#
+# Contributors: odkrys
+
+
 # shellcheck disable=SC2034
 ANSIColours() {
     cRESET="\e[0m";cBLA="\e[30m";cRED="\e[31m";cGRE="\e[32m";cYEL="\e[33m";cBLU="\e[34m";cMAG="\e[35m";cCYA="\e[36m";cGRA="\e[37m"
@@ -23,6 +34,7 @@ Firewall_delete() {
     iptables -D OUTPUT -o $VPN_ID -j ACCEPT 2>/dev/null
     iptables -t nat -D PREROUTING -p udp --dport $wgport -j ACCEPT 2>/dev/null
 }
+
 
 #For verbose debugging, uncomment the following two lines, and uncomment the last line of this script
 #set -x
@@ -62,7 +74,9 @@ if [ "$2" != "disable" ];then
     wg setconf $VPN_ID /opt/etc/wireguard/$VPN_ID.conf
     ip address add dev $VPN_ID $Subnet
     ip link set up dev $VPN_ID
-    ifconfig $VPN_ID mtu 1380
+    #ifconfig $VPN_ID mtu 1380
+    ifconfig $VPN_ID mtu 1420                       # v1.02
+
     ifconfig $VPN_ID txqueuelen 1000
 
     Firewall_delete
