@@ -1,11 +1,22 @@
 #!/bin/sh
-VER="v1.01b"
-#============================================================================================ © 2021 Martineau v1.01b
-#############################################################################EIC Hack 1 of 2################
+VERSION="v1.02"
+#============================================================================================ © 2021 Martineau v0.02
+#
+
+# Maintainer: Martineau
+# Last Updated Date: 05-Mar-2021
+#
+# Description:
+#
+# Acknowledgement:
+#
+# Contributors: odkrys
+
+
 #For verbose debugging, uncomment the following two lines, and uncomment the last line of this script
 #set -x
 #(
-############################################################################################################
+
 # shellcheck disable=SC2034
 ANSIColours() {
 
@@ -161,7 +172,8 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         wg setconf $VPN_ID /opt/etc/wireguard/$VPN_ID.conf
         ip address add dev $VPN_ID $LOCALIP
         ip link set up dev $VPN_ID
-        ifconfig $VPN_ID mtu 1380
+        #ifconfig $VPN_ID mtu 1380
+        ifconfig $VPN_ID mtu 1420                           # v1.02
         ifconfig $VPN_ID txqueuelen 1000
 
         host="$(wg show $VPN_ID endpoints | sed -n 's/.*\t\(.*\):.*/\1/p')"
