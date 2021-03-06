@@ -30,7 +30,7 @@ VERSION="v1.09"
 #
 # Acknowledgement:
 #
-# Contributors: odkrys
+# Contributors: odkrys,Torson
 
 GIT_REPO="wireguard"
 GITHUB_MARTINEAU="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/main"
