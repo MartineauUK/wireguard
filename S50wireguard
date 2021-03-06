@@ -367,11 +367,13 @@ wg13    N      xxx.xxx.xxx.xxx/32    103.231.88.18:51820    193.138.218.74    # 
 wg14    N      xxx.xxx.xxx.xxx/32    193.32.126.66:51820    193.138.218.74    # Mullvad France, Paris
 wg15
 
-wg21    Y      xxx.50.1.1/24         <<= DHCP Pool                            # $HARDWARE_MODEL Local Host Peer 1
-wg22    N      xxx.50.2.1/24         <<= DHCP Pool                            # $HARDWARE_MODEL Local Host Peer 2
+# For each 'server' Peer you need to allocate a unique VPN subnet
+#              VPN Subnet
+wg21    Y      10.50.1.1/24                                                   # $HARDWARE_MODEL Local Host Peer 1
+wg22    N      10.50.2.1/24                                                   # $HARDWARE_MODEL Local Host Peer 2
 
 # The following default 'wg0' interface retained for backward compatibility!
-wg0     N      xxx.xxx.xxx.xxx/32     86.106.143.93:51820    193.138.218.74    # Mullvad USA, New York
+wg0     N      xxx.xxx.xxx.xxx/32     86.106.143.93:51820    193.138.218.74   # Mullvad USA, New York
 
 #       RPDB Selection Routing rules same format as 'nvram get vpn_clientX_clientlist'
 #       < Desciption > Source IP/CIDR > [Target IP/CIDR] > WAN_or_VPN[...]
@@ -387,11 +389,9 @@ wg0-client5 N  4.3.2.1                                                      # Mu
 
 # Optionally define the 'server' Peer 'clients' so they can be identified by name in the enhanced WireGuard Peer status report
 # These entries are automatically added below when the 'create' command is used.
-# Public Key                                      DHCP IP             Annotation Comment
-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=      10.50.1.1           # A Cell phone
-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=      10.50.1.88          # Samsung Galaxy S8
-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=      10.50.2.22          # Dummy Device 1
-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=      10.50.1.89          # Device iPhone12
+# Public Key                                      DHCP IP                Annotation Comment
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=      10.50.1.1/32           # A Cell phone
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=      10.50.1.88/32          # Samsung Galaxy S8
 
 EOF
     return 0
