@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v1.10"
-#============================================================================================ © 2021 Martineau v1.10
+VERSION="v1.11"
+#============================================================================================ © 2021 Martineau v1.11
 #
 #       S50wireguard   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -361,11 +361,11 @@ Create_Sample_Config() {
 #
 #
 # VPN   Auto   Local Peer IP         Remote Peer Socket     DNS               Annotation Comment
-wg11    P      xxx.xxx.xxx.xxx/32    86.106.143.93:51820    193.138.218.74    # Mullvad USA, New York (maybe!)
+wg11    P      xxx.xxx.xxx.xxx/32    86.106.143.93:51820    193.138.218.74    # Mullvad USA, New York
 wg12    N      xxx.xxx.xxx.xxx/32    209.58.188.180:51820   193.138.218.74    # Mullvad China, Hong Kong
 wg13    N      xxx.xxx.xxx.xxx/32    103.231.88.18:51820    193.138.218.74    # Mullvad Oz, Melbourne
 wg14    N      xxx.xxx.xxx.xxx/32    193.32.126.66:51820    193.138.218.74    # Mullvad France, Paris
-wg15
+wg15    N                                                                     #
 
 # For each 'server' Peer you need to allocate a unique VPN subnet
 #              VPN Subnet
@@ -384,14 +384,14 @@ rp14
 rp15    <Router>192.168.1.0/24>>VPN<LAN>192.168.1.1>>WAN
 
 # Custom 'client' Peer interfaces - simply to annotate
-SGS8    N      1.2.3.4            xxx.xxx.xxx.xxx        dns.xxx.xxx.xxx    # A comment here
-wg0-client5 N  4.3.2.1                                                      # Mullvad UK, London
+SGS8    N      1.2.3.4            xxx.xxx.xxx.xxx        dns.xxx.xxx.xxx      # A comment here
+wg0-client5 N  4.3.2.1                                                        # Mullvad UK, London
 
 # Optionally define the 'server' Peer 'clients' so they can be identified by name in the enhanced WireGuard Peer status report
-# These entries are automatically added below when the 'create' command is used.
-# Public Key                                      DHCP IP                Annotation Comment
-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=      10.50.1.1/32           # A Cell phone
-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=      10.50.1.88/32          # Samsung Galaxy S8
+# (These entries are automatically added below when the 'create' command is used)
+# Public Key                                      DHCP IP             Annotation Comment
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=      10.50.1.11/32       # A Cell phone for 'server' 1
+
 
 EOF
     return 0
@@ -449,19 +449,20 @@ EOF
 Server_or_Client() {                                                                    # v1.09
 
     local WG_INTERFACE=$1
+    local PEER_TYPE=
 
     # Is this a standard 'client' Peer interface 'wg11-wg15' or 'server' 'wg21-wg22'    # v1.09
-    if [ -z "$(echo "$WG_INTERFACE" | grep -oE "^wg[2][1-2]|^wg[1][1-5]*$")" ];then     # v1.09
-        # Non-stand so identfy if it's a 'client' or 'server' Peer
+    #if [ -z "$(echo "$WG_INTERFACE" | grep -oE "^wg[2][1-2]|^wg[1][1-5]*$")" ];then     # v1.09
+        # Always identfy if it's a 'client' or 'server' Peer from its config file
         if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then                                # v1.03
             if [ -n "$(grep -iE "^Endpoint" ${CONFIG_DIR}${WG_INTERFACE}.conf)" ];then  # v1.03
-                local Mode="client"
+                local PEER_TYPE="client"
             else
-                local Mode="server"
+                local PEER_TYPE="server"
             fi
         fi
-    fi
-    echo "$Mode"
+    #fi
+    echo "$PEER_TYPE"
 }
 WG_show() {
 
@@ -560,11 +561,16 @@ if [ -n "$(echo "start|stop|restart" | grep -o "$ACTION")" ];then
                 echo -e
             else
                 Mode=$(Server_or_Client "$WG_INTERFACE")
+                if [ -z "$Mode" ];then
+                    SayT "***ERROR: WireGuard VPN Peer ('$WG_INTERFACE') config TYPE cannot be determined?....skipping $ACTION request"
+                    echo -e $cBRED"\a\n\t***ERROR: WireGuard VPN Peer ('$WG_INTERFACE') config TYPE cannot be determined?....skipping $ACTION request\n"$cRESET
+                    exit 98
+                fi
             fi
 
-            # Commandline request overrides entry in config file                            # v1.09
-            [ -n "$(echo "$@" | grep "nopolicy")" ] && Route="default"                      # v1.09
-            [ -n "$(echo "$@" | grep "policy")" ] && { Route="policy"; POLICY_MODE="Policy Mode"; } || Route="default"      # v1.09
+            # Commandline request overrides entry in config file                            # v1.10 Hotfix
+            [ -n "$(echo "$@" | grep -w "nopolicy")" ] && Route="default"                   # v1.11 Hotfix
+            [ -n "$(echo "$@" | grep -w "policy")" ] && { Route="policy"; POLICY_MODE="Policy Mode"; } || Route="default"      # v1.09
 
             echo -e
 
@@ -575,8 +581,8 @@ if [ -n "$(echo "start|stop|restart" | grep -o "$ACTION")" ];then
                     fi
 
                     if [ "$ACTION" == "restart" ];then                                      # v1.09
+                        # If it is UP then terminate the Peer
                         if [ -n "$(ifconfig $WG_INTERFACE 2>/dev/null | grep inet)" ];then  # v1.09
-                            Mode=$(grep -iE "^Endpoint" ${CONFIG_DIR}${WG_INTERFACE}.conf)  # v1.09
                             echo -e $cBWHT;Say "$VERSION Restarting Wireguard VPN '$Mode' Peer ($WG_INTERFACE)"
                             [ "$Mode" == "server" ] && ${CONFIG_DIR}wg_server $WG_INTERFACE "disable" || ${CONFIG_DIR}wg_manager.sh $WG_INTERFACE "disable"                 # v1.09
                         fi
@@ -603,7 +609,7 @@ if [ -n "$(echo "start|stop|restart" | grep -o "$ACTION")" ];then
                         else
                             [ -n "$Mode" ] && TXT="'$Mode' " || TXT=            # v1.09
                             SayT "***ERROR: WireGuard VPN ${TXT}Peer ('$WG_INTERFACE') config NOT found?....skipping $ACTION request"
-                            echo -e $cBRED"\a\tWireGuard ${TXT}Peer (${cBWHT}$WG_INTERFACE${cBRED}) config NOT found?....skipping $ACTION request\n"$cRESET     # v1.09
+                            echo -e $cBRED"\a\n\t***ERROR: WireGuard ${TXT}Peer (${cBWHT}$WG_INTERFACE${cBRED}) config NOT found?....skipping $ACTION request\n"$cRESET     # v1.09
                         fi
                     fi
                 done
@@ -931,14 +937,14 @@ EOF
 
         echo -e $cBGRE"\n\tWireGuard Uninstall complete for $HARDWARE_MODEL (v$BUILDNO)\n"$cRESET
         ;;
-    createlanonly|create)                                                            # {name} [{tag="desciption{"}}]     # v1.03
+    createsplit|create)                                                            # {name} [{tag="desciption{"}}]     # v1.11 v1.03
         # Create a Private/Public key-pair for your mobile phone etc.
         #           e.g. create   Nokia6310 tag="Best phone ever!"
         #
         #  Default Allowed IP is '0.0.0.0/0, ::/0' which forces ALL traffic via the remote 'server' Peer
         #  but 'createlanonly' routes only the 'server' Per LAN e.g. LAN 192.68.0.0/24
 
-        [ "$ACTION" == "createlanonly" ] && LAN_ONLY="Y" || LAN_ONLY="Q. LAN Only"                       # v1.06
+        [ "$ACTION" == "createsplit" ] && SPLIT_TUNNEL="Y" || SPLIT_TUNNEL="Q. Split Tunnel"                       # v1.11 v1.06
 
         DEVICE_NAME=$2
         if [ -n "$DEVICE_NAME" ];then
@@ -987,7 +993,7 @@ EOF
             # Should the Peer ONLY have access to LAN ? e.g. 192.168.0.0/24         # v1.06
             LAN_ADDR=$(nvram get lan_ipaddr)
             LAN_SUBNET=${LAN_ADDR%.*}
-            if [ "$LAN_ONLY" == "Y" ];then
+            if [ "$SPLIT_TUNNEL" == "Y" ];then
 
                 # Reuse the IP if device already exists in '/jffs/configs/WireguardVPN_map'
                 if [ -z "$(grep -F "# $DEVICE_NAME $TAG" /jffs/configs/WireguardVPN_map)" ];then
