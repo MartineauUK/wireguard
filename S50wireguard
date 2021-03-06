@@ -534,12 +534,22 @@ if [ -n "$(echo "start|stop|restart" | grep -o "$ACTION")" ];then
 
                 WG_INTERFACE=$3
 
+                if  [ "$2" == "client" ] && [ -n "$(echo "$WG_INTERFACE" |  grep -oE "^[[:digit:]]$")" ];then
+                    WG_INTERFACE="wg1"$WG_INTERFACE     # v1.09 Hotfix
+                fi
+                if  [ "$2" == "server" ] && [ -n "$(echo "$WG_INTERFACE" |  grep -oE "^[[:digit:]]$")" ];then
+                    WG_INTERFACE="wg1"$WG_INTERFACE     # v1.09 Hotfix
+                fi
+
             ;;
             *)
                 WG_INTERFACE=$3
 
             ;;
         esac
+
+
+
     fi
 
     case "$ACTION" in
