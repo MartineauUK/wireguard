@@ -538,7 +538,7 @@ if [ -n "$(echo "start|stop|restart" | grep -o "$ACTION")" ];then
                     WG_INTERFACE="wg1"$WG_INTERFACE     # v1.09 Hotfix
                 fi
                 if  [ "$2" == "server" ] && [ -n "$(echo "$WG_INTERFACE" |  grep -oE "^[[:digit:]]$")" ];then
-                    WG_INTERFACE="wg1"$WG_INTERFACE     # v1.09 Hotfix
+                    WG_INTERFACE="wg2"$WG_INTERFACE     # v1.09 Hotfix
                 fi
 
             ;;
@@ -1146,11 +1146,11 @@ EOF
 
             ShowHelp
         ;;
-    peerv|peervx)                                                                   # v1.10
+    configx|config)                                                                   # v1.10
 
             FN="/jffs/configs/WireguardVPN_map"
 
-            [ "$1" == "peerv" ] && ACCESS="--view" || ACCESS="--unix"
+            [ "$1" == "config" ] && ACCESS="--view" || ACCESS="--unix"
             if [ -f $FN ];then
                 #PRE_MD5="$(md5sum $FN | awk '{print $1}')"
                 nano $ACCESS $FN
