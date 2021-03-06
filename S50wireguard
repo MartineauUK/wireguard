@@ -1,8 +1,8 @@
 #!/bin/sh
-VERSION="v1.09"
-#============================================================================================ © 2021 Martineau v1.09
+VERSION="v1.10"
+#============================================================================================ © 2021 Martineau v1.10
 #
-#       S50wireguard   {start|stop|restart|show|create} [ [client [policy|nopolicy] |server]} [wg_instance] ]
+#       S50wireguard   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
 #       S50wireguard   start 0
 #                      Initialises remote peer 'client' 'wg0'
@@ -1145,6 +1145,90 @@ EOF
     "-h"|help)
 
             ShowHelp
+        ;;
+    peerv|peervx)                                                                   # v1.10
+
+            FN="/jffs/configs/WireguardVPN_map"
+
+            [ "$1" == "peerv" ] && ACCESS="--view" || ACCESS="--unix"
+            if [ -f $FN ];then
+                #PRE_MD5="$(md5sum $FN | awk '{print $1}')"
+                nano $ACCESS $FN
+            else
+                echo -e $cBRED"\a\n\t***ERROR WireGuard Peer Configuration '$FN' NOT found\n"$cRESET
+            fi
+
+    ;;
+    peer)                                           # peer [ 'list' | interface { [auto y|n|p ] 'del' | 'add' | 'comment' {'#'comment}'} ]  # v1.10
+
+        FN="/jffs/configs/WireguardVPN_map"
+
+        case $2 in
+            list|"")
+                echo -e $cBCYA"\n"
+                #grep "^wg[0-2]" $FN > /tmp/wireguardpeers.txt
+                #column -t /tmp/wireguardpeers.txt
+                #rm /tmp/wireguardpeers.txt
+                #grep "^wg[0-2]" $FN
+                awk '($2=="Y"|| $2=="N"||$2=="P") {print $0}' $FN
+                echo -e "\n"$cRESET
+            ;;
+            *)
+                WG_INTERFACE=$2
+
+                if [ "$3" == "add" ] || [ -n "$(grep "^$WG_INTERFACE" $FN )" ];then
+                    case $3 in
+                        auto)
+                            if [ "$(echo "$4" | grep "^[yYnNpP]$" )" ];then
+                                FLAG=$(echo "$4" | tr 'a-z' 'A-Z')
+                                sed -i "/^$WG_INTERFACE/ s~[^ ]*[^ ]~$FLAG~2" $FN
+                                echo -e $cBGRE"\n\tUpdated AUTO=$FLAG: $(grep -E "^$WG_INTERFACE[[:space:]]" $FN)\n"$cRESET
+                            else
+                                echo -e $cBRED"\a\n\t***ERROR Invalid Peer Auto='$4''$WG_INTERFACE'\n"$cRESET
+                            fi
+                        ;;
+                        del)
+                            sed -i "/^$WG_INTERFACE/d" $FN
+                            echo -e $cBGRE"\n\tWireGuard Peer '$WG_INTERFACE' DELETED\n"$cRESET
+                        ;;
+                        add)
+                            if [ -z "$(grep "^$WG_INTERFACE" $FN )" ];then
+                                shift 3
+                                LINE=$WG_INTERFACE"   $@"
+                                [ $(echo "$LINE" | wc -w) -eq 1 ] && LINE=$LINE"     N     #"
+                                [ -z "$(echo "$LINE" grep -F "#")" ] && LINE=$LINE" # "
+                                LINE=$(_quote "$LINE")
+                                POS=$(awk '($2=="Y"|| $2=="N"||$2=="P") {print NR":"$0}' $FN | tail -n 1 | cut -d':' -f1)
+                                AUTO="$(echo "$LINE" | awk '{print $2}')"
+                                if [ -n "$(echo "$AUTO" | grep "^[yYnNpP]$" )" ];then
+                                    [ -n "$POS" ] && sed -i "$POS a $LINE" $FN
+                                    echo -e $cBGRE"\n\tWireGuard Peer '$WG_INTERFACE' added\n"$cRESET
+                                else
+                                    echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard Peer Auto='$AUTO' flag for '$WG_INTERFACE'\n"$cRESET
+                                fi
+                            else
+                                echo -e $cBRED"\a\n\t***ERROR WireGuard Peer '$WG_INTERFACE' already exists\n"$cRESET
+                            fi
+                        ;;
+                        comment)
+                            echo -e $cBCYA"\n\tPeer Comment (Before): $(grep -E "^$WG_INTERFACE[[:space:]]" $FN)"$cRESET
+                            shift 3
+                            COMMENT="$@"
+                            [ "${COMMENT:0:1}" != "#" ] && COMMENT="# "$COMMENT
+                            sed -i "/^$WG_INTERFACE/ s~\#.*$~$COMMENT~" $FN
+                            echo -e $cBGRE"\tPeer Comment (After) : $(grep -E "^$WG_INTERFACE[[:space:]]" $FN)\n"$cRESET
+
+                        ;;
+                        *)
+                            echo -e $cBCYA"\n\tPeer Entry: $(grep -E "^$WG_INTERFACE[[:space:]]" $FN)\n"$cRESET
+                        ;;
+                    esac
+                else
+                    echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard Peer '$WG_INTERFACE'\n"$cRESET
+                fi
+            ;;
+        esac
+
         ;;
     *)
 
