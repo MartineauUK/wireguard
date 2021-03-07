@@ -137,30 +137,31 @@ Very crude fall-over configuration but may be useful.
 
 For hosting a 'server' Peer (wg21) you can use the following command to generate a Private/Public key-pair and auto add it to the 'wg21.conf' and to the WireGuard config '/jffs/configs/WireGuardVPN_map'
 
-    wgm create GoldstrikeriPhone3GSSupreme24K 
+    wgm create Nokia6310i
 
-	Creating Wireguard Private/Public key pair for device 'GoldstrikeriPhone3GSSupreme24K'
+	Creating Wireguard Private/Public key pair for device 'Nokia6310i'
 
-	Device 'iPhone3GS24K' Public key=uAMVeM6DNsj9rEsz9rjDJ7WZEiJjEp98CDfDhSFL0W0=
+	Device 'Nokia6310i' Public key=uAMVeM6DNsj9rEsz9rjDJ7WZEiJjEp98CDfDhSFL0W0=
 
-	Press y to ADD device 'iPhone3GS24K' to 'server' Peer (wg21) or press [Enter] to SKIP.
+	Press y to ADD device 'Nokia6310i' to 'server' Peer (wg21) or press [Enter] to SKIP.
     y
-	Adding device Peer 'iPhone3GS24K' to RT-AC86U 'server' (wg21) and WireGuard config
+	Adding device Peer 'Nokia6310i' to RT-AC86U 'server' (wg21) and WireGuard config
+
 and the resulting entry in the WireGuard 'server' Peer config 'wg21.conf' - where 10.50.1.125 is derived from the DHCP pool for the 'server' Peer
 
 e.g. WireGuard configuration 'WireguardVPN_map' contains
 
     wg21    Y      10.50.1.1/24                                                 # Martineau Host Peer 1
 
-and the next avaiable IP with DHCP pool prefix '10.50.1' .125 is chosen as .124 is already assigned when the Peer is appended to 'wg21.conf'
+and the next avaiable IP with DHCP pool prefix '10.50.1' e.g. .125 is chosen as .124 is already assigned when the Peer is appended to 'wg21.conf'
 
-    # iPhone3GS24K
+    # Nokia6310i
     [Peer]
     PublicKey = uAMVeM6DNsj9rEsz9rjDJ7WZEiJjEp98CDfDhSFL0W0=
     AllowedIPs = 10.50.1.125/32
-    # iPhone3GS24K End
+    # Nokia6310i End
   
-and the cosmetic Annotation identification for the device '# Device iPhone3GS24K' is appended to the WireGuard configuration 'WireguardVPN_map'  
+and the cosmetic Annotation identification for the device '# Device Nokia6310i' is appended to the WireGuard configuration 'WireguardVPN_map'  
 
     # Optionally define the 'server' Peer 'clients' so they can be identified by name in the enhanced WireGuard Peer status report
     # Public Key                                      DHCP IP             Annotation Comment
@@ -168,14 +169,50 @@ and the cosmetic Annotation identification for the device '# Device iPhone3GS24K
     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=      10.50.1.124         # A Cell phone
     snip>
     
-    uAMVeM6DNsj9rEsz9rjDJ7WZEiJjEp98CDfDhSFL0W0=      10.50.1.125         # Device iPhone3GS24K
+    uAMVeM6DNsj9rEsz9rjDJ7WZEiJjEp98CDfDhSFL0W0=      10.50.1.125         # Device Nokia6310i
 
-To import the device iPhone3GS24K into the WireGuard App on the mobile device or tablet, rather than manually enter the details, or import the text file using a secure means of transfer, it is easier to simply display the QR Code containing the configuration and point the phone/tablet's camera at the QR Code! ;-)
+To import the device Nokia6310i into the WireGuard App on the mobile device or tablet, rather than manually enter the details, or import the text file using a secure means of transfer, it is easier to simply display the QR Code containing the configuration and point the phone's/tablet's camera at the QR Code! ;-)
 
-     wgr qrcode iPhone3GS24K
+     wgr qrcode Nokia6310i
 
 
-
+█████████████████████████████████████████████████████████████████████████
+█████████████████████████████████████████████████████████████████████████
+████ ▄▄▄▄▄ █ ███▀█▄█  █    █ ██▀▀▀▄ ▀██  ▄▀▄▀▀▀▀ ▀▀▄█ ▄█  █▄▀█ ▄▄▄▄▄ ████
+████ █   █ █ █▄▄▄▀ ██▄ ▄ ▄█ ▄▀  ▄  ▀▀▄▄█ ▄▀ █ ██▀▄   ▀▀▄█▄ ▀▄█ █   █ ████
+████ █▄▄▄█ █▀█▀ ▄ █▄▄█ ▀█▀██ ▄ █ █ ▄▄▄ ▀▄▀ █▄▄ ▄▄ ▀ ▀▀▄ ▀█▀█▄█ █▄▄▄█ ████
+████▄▄▄▄▄▄▄█▄█▄▀▄▀ ▀▄█▄▀▄█▄█▄▀▄█▄▀ █▄█ ▀ ▀ ▀▄▀ █ ▀ ▀ ▀▄▀▄▀▄█ █▄▄▄▄▄▄▄████
+████ ▄█▀▄▄▄▀▀█  █ ▄ ▄▄▄▄  █▀ ▀ ▀██  ▄ ▄▄█▄▀█▄▀    ██▄  ▀ █ ▀██▀▄▀▄▄▄ ████
+██████▄▄▀█▄█  ▀██ █ ▀█▄█ █▄ █▄▄█▀ ▀▄ ▄▄█ ▀██▀  █   ▀▀▀▀▀▄ ▀█▄█   █   ████
+████ ▄█▀ █▄█ █▀▀ ██ ▀▄▄▀ █ ▄ ▀ ▄██▀  ▀▀▀▄█▀ █▄ ▄  █▄▄ █ ███▄ █▄█▄▄ █▀████
+█████ ▄ ██▄ ▀▄█ ▀▀█ ▀▀▄▄██▄▀█▀▀▀ ▀██▀ ▀▀▄█ ▄  ▄ ▄  █▀▀▄▄▄  ▀▄█▀▀▀▄▄▄▄████
+██████▀▄▀▀▄  ▀  ▀▀█▄▀▀▄▀▀▀ ▄▀▄▄▄ ▄▄█▄▄██▄ ▄▀▀█ ▄ █ █▀▀▄▀▀▄  ▄▀▄▄ ▀▀▀█████
+████▄█▄█▀▀▄▄▀ █ █  ▀ ▄███▄  ▄▀█  ██▀  ▀ █▄█▄█▄▄▄▀█ ▀▀ ▄▀ ▀ ▀▀▄██ ▀█  ████
+████▄ ▀███▄▀█▄ █ ▀ ▄█▀ ▄▀▀██▀▄ ██ █ ▄██▀█▄▀     ▀▀████ ▄▄  █ ▄▀▀   ▄▄████
+████▄▀▀▄ ▄▄▄ █▀▄ █▄▀ ▀██▀▄▄█ █  █ ▀▀█  ▀█▀  ▄▄█▄  ▀ ▄ █▀▀▄ █ ▄▄▄█▄▀█▀████
+████  ▄█▄▄▄▀█  ▀▀▄█▄▄▄▄   ▀▄▀▀ ▄▄▀▀▄ █▄▀ ▄█▄▀▄▀▄▀ █ ▀ ▀██▀█▀▀█████▄█ ████
+████▄▄█▄▀█▄▄ ▄█▀█▄▀█▀   ▀▀ ██ ▄█  ▄▀██▀▀███▀█ ▀ ▀ ▄█▀▀ ▀▄▄ █▀▀  ▄█ ▄ ████
+████ █▀▄▀█▄▀██▄▄ ▀ ▀▀▄▀▄▄██▀▄ ▀▀▀▀█▄▀▀▄  ▄█ ██▀  ██   ▄▄▀▀▄▄▄▄▄ ▀▄█▄ ████
+████ █▄  ▄▄▄ ▀█ ▄ ▄▄█▀▄▀ ▀ ▄ ▄█▄█▀ ▄▄▄ ▄▀█ ▄▀▄███ ▀▄ ███▄ ▀▀ ▄▄▄ ██  ████
+█████▀▄  █▄█   █▀█▀▄█▀ ▀▄▀ ▄▀▄█▄▄  █▄█ ▀▄  █▄▄▀ ████▄ ██ ▄▄█ █▄█ ██  ████
+████▀ ▀█  ▄▄ ▄█ ▀▀ ▄▄▀ ▀ ▀██▄▄ ▀▄ ▄▄▄  ▀▀ ▄  ▀ █ █ ▀█    █  ▄▄▄▄ ▀▄  ████
+████▀▄▄ █▀▄▀█▀ ▄▄▀▄▀▄▄▀ ▄▄▄██▀▀▀█▄ ▄ █▀ ██ ██ ▀▀█ █▀ ▀ ▀▀▀▀▀   ▀█▄▀▄ ████
+████ ██ ▀▄▄███ █▀▀█▀▄▀█▀ ▀ ▄▀ ▀▀ █ ▄█  ▀█▀ ▀▄██▄▄▄ ▀ ▀█▀▄▀▄██▄█▀▀ █▀█████
+████▄▀█▀ ▀▄▀▄▀█▄▄█▄ ▄ ▄▀▀ ▀ ▀█ ▀▄▀▀▄▀▄ █  ▄▄▄▀█ █▀██▄█▄▄▀   ▀  ▀▀▄▄  ████
+████▄ ▄▄▀ ▄███▀▄▄▀▄▀▀█ ██▄▀ ▀ ▄ ▄▀█▀▄▀▀█▀▀ █ ▄▀█ ▄█▀▀▀█ █ ▀ █▀ ▀▀ █  ████
+█████▄ ▄ █▄▄█▄██▀ ▀▄█▄ ▀ ▄█▄  ▄▄█▄▀▄▄▀█  ▄  █▀▀▄ ▄▀▄▄▀▀▄▀▀█ █▀▄▄ ▄▄▀█████
+████▀█ ▄█▀▄▄ █▄█▄ █▀ █▀▄██▄▀█▀█▀  ▀▀ ▀▄█  ███▄▄▀▄▄▄▄▀██▄▄▄▄█▀▄ █▀██▀ ████
+█████▀▄██▀▄▀▀ █▄▄▀▄▄▄▀▄▀ ▀▀▄█ ▀▄▄█▄▀▄▄▀██ ▄█▄▄█▄ █ █▀ ██▀█▄  ▀█▀ ██▀▀████
+████▀████▀▄██▄▄▄ █ ▄▄▄███▄  ▄▀█ █ ▀▀▀▀  █▄█▀▄█▄█ ▀▄ ▀▄  ██▄▄▀▄▄▄▀ ▄  ████
+█████▀  ▀▄▄ ▄▄▀▀██▀█▄▀  █▀█▀▀▄ █ ▄█ ▀██ ██ ▀ ▀ █▀ ▄▀▄▄▀█ ▀ ▀ ▀▀▀▀ ▀▄ ████
+████▀█▄ █▄▄█  █▀▀▄██▄ ▀▀ ▀ ▀▀ ▀▀█▄  █ ▄  ▀ ▀   ▄▄▄▀▀█ █▀   ▀▀▄▀▀█ █▄▀████
+█████▄▄█▄█▄▄ ▀▄ ██▄ ▄▄▄▀▀▀▀  █▄▀█  ▄▄▄ ▄▀▄▀████▀▄██ ▀ ▀ ▄█▄  ▄▄▄ █▄▄ ████
+████ ▄▄▄▄▄ █▀ ▀▀▀ ██ ▀ ▄▄▀█▄█▄▄▀▀  █▄█ ▀█▀▀▀▄▄▄▀ ▄▄█▀▀ ▄█▄▀█ █▄█ ▀ ▄▄████
+████ █   █ █▄█▀▄ ▄█▀▀██▄▄▄ ▀▄▀▄▀▀▄ ▄▄▄▄▄▄▀▄ ▀█ █ ▄▀▄ █  █▀█    ▄▄▄▄██████
+████ █▄▄▄█ █▀█ ▄ ▀▀▄█▀▄▀  █▄  █▄█ █ ▀▀   ██▄█▄█ █  ▄▀█ █▄ ▀██ ██▀██  ████
+████▄▄▄▄▄▄▄█▄▄▄▄█▄█▄▄█▄█▄████▄▄█▄█▄█▄▄██▄▄▄█▄▄▄▄▄███▄▄▄█▄▄▄▄██▄███▄▄█████
+█████████████████████████████████████████████████████████████████████████
+█████████████████████████████████████████████████████████████████████████
 
     
     
