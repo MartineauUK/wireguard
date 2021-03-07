@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v1.12b"
-#============================================================================================ © 2021 Martineau v1.12b
+VERSION="v1.13"
+#============================================================================================ © 2021 Martineau v1.13
 #
 #       S50wireguard   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -363,11 +363,11 @@ Create_Sample_Config() {
 #
 #
 # VPN   Auto   Local Peer IP         Remote Peer Socket     DNS               Annotation Comment
-wg11    P      xxx.xxx.xxx.xxx/32    86.106.143.93:51820    193.138.218.74    # Mullvad USA, New York
+wg11    Y      12.34.56.78/32        86.106.143.93:51820    193.138.218.74    # ****THIS IS NOT A REAL PEER** Edit 'wg11.conf' with real DATA!
 wg12    N      xxx.xxx.xxx.xxx/32    209.58.188.180:51820   193.138.218.74    # Mullvad China, Hong Kong
 wg13    N      xxx.xxx.xxx.xxx/32    103.231.88.18:51820    193.138.218.74    # Mullvad Oz, Melbourne
 wg14    N      xxx.xxx.xxx.xxx/32    193.32.126.66:51820    193.138.218.74    # Mullvad France, Paris
-wg15    N                                                                     #
+wg15    P                                                                     #
 
 # For each 'server' Peer you need to allocate a unique VPN subnet
 #              VPN Subnet
@@ -379,9 +379,9 @@ wg0     N      xxx.xxx.xxx.xxx/32     86.106.143.93:51820    193.138.218.74   # 
 
 #       RPDB Selection Routing rules same format as 'nvram get vpn_clientX_clientlist'
 #       < Desciption > Source IP/CIDR > [Target IP/CIDR] > WAN_or_VPN[...]
-rp11    <Dummy VPN 3>172.16.1.3>>VPN<Plex>172.16.1.123>1.1.1.1>VPN<Router>172.16.1.1>>WAN<All LAN>172.16.1.0/24>>VPN
+rp11    <>
 rp12
-rp13
+rp13    <Dummy VPN 3>172.16.1.3>>VPN<Plex>172.16.1.123>1.1.1.1>VPN<Router>172.16.1.1>>WAN<All LAN>172.16.1.0/24>>VPN
 rp14
 rp15    <Router>192.168.1.0/24>>VPN<LAN>192.168.1.1>>WAN
 
@@ -493,14 +493,16 @@ Edit_DNSMasq() {
 }
 Get_scripts() {                                                         # v1.12
 
+    local BRANCH="$1"
+
     echo -e $cBCYA"\n\tDownloading scripts\n"$cRESET 2>&1
 
-    download_file ${INSTALL_DIR} S50wireguard martineau $DEV dos2unix 755
-    download_file ${INSTALL_DIR} wg_manager.sh martineau $DEV dos2unix 755
-    download_file ${INSTALL_DIR} wg_server martineau $DEV dos2unix 755
+    #download_file ${INSTALL_DIR} S50wireguard martineau $BRANCH dos2unix 755
+    download_file ${INSTALL_DIR} wg_manager.sh martineau $BRANCH dos2unix 755
+    download_file ${INSTALL_DIR} wg_server martineau $BRANCH dos2unix 755
 
     # Ensure Boot-time
-    cp ${CONFIG_DIR}S50wireguard /opt/etc/init.d/S50wireguard           # v1.12
+    cp ${INSTALL_DIR}S50wireguard /opt/etc/init.d/S50wireguard           # v1.12
 
 }
 
@@ -809,6 +811,8 @@ case "$ACTION" in
             Get_scripts "$2"
         fi
 
+        modprobe xt_comment
+
         # Kernel module
         echo -e $cBCYA"\n\tDownloading Wireguard Kernel module for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
 
@@ -827,11 +831,11 @@ case "$ACTION" in
 [Interface]
 #Address = 10.10.10.2/24
 #DNS = 10.10.10.1
-PrivateKey = This_should_be_replaced_with_YOUR_Private_Key
+PrivateKey = Ba1dgO/plL4wCB+p111h8bIAWNeNgPZ7L+HFBhoE4=
 
 [Peer]
 Endpoint = 10.11.12.13:51820
-PublicKey = This_should_be_replaced_with_the_Remote_Peer_Public_Key
+PublicKey = Ba1dgO/plL4wCB+pRdabQh8bIAWNeNgPZ7L+HFBhoE4=
 AllowedIPs = 0.0.0.0/0
 PersistentKeepalive = 25
 EOF
@@ -840,7 +844,7 @@ EOF
         cat > ${CONFIG_DIR}wg21.conf << EOF
 # $HARDWARE_MODEL 'server' Peer #1 (wg21)
 [Interface]
-PrivateKey = This_should_be_replaced_with_$HARDWARE_MODEL_Private_Key
+PrivateKey = Ha1rgO/plL4wCB+pRdc6Qh8bIAWNeNgPZ7L+HFBhoE4=
 ListenPort = 51820
 
 # e.g. Accept a WireGuard connection from say YOUR mobile device to the router
@@ -1179,7 +1183,7 @@ EOF
                 fi
 
                 if [ "$DOWNLOAD" == "Y" ];then
-                    Get_scripts
+                    Get_scripts "$DEV"
                 fi
 
                 Check_Module_Versions
