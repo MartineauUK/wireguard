@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v1.11"
-#============================================================================================ © 2021 Martineau v1.11
+VERSION="v1.13"
+#============================================================================================ © 2021 Martineau v1.13
 #
 #       S50wireguard   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,19 +24,20 @@ VERSION="v1.11"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 06-Mar-2021
+# Last Updated Date: 07-Mar-2021
 #
 # Description:
 #
 # Acknowledgement:
 #
-# Contributors: odkrys,Torson
+# Contributors: odkrys,Torson,ZebMcKayhan
 
 GIT_REPO="wireguard"
 GITHUB_MARTINEAU="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/main"
 GITHUB_MARTINEAU_DEV="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/dev"
 GITHUB_DIR=$GITHUB_MARTINEAU                       # default for script
 CONFIG_DIR="/opt/etc/wireguard/"
+INSTALL_DIR="/jffs/addons/wireguard/"
 CHECK_GITHUB="1"
 SILENT="s"                                         # Default is no progress messages for file downloads
 
@@ -87,6 +88,8 @@ download_file() {
 
         local GITHUB="$3"
         local GITHUB_BRANCH="$4"
+        local DOSUNIX="$5"
+        local CHMOD="$6"
 
         case $GITHUB in
             martineau)
@@ -100,7 +103,7 @@ download_file() {
         if [ "$STATUS" -eq "200" ]; then
             [ -n "$(echo "$@" | grep -F "dos2unix")" ] && dos2unix $DIR/$FILE
             printf '\t%b%s%b downloaded successfully %b\n' "$cBGRE" "$FILE" "$cRESET" "$DEVTXT"
-
+            [ -n "$CHMOD" ] && chmod $CHMOD "$DIR/$FILE"
         else
             printf '\n%b%s%b download FAILED with curl error %s\n\n' "\n\t\a$cBMAG" "'$FILE'" "$cBRED" "$STATUS"
             echo -e $cRESET"\a\n"
@@ -134,13 +137,13 @@ Check_Version_Update() {
 
         # As the developer, I need to differentiate between the GitHub md5sum hasn't changed, which means I've tweaked it locally
         if [ -n "$REMOTE_VERSION_NUMDOT" ];then
-            [ ! -f ${CONFIG_DIR}S50wireguard.md5 ] && echo $remotemd5 > ${CONFIG_DIR}S50wireguard.md5
+            [ ! -f ${INSTALL_DIR}S50wireguard.md5 ] && echo $remotemd5 > ${INSTALL_DIR}S50wireguard.md5
         fi
 
         [ -z "$REMOTE_VERSION_NUM" ] && REMOTE_VERSION_NUM=0
 
         # Local Version higher than GitHub version or MD5 Mismatch due to local development?
-        if [ ${REMOTE_VERSION_NUM:0:3} -lt ${LOCAL_VERSION_NUM:0:3} ] || [ "$(echo "$VERSION" | grep -om1 "b")" == "b" ] || [ $REMOTE_VERSION_NUM -lt $LOCAL_VERSION_NUM ] || { [ "$(awk '{print $1}' ${CONFIG_DIR}S50wireguard.md5)" == "$remotemd5" ]; } && [ "$localmd5" != "$remotemd5" ];then  # v1.03
+        if [ ${REMOTE_VERSION_NUM:0:3} -lt ${LOCAL_VERSION_NUM:0:3} ] || [ "$(echo "$VERSION" | grep -om1 "b")" == "b" ] || [ $REMOTE_VERSION_NUM -lt $LOCAL_VERSION_NUM ] || { [ "$(awk '{print $1}' ${INSTALL_DIR}S50wireguard.md5)" == "$remotemd5" ]; } && [ "$localmd5" != "$remotemd5" ];then  # v1.03
             local VERSION=$LOCAL_VERSION_NUMDOT                             # v1.03
             if [ $REMOTE_VERSION_NUM -lt $LOCAL_VERSION_NUM ];then
                 ALLOWUPGRADE="N"
@@ -173,13 +176,16 @@ Check_Version_Update() {
 }
 Download_Modules() {                                                    # v1.03
 _Get_File() {
+
     local WEBFILE=$1
+
     [ -z "$2" ] && echo -e $cBCYA"\n\tDownloading WireGuard Kernel module ${cBWHT}'$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO)..."$cRESET
     echo -e $cBGRA
+
     curl -# -fL --retry 3 https://github.com/odkrys/entware-makefile-for-merlin/raw/main/${WEBFILE} -o ${DIR}${WEBFILE}
 }
     local ROUTER=$1
-    local DIR="/tmp/wireguard/"
+    local DIR="${INSTALL_DIR}"
 
     [ ! -d $DIR ] && mkdir $DIR
 
@@ -218,25 +224,26 @@ _Get_File() {
     _Get_File  "$WEBFILE" "NOMSG"
 }
 Load_Module_UserspaceTool() {                                           # v1.03
-    if [ ! -d /tmp/wireguard ];then
-        echo -e $cRED"\a\n\tNo modules found - '/tmp/wireguard doesn't exist'\n"
+    if [ ! -d /jffs/addons/wireguard ];then
+        echo -e $cRED"\a\n\tNo modules found - '/jffs/addons/wireguard doesn't exist'\n"
         echo -e "\tPress$cBRED y$cRESET to$cBRED DOWNLOAD WireGuard Kernel and Userspace Tools modules ${cRESET} or press$cBGRE [Enter] to SKIP."
             read -r "ANS"
             if [ "$ANS" == "y" ];then
                 Download_Modules $HARDWARE_MODEL
+
             fi
     fi
 
     STATUS=0
-    echo -e $cBCYA"\n\tLoading WireGuard Kernel module and Userspace Tools for $HARDWARE_MODEL (v$BUILDNO)\n"$cRESET
-    for MODULE in $(ls /tmp/wireguard/*.ipk)
+    echo -e $cBCYA"\n\tLoading WireGuard Kernel module and Userspace Tools for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
+    for MODULE in $(ls /jffs/addons/wireguard/*.ipk)
         do
             opkg install $MODULE
             if [ $? -eq 0 ];then
-                cp $MODULE  ${CONFIG_DIR}                   # v1.03
+                cp $MODULE  ${INSTALL_DIR}                   # v1.03
                 MODULE_NAME=$(echo "$(basename $MODULE)" | sed 's/_.*$//')
-                md5sum $MODULE > ${CONFIG_DIR}$MODULE_NAME".md5"
-                sed -i 's~/tmp/wireguard/~~' ${CONFIG_DIR}$MODULE_NAME".md5"
+                md5sum $MODULE > ${INSTALL_DIR}$MODULE_NAME".md5"
+                sed -i 's~/jffs/addons/wireguard/~~' ${INSTALL_DIR}$MODULE_NAME".md5"
             else
                 STATUS=0
             fi
@@ -255,8 +262,8 @@ Load_Module_UserspaceTool() {                                           # v1.03
 
 }
 Show_MD5() {
-    echo -e $cBCYA"\tMD5="$(awk '{print $0}' ${CONFIG_DIR}wireguard-kernel.md5)
-    echo -e $cBCYA"\tMD5="$(awk '{print $0}' ${CONFIG_DIR}wireguard-tools.md5)
+    echo -e $cBCYA"\tMD5="$(awk '{print $0}' ${INSTALL_DIR}wireguard-kernel.md5)
+    echo -e $cBCYA"\tMD5="$(awk '{print $0}' ${INSTALL_DIR}wireguard-tools.md5)
 }
 Check_Module_Versions() {
 
@@ -264,13 +271,13 @@ Check_Module_Versions() {
 
     local UPDATES="N"
 
-    [ -n "$(lsmod | grep -i wireguard)" ] &&  echo -e $cBGRE"\t[✔] WireGuard Module is LOADED\n"$cRESET || echo -e $cBRED"\t[✖] WireGuard Module is NOT LOADED\n"$cRESET
-
     # Check if Kernel and User Tools Update available
     echo -e $cBWHT"\tChecking for WireGuard Kernel and Userspace Tool updates..."
 
     echo -e $cBGRA"\t"$(dmesg | grep -a "WireGuard")
     echo -e $cBGRA"\t"$(dmesg | grep -a "wireguard: Copyright")"\n"$cRESET
+
+    [ -n "$(lsmod | grep -i wireguard)" ] &&  echo -e $cBGRE"\t[✔] WireGuard Module is LOADED\n"$cRESET || echo -e $cBRED"\t[✖] WireGuard Module is NOT LOADED\n"$cRESET
 
     # Without a BOOT, there may be a mismatch
     local BOOTLOADED=$(dmesg | grep -a WireGuard | awk '{print $3}')
@@ -295,7 +302,7 @@ Check_Module_Versions() {
             echo -e $cBWHT"\n\tUpdate skipped\n"$cRESET
         fi
     else
-        echo -e $cBWHT"\n\tWireGuard Kernel and Userspace Tool up to date.\n"$cRESET
+        echo -e $cBGRE"\n\tWireGuard Kernel and Userspace Tool up to date.\n"$cRESET
     fi
 }
 Manage_alias() {
@@ -304,14 +311,8 @@ Manage_alias() {
 
     case "$1" in
         del)
-            echo -e $cBWHT"\n\tDeleting aliases for $SCRIPT_NAME\n"$cRESET
+            echo -e $cBCYA"\n\tDeleted aliases for '$SCRIPT_NAME'"$cRESET
             sed -i "/$SCRIPT_NAME/d" /jffs/configs/profile.add
-            for ALIAS in $ALIASES
-                do
-                    unalias "wg"$ALIAS
-                done
-
-            echo -e $cRESET
         ;;
         "?")
             echo -e $cRESET"\n\tAlias info\n"
@@ -319,27 +320,29 @@ Manage_alias() {
                 do
                     type "wg"$ALIAS
                 done
-            # alias | grep $SCRIPT_NAME
 
         ;;
         *)
         # Create Alias
             if [ -z "$(grep "$SCRIPT_NAME" /jffs/configs/profile.add)" ];then
-                echo -e $cBWHT"\n\tCreating aliases and shell functions for $SCRIPT_NAME\n"$cRESET
-                alias wgstart='/opt/etc/init.d/$SCRIPT_NAME start'
-                echo "alias wgstart='/opt/etc/init.d/$SCRIPT_NAME start'"               >>/jffs/configs/profile.add
+                echo -e $cBCYA"\n\tCreating aliases and shell functions for '$SCRIPT_NAME'"$cRESET
+                alias wgstart='/jffs/addons/wireguard/$SCRIPT_NAME start'
+                echo "alias wgstart='/jffs/addons/wireguard/$SCRIPT_NAME start'"               >>/jffs/configs/profile.add
 
-                alias wgstop='/opt/etc/init.d/$SCRIPT_NAME stop'
-                echo "alias wgstop='/opt/etc/init.d/$SCRIPT_NAME stop'"                 >>/jffs/configs/profile.add
+                alias wgstop='/jffs/scripts/addons/wireguard/$SCRIPT_NAME stop'
+                echo "alias wgstop='/jffs/addons/wireguard/$SCRIPT_NAME stop'"                 >>/jffs/configs/profile.add
 
-                alias wgshow='/opt/etc/init.d/$SCRIPT_NAME show'
-                echo "alias wgshow='/opt/etc/init.d/$SCRIPT_NAME show'"                 >>/jffs/configs/profile.add
+                alias wgrestart='/jffs/addons/wireguard/$SCRIPT_NAME restart'
+                echo "alias wgrestart='/jffs/addons/wireguard/$SCRIPT_NAME restart'"           >>/jffs/configs/profile.add
 
-                alias wgdiag='/opt/etc/init.d/$SCRIPT_NAME diag'
-                echo "alias wgdiag='/opt/etc/init.d/$SCRIPT_NAME diag'"                 >>/jffs/configs/profile.add
+                alias wgshow='/jffs/addons/wireguard/$SCRIPT_NAME show'
+                echo "alias wgshow='/jffs/addons/wireguard/$SCRIPT_NAME show'"                 >>/jffs/configs/profile.add
+
+                alias wgdiag='/jffs/scripts/wireguard/$SCRIPT_NAME diag'
+                echo "alias wgdiag='/jffs/addons/wireguard/$SCRIPT_NAME diag'"                 >>/jffs/configs/profile.add
 
                 # Shell function!
-                echo -e "wgm()  { /opt/etc/init.d/$SCRIPT_NAME \$@; }"                  >>/jffs/configs/profile.add
+                echo -e "wgm()  { /jffs/addons/wireguard/$SCRIPT_NAME \$@; }"                  >>/jffs/configs/profile.add
             else
                 echo -e $cRED"\n\tWarning: Aliases and shell functions for $SCRIPT_NAME already exist\n"$cRESET
             fi
@@ -348,24 +351,23 @@ Manage_alias() {
 }
 Create_Sample_Config() {
 
-    if [ -f /jffs/configs/WireguardVPN_map ];then
-        echo -e $cBYEL"\a\n\tWarning: WireGuard configuration file '/jffs/configs/WireguardVPN_map' already exists!...renamed to 'WireguardVPN_map.$TS'"
-        mv /jffs/configs/WireguardVPN_map /jffs/configs/WireguardVPN_map.$TS
+    if [ -f /jffs/configs/WireguardVPN.conf ];then
+        echo -e $cBYEL"\a\n\tWarning: WireGuard configuration file '/jffs/configs/WireguardVPN.conf' already exists!...renamed to 'WireguardVPN.conf$TS'"
+        mv /jffs/configs/WireguardVPN.conf /jffs/configs/WireguardVPN.conf.$TS
     fi
-    echo -e $cBGRE"\a\n\tCreating WireGuard configuration file '/jffs/configs/WireguardVPN_map'"
+    echo -e $cBCYA"\a\n\tCreating WireGuard configuration file '/jffs/configs/WireguardVPN.conf'"
 
-
-    cat > /jffs/configs/WireguardVPN_map << EOF
+    cat > /jffs/configs/WireguardVPN.conf << EOF
 # NOTE: Auto=Y  Command 'S50wireguard start' will auto-start this Peer
 #       Auto=P  Command 'S50wireguard start' will auto-start this Peer using it's Selective Routing RPDB Policy rules if defined e.g 'rp11'
 #
 #
 # VPN   Auto   Local Peer IP         Remote Peer Socket     DNS               Annotation Comment
-wg11    P      xxx.xxx.xxx.xxx/32    86.106.143.93:51820    193.138.218.74    # Mullvad USA, New York
+wg11    Y      12.34.56.78/32        86.106.143.93:51820    193.138.218.74    # ****THIS IS NOT A REAL PEER** Edit 'wg11.conf' with real DATA!
 wg12    N      xxx.xxx.xxx.xxx/32    209.58.188.180:51820   193.138.218.74    # Mullvad China, Hong Kong
 wg13    N      xxx.xxx.xxx.xxx/32    103.231.88.18:51820    193.138.218.74    # Mullvad Oz, Melbourne
 wg14    N      xxx.xxx.xxx.xxx/32    193.32.126.66:51820    193.138.218.74    # Mullvad France, Paris
-wg15    N                                                                     #
+wg15    P                                                                     #
 
 # For each 'server' Peer you need to allocate a unique VPN subnet
 #              VPN Subnet
@@ -377,9 +379,9 @@ wg0     N      xxx.xxx.xxx.xxx/32     86.106.143.93:51820    193.138.218.74   # 
 
 #       RPDB Selection Routing rules same format as 'nvram get vpn_clientX_clientlist'
 #       < Desciption > Source IP/CIDR > [Target IP/CIDR] > WAN_or_VPN[...]
-rp11    <Dummy VPN 3>172.16.1.3>>VPN<Plex>172.16.1.123>1.1.1.1>VPN<Router>172.16.1.1>>WAN<All LAN>172.16.1.0/24>>VPN
+rp11    <>
 rp12
-rp13
+rp13    <Dummy VPN 3>172.16.1.3>>VPN<Plex>172.16.1.123>1.1.1.1>VPN<Router>172.16.1.1>>WAN<All LAN>172.16.1.0/24>>VPN
 rp14
 rp15    <Router>192.168.1.0/24>>VPN<LAN>192.168.1.1>>WAN
 
@@ -409,7 +411,6 @@ Convert_Key() {
 Display_QRCode() {
 
     local FN=$1
-    local ANS=
     local ANS=$2
 
     if [ -f $FN ];then                                          # v1.05
@@ -425,26 +426,28 @@ Edit_nat_start() {
     if [ "$1" != "del" ];then
         if [ -z "$(grep "WireGuard" /jffs/scripts/nat-start)" ];then
             [ ! -f /jffs/scripts/nat-start ] && { echo -e "#!/bin/sh\n\n"    > /jffs/scripts/nat-start; chmod +x /jffs/scripts/nat-start; }
-            echo -e "/opt/etc/wireguard/wg_firewall            # WireGuard" >> /jffs/scripts/nat-start
-            cat >> /opt/etc/wireguard/wg_firewall << EOF
+            echo -e "/jffs/addons/wireguard/wg_firewall            # WireGuard" >> /jffs/scripts/nat-start
+            cat >> /jffs/addons/wireguard/wg_firewall << EOF
 #!/bin/sh
 
 # Reinstate WireGuard firewall rules by restarting WireGuard as nat-start has executed
 #
 if [ -n "\$(wg show interfaces)" ];then
-    logger -st "(\$(basename "\$0"))" \$\$ "Restarting WireGuard to reinstate rules"
-    /opt/etc/init.d/\$SCRIPT_NAME restart
+    logger -st "(\$(basename "\$0"))" \$\$ "Restarting WireGuard to reinstate RPDB/firewall rules"
+    /jffs/addons/wireguard/$SCRIPT_NAME restart
 fi
 EOF
 
-            chmod +x /opt/etc/wireguard/wg_firewall
+            chmod +x /jffs/addons/wireguard/wg_firewall
         fi
+        echo -e $cBCYA"\n\tnat-start updated to protect WireGuard firewall rules"$cRESET
+        SayT "nat-start updated to protect WireGuard firewall rules"
     else
-        rm /opt/etc/wireguard/wg_firewall
         sed -i '/WireGuard/d' /jffs/scripts/nat-start
+        echo -e $cBCYA"\n\tnat-start updated - no longer protecting WireGuard firewall rules"$cRESET
+        SayT "nat-start updated - no longer protecting WireGuard firewall rules"
     fi
-    echo -e $cBGRE"\n\tnat-start updated"$cRESET
-    SayT "nat-start updated"
+
 }
 Server_or_Client() {                                                                    # v1.09
 
@@ -473,6 +476,35 @@ WG_show() {
         /opt/bin/wg show all
     fi
 }
+Edit_DNSMasq() {
+
+    if [ "$1" != "del" ];then                           # v1.12
+        # Allow dnmsasq to listen on Wireguard interfaces for DNS
+        if [ -z "$(grep -E "^interface=wg\*" /jffs/configs/dnsmasq.conf.add)" ];then
+            echo -e $cBGRE"Added 'wg*' interfaces to DNSMasq"$cRESET
+            echo -e "interface=wg*     # WireGuard" >> /jffs/configs/dnsmasq.conf.add
+            service restart_dnsmasq
+        fi
+    else
+        [ -n "$(grep "WireGuard" /jffs/configs/dnsmasq.conf.add)" ] && sed -i '/WireGuard/d' /jffs/configs/dnsmasq.conf.add     # v1.12
+        service restart_dnsmasq
+
+    fi
+}
+Get_scripts() {                                                         # v1.12
+
+    local BRANCH="$1"
+
+    echo -e $cBCYA"\n\tDownloading scripts\n"$cRESET 2>&1
+
+    #download_file ${INSTALL_DIR} S50wireguard martineau $BRANCH dos2unix 755
+    download_file ${INSTALL_DIR} wg_manager.sh martineau $BRANCH dos2unix 755
+    download_file ${INSTALL_DIR} wg_server martineau $BRANCH dos2unix 755
+
+    # Ensure Boot-time
+    cp ${INSTALL_DIR}S50wireguard /opt/etc/init.d/S50wireguard           # v1.12
+
+}
 
 #For verbose debugging, uncomment the following two lines, and uncomment the last line of this script
 #set -x
@@ -498,7 +530,7 @@ TS=$(date +"%Y%m%d-%H%M%S")    # current date and time 'yyyymmdd-hhmmss'
 if [ "$(nvram get ntp_ready)" = "0" ];then              # Ensure event 'restart_diskmon' triggers the actual start of WireGuard.
     FN="/jffs/scripts/service-event-end"
     [ ! -f $FN ] && { echo "#!/bin/sh" > $FN; chmod +x $FN; }
-    [ -z "$(grep "wireguard" $FN)" ] && echo -e "if [ "\$2" = "diskmon" ]; then { sh /opt/etc/init.d/S50wireguard start & } ; fi # wireguard" >> $FN
+    [ -z "$(grep "wireguard" $FN)" ] && echo -e "if [ "\$2" = "diskmon" ]; then { sh ${INSTALL_DIR}S50wireguard start & } ; fi # wireguard" >> $FN
     Say "$VERSION WireGuard delayed for NTP synch event trigger 'restart_diskmon' [$@]"
     exit 99
 fi
@@ -511,6 +543,10 @@ TYPE=$2
 # Non-standard SxxScript should normally call '. /opt/etc/init.d/rc.func'
 [ "$(echo $2 | grep -o "post-mount")" == "post-mount" ] && shift
 
+# Legacy tidy-up! to adopt a new name for the configuration file
+[ -f /jffs/configs/WireguardVPN_map ] && mv /jffs/configs/WireguardVPN_map /jffs/configs/WireguardVPN.conf      # v1.12
+
+####################################################################################### Options start|stop|restart
 if [ -n "$(echo "start|stop|restart" | grep -o "$ACTION")" ];then
 
     if [ -z "$2" ];then
@@ -518,7 +554,7 @@ if [ -n "$(echo "start|stop|restart" | grep -o "$ACTION")" ];then
 
         # If no specific Peer specified, for Restart retrieve ACTIVE Peers otherwise for Stop/Start use Peer configuration
         if [ "$ACTION" != "restart" ];then                  # v1.09
-            AUTO_PEERS=$(awk '$2 == "Y" || $2 =="P" {print $1}' /jffs/configs/WireguardVPN_map| tr '\n#' ' ')
+            AUTO_PEERS=$(awk '$2 == "Y" || $2 =="P" {print $1}' /jffs/configs/WireguardVPN.conf | tr '\n#' ' ')
         else
             AUTO_PEERS=$(wg show interfaces)                # v1.09
         fi
@@ -562,9 +598,14 @@ if [ -n "$(echo "start|stop|restart" | grep -o "$ACTION")" ];then
             else
                 Mode=$(Server_or_Client "$WG_INTERFACE")
                 if [ -z "$Mode" ];then
-                    SayT "***ERROR: WireGuard VPN Peer ('$WG_INTERFACE') config TYPE cannot be determined?....skipping $ACTION request"
-                    echo -e $cBRED"\a\n\t***ERROR: WireGuard VPN Peer ('$WG_INTERFACE') config TYPE cannot be determined?....skipping $ACTION request\n"$cRESET
-                    exit 98
+                        if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
+                            SayT "***ERROR: WireGuard VPN Peer ($WG_INTERFACE) config TYPE cannot be determined?....skipping $ACTION request"
+                            echo -e $cBRED"\a\n\t***ERROR: WireGuard VPN Peer (${cBWHT}$WG_INTERFACE${cBRED}) config TYPE cannot be determined?....skipping $ACTION request\n"$cRESET
+                        else
+                            SayT "***ERROR: WireGuard VPN Peer ('$WG_INTERFACE') config NOT found?....skipping $ACTION request"
+                            echo -e $cBRED"\a\n\t***ERROR: WireGuard Peer (${cBWHT}$WG_INTERFACE${cBRED}) config NOT found?....skipping $ACTION request\n"$cRESET
+                        fi
+                        exit 98
                 fi
             fi
 
@@ -577,14 +618,14 @@ if [ -n "$(echo "start|stop|restart" | grep -o "$ACTION")" ];then
             for WG_INTERFACE in $WG_INTERFACE $AUTO_PEERS
                 do
                     if [ -z "$Route" ];then
-                        [ "$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' /jffs/configs/WireguardVPN_map)" == "P" ] && Route="policy" || Route="default"
+                        [ "$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' /jffs/configs/WireguardVPN.conf)" == "P" ] && Route="policy" || Route="default"
                     fi
 
                     if [ "$ACTION" == "restart" ];then                                      # v1.09
                         # If it is UP then terminate the Peer
                         if [ -n "$(ifconfig $WG_INTERFACE 2>/dev/null | grep inet)" ];then  # v1.09
                             echo -e $cBWHT;Say "$VERSION Restarting Wireguard VPN '$Mode' Peer ($WG_INTERFACE)"
-                            [ "$Mode" == "server" ] && ${CONFIG_DIR}wg_server $WG_INTERFACE "disable" || ${CONFIG_DIR}wg_manager.sh $WG_INTERFACE "disable"                 # v1.09
+                            [ "$Mode" == "server" ] && /jffs/addons/wireguard/wg_server $WG_INTERFACE "disable" || ${CONFIG_DIR}wg_manager.sh $WG_INTERFACE "disable"                 # v1.09
                         fi
                     fi
 
@@ -599,12 +640,12 @@ if [ -n "$(echo "start|stop|restart" | grep -o "$ACTION")" ];then
                             [ -z "$(grep -iE "^Endpoint" ${CONFIG_DIR}${WG_INTERFACE}.conf)" ] && Mode="server" || Mode="client"
 
                             if [ "$Mode" == "server" ] ; then
-                                ${CONFIG_DIR}wg_server $WG_INTERFACE
+                                sh ${INSTALL_DIR}wg_server $WG_INTERFACE
 
                                 elif [ "$Mode" == "client" ] && [ "$Route" != "policy" ] ; then
-                                    ${CONFIG_DIR}wg_manager.sh $WG_INTERFACE
+                                    sh ${INSTALL_DIR}wg_manager.sh $WG_INTERFACE
                                 else
-                                    ${CONFIG_DIR}wg_manager.sh $WG_INTERFACE "policy"
+                                    sh ${INSTALL_DIR}wg_manager.sh $WG_INTERFACE "policy"
                             fi
                         else
                             [ -n "$Mode" ] && TXT="'$Mode' " || TXT=            # v1.09
@@ -637,7 +678,7 @@ if [ -n "$(echo "start|stop|restart" | grep -o "$ACTION")" ];then
                 do
                     [ -z "$(grep -iE "^Endpoint" ${CONFIG_DIR}${WG_INTERFACE}.conf)" ] && Mode="server" || Mode="client"
 
-                    DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' /jffs/configs/WireguardVPN_map | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
+                    DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' /jffs/configs/WireguardVPN.conf | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
                     echo -en $cBCYA
                     Say "$VERSION Requesting termination of WireGuard VPN '$Mode' Peer ('$WG_INTERFACE')"
 
@@ -646,14 +687,14 @@ if [ -n "$(echo "start|stop|restart" | grep -o "$ACTION")" ];then
                     else
                         if [ "$Mode" == "server" ]; then
 
-                                ${CONFIG_DIR}wg_server $WG_INTERFACE "disable"
+                                sh ${INSTALL_DIR}wg_server $WG_INTERFACE "disable"
 
                                 elif [ "$Mode" == "client" ] && [ "$Route" != "policy" ] ; then
 
                                     #wg show $WG_INTERFACE >/dev/null 2>&1 && ${CONFIG_DIR}wg-down $WG_INTERFACE || Say "WireGuard $Mode service ('$WG_INTERFACE') NOT running."
-                                    /opt/bin/wg show $WG_INTERFACE >/dev/null 2>&1 && ${CONFIG_DIR}wg_manager.sh $WG_INTERFACE "disable" || Say "WireGuard $Mode service ('$WG_INTERFACE') NOT running."
+                                    /opt/bin/wg show $WG_INTERFACE >/dev/null 2>&1 && sh ${INSTALL_DIR}wg_manager.sh $WG_INTERFACE "disable" || Say "WireGuard $Mode service ('$WG_INTERFACE') NOT running."
                                 else
-                                    /opt/bin/wg show $WG_INTERFACE >/dev/null 2>&1 && ${CONFIG_DIR}wg_manager.sh $WG_INTERFACE "disable" "policy" || Say "WireGuard $Mode (Policy) service ('$WG_INTERFACE') NOT running."
+                                    /opt/bin/wg show $WG_INTERFACE >/dev/null 2>&1 && sh ${INSTALL_DIR}wg_manager.sh $WG_INTERFACE "disable" "policy" || Say "WireGuard $Mode (Policy) service ('$WG_INTERFACE') NOT running."
                         fi
 
                     fi
@@ -666,8 +707,8 @@ if [ -n "$(echo "start|stop|restart" | grep -o "$ACTION")" ];then
     exit 0
 fi
 
-# Process ALL other CMD line requests
-#####################################
+####################################################################################### Options Process ALL other CMD line requests
+###################################################################################################################################
 case "$ACTION" in
     show|diag)
         echo -e
@@ -689,10 +730,10 @@ case "$ACTION" in
                         [ -z "$(grep -iE "^Endpoint" ${CONFIG_DIR}${WG_INTERFACE}.conf)" ] && TYPE="server" || TYPE="client"
 
                         # Read the Remote peer config to set the LOCAL peer Endpoint
-                        if [ -f /jffs/configs/WireguardVPN_map ];then
-                            LOCALIP=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' /jffs/configs/WireguardVPN_map)
-                            SOCKET=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $4}' /jffs/configs/WireguardVPN_map)
-                            DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' /jffs/configs/WireguardVPN_map | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
+                        if [ -f /jffs/configs/WireguardVPN.conf ];then
+                            LOCALIP=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' /jffs/configs/WireguardVPN.conf)
+                            SOCKET=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $4}' /jffs/configs/WireguardVPN.conf)
+                            DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' /jffs/configs/WireguardVPN.conf | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
                         fi
                         LINE=${COLOR}$LINE" ${cBMAG}\t('$TYPE' $DESC)"
                     else
@@ -704,14 +745,14 @@ case "$ACTION" in
                     if [ -n "$(echo "$LINE" | grep -iE "Endpoint" )" ];then
                         # Don't get the description based on interface, but the IP socket?
                         #SOCKET=$(echo $LINE | awk '{print $2}')
-                        #DESC=$(awk -v pattern="$SOCKET" 'match($0,pattern) {print $0}' /jffs/configs/WireguardVPN_map | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
+                        #DESC=$(awk -v pattern="$SOCKET" 'match($0,pattern) {print $0}' /jffs/configs/WireguardVPN.conf | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
                         #LINE=${COLOR}$LINE" ${cBMAG}\t\t\t("$DESC")"
                         :
                     fi
 
                     if [ -n "$(echo "$LINE" | grep -iE "peer:" )" ] && [ "$TYPE" == "server" ];then
                         PUB_KEY=$(echo "$LINE" | awk '{print $2}')
-                        DESC=$(grep -F "$PUB_KEY" /jffs/configs/WireguardVPN_map | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
+                        DESC=$(grep -F "$PUB_KEY" /jffs/configs/WireguardVPN.conf | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
                         [ -z "$DESC" ] && DESC="# Unidentified"
                         LINE=${COLOR}$LINE" ${cBMAG}\t('$TYPE client'  $DESC)"
                     fi
@@ -758,8 +799,11 @@ case "$ACTION" in
             exit 96
         fi
 
-        # Temporary directory if '/opt/etc/wireguard' doesn't exist
-        mkdir -p /tmp/wireguard
+        echo -en $cBRED
+        cp ${INSTALL_DIR}$SCRIPT_NAME /opt/etc/init.d/$SCRIPT_NAME          # v1.12
+
+        # Amtm
+        # mkdir -p /jffs/addons/wireguard
         if [ -d /opt/etc/ ];then
            [ ! -d /opt/etc/wireguard ] && mkdir -p /opt/etc/wireguard
         else
@@ -767,11 +811,12 @@ case "$ACTION" in
             exit 95
         fi
 
+        # Scripts
         if [ -d /opt/etc/wireguard ];then
-            echo -e $cBCYA"\n\tDownloading scripts 'wg_manager.sh/wg_server'\n"$cRESET
-            curl -# -L --retry 3 "https://raw.githubusercontent.com/MartineauUK/wireguard/main/wg_manager.sh" -o "${CONFIG_DIR}wg_manager.sh" && chmod 755 "${CONFIG_DIR}wg_manager.sh"
-            curl -# -L --retry 3 "https://raw.githubusercontent.com/MartineauUK/wireguard/main/wg_server"     -o "${CONFIG_DIR}wg_server"  && chmod 755 "${CONFIG_DIR}wg_server"
+            Get_scripts "$2"
         fi
+
+        modprobe xt_comment
 
         # Kernel module
         echo -e $cBCYA"\n\tDownloading Wireguard Kernel module for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
@@ -781,21 +826,21 @@ case "$ACTION" in
         Download_Modules $HARDWARE_MODEL
         Load_Module_UserspaceTool
 
-        # Create the Sample/template parameter file '/jffs/configs/WireguardVPN_map'
+        # Create the Sample/template parameter file '/jffs/configs/WireguardVPN.conf'
         Create_Sample_Config
 
         # Create dummy 'Client' and 'Server' templates
         echo -e $cBCYA"\n\tCreating WireGuard 'Client' and 'Server' Peer templates 'wg11.conf' and wg21.conf'"$cRESET
-        opkg install qrencode
+
         cat > ${CONFIG_DIR}wg11.conf << EOF
 [Interface]
 #Address = 10.10.10.2/24
 #DNS = 10.10.10.1
-PrivateKey = This_should_be_replaced_with_YOUR_Private_Key
+PrivateKey = Ba1dgO/plL4wCB+p111h8bIAWNeNgPZ7L+HFBhoE4=
 
 [Peer]
-Endpoint = edit.this.IP.address:51820
-PublicKey = This_should_be_replaced_with_the_Remote_Peer_Public_Key
+Endpoint = 10.11.12.13:51820
+PublicKey = Ba1dgO/plL4wCB+pRdabQh8bIAWNeNgPZ7L+HFBhoE4=
 AllowedIPs = 0.0.0.0/0
 PersistentKeepalive = 25
 EOF
@@ -804,7 +849,7 @@ EOF
         cat > ${CONFIG_DIR}wg21.conf << EOF
 # $HARDWARE_MODEL 'server' Peer #1 (wg21)
 [Interface]
-PrivateKey = This_should_be_replaced_with_$HARDWARE_MODEL_Private_Key
+PrivateKey = Ha1rgO/plL4wCB+pRdc6Qh8bIAWNeNgPZ7L+HFBhoE4=
 ListenPort = 51820
 
 # e.g. Accept a WireGuard connection from say YOUR mobile device to the router
@@ -822,11 +867,11 @@ EOF
         if [ -n "$(which wg)" ];then
             for I in 1 2 3 4 5
                 do
-                    wg genkey | tee ${CONFIG_DIR}client1${I}_private.key | wg pubkey | tee ${CONFIG_DIR}client1${I}_public.key
+                    wg genkey | tee ${CONFIG_DIR}client1${I}_private.key | wg pubkey > ${CONFIG_DIR}client1${I}_public.key
                 done
             for I in 1 2
                 do
-                    wg genkey | tee ${CONFIG_DIR}server2${I}_private.key | wg pubkey | tee ${CONFIG_DIR}server2${I}_public.key
+                    wg genkey | tee ${CONFIG_DIR}server2${I}_private.key | wg pubkey > ${CONFIG_DIR}server2${I}_public.key
                 done
 
             # Update the Sample Peer templates with the router's real keys
@@ -839,7 +884,7 @@ EOF
             sed -i "/^PrivateKey/ s~[^ ]*[^ ]~$PRIV_KEY~3" ${CONFIG_DIR}wg21.conf
 
             # Create a Private/Public key-pair for your mobile phone
-            wg genkey | tee ${CONFIG_DIR}mobilephone_private.key | wg pubkey | tee ${CONFIG_DIR}mobilephone_public.key
+            wg genkey | tee ${CONFIG_DIR}mobilephone_private.key | wg pubkey > ${CONFIG_DIR}mobilephone_public.key
             PUB_KEY=$(cat ${CONFIG_DIR}mobilephone_public.key)
             PUB_KEY=$(Convert_Key "$PUB_KEY")
             sed -i "/^PublicKey/ s~[^ ]*[^ ]~$PUB_KEY~3" ${CONFIG_DIR}wg21.conf
@@ -847,34 +892,38 @@ EOF
         fi
 
         if  [ -n "$(which wg)" ] && [ "$ROUTER_COMPATIBLE" == "Y" ];then
-            echo -e $cBWHT"\n\tWireGuard install COMPLETED.\n"$cRESET
-            rm -rf /tmp/wireguard
 
             # Backup the legacy original if it exists
-            if [ -f /jffs/scripts/S50wireguard ];then
-                [ -f /opt/etc/init.d/S50wireguard ] && mv /opt/etc/init.d/S50wireguard /opt/etc/init.d/S50wireguard.$TS
-                cp /jffs/scripts/S50wireguard /opt/etc/init.d/S50wireguard
-                rm /jffs/scripts/S50wireguard
+            if [ -f ${INSTALL_DIR}S50wireguard ];then
+                [ -f ${INSTALL_DIR}S50wireguard ] && mv /opt/etc/init.d/S50wireguard /opt/etc/init.d/S50wireguard.$TS
+                cp ${INSTALL_DIR}S50wireguard /opt/etc/init.d/S50wireguard
             fi
 
-            # Test the this script against the two Sample Peers (wg11 and Wg21)
-            echo -e $cBGRE"\n\tTest Initialising the Sample WireGuard 'client' and 'server' Peers, BUT ONLY the Sample 'server' will start up!! :-).\n"$cRESET
+            # Test this script - (well actually the one used @BOOT) against the two Sample Peers (wg11 and Wg21)
+            echo -e $cBCYA"\n\tTest Initialising the Sample WireGuard 'client' and 'server' Peers, BUT ONLY the Sample 'server' will Initialise correctly!!!! :-).\n"$cRESET
             /opt/etc/init.d/S50wireguard start
-            # Test the checkdebug report
-            echo -e $cBGRE"\n\tTest WireGuard Peer Status (in verbose DEBUG mode to show RPDB rules"
-            /opt/etc/init.d/S50wireguard checkdebug
-            echo -e $cBGRE"\n\tTerminating ACTIVE WireGuard Peers...\n"$cRESET
+            # Test the Status report
+            echo -e $cBCYA"\n\tTest WireGuard Peer Status"
+            /opt/etc/init.d/S50wireguard show               # v1.11
+            echo -e $cBCYA"\n\tTerminating ACTIVE WireGuard Peers...\n"$cRESET
             /opt/etc/init.d/S50wireguard stop
         else
-            echo -e $cBRED"\n\t***ERROR: WireGuard install FAILED!\n"$cRESET
-            # rm -rF /tmp/wireguard
+            echo -e $cBRED"\a\n\t***ERROR: WireGuard install FAILED!\n"$cRESET
+            # rm -rF /jffs/addons/wireguard
         fi
 
-        Display_QRCode "${CONFIG_DIR}wg11.conf"             # v1.05
+        echo -e $cBCYA"\n\tInstalling QR rendering module"$cBGRA
+        opkg install qrencode
+
+        Display_QRCode ${CONFIG_DIR}wg11.conf
+
+        Edit_nat_start                                      # v1.07
+
+        Edit_DNSMasq                                        # v1.12
 
         Manage_alias
 
-        Edit_nat_start                                      # v1.07
+        echo -e $cBGRE"\n\tWireGuard install COMPLETED.\n"$cRESET
 
         ;;
     alias)                                                  # ['del']
@@ -891,14 +940,9 @@ EOF
         Load_Module_UserspaceTool
         ;;
     usedns)
-        #cp ${CONFIG_DIR}S50wireguard /opt/etc/init.d
 
-        # Allow dnmsasq to listen on Wireguard interfaces for DNS
-        if [ -z "$(grep -E "^interface=wg\*" /jffs/configs/dnsmasq.conf.add)" ];then
-            echo -e $cBGRE"Adding 'wg*' interfaces to DNSMasq"$cRESET
-            echo -e "interface=wg*" >> /jffs/configs/dnsmasq.conf.add
-            service restart_dnsmasq
-        fi
+        Edit_DNSMasq "$1"                                   # v1.12
+
         ;;
     createconfig)
 
@@ -917,23 +961,30 @@ EOF
         ;;
     uninstall)
 
-        echo -e $cBCYA"\n\tUninstalling Wireguard Kernel module and Userspace Tools for $HARDWARE_MODEL (v$BUILDNO)"$cBRED
+        echo -e $cBCYA"\n\tUninstalling Wireguard Kernel module and Userspace Tools for $HARDWARE_MODEL (v$BUILDNO)"$cBGRA
         opkg remove wireguard-kernel wireguard-tools
         echo -e $cBCYA"\n\tDeleting Wireguard install directories and files"$cRESET
+        echo -en $cBRED
+        [ -f /jffs/configs/WireguardVPN.conf ] && rm /jffs/configs/WireguardVPN.conf
         [ -f /opt/etc/init.d/S50wireguard ] && rm /opt/etc/init.d/S50wireguard
-        [ -f /jffs/scripts/S50wireguard ] && rm /jffs/scripts/S50wireguard
-        [ -f /jffs/configs/WireguardVPN_map ] && rm /jffs/configs/WireguardVPN_map
-        sed -i '/S50wireguard/d' /tmp/home/root/.profile
-        rm -rf /tmp/wireguard
+            # legacy tidy-up!
+            [ -f /jffs/scripts/S50wireguard ] && rm /jffs/scripts/S50wireguard
+            [ -f /jffs/configs/WireguardVPN_map ] && rm /jffs/configs/WireguardVPN_map
 
-        echo -e "\tPress$cBRED Y$cRESET to$cBRED delete ALL WireGuard DATA files (Peer *.config etc.) $cRESET('/opt/etc/wireguard') or press$cBGRE [Enter] to keep custom WireGuard DATA files."
+        rm -rf /jffs/addons/wireguard
+
+        echo -e "\tPress$cBRED Y$cRESET to$cBRED delete ALL WireGuard DATA files (Peer *.config etc.) $cRESET('${CONFIG_DIR}') or press$cBGRE [Enter] to keep custom WireGuard DATA files."
         read -r "ANS"
         if [ "$ANS" == "Y" ];then
-           echo -e $cBCYA"\n\tDeleting $cRESET'/opt/etc/wireguard'\n"
-           [ -d /opt/etc/wireguard ] && rm -rf /opt/etc/wireguard
+           echo -e $cBCYA"\n\tDeleting $cRESET'${CONFIG_DIR}'\n"
+           [ -d /opt/etc/wireguard ] && rm -rf ${CONFIG_DIR}
         fi
 
         Edit_nat_start "del"
+
+        Manage_alias "del"                  # v1.11
+
+        Edit_DNSMasq "del"                      # v1.12
 
         echo -e $cBGRE"\n\tWireGuard Uninstall complete for $HARDWARE_MODEL (v$BUILDNO)\n"$cRESET
         ;;
@@ -995,18 +1046,18 @@ EOF
             LAN_SUBNET=${LAN_ADDR%.*}
             if [ "$SPLIT_TUNNEL" == "Y" ];then
 
-                # Reuse the IP if device already exists in '/jffs/configs/WireguardVPN_map'
-                if [ -z "$(grep -F "# $DEVICE_NAME $TAG" /jffs/configs/WireguardVPN_map)" ];then
-                    DHCP_POOL=$(awk -v pattern="$SERVER_PEER" 'match($0,"^"pattern) {print $3}' /jffs/configs/WireguardVPN_map | tr '/' ' ' | awk '{print $1}') # v1.06
+                # Reuse the IP if device already exists in '/jffs/configs/WireguardVPN.conf'
+                if [ -z "$(grep -F "# $DEVICE_NAME $TAG" /jffs/configs/WireguardVPN.conf)" ];then
+                    DHCP_POOL=$(awk -v pattern="$SERVER_PEER" 'match($0,"^"pattern) {print $3}' /jffs/configs/WireguardVPN.conf | tr '/' ' ' | awk '{print $1}') # v1.06
                 else
-                    IP=$(grep -w "$DEVICE_NAME" /jffs/configs/WireguardVPN_map | awk '{print $2}')  # v1.06
-                    sed -i "/# $DEVICE_NAME $TAG/d" /jffs/configs/WireguardVPN_map  # v1.06
+                    IP=$(grep -w "$DEVICE_NAME" /jffs/configs/WireguardVPN.conf | awk '{print $2}')  # v1.06
+                    sed -i "/# $DEVICE_NAME $TAG/d" /jffs/configs/WireguardVPN.conf  # v1.06
                 fi
                 if [ -n "$DHCP_POOL" ] || [ -n "$IP" ];then                                     # v1.06 Hack
 
                     if [ -z "$IP" ];then
                         DHCP_POOL_SUBNET=${DHCP_POOL%.*}
-                        IP=$(grep -F "$DHCP_POOL_SUBNET." /jffs/configs/WireguardVPN_map | grep -Ev "^#" | grep -v "$SERVER_PEER" | awk '{print $2}' | sed 's~/32.*$~~g' | sort -n -t . -k 1,1 -k 2,2 -k 3,3 -k 4,4 | tail -n 1)
+                        IP=$(grep -F "$DHCP_POOL_SUBNET." /jffs/configs/WireguardVPN.conf | grep -Ev "^#" | grep -v "$SERVER_PEER" | awk '{print $2}' | sed 's~/32.*$~~g' | sort -n -t . -k 1,1 -k 2,2 -k 3,3 -k 4,4 | tail -n 1)
                         IP=${IP##*.}        # 4th octet
                         IP=$((IP+1))
                     else
@@ -1017,12 +1068,12 @@ EOF
                         [ "$USE_IPV6" == "Y" ] && IPV6=", fc00:23:5::${IP}/128, 2001:db8:23:5::/64"     # v1.07
                         IP=$DHCP_POOL_SUBNET"."$IP"/32"
                     else
-                        echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) subnet MAX 254 reached '/jffs/configs/WireguardVPN_map'"
+                        echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) subnet MAX 254 reached '/jffs/configs/WireguardVPN.conf'"
                         exit 92
                     fi
 
                 else
-                    echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) subnet NOT defined in '/jffs/configs/WireguardVPN_map'"
+                    echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) subnet NOT defined in '/jffs/configs/WireguardVPN.conf'"
                     exit 91
                 fi
 
@@ -1082,8 +1133,8 @@ EOF
                 TAG=$(echo "$@" | sed -n "s/^.*tag=//p" | awk '{print $0}')
                 [ -z "$TAG" ] && TAG="Device"                                   # v1.03
 
-                [ -z "$(grep "$PUB_KEY" /jffs/configs/WireguardVPN_map)" ] && echo -e "$PUB_KEY      $IP     # $DEVICE_NAME $TAG" >> /jffs/configs/WireguardVPN_map     # v.03
-                tail -n 1 /jffs/configs/WireguardVPN_map
+                [ -z "$(grep "$PUB_KEY" /jffs/configs/WireguardVPN.conf)" ] && echo -e "$PUB_KEY      $IP     # $DEVICE_NAME $TAG" >> /jffs/configs/WireguardVPN.conf     # v.03
+                tail -n 1 /jffs/configs/WireguardVPN.conf
 
                 # Need to Restart the Peer (if it is UP) or Start it so it can listen for new 'client' Peer device
                 INSTANCE=${SERVER_PEER:3:1}
@@ -1092,7 +1143,7 @@ EOF
                 echo -e $cBWHT"\a\n\tWireGuard 'server' Peer needs to be ${CMD}ed to listen for 'client' Peer $DEVICE_NAME $TAG"
                 echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer ($SERVER_PEER) or press$cBGRE [Enter] to SKIP."
                 read -r "ANS"
-                [ "$ANS" == "y" ] && { /opt/etc/init.d/S50wireguard restart server "$INSTANCE"; /opt/etc/init.d/S50wireguard "show"; }
+                [ "$ANS" == "y" ] && { ${INSTALL_DIR}/S50wireguard restart server "$INSTANCE"; ${INSTALL_DIR}S50wireguard "show"; }
 
             fi
         else
@@ -1112,15 +1163,22 @@ EOF
 
                 # Check if DNSmasq is listening on ALL wg* interfaces               # v1.07
                 if [ -z "$(grep -F "wg*" /etc/dnsmasq.conf)" ];then
-                    echo -e $cBRED"\t[✖]${cBWHT} DNSmasq is not listening on any WireGuard interfaces 'wg*'\n"$cRESET
+                    echo -e $cBRED"\t[✖]${cBWHT} DNSmasq ${cRED}is not listening on any WireGuard interfaces 'wg*' - ${cBWHT}use 'wgm usedns' to ENABLE\n"$cRESET
                 else
-                    echo -e $cBGRE"\t[✔]${cBWHT} DNSmasq is listening on ALL WireGuard interfaces 'wg*'\n"$cRESET
+                    echo -e $cBGRE"\t[✔]${cBWHT} DNSmasq ${cBGRE}is listening on ALL WireGuard interfaces 'wg*'\n"$cRESET
+                fi
+
+                if [ -z "$(grep -i "wireguard" /jffs/scripts/nat-start)" ];then     # v1.11
+                    echo -e $cBRED"\t[✖]${cBWHT} nat-start$${cBRED} is NOT monitoring WireGuard Firewall rules - ${cBWHT}use 'wgm natstart' to ENABLE\n"$cRESET
+                else
+                    echo -e $cBGRE"\t[✔]${cBWHT} nat-start ${cBGRE}is monitoring WireGuard Firewall rules\n"$cRESET
                 fi
 
                 ;;
             *)
                 [ "$2" == "dev" ] && DEV="dev" || DEV="main"
                 DOWNLOAD="N"
+
                 if [ "$ACTION" == "uf" ];then
                     echo -e ${cRESET}$cWRED"\n\tForced Update"$cRESET"\n"
                     DOWNLOAD="Y"
@@ -1130,10 +1188,7 @@ EOF
                 fi
 
                 if [ "$DOWNLOAD" == "Y" ];then
-                    download_file /opt/etc/init.d S50wireguard martineau $DEV dos2unix
-                    download_file "${CONFIG_DIR}" wg_manager.sh martineau $DEV dos2unix
-                    download_file "${CONFIG_DIR}" wg_server martineau $DEV dos2unix
-                    echo -e
+                    Get_scripts "$DEV"
                 fi
 
                 Check_Module_Versions
@@ -1154,7 +1209,7 @@ EOF
         ;;
     configx|config)                                                                   # v1.10
 
-            FN="/jffs/configs/WireguardVPN_map"
+            FN="/jffs/configs/WireguardVPN.conf"
 
             [ "$1" == "config" ] && ACCESS="--view" || ACCESS="--unix"
             if [ -f $FN ];then
@@ -1167,15 +1222,12 @@ EOF
     ;;
     peer)                                           # peer [ 'list' | interface { [auto y|n|p ] 'del' | 'add' | 'comment' {'#'comment}'} ]  # v1.10
 
-        FN="/jffs/configs/WireguardVPN_map"
+        FN="/jffs/configs/WireguardVPN.conf"
 
         case $2 in
             list|"")
                 echo -e $cBCYA"\n"
-                #grep "^wg[0-2]" $FN > /tmp/wireguardpeers.txt
-                #column -t /tmp/wireguardpeers.txt
-                #rm /tmp/wireguardpeers.txt
-                #grep "^wg[0-2]" $FN
+
                 awk '($2=="Y"|| $2=="N"||$2=="P") {print $0}' $FN
                 echo -e "\n"$cRESET
             ;;
