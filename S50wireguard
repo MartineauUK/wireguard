@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v1.12"
-#============================================================================================ © 2021 Martineau v1.12
+VERSION="v1.12b"
+#============================================================================================ © 2021 Martineau v1.12b
 #
 #       S50wireguard   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -493,7 +493,7 @@ Edit_DNSMasq() {
 }
 Get_scripts() {                                                         # v1.12
 
-    echo -e $cBCYA"\n\tDownloading scripts 'wg_manager.sh/wg_server'\n"$cRESET 2>&1
+    echo -e $cBCYA"\n\tDownloading scripts\n"$cRESET 2>&1
 
     download_file ${INSTALL_DIR} S50wireguard martineau $DEV dos2unix 755
     download_file ${INSTALL_DIR} wg_manager.sh martineau $DEV dos2unix 755
@@ -794,7 +794,7 @@ case "$ACTION" in
 
         echo -en $cBRED
         cp ${INSTALL_DIR}$SCRIPT_NAME /opt/etc/init.d/$SCRIPT_NAME          # v1.12
-exit
+
         # Amtm
         # mkdir -p /jffs/addons/wireguard
         if [ -d /opt/etc/ ];then
