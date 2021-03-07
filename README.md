@@ -11,7 +11,7 @@ Enable SSH on router, then use your preferred SSH Client e.g. Xshell6,MobaXterm,
 
 (TIP: Triple-click the install command below) to copy'n'paste into your router's SSH session:
     
-    mkdir /jffs/addons 2>/dev/null;mkdir /jffs/addons/wireguard 2>/dev/null;curl --retry 3 "https://raw.githubusercontent.com/MartineauUK/wireguard/main/S50wireguard" -o "/jffs/addons/wireguard/S50wireguard" && chmod 755 "/jffs/addons/wireguard/S50wireguard" && /jffs/addons/wireguard/S50wireguard install
+    mkdir /jffs/addons 2>/dev/null;mkdir /jffs/addons/wireguard 2>/dev/null;curl --retry 3 "https://raw.githubusercontent.com/MartineauUK/wireguard/main/S50wireguard" -o "/jffs/scripts/S50wireguard" && chmod 755 "/jffs/scripts/S50wireguard" && /jffs/scripts/S50wireguard install
     
 Example successful install.....
 
