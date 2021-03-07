@@ -95,24 +95,29 @@ The contents of the WireGuard configuration file will be used when 'wg13.conf' i
     S50wireguard   stop 1
                    Terminates local peer 'server' 'wg21'
     S50wireguard   stop
-                   Terminates ALL ACTIVE peers (wg1* and wg2*)
+                   Terminates ALL ACTIVE peers (wg1* and wg2* etc.)
     S50wireguard   start
-                   Initialises ALL peers (wg1* and wg2*) defined in the configuration file where Auto=Y or Auto=P
+                   Initialises ALL peers (wg1* and wg2* etc.) defined in the configuration file where Auto=Y or Auto=P
                  
 and if the install is successful, there should now be simple aliases
 
 e.g.
 
-    wgstart
-    wgstop
-    wgr
-    wgd
-    
-where the top two aliases allow quickly Starting/Stopping all of the Defined/Active WireGuard Peers, and the bottom two generate a report of active Peers (either with or without DEBUG iptables/RPDB rules)
+    wgstart         Start ALL Peers defined in the config where Auto=Y or Auto=P
+    wgstop          Stop ALL ACTIVE Peers
+    wgrestart       Restart/Start either the designated Peer or ALL Peers defined in config where Auto=Y or Auto=P
+    wgshow          generate a report of active Peers
+    wgdiag          Generate a report of active Peers (with or without DEBUG iptables/RPDB rules etc.)
+ 
+    The following (WireGuard Manager) is the alias to allow execution of console commands  
+  
+e.g.
+
+    wgm peer list   Lists the defined Peers in the config The sub-commands for peer allow manipulation of the Auto= value etc
 
 An example of the enhanced WireGuard Peer Status report showing the names of the Peers rather than just their cryptic Public Keys
 
-    wgr
+    wgshow
 
     (S50wireguard): 15024 v1.01b4 WireGuard VPN Peer Status check.....
 
@@ -132,29 +137,30 @@ Very crude fall-over configuration but may be useful.
 
 For hosting a 'server' Peer (wg21) you can use the following command to generate a Private/Public key-pair and auto add it to the 'wg21.conf' and to the WireGuard config '/jffs/configs/WireGuardVPN_map'
 
-    S50wireguard genkeys GoldstrikeriPhone3GSSupreme24K
+    wgm create GoldstrikeriPhone3GSSupreme24K 
 
 	Creating Wireguard Private/Public key pair for device 'GoldstrikeriPhone3GSSupreme24K'
 
-	Device 'GoldstrikeriPhone3GSSupreme24K' Public key=uAMVeM6DNsj9rEsz9rjDJ7WZEiJjEp98CDfDhSFL0W0=
+	Device 'iPhone3GS24K' Public key=uAMVeM6DNsj9rEsz9rjDJ7WZEiJjEp98CDfDhSFL0W0=
 
-	Press y to ADD device 'GoldstrikeriPhone3GSSupreme24K' to 'server' Peer (wg21) or press [Enter] to SKIP.
+	Press y to ADD device 'iPhone3GS24K' to 'server' Peer (wg21) or press [Enter] to SKIP.
     y
-	Adding device Peer 'GoldstrikeriPhone3GSSupreme24K' to RT-AC86U 'server' (wg21) and WireGuard config
+	Adding device Peer 'iPhone3GS24K' to RT-AC86U 'server' (wg21) and WireGuard config
 and the resulting entry in the WireGuard 'server' Peer config 'wg21.conf' - where 10.50.1.125 is derived from the DHCP pool for the 'server' Peer
 
 e.g. WireGuard configuration 'WireguardVPN_map' contains
 
     wg21    Y      10.50.1.1/24                                                 # Martineau Host Peer 1
 
-and the next avaiable IP with DHCP pool prefix '10.60.1' .125 is chosen as .124 is aleady assigned when the Peer is appended to 'wg21.conf'
+and the next avaiable IP with DHCP pool prefix '10.50.1' .125 is chosen as .124 is already assigned when the Peer is appended to 'wg21.conf'
 
-    #GoldstrikeriPhone3GSSupreme24K
+    # iPhone3GS24K
     [Peer]
     PublicKey = uAMVeM6DNsj9rEsz9rjDJ7WZEiJjEp98CDfDhSFL0W0=
     AllowedIPs = 10.50.1.125/32
+    # iPhone3GS24K End
   
-and the cosmetic Annotation identification for the device '# Device GoldstrikeriPhone3GSSupreme24K' is appended to the WireGuard configuration 'WireguardVPN_map'  
+and the cosmetic Annotation identification for the device '# Device iPhone3GS24K' is appended to the WireGuard configuration 'WireguardVPN_map'  
 
     # Optionally define the 'server' Peer 'clients' so they can be identified by name in the enhanced WireGuard Peer status report
     # Public Key                                      DHCP IP             Annotation Comment
@@ -162,9 +168,11 @@ and the cosmetic Annotation identification for the device '# Device Goldstrikeri
     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=      10.50.1.124         # A Cell phone
     snip>
     
-    uAMVeM6DNsj9rEsz9rjDJ7WZEiJjEp98CDfDhSFL0W0=      10.50.1.125         # Device GoldstrikeriPhone3GSSupreme24K
+    uAMVeM6DNsj9rEsz9rjDJ7WZEiJjEp98CDfDhSFL0W0=      10.50.1.125         # Device iPhone3GS24K
 
-    
+To import the device iPhone3GS24K into the WireGuard App on the mobile device or tablet, rather than manually enter the details, or import the text file using a secure means of transfer, it is easier to simply display the QR Code containing the configuration and point the phone/tablet's camera at the QR Code! ;-)
+
+     wgr qrcode iPhone3GS24K
 
 
 
