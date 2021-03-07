@@ -127,6 +127,7 @@ FIRMWARE=$(echo $(nvram get buildno) | awk 'BEGIN { FS = "." } {printf("%03d%02d
 CONFIG_DIR="/opt/etc/wireguard/"                    # v1.03
 
 modprobe xt_set
+modprobe xt_comment
 insmod /opt/lib/modules/wireguard 2> /dev/null
 #############################################################################EIC Hack 1 of 1################
 #insmod /opt/lib/modules/wireguard
@@ -235,7 +236,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         iptables -t mangle -I FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7
         iptables -t mangle -I PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7
 
-        if [ $FIRMWARE -ge 38601 ];then         # Allow Guest #1 SSID VLANs
+        if [ $FIRMWARE -ge 38601 ];then         # Allow Guest #1 SSID VLANs SNB @ZebMcKayhan
             iptables -t filter -I FORWARD -i br1 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN"
             iptables -t filter -I FORWARD -i br2 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN"
             iptables -t nat -I POSTROUTING -s $(nvram get lan_ipaddr)/16 -o $VPN_ID -j MASQUERADE
