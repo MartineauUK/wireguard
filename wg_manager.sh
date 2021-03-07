@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v1.03"
-#============================================================================================ © 2021 Martineau v0.03
+VERSION="v1.04"
+#============================================================================================ © 2021 Martineau v0.04
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 06-Mar-2021
+# Last Updated Date: 07-Mar-2021
 #
 # Description:
 #
@@ -127,6 +127,7 @@ FIRMWARE=$(echo $(nvram get buildno) | awk 'BEGIN { FS = "." } {printf("%03d%02d
 CONFIG_DIR="/opt/etc/wireguard/"                    # v1.03
 
 modprobe xt_set
+modprobe xt_comment
 insmod /opt/lib/modules/wireguard 2> /dev/null
 #############################################################################EIC Hack 1 of 1################
 #insmod /opt/lib/modules/wireguard
@@ -157,13 +158,13 @@ fi
 [ -n "$(echo "$@" | grep "policy")" ] && POLICY_MODE="in Policy Mode " || POLICY_MODE=
 
 # Read the Peer config to set the Annotation Description and LOCAL peer endpoint etc.
-if [ -f /jffs/configs/WireguardVPN_map ];then
+if [ -f /jffs/configs/WireguardVPN.conf ];then
     if [ "$MODE" == "client" ];then                         # v1.03
         if [ -z "$LOCALIP" ];then
-           LOCALIP=$(awk -v pattern="${VPN_ID}" 'match($0,"^"pattern) {print $3}' /jffs/configs/WireguardVPN_map)       # v1.03
+           LOCALIP=$(awk -v pattern="${VPN_ID}" 'match($0,"^"pattern) {print $3}' /jffs/configs/WireguardVPN.conf)       # v1.03
            export LocalIP=$LOCALIP
         fi
-        [ -z "$SOCKET" ] && SOCKET=$(awk -v pattern="${VPN_ID}" 'match($0,"^"pattern) {print $4}' /jffs/configs/WireguardVPN_map)
+        [ -z "$SOCKET" ] && SOCKET=$(awk -v pattern="${VPN_ID}" 'match($0,"^"pattern) {print $4}' /jffs/configs/WireguardVPN.conf)
         START_PRIO=99${VPN_NUM}0
         END_PRIO=99${VPN_NUM}9
         WAN_PRIO=99${VPN_NUM}0
@@ -173,7 +174,7 @@ if [ -f /jffs/configs/WireguardVPN_map ];then
     else
         SOCKET=$(nvram get wan_gateway)":"$(awk '/Listen/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)      # v1.03
     fi
-    DESC=$(awk -v pattern="${VPN_ID}" 'match($0,"^"pattern) {print $0}' /jffs/configs/WireguardVPN_map | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
+    DESC=$(awk -v pattern="${VPN_ID}" 'match($0,"^"pattern) {print $0}' /jffs/configs/WireguardVPN.conf | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
     [ -z "$DESC" ] && DESC="# Unidentified"
 fi
 
@@ -208,7 +209,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
             ip route add 128/1 dev $VPN_ID 2>/dev/null
         else
             #ip rule add from $(nvram get lan_ipaddr | cut -d"." -f1-3).0/24 table 12$VPN_NUM prio 99$VPN_NUM"9"
-            VPN_IP_LIST=$(awk -v pattern="${VPN_NUM}" 'match($0,"^rp1"pattern) {print $0}' /jffs/configs/WireguardVPN_map | grep -oE "<.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
+            VPN_IP_LIST=$(awk -v pattern="${VPN_NUM}" 'match($0,"^rp1"pattern) {print $0}' /jffs/configs/WireguardVPN.conf | grep -oE "<.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
 
             create_client_list
 
@@ -235,7 +236,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         iptables -t mangle -I FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7
         iptables -t mangle -I PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7
 
-        if [ $FIRMWARE -ge 38601 ];then         # Allow Guest #1 SSID VLANs
+        if [ $FIRMWARE -ge 38601 ];then         # Allow Guest #1 SSID VLANs SNB @ZebMcKayhan
             iptables -t filter -I FORWARD -i br1 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN"
             iptables -t filter -I FORWARD -i br2 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN"
             iptables -t nat -I POSTROUTING -s $(nvram get lan_ipaddr)/16 -o $VPN_ID -j MASQUERADE
@@ -256,7 +257,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         ############################################################################################################
 
     else
-        echo -e "\a\n\t";logger -st "wireguard-{$MODE}${VPN_NUM}" "Local Peer I/P endpoint ('/jffs/configs/WireguardVPN_map') not VALID. ABORTing Initialisation."
+        echo -e "\a\n\t";logger -st "wireguard-{$MODE}${VPN_NUM}" "Local Peer I/P endpoint ('/jffs/configs/WireguardVPN.conf') not VALID. ABORTing Initialisation."
         echo -e
     fi
 
