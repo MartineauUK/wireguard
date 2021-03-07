@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v1.02b"
-#============================================================================================ © 2021 Martineau v0.02b
+VERSION="v1.04"
+#============================================================================================ © 2021 Martineau v0.04
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 05-Mar-2021
+# Last Updated Date: 07-Mar-2021
 #
 # Description:
 #
@@ -124,19 +124,32 @@ ANSIColours
 
 FIRMWARE=$(echo $(nvram get buildno) | awk 'BEGIN { FS = "." } {printf("%03d%02d",$1,$2)}')
 
+CONFIG_DIR="/opt/etc/wireguard/"                    # v1.03
+
 modprobe xt_set
+insmod /opt/lib/modules/wireguard 2> /dev/null
 #############################################################################EIC Hack 1 of 1################
 #insmod /opt/lib/modules/wireguard
 VPN_ID=$1
 [ -z "$1" ] && VPN_ID="wg0"
-VPN_NUM=${VPN_ID#"${VPN_ID%?}"}
 [ "${VPN_ID:0:3}" == "wg1" ] && { MODE="client"; TXT="to"; } || { MODE="server"; TXT="Hosted at"; }
-insmod /opt/lib/modules/wireguard 2> /dev/null
-if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
-    #echo -e $cBGRA
-    #dmesg | grep -a WireGuard | tail -n 1
-    #echo -e $cBWHT
-    :
+VPN_NUM=${VPN_ID#"${VPN_ID%?}"}
+
+# Is this a standard 'client' Peer interface 'wg11-wg15'                    # v1.03
+if [ -z "$(echo "$VPN_ID" |  grep -oE "^wg[2][1-2]|^wg[1][1-5]*$")" ];then      # v1.03
+    # Non-stand so identfy if it's a 'client' or 'server' Peer
+    VPN_NUM="0"                 # i.e. 'client' Peer prio '990x' where the RPDB rules for 'client' Peers 'wg11'-wg15' are '991x-995x'
+    if [ -f ${CONFIG_DIR}${VPN_ID}.conf ];then                                  # v1.03
+        if [ -n "$(grep -E "^Endpoint" ${CONFIG_DIR}${VPN_ID}.conf)" ];then     # v1.03
+            MODE="client"
+            TXT="to"
+            SOCKET="$(awk '/^Endpoint/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)"                    # v1.03
+            LOCALIP="$(awk -F "[ :]" '/^Endpoint/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)"     # v1.03
+        else
+            echo -e $cBRED"\a\n\t***ERROR: WireGuard '$MODE' not supported by $0!\n"$cRESET
+            exit 87
+        fi
+    fi
 fi
 
 ############################################################################################################
@@ -144,11 +157,13 @@ fi
 [ -n "$(echo "$@" | grep "policy")" ] && POLICY_MODE="in Policy Mode " || POLICY_MODE=
 
 # Read the Peer config to set the Annotation Description and LOCAL peer endpoint etc.
-if [ -f /jffs/configs/WireguardVPN_map ];then
-    if [ "${VPN_ID:0:3}" != "wg2" ];then
-        LOCALIP=$(awk -v pattern="${VPN_ID}" 'match($0,"^"pattern) {print $3}' /jffs/configs/WireguardVPN_map)
-        export LocalIP=$LOCALIP
-        SOCKET=$(awk -v pattern="${VPN_ID}" 'match($0,"^"pattern) {print $4}' /jffs/configs/WireguardVPN_map)
+if [ -f /jffs/configs/WireguardVPN.conf ];then
+    if [ "$MODE" == "client" ];then                         # v1.03
+        if [ -z "$LOCALIP" ];then
+           LOCALIP=$(awk -v pattern="${VPN_ID}" 'match($0,"^"pattern) {print $3}' /jffs/configs/WireguardVPN.conf)       # v1.03
+           export LocalIP=$LOCALIP
+        fi
+        [ -z "$SOCKET" ] && SOCKET=$(awk -v pattern="${VPN_ID}" 'match($0,"^"pattern) {print $4}' /jffs/configs/WireguardVPN.conf)
         START_PRIO=99${VPN_NUM}0
         END_PRIO=99${VPN_NUM}9
         WAN_PRIO=99${VPN_NUM}0
@@ -156,16 +171,17 @@ if [ -f /jffs/configs/WireguardVPN_map ];then
         VPN_TBL=12$VPN_NUM
         VPN_UNIT=$VPN_ID
     else
-        SOCKET=$(nvram get wan_gateway)":"$(awk '/Listen/ {print $3}' /opt/etc/wireguard/${VPN_ID}.conf)
+        SOCKET=$(nvram get wan_gateway)":"$(awk '/Listen/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)      # v1.03
     fi
-    DESC=$(awk -v pattern="${VPN_ID}" 'match($0,"^"pattern) {print $0}' /jffs/configs/WireguardVPN_map | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
-
+    DESC=$(awk -v pattern="${VPN_ID}" 'match($0,"^"pattern) {print $0}' /jffs/configs/WireguardVPN.conf | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
+    [ -z "$DESC" ] && DESC="# Unidentified"
 fi
 
 if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
 
-    if [ -n "$LOCALIP" ] || [ "${VPN_ID:0:3}" == "wg2" ];then
-        logger -st "wireguard-${MODE}${VPN_NUM}" "Initialising Wireguard VPN $MODE Peer ($VPN_ID) ${POLICY_MODE}${TXT} $SOCKET ($DESC)"
+    if [ -n "$LOCALIP" ] || [ "$MODE" == "client" ];then                                # v1.03
+        logger -t "wireguard-${MODE}${VPN_NUM}" "Initialising Wireguard VPN $MODE Peer ($VPN_ID) ${POLICY_MODE}${TXT} $SOCKET ($DESC)"
+        echo -e $cBCYA"\twireguard-${MODE}${VPN_NUM}: Initialising Wireguard VPN '$MODE' Peer (${cBMAG}$VPN_ID${cBCYA}) ${POLICY_MODE}${TXT} $SOCKET (${cBMAG}$DESC${cBCYA})"$cRESET
 
         ip link del dev $VPN_ID 2>/dev/null
         ip link add dev $VPN_ID type wireguard
@@ -192,7 +208,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
             ip route add 128/1 dev $VPN_ID 2>/dev/null
         else
             #ip rule add from $(nvram get lan_ipaddr | cut -d"." -f1-3).0/24 table 12$VPN_NUM prio 99$VPN_NUM"9"
-            VPN_IP_LIST=$(awk -v pattern="${VPN_NUM}" 'match($0,"^rp1"pattern) {print $0}' /jffs/configs/WireguardVPN_map | grep -oE "<.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
+            VPN_IP_LIST=$(awk -v pattern="${VPN_NUM}" 'match($0,"^rp1"pattern) {print $0}' /jffs/configs/WireguardVPN.conf | grep -oE "<.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
 
             create_client_list
 
@@ -240,7 +256,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         ############################################################################################################
 
     else
-        echo -e "\a\n\t";logger -st "wireguard-{$MODE}${VPN_NUM}" "Local Peer I/P endpoint ('/jffs/configs/WireguardVPN_map') not VALID. ABORTing Initialisation."
+        echo -e "\a\n\t";logger -st "wireguard-{$MODE}${VPN_NUM}" "Local Peer I/P endpoint ('/jffs/configs/WireguardVPN.conf') not VALID. ABORTing Initialisation."
         echo -e
     fi
 
@@ -275,8 +291,8 @@ else
 #############################################################################EIC Hack 6 of 7################
     #service restart_dnsmasq
     #service restart_dnsmasq 2>&1 1>/dev/null
-    echo -en $cBGRE"\t"
-    logger -st "wireguard-${MODE}${VPN_NUM}" "Wireguard VPN '$MODE' Peer ($VPN_ID) $TXT $SOCKET ($DESC) DELETED"
+    logger -t "wireguard-${MODE}${VPN_NUM}" "Wireguard VPN '$MODE' Peer ($VPN_ID) $TXT $SOCKET ($DESC) DELETED"
+    echo -e $cBGRE"\twireguard-${MODE}${VPN_NUM}: Wireguard VPN '$MODE' Peer (${cBMAG}$VPN_ID${cBGRE}) $TXT $SOCKET (${cBMAG}$DESC${cBGRE}) ${cBRED}${aREVERSE}DELETED"$cRESET
     echo -e $cRESET
 fi
 
