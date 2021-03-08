@@ -52,6 +52,69 @@ Example successful install.....
 
 WireGuard Manager v2.0 now uses a menu (amtm compatible)
 
+    wgm
+
+    +======================================================================+
+    |  Welcome to the WireGuard Manager/Installer script (Asuswrt-Merlin)  |
+    |                                                                      |
+    |                      Version v2.01b by Martineau                     |
+    |                                                                      |
+    +======================================================================+
+	WireGuard ACTIVE Peer Status: Clients 3, Servers 2
+
+	No updates available - you have the latest version
+
+
+    1  = Update Wireguard modules						7  = Display QR code for a Peer {Peer}
+    2  = Remove WireGuard/wg_manager					8  = Peer management [ {Peer} [ add | del | {auto [y|n|p]}] ] ]
+    3  = List ACTIVE WireGuard Peers [3x - lists ALL details]									
+    4  = Start   WireGuard Peer [Peer]									
+    5  = Stop    WireGuard Peer [Peer]									
+    6  = Restart WireGuard Peer [Peer]									
+
+    ?  = About Configuration					
+    v  = View ('/jffs/addons/wireguard/WireguardVPN.conf')		
+
+    e  = Exit Script [?]
+
+    E:Option ==> 3
+
+		 WireGuard VPN Peer Status
+
+	interface: wg11 	('client' # Mullvad USA, New York)
+		peer: ru9aQRxYBkK5pWvNkdFlCR8VMPSqcEENBPGkIGEN0XU=
+		 transfer: 228.31 KiB received, 32.93 KiB sent
+	interface: wg12 	('client' # Mullvad China, Hong Kong)
+		peer: oS4vR1RHoFtpevzl2KLUjqDH9AiLwnh9GHBMiB5FVgM=
+		 transfer: 204.65 KiB received, 24.38 KiB sent
+	interface: wg13 	('client' # Mullvad Oz, Melbourne)
+		peer: D2ltFd7TbpYNq9PejAeGwlaJ2bEFLqOSYywdY9N5xCY=
+		 transfer: 189.15 KiB received, 15.96 KiB sent
+	interface: wg21 	('server' # Martineau RT-AC86U Host Peer 1)
+		peer: jCLceBJGCk1nKFHsMEAXbnxm5DvGkbM+EspGM84B/Ck= 	('server client' # Unidentified)
+	interface: wg22 	('server' # Martineau RT-AC86U Host Peer 2)
+		peer: EOv5VAl6eD8JaBQbL7vEu5kyKtQODrxuSK9GYNROThc= 	('server client' # Unidentified)
+
+    e  = Exit Script [?]
+
+    E:Option ==> ?
+
+	No updates available - you have the latest version
+	Checking for WireGuard Kernel and Userspace Tool updates...
+	wireguard: WireGuard 1.0.20210219 loaded. See www.wireguard.com for information.
+	wireguard: Copyright (C) 2015-2019 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
+
+	[✔] WireGuard Module is LOADED
+
+	MD5=07a24a0efa926b3ad2c564d18b12312f wireguard-kernel_1.0.20210219-k27_aarch64-3.10.ipk
+	MD5=d7fdc2f1a770856a66c2c677ecb64d1b wireguard-tools_1.0.20210223-1_aarch64-3.10.ipk
+
+	WireGuard Kernel and Userspace Tool up to date.
+
+
+
+	WireGuard ACTIVE Peer Status: Clients 3, Servers 2
+
 
 
 
