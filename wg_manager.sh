@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v2.01b"
-#============================================================================================ © 2021 Martineau v2.01b
+VERSION="v2.01b2"
+#============================================================================================ © 2021 Martineau v2.01b2
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -843,7 +843,7 @@ Peer_Status() {
     local CLIENT_PEERS=0
     local SERVER_PEERS=0
 
-    ACTIVE_PEERS="$(wg show interfaces)"
+    [ -n "$(which wg)" ] && ACTIVE_PEERS="$(wg show interfaces)"
 
     for PEER in $ACTIVE_PEERS
         do
@@ -883,6 +883,139 @@ exit_message() {
         fi
         echo -e $cRESET
         exit $CODE
+}
+Install_WireGuard_Manager() {
+
+    if [ "$(Is_AX)" == "N" ] && [ "$(Is_HND)" == "N" ];then
+        echo -e $cBRED"\a\n\tERROR: Router$cRESET $HARDWARE_MODEL (v$BUILDNO)$cBRED is not currently compatible with WireGuard!\n"
+        exit 96
+    fi
+
+    echo -en $cBRED
+
+    # Amtm
+    # mkdir -p /jffs/addons/wireguard
+    if [ -d /opt/etc/ ];then
+       [ ! -d /opt/etc/wireguard ] && mkdir -p /opt/etc/wireguard
+    else
+        echo -e $cBRED"\a\n\t***ERROR: Entware directory '${cRESET}/opt/etc/${cBRED}' not found? - Please install Entware (amtm Diversion)\n"$cRESET
+        exit 95
+    fi
+
+    # Scripts
+    if [ -d /opt/etc/wireguard ];then
+        Get_scripts "$2"
+    fi
+
+    modprobe xt_comment
+
+    # Kernel module
+    echo -e $cBCYA"\n\tDownloading Wireguard Kernel module for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
+
+    ROUTER_COMPATIBLE="Y"
+
+    Download_Modules $HARDWARE_MODEL
+    Load_Module_UserspaceTool
+
+    # Create the Sample/template parameter file '${INSTALL_DIR}WireguardVPN.conf'
+    Create_Sample_Config
+
+    # Create dummy 'Client' and 'Server' templates
+    echo -e $cBCYA"\n\tCreating WireGuard 'Client' and 'Server' Peer templates 'wg11.conf' and wg21.conf'"$cRESET
+
+    cat > ${CONFIG_DIR}wg11.conf << EOF
+[Interface]
+#Address = 10.10.10.2/24
+#DNS = 10.10.10.1
+PrivateKey = Ba1dgO/plL4wCB+p111h8bIAWNeNgPZ7L+HFBhoE4=
+
+[Peer]
+Endpoint = 10.11.12.13:51820
+PublicKey = Ba1dgO/plL4wCB+pRdabQh8bIAWNeNgPZ7L+HFBhoE4=
+AllowedIPs = 0.0.0.0/0
+PersistentKeepalive = 25
+EOF
+
+    # Create Server template
+    cat > ${CONFIG_DIR}wg21.conf << EOF
+# $HARDWARE_MODEL 'server' Peer #1 (wg21)
+[Interface]
+PrivateKey = Ha1rgO/plL4wCB+pRdc6Qh8bIAWNeNgPZ7L+HFBhoE4=
+ListenPort = 51820
+
+# e.g. Accept a WireGuard connection from say YOUR mobile device to the router
+# see '${CONFIG_DIR}mobilephone_private.key'
+
+# Peer Example
+#[Peer]
+#PublicKey = This_should_be_replaced_with_the_Public_Key_of_YOUR_mobile_device
+#AllowedIPs = PEER.ip.xxx.xxx/32
+# Peer Example End
+EOF
+
+    # Create 'server' Peer wg21
+    echo -e $cBCYA"\n\tCreating WireGuard Private/Public key-pairs for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
+    if [ -n "$(which wg)" ];then
+        for I in 1 2 3 4 5
+            do
+                wg genkey | tee ${CONFIG_DIR}client1${I}_private.key | wg pubkey > ${CONFIG_DIR}client1${I}_public.key
+            done
+        for I in 1 2
+            do
+                wg genkey | tee ${CONFIG_DIR}server2${I}_private.key | wg pubkey > ${CONFIG_DIR}server2${I}_public.key
+            done
+
+        # Update the Sample Peer templates with the router's real keys
+        PRIV_KEY=$(cat ${CONFIG_DIR}client11_private.key)
+        PRIV_KEY=$(Convert_Key "$PRIV_KEY")
+        sed -i "/^PrivateKey/ s~[^ ]*[^ ]~$PRIV_KEY~3" ${CONFIG_DIR}wg11.conf
+
+        PRIV_KEY=$(cat ${CONFIG_DIR}server21_private.key)
+        PRIV_KEY=$(Convert_Key "$PRIV_KEY")
+        sed -i "/^PrivateKey/ s~[^ ]*[^ ]~$PRIV_KEY~3" ${CONFIG_DIR}wg21.conf
+
+        # Create a Private/Public key-pair for your mobile phone
+        wg genkey | tee ${CONFIG_DIR}mobilephone_private.key | wg pubkey > ${CONFIG_DIR}mobilephone_public.key
+        PUB_KEY=$(cat ${CONFIG_DIR}mobilephone_public.key)
+        PUB_KEY=$(Convert_Key "$PUB_KEY")
+        sed -i "/^PublicKey/ s~[^ ]*[^ ]~$PUB_KEY~3" ${CONFIG_DIR}wg21.conf
+
+    fi
+
+    if  [ -n "$(which wg)" ] && [ "$ROUTER_COMPATIBLE" == "Y" ];then
+
+        # Test this script - (well actually the one used @BOOT) against the two Sample Peers (wg11 and Wg21)
+        echo -e $cBCYA"\n\tTest Initialising the Sample WireGuard 'client' and 'server' Peers, BUT ONLY the Sample 'server' will Initialise correctly!!!! :-).\n"$cRESET
+        ${INSTALL_DIR}$SCRIPT_NAME start
+        # Test the Status report
+        echo -e $cBCYA"\n\tTest WireGuard Peer Status"
+        ${INSTALL_DIR}$SCRIPT_NAME show               # v1.11
+        echo -e $cBCYA"\n\tTerminating ACTIVE WireGuard Peers...\n"$cRESET
+        ${INSTALL_DIR}$SCRIPT_NAME stop
+    else
+        echo -e $cBRED"\a\n\t***ERROR: WireGuard install FAILED!\n"$cRESET
+        # rm -rF /jffs/addons/wireguard
+    fi
+
+    echo -e $cBCYA"\n\tInstalling QR rendering module"$cBGRA
+    opkg install qrencode
+
+    Display_QRCode ${CONFIG_DIR}wg11.conf
+
+    Edit_nat_start                                      # v1.07
+
+    Edit_DNSMasq                                        # v1.12
+
+    Manage_alias
+
+    # Auto start ALL defined WireGuard Peers @BOOT
+    # Use post-mount
+    if [ -z "$(grep -i "WireGuard" /jffs/scripts/post-mount)" ];then
+        echo -e "/jffs/addons/wireguard/wg_manager.sh init \"$@\" & # WireGuard Manager" >> /jffs/scripts/post-mount
+    fi
+
+    echo -e $cBGRE"\n\tWireGuard install COMPLETED.\n"$cRESET
+
 }
 Show_Peer_Status() {
 
@@ -991,11 +1124,11 @@ Show_Main_Menu() {
                 if [ "$EASYMENU" == "N" ];then
                     printf '|   i = Install WireGuard Advanced Mode                     |\n'
                 else
-                    printf '|   1 = Install WireGuard                                     |\n'
+                    printf '|   1 = Install WireGuard                                              |\n'
                 fi
                 local YES_NO="   "                              # v2.07
-                [ "$EASYMENU" == "Y" ] && local YES_NO="${cBGRE}   ";   printf '|       o1. Enable na-start protection                             %b    %b |\n' "$YES_NO" "$cRESET"
-                [ "$EASYMENU" == "Y" ] && local YES_NO="${cGRA}   ";    printf '|       o2. Enable DNS             %b    %b |\n' "$cBRED" "$cRESET" "$YES_NO" "$cRESET"
+                [ "$EASYMENU" == "Y" ] && local YES_NO="${cBGRE}   ";   printf '|       o1. Enable nat-start protection for Firewall rules     %b    %b |\n' "$YES_NO" "$cRESET"
+                [ "$EASYMENU" == "Y" ] && local YES_NO="${cBGRE}   ";   printf '|       o2. Enable DNS                                         %b    %b |\n' "$YES_NO" "$cRESET"
                 printf '|                                                                      |\n'
 
                 if [ "$EASYMENU" == "N" ];then                  # v2.07
@@ -1051,12 +1184,15 @@ Show_Main_Menu() {
                     echo -e ${cWGRE}"\n"$cRESET      # Separator line
                     printf "%s\t\t\t\t\t\t%s\n"                 "$MENU_I" "$MENU_Q"
                     printf "%s\t\t\t\t\t%s\n"                   "$MENU_Z" "$MENU_P"
-                    printf "%s\t\t\t\t\t\t\t\t\t%s\n"           "$MENU_L"
-                    printf "%s\t\t\t\t\t\t\t\t\t%s\n"           "$MENU_S"
-                    printf "%s\t\t\t\t\t\t\t\t\t%s\n"           "$MENU_T"
-                    printf "%s\t\t\t\t\t\t\t\t\t%s\n"           "$MENU_R"
-                    printf "\n%s\t\t\t\t\t\n"                   "$MENU__"
-                    printf "%s\t\t\n"                           "$MENU_VX"
+
+                    if [ -f ${INSTALL_DIR}WireguardVPN.conf ];then
+                        printf "%s\t\t\t\t\t\t\t\t\t%s\n"           "$MENU_L"
+                        printf "%s\t\t\t\t\t\t\t\t\t%s\n"           "$MENU_S"
+                        printf "%s\t\t\t\t\t\t\t\t\t%s\n"           "$MENU_T"
+                        printf "%s\t\t\t\t\t\t\t\t\t%s\n"           "$MENU_R"
+                        printf "\n%s\t\t\t\t\t\n"                   "$MENU__"
+                        printf "%s\t\t\n"                           "$MENU_VX"
+                    fi
 
                     printf '\n%be %b = Exit Script [?]\n' "${cBYEL}" "${cRESET}"
                 fi
@@ -1092,7 +1228,8 @@ Show_Main_Menu() {
             if [ "$EASYMENU" == "Y" ];then
                 case "$menu1" in
                     0) ;;
-                    1|i) [ -z "$(which wg)" ]  && menu1="getmodules" || menu1="loadmodules";;
+                    1|i)
+                        [ -n "$(ls ${INSTALL_DIR}*.ipk)" ]  && menu1="install" || menu1="getmodules";;
                     2|z) menu1="uninstall";;
                     3|3+|3*|show*) menu1=$(echo "$menu1" | sed 's/^3/show/');;
                     4*|start*) menu1=$(echo "$menu1" | awk '{$1="start"}1') ;;
@@ -1179,138 +1316,10 @@ Show_Main_Menu() {
                     ;;
                 install)
 
-                    if [ "$(Is_AX)" == "N" ] && [ "$(Is_HND)" == "N" ];then
-                        echo -e $cBRED"\a\n\tERROR: Router$cRESET $HARDWARE_MODEL (v$BUILDNO)$cBRED is not currently compatible with WireGuard!\n"
-                        exit 96
-                    fi
-
-                    echo -en $cBRED
-                    cp ${INSTALL_DIR}$SCRIPT_NAME /opt/etc/init.d/$SCRIPT_NAME          # v1.12
-
-                    # Amtm
-                    # mkdir -p /jffs/addons/wireguard
-                    if [ -d /opt/etc/ ];then
-                       [ ! -d /opt/etc/wireguard ] && mkdir -p /opt/etc/wireguard
-                    else
-                        echo -e $cBRED"\a\n\t***ERROR: Entware directory '${cRESET}/opt/etc/${cBRED}' not found? - Please install Entware (amtm Diversion)\n"$cRESET
-                        exit 95
-                    fi
-
-                    # Scripts
-                    if [ -d /opt/etc/wireguard ];then
-                        Get_scripts "$2"
-                    fi
-
-                    modprobe xt_comment
-
-                    # Kernel module
-                    echo -e $cBCYA"\n\tDownloading Wireguard Kernel module for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
-
-                    ROUTER_COMPATIBLE="Y"
-
-                    Download_Modules $HARDWARE_MODEL
-                    Load_Module_UserspaceTool
-
-                    # Create the Sample/template parameter file '${INSTALL_DIR}WireguardVPN.conf'
-                    Create_Sample_Config
-
-                    # Create dummy 'Client' and 'Server' templates
-                    echo -e $cBCYA"\n\tCreating WireGuard 'Client' and 'Server' Peer templates 'wg11.conf' and wg21.conf'"$cRESET
-
-                    cat > ${CONFIG_DIR}wg11.conf << EOF
-[Interface]
-#Address = 10.10.10.2/24
-#DNS = 10.10.10.1
-PrivateKey = Ba1dgO/plL4wCB+p111h8bIAWNeNgPZ7L+HFBhoE4=
-
-[Peer]
-Endpoint = 10.11.12.13:51820
-PublicKey = Ba1dgO/plL4wCB+pRdabQh8bIAWNeNgPZ7L+HFBhoE4=
-AllowedIPs = 0.0.0.0/0
-PersistentKeepalive = 25
-EOF
-
-                    # Create Server template
-                    cat > ${CONFIG_DIR}wg21.conf << EOF
-# $HARDWARE_MODEL 'server' Peer #1 (wg21)
-[Interface]
-PrivateKey = Ha1rgO/plL4wCB+pRdc6Qh8bIAWNeNgPZ7L+HFBhoE4=
-ListenPort = 51820
-
-# e.g. Accept a WireGuard connection from say YOUR mobile device to the router
-# see '${CONFIG_DIR}mobilephone_private.key'
-
-# Peer Example
-#[Peer]
-#PublicKey = This_should_be_replaced_with_the_Public_Key_of_YOUR_mobile_device
-#AllowedIPs = PEER.ip.xxx.xxx/32
-# Peer Example End
-EOF
-
-                    # Create 'server' Peer wg21
-                    echo -e $cBCYA"\n\tCreating WireGuard Private/Public key-pairs for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
-                    if [ -n "$(which wg)" ];then
-                        for I in 1 2 3 4 5
-                            do
-                                wg genkey | tee ${CONFIG_DIR}client1${I}_private.key | wg pubkey > ${CONFIG_DIR}client1${I}_public.key
-                            done
-                        for I in 1 2
-                            do
-                                wg genkey | tee ${CONFIG_DIR}server2${I}_private.key | wg pubkey > ${CONFIG_DIR}server2${I}_public.key
-                            done
-
-                        # Update the Sample Peer templates with the router's real keys
-                        PRIV_KEY=$(cat ${CONFIG_DIR}client11_private.key)
-                        PRIV_KEY=$(Convert_Key "$PRIV_KEY")
-                        sed -i "/^PrivateKey/ s~[^ ]*[^ ]~$PRIV_KEY~3" ${CONFIG_DIR}wg11.conf
-
-                        PRIV_KEY=$(cat ${CONFIG_DIR}server21_private.key)
-                        PRIV_KEY=$(Convert_Key "$PRIV_KEY")
-                        sed -i "/^PrivateKey/ s~[^ ]*[^ ]~$PRIV_KEY~3" ${CONFIG_DIR}wg21.conf
-
-                        # Create a Private/Public key-pair for your mobile phone
-                        wg genkey | tee ${CONFIG_DIR}mobilephone_private.key | wg pubkey > ${CONFIG_DIR}mobilephone_public.key
-                        PUB_KEY=$(cat ${CONFIG_DIR}mobilephone_public.key)
-                        PUB_KEY=$(Convert_Key "$PUB_KEY")
-                        sed -i "/^PublicKey/ s~[^ ]*[^ ]~$PUB_KEY~3" ${CONFIG_DIR}wg21.conf
-
-                    fi
-
-                    if  [ -n "$(which wg)" ] && [ "$ROUTER_COMPATIBLE" == "Y" ];then
-
-                        # Test this script - (well actually the one used @BOOT) against the two Sample Peers (wg11 and Wg21)
-                        echo -e $cBCYA"\n\tTest Initialising the Sample WireGuard 'client' and 'server' Peers, BUT ONLY the Sample 'server' will Initialise correctly!!!! :-).\n"$cRESET
-                        ${INSTALL_DIR}$SCRIPT_NAME start
-                        # Test the Status report
-                        echo -e $cBCYA"\n\tTest WireGuard Peer Status"
-                        ${INSTALL_DIR}$SCRIPT_NAME show               # v1.11
-                        echo -e $cBCYA"\n\tTerminating ACTIVE WireGuard Peers...\n"$cRESET
-                        ${INSTALL_DIR}$SCRIPT_NAME stop
-                    else
-                        echo -e $cBRED"\a\n\t***ERROR: WireGuard install FAILED!\n"$cRESET
-                        # rm -rF /jffs/addons/wireguard
-                    fi
-
-                    echo -e $cBCYA"\n\tInstalling QR rendering module"$cBGRA
-                    opkg install qrencode
-
-                    Display_QRCode ${CONFIG_DIR}wg11.conf
-
-                    Edit_nat_start                                      # v1.07
-
-                    Edit_DNSMasq                                        # v1.12
-
-                    Manage_alias
-
-                    # Auto start ALL defined WireGuard Peers @BOOT
-                    # Use post-mount
-                    if [ -z "$(grep -i "WireGuard" /jffs/scripts/post-mount)" ];then
-                        echo -e "/jffs/addons/wireguard/wg_manager.sh init \"$@\" & # WireGuard Manager" >> /jffs/scripts/post-mount
-                    fi
-
-                    echo -e $cBGRE"\n\tWireGuard install COMPLETED.\n"$cRESET
+                    Install_WireGuard_Manager
 
                     ;;
+
                 alias*)                                                  # ['del']
 
                     local ARG=
@@ -1800,7 +1809,7 @@ modprobe xt_comment                                 # v2.01
 
 clear
 
-Check_Lock "wg"
+#Check_Lock "wg"
 
 # Retain commandline comaptibility
 case "$1" in
@@ -1817,6 +1826,10 @@ case "$1" in
     show)
         Show_Peer_Status "show+"                        # Force verbose detail
     ;;
+    install)
+        #Install_WireGuard_Manager
+        :                                               # Force menu install
+    ;;
     *)
         Show_Main_Menu "$@"
     ;;
@@ -1824,7 +1837,7 @@ esac
 
 echo -e $cRESET
 
-rm -rf /tmp/wg.lock
+#rm -rf /tmp/wg.lock
 
 exit 0
 
