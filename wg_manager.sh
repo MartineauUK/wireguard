@@ -707,9 +707,9 @@ Get_scripts() {                                                         # v1.12
 
     echo -e $cBCYA"\n\tDownloading scripts\n"$cRESET 2>&1
 
-    #download_file ${INSTALL_DIR} wg_manager.sh martineau $BRANCH dos2unix 755
-    #download_file ${INSTALL_DIR} wg_client martineau $BRANCH dos2unix 755
-    #download_file ${INSTALL_DIR} wg_server martineau $BRANCH dos2unix 755
+    download_file ${INSTALL_DIR} wg_manager.sh martineau $BRANCH dos2unix 755
+    download_file ${INSTALL_DIR} wg_client martineau $BRANCH dos2unix 755
+    download_file ${INSTALL_DIR} wg_server martineau $BRANCH dos2unix 755
 
 }
 Read_INPUT() {
