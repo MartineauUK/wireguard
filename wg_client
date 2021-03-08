@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v1.01"
-#============================================================================================ © 2021 Martineau v1.01
+VERSION="v1.02"
+#============================================================================================ © 2021 Martineau v1.02
 #
 
 # Maintainer: Martineau
@@ -124,7 +124,8 @@ ANSIColours
 
 FIRMWARE=$(echo $(nvram get buildno) | awk 'BEGIN { FS = "." } {printf("%03d%02d",$1,$2)}')
 
-CONFIG_DIR="/opt/etc/wireguard/"                    # v1.03
+CONFIG_DIR="/opt/etc/wireguard"
+INSTALL_DIR="/jffs/addons/wireguard/"
 
 modprobe xt_set
 modprobe xt_comment
@@ -186,7 +187,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
 
         ip link del dev $VPN_ID 2>/dev/null
         ip link add dev $VPN_ID type wireguard
-        wg setconf $VPN_ID /opt/etc/wireguard/$VPN_ID.conf
+        wg setconf $VPN_ID ${CONFIG_DIR}$VPN_ID.conf
         ip address add dev $VPN_ID $LOCALIP
         ip link set up dev $VPN_ID
         #ifconfig $VPN_ID mtu 1380
