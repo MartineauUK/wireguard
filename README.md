@@ -11,7 +11,7 @@ Enable SSH on router, then use your preferred SSH Client e.g. Xshell6,MobaXterm,
 
 (TIP: Triple-click the install command below) to copy'n'paste into your router's SSH session:
     
-    mkdir -p /jffs/addons 2>/dev/null;mkdir -p /jffs/addons/wireguard 2>/dev/null;curl --retry 3 "https://raw.githubusercontent.com/MartineauUK/wireguard/main/S50wireguard" -o "/jffs/addons/S50wireguard" && chmod 755 "/jffs/addons/S50wireguard" && /jffs/addons/S50wireguard install
+    mkdir -p /jffs/addons 2>/dev/null;mkdir -p /jffs/addons/wireguard 2>/dev/null;curl --retry 3 "https://raw.githubusercontent.com/MartineauUK/wireguard/main/wg_manager.sh" -o "/jffs/addons/wg_manager" && chmod 755 "/jffs/addons/S50wireguard" && /jffs/addons/wg_manager.sh install
     
 Example successful install.....
 
@@ -49,6 +49,11 @@ Example successful install.....
 	Creating WireGuard 'Client' and 'Server' Peer templates 'wg11.conf' and wg21.conf'
 
 	WireGuard install COMPLETED.
+
+WireGuard Manager v2.0 now uses a menu (amtm compatible)
+
+
+
 
 In lieu of the NVRAM variables that can retain OpenVPN Client/Server configurations across reboots, this script uses 
 
