@@ -150,12 +150,12 @@ Check_Version_Update() {
     local localmd5="$(md5sum "$0" | awk '{print $1}')"
 
     if [ "$1" != "nochk" ];then
-        local REMOTE_VERSION_NUMDOT="$(curl -${SILENT}fLN --retry 3 --connect-timeout 3 "${GITHUB_DIR}/S50wireguard" | grep -E "^VERSION\=" | tr -d '"' | sed 's/VER.*\=//')" || REMOTE_VERSION_NUMDOT="?.??"   # v3.23
+        local REMOTE_VERSION_NUMDOT="$(curl -${SILENT}fLN --retry 3 --connect-timeout 3 "${GITHUB_DIR}/wg_manager.sh" | grep -E "^VERSION\=" | tr -d '"' | sed 's/VER.*\=//')" || REMOTE_VERSION_NUMDOT="?.??"   # v3.23
         if [ -z "$REMOTE_VERSION_NUMDOT" ] || [ "$REMOTE_VERSION_NUMDOT" == "?.??" ];then
             echo -e ${cRESET}$cRED_"\a\t***ERROR Unable to verify Github version...check DNS/Internet access!\n\n"$cRESET
             local REMOTE_VERSION_NUMDOT=
         else
-            [ "$1" != "nochk" ] && remotemd5="$(curl -${SILENT}fL  --retry 3 --connect-timeout 3 "${GITHUB_DIR}/S50wireguard" | md5sum | awk '{print $1}')"
+            [ "$1" != "nochk" ] && remotemd5="$(curl -${SILENT}fL  --retry 3 --connect-timeout 3 "${GITHUB_DIR}/wg_manager.sh" | md5sum | awk '{print $1}')"
             local REMOTE_VERSION_NUM=$(echo $REMOTE_VERSION_NUMDOT | sed 's/[^0-9]*//g')
         fi
     fi
@@ -163,18 +163,18 @@ Check_Version_Update() {
     local LOCAL_VERSION_NUMDOT=$VERSION                                     # v1.03
     local LOCAL_VERSION_NUM=$(echo $VERSION | sed 's/[^0-9]*//g')
 
-    local CHANGELOG="$cRESET(${cBCYA}Change Log: ${cBYEL}https://github.com/MartineauUK/${GIT_REPO}/commits/main/S50wireguard$cRESET)"
-    [ -n "$(echo $VERSION | grep "b")" ] && local CHANGELOG="$cRESET(${cBCYA}Change Log: ${cBYEL}https://github.com/MartineauUK/${GIT_REPO}/commits/dev/S50wireguard$cRESET)"
+    local CHANGELOG="$cRESET(${cBCYA}Change Log: ${cBYEL}https://github.com/MartineauUK/${GIT_REPO}/commits/main/wg_manager.sh$cRESET)"
+    [ -n "$(echo $VERSION | grep "b")" ] && local CHANGELOG="$cRESET(${cBCYA}Change Log: ${cBYEL}https://github.com/MartineauUK/${GIT_REPO}/commits/dev/wg_manager.sh$cRESET)"
 
     # As the developer, I need to differentiate between the GitHub md5sum hasn't changed, which means I've tweaked it locally
     if [ -n "$REMOTE_VERSION_NUMDOT" ];then
-        [ ! -f ${INSTALL_DIR}S50wireguard.md5 ] && echo $remotemd5 > ${INSTALL_DIR}S50wireguard.md5
+        [ ! -f ${INSTALL_DIR}wg_manager.sh.md5 ] && echo $remotemd5 > ${INSTALL_DIR}wg_manager.sh.md5
     fi
 
     [ -z "$REMOTE_VERSION_NUM" ] && REMOTE_VERSION_NUM=0
 
     # Local Version higher than GitHub version or MD5 Mismatch due to local development?
-    if [ ${REMOTE_VERSION_NUM:0:3} -lt ${LOCAL_VERSION_NUM:0:3} ] || [ "$(echo "$VERSION" | grep -om1 "b")" == "b" ] || [ $REMOTE_VERSION_NUM -lt $LOCAL_VERSION_NUM ] || { [ "$(awk '{print $1}' ${INSTALL_DIR}S50wireguard.md5)" == "$remotemd5" ]; } && [ "$localmd5" != "$remotemd5" ];then  # v1.03
+    if [ ${REMOTE_VERSION_NUM:0:3} -lt ${LOCAL_VERSION_NUM:0:3} ] || [ "$(echo "$VERSION" | grep -om1 "b")" == "b" ] || [ $REMOTE_VERSION_NUM -lt $LOCAL_VERSION_NUM ] || { [ "$(awk '{print $1}' ${INSTALL_DIR}wg_manager.sh.md5)" == "$remotemd5" ]; } && [ "$localmd5" != "$remotemd5" ];then  # v1.03
         local VERSION=$LOCAL_VERSION_NUMDOT                             # v1.03
         if [ $REMOTE_VERSION_NUM -lt $LOCAL_VERSION_NUM ];then
             ALLOWUPGRADE="N"
@@ -548,8 +548,8 @@ Create_Sample_Config() {
     echo -e $cBCYA"\a\n\tCreating WireGuard configuration file '${INSTALL_DIR}WireguardVPN.conf'"
 
     cat > ${INSTALL_DIR}WireguardVPN.conf << EOF
-# NOTE: Auto=Y  Command 'S50wireguard start' will auto-start this Peer
-#       Auto=P  Command 'S50wireguard start' will auto-start this Peer using it's Selective Routing RPDB Policy rules if defined e.g 'rp11'
+# NOTE: Auto=Y  Command 'wg_manager.sh start' will auto-start this Peer
+#       Auto=P  Command 'wg_manager.sh start' will auto-start this Peer using it's Selective Routing RPDB Policy rules if defined e.g 'rp11'
 #
 #
 # VPN   Auto   Local Peer IP         Remote Peer Socket     DNS               Annotation Comment
@@ -697,7 +697,7 @@ Get_scripts() {                                                         # v1.12
 
     echo -e $cBCYA"\n\tDownloading scripts\n"$cRESET 2>&1
 
-    download_file ${INSTALL_DIR} S50wireguard martineau $BRANCH dos2unix 755
+    download_file ${INSTALL_DIR} wg_manager.sh martineau $BRANCH dos2unix 755
     download_file ${INSTALL_DIR} wg_client martineau $BRANCH dos2unix 755
     download_file ${INSTALL_DIR} wg_server martineau $BRANCH dos2unix 755
 
@@ -1549,7 +1549,7 @@ EOF
                             echo -e $cBWHT"\a\n\tWireGuard 'server' Peer needs to be ${CMD}ed to listen for 'client' Peer $DEVICE_NAME $TAG"
                             echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer ($SERVER_PEER) or press$cBGRE [Enter] to SKIP."
                             read -r "ANS"
-                            [ "$ANS" == "y" ] && { ${INSTALL_DIR}/S50wireguard restart server "$INSTANCE"; ${INSTALL_DIR}S50wireguard "show"; }
+                            [ "$ANS" == "y" ] && { ${INSTALL_DIR}/wg_manager.sh restart server "$INSTANCE"; ${INSTALL_DIR}wg_manager.sh "show"; }
 
                         fi
                     else
@@ -1739,7 +1739,7 @@ EOF
                 *)
 
                     ShowHelp
-                    echo -e $cBWHT"$VERSION S50wireguard WireGuard Session Manager\n\n\t${cBRED}***ERROR Invalid/missing arg '$ACTION'\n"$cRESET    # v1.09
+                    echo -e $cBWHT"$VERSION wg_manager.sh WireGuard Session Manager\n\n\t${cBRED}***ERROR Invalid/missing arg '$ACTION'\n"$cRESET    # v1.09
                     ;;
             esac
 
