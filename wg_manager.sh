@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v2.01b2"
-#============================================================================================ © 2021 Martineau v2.01b2
+VERSION="v2.01b3"
+#============================================================================================ © 2021 Martineau v2.01b3
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -213,12 +213,14 @@ _Get_File() {
     [ -z "$2" ] && echo -e $cBCYA"\n\tDownloading WireGuard Kernel module ${cBWHT}'$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO)..."$cRESET
     echo -e $cBGRA
 
-    curl -# -fL --retry 3 https://github.com/odkrys/entware-makefile-for-merlin/raw/main/${WEBFILE} -o ${DIR}${WEBFILE}
-}
-    local ROUTER=$1
-    local DIR="${INSTALL_DIR}"
+    curl -# -fL --retry 3 https://github.com/odkrys/entware-makefile-for-merlin/raw/main/${WEBFILE} -o ${INSTALL_DIR}${WEBFILE}
 
-    [ ! -d $DIR ] && mkdir $DIR
+    return $?
+}
+
+    local ROUTER=$1
+
+    [ ! -d "${INSTALL_DIR}" ] && mkdir "${INSTALL_DIR}"
 
     local WEBFILE_NAMES=$(curl -${SILENT}fL https://www.snbforums.com/threads/experimental-wireguard-for-hnd-platform-4-1-x-kernels.46164/ | grep "<a href=.*odkrys.*wireguard" | grep -oE "wireguard.*" | sed 's/\"//g' | tr '\n' ' ')
 
@@ -245,6 +247,7 @@ _Get_File() {
             #
             #
             _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $1}')"
+            RC=$?
             ROUTER_COMPATIBLE="N"
             ;;
     esac
@@ -253,10 +256,17 @@ _Get_File() {
     WEBFILE=$(echo "$WEBFILE_NAMES" | awk '{print $4}')
     echo -e $cBCYA"\n\tDownloading WireGuard User space Tools$cBWHT '$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO)"$cRESET
     _Get_File  "$WEBFILE" "NOMSG"
+    RC=$?
+
+debug="###################################################### 256 THIS"
+    Load_Module_UserspaceTool
+
+    return 0
 }
 Load_Module_UserspaceTool() {                                           # v1.03
-    if [ ! -d /jffs/addons/wireguard ];then
-        echo -e $cRED"\a\n\tNo modules found - '/jffs/addons/wireguard doesn't exist'\n"
+debug="#################################################################################### 258"
+    if [ ! -d "${INSTALL_DIR}" ];then
+        echo -e $cRED"\a\n\tNo modules found - '/${INSTALL_DIR} doesn't exist'\n"
         echo -e "\tPress$cBRED y$cRESET to$cBRED DOWNLOAD WireGuard Kernel and Userspace Tools modules ${cRESET} or press$cBGRE [Enter] to SKIP."
             read -r "ANS"
             if [ "$ANS" == "y" ];then
@@ -345,7 +355,7 @@ Manage_Wireguard_Sessions() {
 
         # If no specific Peer specified, for Restart retrieve ACTIVE Peers otherwise for Stop/Start use Peer configuration
         if [ "$ACTION" != "restart" ];then                  # v1.09
-            AUTO_PEERS=$(awk '$2 == "Y" || $2 =="P" {print $1}' /jffs/configs/WireguardVPN.conf | tr '\n#' ' ')
+            AUTO_PEERS=$(awk '$2 == "Y" || $2 =="P" {print $1}' ${INSTALL_DIR}WireguardVPN.conf | tr '\n#' ' ')
         else
             AUTO_PEERS=$(wg show interfaces)                # v1.09
         fi
@@ -697,9 +707,9 @@ Get_scripts() {                                                         # v1.12
 
     echo -e $cBCYA"\n\tDownloading scripts\n"$cRESET 2>&1
 
-    download_file ${INSTALL_DIR} wg_manager.sh martineau $BRANCH dos2unix 755
-    download_file ${INSTALL_DIR} wg_client martineau $BRANCH dos2unix 755
-    download_file ${INSTALL_DIR} wg_server martineau $BRANCH dos2unix 755
+    #download_file ${INSTALL_DIR} wg_manager.sh martineau $BRANCH dos2unix 755
+    #download_file ${INSTALL_DIR} wg_client martineau $BRANCH dos2unix 755
+    #download_file ${INSTALL_DIR} wg_server martineau $BRANCH dos2unix 755
 
 }
 Read_INPUT() {
@@ -903,7 +913,7 @@ Install_WireGuard_Manager() {
     fi
 
     # Scripts
-    if [ -d /opt/etc/wireguard ];then
+    if [ -d "${CONFIG_DIR}" ];then
         Get_scripts "$2"
     fi
 
@@ -913,10 +923,11 @@ Install_WireGuard_Manager() {
     echo -e $cBCYA"\n\tDownloading Wireguard Kernel module for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
 
     ROUTER_COMPATIBLE="Y"
-
-    Download_Modules $HARDWARE_MODEL
-    Load_Module_UserspaceTool
-
+debug="############################################################ 919 THIS"
+    #Download_Modules $HARDWARE_MODEL
+debug="############################################################ 921 THIS"
+    #Load_Module_UserspaceTool
+debug="############################################################ 923 THIS"
     # Create the Sample/template parameter file '${INSTALL_DIR}WireguardVPN.conf'
     Create_Sample_Config
 
@@ -1229,7 +1240,7 @@ Show_Main_Menu() {
                 case "$menu1" in
                     0) ;;
                     1|i)
-                        [ -n "$(ls ${INSTALL_DIR}*.ipk)" ]  && menu1="install" || menu1="getmodules";;
+                        [ -n "$(ls ${INSTALL_DIR}*.ipk 2>/dev/null)" ]  && menu1="install" || menu1="getmodules";;
                     2|z) menu1="uninstall";;
                     3|3+|3*|show*) menu1=$(echo "$menu1" | sed 's/^3/show/');;
                     4*|start*) menu1=$(echo "$menu1" | awk '{$1="start"}1') ;;
