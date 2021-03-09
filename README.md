@@ -114,9 +114,9 @@ Example successful install.....
 	Installing QR rendering module
     Package qrencode (4.1.1-1) installed in root is up to date.
 	Press y to Display QR Code for Scanning into WireGuard App on device '' or press [Enter] to SKIP.
-y
+    y
 
-***QR code image goes here
+***QR code image goes here***
 
 	WireGuard install COMPLETED.
 
