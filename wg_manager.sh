@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v2.01bB"
-#============================================================================================ © 2021 Martineau v2.01bB
+VERSION="v2.01bC"
+#============================================================================================ © 2021 Martineau v2.01bC
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -402,12 +402,12 @@ Manage_Wireguard_Sessions() {
                 if [ -z "$Mode" ];then
                         if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
                             SayT "***ERROR: WireGuard VPN Peer ($WG_INTERFACE) config TYPE cannot be determined?....skipping $ACTION request"
-                            echo -e $cBRED"\a\n\t***ERROR: WireGuard VPN Peer (${cBWHT}$WG_INTERFACE${cBRED}) config TYPE cannot be determined?....skipping $ACTION request\n"$cRESET
+                            echo -e $cBRED"\a\n\t***ERROR: WireGuard VPN Peer (${cBWHT}$WG_INTERFACE${cBRED}) config TYPE cannot be determined?....skipping $ACTION request\n"$cRESET 2>&1
                         else
                             SayT "***ERROR: WireGuard VPN Peer ('$WG_INTERFACE') config NOT found?....skipping $ACTION request"
-                            echo -e $cBRED"\a\n\t***ERROR: WireGuard Peer (${cBWHT}$WG_INTERFACE${cBRED}) config NOT found?....skipping $ACTION request\n"$cRESET
+                            echo -e $cBRED"\a\n\t***ERROR: WireGuard Peer (${cBWHT}$WG_INTERFACE${cBRED}) config NOT found?....skipping $ACTION request\n"$cRESET 2>&1
                         fi
-                        exit 98
+                        return 1
                 fi
             fi
 
@@ -426,7 +426,7 @@ Manage_Wireguard_Sessions() {
                     if [ "$ACTION" == "restart" ];then                                      # v1.09
                         # If it is UP then terminate the Peer
                         if [ -n "$(ifconfig $WG_INTERFACE 2>/dev/null | grep inet)" ];then  # v1.09
-                            echo -e $cBWHT;Say "$VERSION Restarting Wireguard VPN '$Mode' Peer ($WG_INTERFACE)"
+                            echo -e $cBWHT;Say "$VERSION Restarting Wireguard VPN '$Mode' Peer ($WG_INTERFACE)" 2>&1
                             [ "$Mode" == "server" ] && /jffs/addons/wireguard/wg_server $WG_INTERFACE "disable" || ${INSTALL_DIR}wg_client $WG_INTERFACE "disable"                 # v1.09
                         fi
                     fi
@@ -435,7 +435,7 @@ Manage_Wireguard_Sessions() {
                     SayT "$VERSION Initialising Wireguard VPN '$Mode' Peer ($WG_INTERFACE) ${POLICY_MODE}"
                     if [ -n "$(ifconfig | grep -E "^$WG_INTERFACE")" ];then
                         SayT "***ERROR: WireGuard '$Mode' Peer ('$WG_INTERFACE') ALREADY ACTIVE"
-                        echo -e $cRED"\a\t***ERROR: WireGuard '$Mode' Peer (${cBWHT}$WG_INTERFACE${cBRED}) ALREADY ACTIVE\n"$cRESET
+                        echo -e $cRED"\a\t***ERROR: WireGuard '$Mode' Peer (${cBWHT}$WG_INTERFACE${cBRED}) ALREADY ACTIVE\n"$cRESET 2>&1
                     else
                         if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
                             # Rather than rely on naming convention; verify the content
@@ -452,7 +452,7 @@ Manage_Wireguard_Sessions() {
                         else
                             [ -n "$Mode" ] && TXT="'$Mode' " || TXT=            # v1.09
                             SayT "***ERROR: WireGuard VPN ${TXT}Peer ('$WG_INTERFACE') config NOT found?....skipping $ACTION request"
-                            echo -e $cBRED"\a\n\t***ERROR: WireGuard ${TXT}Peer (${cBWHT}$WG_INTERFACE${cBRED}) config NOT found?....skipping $ACTION request\n"$cRESET     # v1.09
+                            echo -e $cBRED"\a\n\t***ERROR: WireGuard ${TXT}Peer (${cBWHT}$WG_INTERFACE${cBRED}) config NOT found?....skipping $ACTION request\n"$cRESET   2>&1  # v1.09
                         fi
                     fi
                 done
@@ -465,12 +465,12 @@ Manage_Wireguard_Sessions() {
                 if [ -n "$AUTO_PEERS" ];then
                     WG_INTERFACE=
                     SayT "$VERSION Requesting termination of Active WireGuard VPN Peers ($AUTO_PEERS)"
-                    echo -e $cBWHT"\n\tRequesting termination of Active WireGuard VPN Peers ($AUTO_PEERS)\n"$cRESET
+                    echo -e $cBWHT"\n\tRequesting termination of Active WireGuard VPN Peers ($AUTO_PEERS)\n"$cRESET 2>&1
                 else
-                    echo -e $cRED"\a\tNo WireGuard VPN Peers ACTIVE for Termination request\n"
+                    echo -e $cRED"\a\tNo WireGuard VPN Peers ACTIVE for Termination request\n" 2>&1
                     SayT "No WireGuard VPN Peers ACTIVE for Termination request"
-                    echo -e
-                    exit 0
+                    echo -e 2>&1
+                    return 0
                 fi
             fi
 
@@ -1745,22 +1745,30 @@ EOF
                     esac
 
                     ;;
-                restart*|stop*|start*)
+                restart*|stop*|start*)                              # start [client|server] Peer [policy]
+                                                                    # start Peer                 [policy]
+                    local TYPE="?"
+                    local PEER=
+                    local POLICY=
 
-                    local ACTION="$(echo "$menu1"| awk '{print $1}')"
+                    ACTION=$(echo "$menu1" | awk '{print $1}')
+                    ARG=$(echo "$menu1" | awk '{print $2}')
+                    ARG2=$(echo "$menu1" | awk '{print $3}')
+                    ARG3=$(echo "$menu1" | awk '{print $4}')
 
-
-                    local ARG=
-                    if [ "$(echo "$menu1" | wc -w)" -ge 2 ];then
-                        local ARG="$(printf "%s" "$menu1" | cut -d' ' -f2)"
+                    if [ -f ${CONFIG_DIR}$ARG.conf ];then
+                        local TYPE=$(Server_or_Client "$ARG")
+                        WG_INTERFACE=$ARG
+                        POLICY=$ARG2
+                    else
+                        if [ -f ${CONFIG_DIR}$ARG.conf ];then
+                            local TYPE=$(Server_or_Client "$ARG")
+                            WG_INTERFACE=$ARG2
+                            POLICY=$ARG3
+                        fi
                     fi
-                    local ARG2=
-                    if [ "$(echo "$menu1" | wc -w)" -ge 3 ];then
-                        local ARG2="$(printf "%s" "$menu1" | cut -d' ' -f3)"
-                    fi
 
-                    local TYPE=$(Server_or_Client "$ARG")
-                    Manage_Wireguard_Sessions "$ACTION" "$TYPE" "$ARG"
+                    Manage_Wireguard_Sessions "$ACTION" "$TYPE" "$WG_INTERFACE" "$POLICY"
 
                 ;;
                 debug)
