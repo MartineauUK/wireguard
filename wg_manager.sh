@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v2.01bC"
-#============================================================================================ © 2021 Martineau v2.01bC
+VERSION="v2.01bD"
+#============================================================================================ © 2021 Martineau v2.01bD
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -1820,7 +1820,9 @@ EASYMENU="Y"
 TS=$(date +"%Y%m%d-%H%M%S")    # current date and time 'yyyymmdd-hhmmss'
 
 ACTION=$1
-TYPE=$2
+PEER=$2
+TYPE=
+[ -f ${CONFIG_DIR}$PEER.conf ] && TYPE=$(Server_or_Client "$PEER")
 
 # Legacy tidy-up! to adopt a new name for the configuration file
 [ -f /jffs/configs/WireguardVPN_map ] && mv /jffs/configs/WireguardVPN_map ${INSTALL_DIR}WireguardVPN.conf      # v2.01
@@ -1852,17 +1854,17 @@ if [ "$1" != "install" ];then   # v2.01
         case "$1" in
 
             start|init)
-                Manage_Wireguard_Sessions "start"               # Post mount should start ALL defined sessions @BOOT
+                Manage_Wireguard_Sessions "start" "$TYPE" "$PEER"             # Post mount should start ALL defined sessions @BOOT
                 echo -e $cRESET
                 exit_message
             ;;
             stop)
-                Manage_Wireguard_Sessions "stop"
+                Manage_Wireguard_Sessions "stop" "$TYPE" "$PEER"
                 echo -e $cRESET
                 exit_message
             ;;
             restart)
-                Manage_Wireguard_Sessions "restart"
+                Manage_Wireguard_Sessions "restart" "$TYPE" "$PEER"
                 echo -e $cRESET
                 exit_message
             ;;
