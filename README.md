@@ -132,9 +132,7 @@ WireGuard Manager v2.0 now uses a menu (amtm compatible)
     |                      Version v2.01b9 by Martineau                    |
     |                                                                      |
     +======================================================================+
-	WireGuard ACTIVE Peer Status: Clients 3, Servers 2
-
-	[✔] Push to Github PENDING for (Minor Hotfix)  update >>>> wg_manager.sh v2.01b9
+	       WireGuard ACTIVE Peer Status: Clients 3, Servers 2
 
     =============================================================================================================================================================
 
@@ -195,9 +193,9 @@ WireGuard Manager v2.0 now uses a menu (amtm compatible)
 
 In lieu of the NVRAM variables that can retain OpenVPN Client/Server configurations across reboots, this script uses 
 
-'/jffs/configs/WireguardVPN_map' for the WireGuard directives.
+'/jffs/addons/wireguard/WireguardVPN.conf' for the WireGuard directives.
 
-As this is a beta, the layout of the file includes placeholders, but currently, the first column is significant and is used as a primary lookup key and only the 'Auto' and 'Annotation Comment' fields are extracted/used to determine the actions taken by the script.
+As this is a beta, the layout of the file includes placeholders, but currently, the first andsecond column are significant and are used as a primary lookup key e.g the 'Auto' and 'Annotation Comment' fields are extracted/used to determine the actions taken by the script.
 
 e.g.
 
@@ -242,17 +240,15 @@ The contents of the WireGuard configuration file will be used when 'wg13.conf' i
     S50wireguard   start
                    Initialises ALL peers (wg1* and wg2* etc.) defined in the configuration file where Auto=Y or Auto=P
                  
-and if the install is successful, there should now be simple aliases
+and if the install is successful, there should now be a couple of simple aliases
 
 e.g.
 
-    wgstart         Start ALL Peers defined in the config where Auto=Y or Auto=P
-    wgstop          Stop ALL ACTIVE Peers
-    wgrestart       Restart/Start either the designated Peer or ALL Peers defined in config where Auto=Y or Auto=P
-    wgshow          generate a report of active Peers
-    wgdiag          Generate a report of active Peers (with or without DEBUG iptables/RPDB rules etc.)
+    wg_manager and wgm 
+to start the script   (NOTE 'wg_manager' is available immediately, but 'wgm' will require you to logoff/login to refesh your terminal profile.) 
+
  
-    The following (WireGuard Manager) is the alias to allow execution of console commands  
+    The following (WireGuard Manager) is the alias to invoke the script 
   
 e.g.
 
@@ -278,7 +274,7 @@ An example of the enhanced WireGuard Peer Status report showing the names of the
 NOTE: Currently, if you start say three WireGuard remote Peers concurrently and none of which are designated as Policy Peers, ALL traffic will be forced via the most recent connection, so if you then terminate that Peer, then the least oldest of the previous Peers will then have ALL traffic directed through it.
 Very crude fall-over configuration but may be useful. 
 
-For hosting a 'server' Peer (wg21) you can use the following command to generate a Private/Public key-pair and auto add it to the 'wg21.conf' and to the WireGuard config '/jffs/configs/WireGuardVPN_map'
+For hosting a 'server' Peer (wg21) you can use the following command to generate a Private/Public key-pair and auto add it to the 'wg21.conf' and to the WireGuard config '/jffs/addons/wireguard/WireGuardVPN,conf'
 
     wgm create Nokia6310i
 
