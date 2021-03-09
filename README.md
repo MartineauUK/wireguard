@@ -57,16 +57,18 @@ WireGuard Manager v2.0 now uses a menu (amtm compatible)
     +======================================================================+
     |  Welcome to the WireGuard Manager/Installer script (Asuswrt-Merlin)  |
     |                                                                      |
-    |                      Version v2.01b by Martineau                     |
+    |                      Version v2.01b9 by Martineau                    |
     |                                                                      |
     +======================================================================+
 	WireGuard ACTIVE Peer Status: Clients 3, Servers 2
 
-	No updates available - you have the latest version
+	[✔] Push to Github PENDING for (Minor Hotfix)  update >>>> wg_manager.sh v2.01b9
 
+    =============================================================================================================================================================
 
-    1  = Update Wireguard modules						7  = Display QR code for a Peer {Peer}
+    1  = Update Wireguard modules						7  = Display QR code for a Peer {device} e.g. iPhone
     2  = Remove WireGuard/wg_manager					8  = Peer management [ {Peer} [ add | del | {auto [y|n|p]}] ] ]
+									9  = Create Key-pair for Peer {Device} e.g. Nokia6310i (creates Nokia6310i.conf etc.)
     3  = List ACTIVE WireGuard Peers [3x - lists ALL details]									
     4  = Start   WireGuard Peer [Peer]									
     5  = Stop    WireGuard Peer [Peer]									
@@ -76,6 +78,7 @@ WireGuard Manager v2.0 now uses a menu (amtm compatible)
     v  = View ('/jffs/addons/wireguard/WireguardVPN.conf')		
 
     e  = Exit Script [?]
+
 
     E:Option ==> 3
 
