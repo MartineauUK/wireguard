@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v2.01b9"
-#============================================================================================ © 2021 Martineau v2.01b9
+VERSION="v2.01bA"
+#============================================================================================ © 2021 Martineau v2.01bA
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -1250,7 +1250,7 @@ Show_Main_Menu() {
                     6*|restart*) menu1=$(echo "$menu1" | awk '{$1="restart"}1') ;;
                     7*|qrcode*) menu1=$(echo "$menu1" | awk '{$1="qrcode"}1') ;;
                     8*|peer*) menu1=$(echo "$menu1" | awk '{$1="peer"}1') ;;
-                    u|uf" "*) ;;                           # v3.14
+                    u|uf|uf" "*) ;;                           # v3.14
                     "?") ;;
                     v|vx) ;;
                     peer*) ;;
@@ -1279,6 +1279,11 @@ Show_Main_Menu() {
             case "$menu1" in
                 "")
                     continue
+                ;;
+                0)
+                    Show_credits
+                    printf '|                                                                      |\n'
+                    printf '+======================================================================+\n'
                 ;;
                 e|exit)                                         # v3.23
                     [ -n "$(echo "$menu1" | grep -E "e.*\?")" ] && exit_message "0" || exit_message
@@ -1584,6 +1589,8 @@ EOF
                     fi
                     ;;
                 "?"|u|u" "*|uf|uf" "*)
+
+                    local ACTION="$(echo "$menu1"| awk '{print $1}')"
 
                     case "$ACTION" in
                         "?")
