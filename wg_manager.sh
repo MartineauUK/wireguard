@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v2.01b5"
-#============================================================================================ © 2021 Martineau v2.01b5
+VERSION="v2.01b6"
+#============================================================================================ © 2021 Martineau v2.01b6
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -706,6 +706,9 @@ Get_scripts() {                                                         # v1.12
     download_file ${INSTALL_DIR} wg_manager.sh martineau $BRANCH dos2unix 777
     download_file ${INSTALL_DIR} wg_client martineau $BRANCH dos2unix 777
     download_file ${INSTALL_DIR} wg_server martineau $BRANCH dos2unix 777
+    chmod +x ${INSTALL_DIR}wg_manager.sh
+    chmod +x ${INSTALL_DIR}wg_client
+    chmod +x ${INSTALL_DIR}wg_server
 
 }
 Read_INPUT() {
