@@ -91,9 +91,6 @@ Example successful install.....
 
 
 	Terminating ACTIVE WireGuard Peers ...
-
-
-
 	Requesting termination of Active WireGuard VPN Peers (wg11 wg21)
 
 
