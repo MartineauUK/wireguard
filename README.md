@@ -11,7 +11,7 @@ Enable SSH on router, then use your preferred SSH Client e.g. Xshell6,MobaXterm,
 
 (TIP: Triple-click the install command below) to copy'n'paste into your router's SSH session:
     
-    mkdir -p /jffs/addons 2>/dev/null;mkdir -p /jffs/addons/wireguard 2>/dev/null;curl --retry 3 "https://raw.githubusercontent.com/MartineauUK/wireguard/main/wg_manager.sh" -o "/jffs/addons/wg_manager.sh" && chmod 755 "/jffs/addons/wg_manager.sh" && /jffs/addons/wg_manager.sh install
+    mkdir -p /jffs/addons 2>/dev/null;mkdir -p /jffs/addons/wireguard 2>/dev/null;curl --retry 3 "https://raw.githubusercontent.com/MartineauUK/wireguard/main/wg_manager.sh" -o "/jffs/addons/wireguard/wg_manager.sh" && chmod 755 "/jffs/addons/wireguard/wg_manager.sh" && /jffs/addons/wireguard/wg_manager.sh install
     
 Example successful install.....
 
