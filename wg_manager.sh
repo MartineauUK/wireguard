@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v2.01bA"
-#============================================================================================ © 2021 Martineau v2.01bA
+VERSION="v2.01bB"
+#============================================================================================ © 2021 Martineau v2.01bB
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -1250,6 +1250,7 @@ Show_Main_Menu() {
                     6*|restart*) menu1=$(echo "$menu1" | awk '{$1="restart"}1') ;;
                     7*|qrcode*) menu1=$(echo "$menu1" | awk '{$1="qrcode"}1') ;;
                     8*|peer*) menu1=$(echo "$menu1" | awk '{$1="peer"}1') ;;
+                    9*|createsplit*|create*) menu1=$(echo "$menu1" | awk '{$1="create"}1') ;;
                     u|uf|uf" "*) ;;                           # v3.14
                     "?") ;;
                     v|vx) ;;
