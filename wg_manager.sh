@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v2.01b7"
-#============================================================================================ © 2021 Martineau v2.01b7
+VERSION="v2.01b8"
+#============================================================================================ © 2021 Martineau v2.01b8
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -49,11 +49,16 @@ SayT() {
    echo -e $$ $@ | logger -t "($(basename $0))"
 }
 # shellcheck disable=SC2034
-ANSIColours() {
-    cRESET="\e[0m";cBLA="\e[30m";cRED="\e[31m";cGRE="\e[32m";cYEL="\e[33m";cBLU="\e[34m";cMAG="\e[35m";cCYA="\e[36m";cGRA="\e[37m"
+ANSIColours () {
+    cRESET="\e[0m";cBLA="\e[30m";cRED="\e[31m";cGRE="\e[32m";cYEL="\e[33m";cBLU="\e[34m";cMAG="\e[35m";cCYA="\e[36m";cGRA="\e[37m";cFGRESET="\e[39m"
     cBGRA="\e[90m";cBRED="\e[91m";cBGRE="\e[92m";cBYEL="\e[93m";cBBLU="\e[94m";cBMAG="\e[95m";cBCYA="\e[96m";cBWHT="\e[97m"
     aBOLD="\e[1m";aDIM="\e[2m";aUNDER="\e[4m";aBLINK="\e[5m";aREVERSE="\e[7m"
+    aBOLDr="\e[21m";aDIMr="\e[22m";aUNDERr="\e[24m";aBLINKr="\e[25m";aREVERSEr="\e[27m"
     cWRED="\e[41m";cWGRE="\e[42m";cWYEL="\e[43m";cWBLU="\e[44m";cWMAG="\e[45m";cWCYA="\e[46m";cWGRA="\e[47m"
+    cYBLU="\e[93;48;5;21m"
+    cRED_="\e[41m";cGRE_="\e[42m"
+    xHOME="\e[H";xERASE="\e[2J";xERASEDOWN="\e[J";xERASEUP="\e[1J";xCSRPOS="\e[s";xPOSCSR="\e[u";xERASEEOL="\e[K";xQUERYCSRPOS="\e[6n"
+    xGoto="\e[Line;Columnf"
 }
 # Print between line beginning with'#==' to first blank line inclusive
 ShowHelp() {
@@ -255,7 +260,7 @@ Download_Modules() {
 
     # User Space Tools
     WEBFILE=$(echo "$WEBFILE_NAMES" | awk '{print $4}')
-    echo -e $cBCYA"\n\tDownloading WireGuard User space Tools$cBWHT '$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO)"$cRESET
+    echo -e $cBCYA"\n\tDownloading WireGuard User space Tool$cBWHT '$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO)"$cRESET
     _Get_File  "$WEBFILE" "NOMSG"
 
 }
@@ -263,7 +268,7 @@ Load_Module_UserspaceTool() {                                           # v1.03
 
     if [ ! -d "${INSTALL_DIR}" ];then
         echo -e $cRED"\a\n\tNo modules found - '/${INSTALL_DIR} doesn't exist'\n"
-        echo -e "\tPress$cBRED y$cRESET to$cBRED DOWNLOAD WireGuard Kernel and Userspace Tools modules ${cRESET} or press$cBGRE [Enter] to SKIP."
+        echo -e "\tPress$cBRED y$cRESET to$cBRED DOWNLOAD WireGuard Kernel and Userspace Tool modules ${cRESET} or press$cBGRE [Enter] to SKIP."
             read -r "ANS"
             if [ "$ANS" == "y" ];then
                 Download_Modules $HARDWARE_MODEL
@@ -272,7 +277,7 @@ Load_Module_UserspaceTool() {                                           # v1.03
     fi
 
     STATUS=0
-    echo -e $cBCYA"\n\tLoading WireGuard Kernel module and Userspace Tools for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
+    echo -e $cBCYA"\n\tLoading WireGuard Kernel module and Userspace Tool for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
     for MODULE in $(ls /jffs/addons/wireguard/*.ipk)
         do
             opkg install $MODULE
@@ -293,7 +298,7 @@ Load_Module_UserspaceTool() {                                           # v1.03
         echo -e $cBGRA"\t"$(dmesg | grep -a "wireguard: Copyright")"\n"$cRESET
         return 0
     else
-        echo -e $cBRED"\a\n\t***ERROR: Unable to DOWNLOAD WireGuard Kernel and Userspace Tools modules\n"
+        echo -e $cBRED"\a\n\t***ERROR: Unable to DOWNLOAD WireGuard Kernel and Userspace Tool modules\n"
         return 1
     fi
 
@@ -327,10 +332,10 @@ Check_Module_Versions() {
 
     Show_MD5
     [ -z "$(echo "$FILES" | grep -F "$WGKERNEL")" ] && { echo -e $cBYEL"\t\tKernel UPDATE available" $FILE; local UPDATES="Y"; }
-    [ -z "$(echo "$FILES" | grep -F "$WGTOOLS")" ] && { echo -e $cBYEL"\t\tUserspace Tools UPDATE available" $FILE; local UPDATES="Y"; }
+    [ -z "$(echo "$FILES" | grep -F "$WGTOOLS")" ] && { echo -e $cBYEL"\t\tUserspace Tool UPDATE available" $FILE; local UPDATES="Y"; }
 
     if [ "$UPDATES" == "Y" ];then
-        echo -e $cRESET"\n\tPress$cBRED y$cRESET to$cBRED Update WireGuard Kernel and Userspace Tools${cRESET} or press$cBGRE [Enter] to SKIP."
+        echo -e $cRESET"\n\tPress$cBRED y$cRESET to$cBRED Update WireGuard Kernel and Userspace Tool${cRESET} or press$cBGRE [Enter] to SKIP."
         read -r "ANS"
         if [ "$ANS" == "y" ];then
             Download_Modules $HARDWARE_MODEL
@@ -507,11 +512,12 @@ Manage_alias() {
 
     case "$1" in
         del)
-            echo -e $cBCYA"\n\tDeleted aliases for '$SCRIPT_NAME'"$cRESET
+            echo -e $cBCYA"\tDeleted aliases for '$SCRIPT_NAME'"$cRESET
             sed -i "/$SCRIPT_NAME/d" /jffs/configs/profile.add
+            rm -rf "/opt/bin/unbound_manager" 2>/dev/null                                   # v2.01
         ;;
         "?")
-            echo -e $cRESET"\n\tAlias info\n"
+            echo -e $cRESET"\tAlias info\n"
             for ALIAS in $ALIASES
                 do
                     type "wg"$ALIAS
@@ -520,25 +526,32 @@ Manage_alias() {
         ;;
         *)
         # Create Alias
+
+            rm -rf "/opt/bin/wg_manager" 2>/dev/null                                        # v2.01
+            if [ -d "/opt/bin" ] && [ ! -L "/opt/bin/wg_manager" ]; then
+                echo -e $cBCYA"\tCreating 'wg_manager' alias for '$SCRIPT_NAME'" 2>&1
+                ln -s /jffs/addons/wireguard/wg_manager.sh /opt/bin/wg_manager              # v2.01
+            fi
+
             if [ -z "$(grep "$SCRIPT_NAME" /jffs/configs/profile.add)" ];then
-                echo -e $cBCYA"\n\tCreating aliases and shell functions for '$SCRIPT_NAME'"$cRESET
-                alias wgstart='/jffs/addons/wireguard/$SCRIPT_NAME start'
-                echo "alias wgstart='/jffs/addons/wireguard/$SCRIPT_NAME start'"               >>/jffs/configs/profile.add
+                # echo -e $cBCYA"\n\tCreating aliases and shell functions for '$SCRIPT_NAME'"$cRESET
+                # alias wgstart='/jffs/addons/wireguard/$SCRIPT_NAME start'
+                # echo "alias wgstart='/jffs/addons/wireguard/$SCRIPT_NAME start'"               >>/jffs/configs/profile.add
 
-                alias wgstop='/jffs/scripts/addons/wireguard/$SCRIPT_NAME stop'
-                echo "alias wgstop='/jffs/addons/wireguard/$SCRIPT_NAME stop'"                 >>/jffs/configs/profile.add
+                # alias wgstop='/jffs/scripts/addons/wireguard/$SCRIPT_NAME stop'
+                # echo "alias wgstop='/jffs/addons/wireguard/$SCRIPT_NAME stop'"                 >>/jffs/configs/profile.add
 
-                alias wgrestart='/jffs/addons/wireguard/$SCRIPT_NAME restart'
-                echo "alias wgrestart='/jffs/addons/wireguard/$SCRIPT_NAME restart'"           >>/jffs/configs/profile.add
+                # alias wgrestart='/jffs/addons/wireguard/$SCRIPT_NAME restart'
+                # echo "alias wgrestart='/jffs/addons/wireguard/$SCRIPT_NAME restart'"           >>/jffs/configs/profile.add
 
-                alias wgshow='/jffs/addons/wireguard/$SCRIPT_NAME show'
-                echo "alias wgshow='/jffs/addons/wireguard/$SCRIPT_NAME show'"                 >>/jffs/configs/profile.add
+                # alias wgshow='/jffs/addons/wireguard/$SCRIPT_NAME show'
+                # echo "alias wgshow='/jffs/addons/wireguard/$SCRIPT_NAME show'"                 >>/jffs/configs/profile.add
 
-                alias wgdiag='/jffs/scripts/wireguard/$SCRIPT_NAME diag'
-                echo "alias wgdiag='/jffs/addons/wireguard/$SCRIPT_NAME diag'"                 >>/jffs/configs/profile.add
+                # alias wgdiag='/jffs/scripts/wireguard/$SCRIPT_NAME diag'
+                # echo "alias wgdiag='/jffs/addons/wireguard/$SCRIPT_NAME diag'"                 >>/jffs/configs/profile.add
 
                 # Shell function!
-                echo -e "wgm()  { /jffs/addons/wireguard/$SCRIPT_NAME \$@; }"                  >>/jffs/configs/profile.add
+                echo -e "wgm()  { ${INSTALL_DIR}$SCRIPT_NAME \$@; }"                  >>/jffs/configs/profile.add
             else
                 echo -e $cRED"\n\tWarning: Aliases and shell functions for $SCRIPT_NAME already exist\n"$cRESET
             fi
@@ -563,7 +576,7 @@ wg11    Y      12.34.56.78/32        86.106.143.93:51820    193.138.218.74    # 
 wg12    N      xxx.xxx.xxx.xxx/32    209.58.188.180:51820   193.138.218.74    # Mullvad China, Hong Kong
 wg13    N      xxx.xxx.xxx.xxx/32    103.231.88.18:51820    193.138.218.74    # Mullvad Oz, Melbourne
 wg14    N      xxx.xxx.xxx.xxx/32    193.32.126.66:51820    193.138.218.74    # Mullvad France, Paris
-wg15    P                                                                     #
+wg15    N                                                                     #
 
 # For each 'server' Peer you need to allocate a unique VPN subnet
 #              VPN Subnet
@@ -620,8 +633,9 @@ Display_QRCode() {
 Edit_nat_start() {
 
     if [ "$1" != "del" ];then
+
+        [ ! -f /jffs/scripts/nat-start ] && { echo -e "#!/bin/sh\n\n"    > /jffs/scripts/nat-start; chmod +x /jffs/scripts/nat-start; }
         if [ -z "$(grep "WireGuard" /jffs/scripts/nat-start)" ];then
-            [ ! -f /jffs/scripts/nat-start ] && { echo -e "#!/bin/sh\n\n"    > /jffs/scripts/nat-start; chmod +x /jffs/scripts/nat-start; }
             echo -e "/jffs/addons/wireguard/wg_firewall            # WireGuard" >> /jffs/scripts/nat-start
             cat >> /jffs/addons/wireguard/wg_firewall << EOF
 #!/bin/sh
@@ -636,11 +650,11 @@ EOF
 
             chmod +x /jffs/addons/wireguard/wg_firewall
         fi
-        echo -e $cBCYA"\n\tnat-start updated to protect WireGuard firewall rules"$cRESET
+        echo -e $cBCYA"\tnat-start updated to protect WireGuard firewall rules"$cRESET
         SayT "nat-start updated to protect WireGuard firewall rules"
     else
         sed -i '/WireGuard/d' /jffs/scripts/nat-start
-        echo -e $cBCYA"\n\tnat-start updated - no longer protecting WireGuard firewall rules"$cRESET
+        echo -e $cBCYA"\tnat-start updated - no longer protecting WireGuard firewall rules"$cRESET
         SayT "nat-start updated - no longer protecting WireGuard firewall rules"
     fi
 
@@ -685,7 +699,7 @@ Edit_DNSMasq() {
     if [ -z "$1"  ];then                           # v2.01
         # Allow dnmsasq to listen on Wireguard interfaces for DNS
         if [ -z "$(grep -E "^interface=wg\*" /jffs/configs/dnsmasq.conf.add)" ];then
-            echo -e $cBGRE"\n\tAdded 'wg*' interfaces to DNSMasq"$cRESET 2>&1
+            echo -e $cBGRE"\tAdded 'wg*' interfaces to DNSMasq"$cRESET 2>&1
             echo -e "interface=wg*     # WireGuard" >> /jffs/configs/dnsmasq.conf.add
             service restart_dnsmasq 2>/dev/null
         fi
@@ -701,9 +715,10 @@ Get_scripts() {                                                         # v1.12
 
     local BRANCH="$1"
 
-    echo -e $cBCYA"\n\tDownloading scripts\n"$cRESET 2>&1
+    echo -e $cBCYA"\tDownloading scripts"$cRESET 2>&1
 
-    download_file ${INSTALL_DIR} wg_manager.sh martineau $BRANCH dos2unix 777
+    # Allow use of custom script for debugging
+    [ "$(WireGuard_Installed)" == "Y" ] && download_file ${INSTALL_DIR} wg_manager.sh martineau $BRANCH dos2unix 777
     download_file ${INSTALL_DIR} wg_client martineau $BRANCH dos2unix 777
     download_file ${INSTALL_DIR} wg_server martineau $BRANCH dos2unix 777
     chmod +x ${INSTALL_DIR}wg_manager.sh
@@ -838,7 +853,7 @@ _GetKEY() {
 
 }
 WireGuard_Installed() {
-    if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(which wg)" ];then   # v2.00
+    if [ -f "${INSTALL_DIR}WireguardVPN.conf" ] && [ -n "$(which wg)" ];then   # v2.00
         echo "Y"
         return 0
     else
@@ -895,6 +910,8 @@ exit_message() {
 }
 Install_WireGuard_Manager() {
 
+    echo -e $cBWHT"\n\tInstalling WireGuard Manager - Router$cBMAG $HARDWARE_MODEL (v$BUILDNO)"$cRESET
+
     if [ "$(Is_AX)" == "N" ] && [ "$(Is_HND)" == "N" ];then
         echo -e $cBRED"\a\n\tERROR: Router$cRESET $HARDWARE_MODEL (v$BUILDNO)$cBRED is not currently compatible with WireGuard!\n"
         exit 96
@@ -914,12 +931,13 @@ Install_WireGuard_Manager() {
     # Scripts
     if [ -d "${INSTALL_DIR}" ];then
         Get_scripts "$2"
+        echo -e
     fi
 
     modprobe xt_comment
 
     # Kernel module
-    echo -e $cBCYA"\n\tDownloading Wireguard Kernel module for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
+    echo -e $cBCYA"\tDownloading Wireguard Kernel module for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
 
     ROUTER_COMPATIBLE="Y"
 
@@ -931,7 +949,7 @@ Install_WireGuard_Manager() {
     Create_Sample_Config
 
     # Create dummy 'Client' and 'Server' templates
-    echo -e $cBCYA"\n\tCreating WireGuard 'Client' and 'Server' Peer templates 'wg11.conf' and wg21.conf'"$cRESET
+    echo -e $cBCYA"\tCreating WireGuard 'Client' and 'Server' Peer templates 'wg11.conf' and wg21.conf'"$cRESET
 
     cat > ${CONFIG_DIR}wg11.conf << EOF
 [Interface]
@@ -964,7 +982,7 @@ ListenPort = 51820
 EOF
 
     # Create 'server' Peer wg21
-    echo -e $cBCYA"\n\tCreating WireGuard Private/Public key-pairs for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
+    echo -e $cBCYA"\tCreating WireGuard Private/Public key-pairs for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
     if [ -n "$(which wg)" ];then
         for I in 1 2 3 4 5
             do
@@ -994,18 +1012,17 @@ EOF
 
     if  [ -n "$(which wg)" ] && [ "$ROUTER_COMPATIBLE" == "Y" ];then
 
-        # Test this script - (well actually the one used @BOOT) against the two Sample Peers (wg11 and Wg21)
-        echo -e $cBCYA"\n\tTest Initialising the Sample WireGuard 'client' and 'server' Peers, BUT ONLY the Sample 'server' will Initialise correctly!!!! :-).\n"$cRESET
+        # Test 'wg' and this script - (well actually the one used @BOOT) against the two Sample Peers (wg11 and Wg21)
+        echo -e $cBCYA"\t${cRESET}${cYBLU}Test ${cRESET}${cBCYA}Initialising the Sample WireGuard 'client' and 'server' Peers, ${cYBLU}BUT ONLY the Sample 'server' (wg21) will Initialise WITHOUT errors!!!! :-)${cYBLU}"$cRESET
         ${INSTALL_DIR}$SCRIPT_NAME start
         # Test the Status report
-        echo -e $cBCYA"\n\tTest WireGuard Peer Status"
+        echo -e $cBCYA"\tWireGuard Peer Status"
         ${INSTALL_DIR}$SCRIPT_NAME show               # v1.11
 
-        echo -e $cBCYA"\n\tTerminating ACTIVE WireGuard Peers ...\n"$cRESET
+        echo -e $cBCYA"\tTerminating ACTIVE WireGuard Peers ...\n"$cRESET
         ${INSTALL_DIR}$SCRIPT_NAME stop
     else
-        echo -e $cBRED"\a\n\t***ERROR: WireGuard install FAILED!\n"$cRESET
-        # rm -rF /jffs/addons/wireguard
+        echo -e $cBRED"\a\n\t***ERROR: WireGuard install FAILED!\n"$cRESETd
     fi
 
     Edit_nat_start                                      # v1.07
@@ -1016,16 +1033,16 @@ EOF
 
     # Auto start ALL defined WireGuard Peers @BOOT
     # Use post-mount
-    echo -e $cBCYA"\n\tAdding Peer Auto-start @BOOT\n"$cRESET
+    echo -e $cBCYA"\tAdding Peer Auto-start @BOOT"$cRESET
     if [ -z "$(grep -i "WireGuard" /jffs/scripts/post-mount)" ];then
         echo -e "/jffs/addons/wireguard/wg_manager.sh init \"$@\" & # WireGuard Manager" >> /jffs/scripts/post-mount
     fi
 
-    echo -e $cBCYA"\n\tInstalling QR rendering module"$cBGRA
+    echo -e $cBCYA"\tInstalling QR rendering module"$cBGRA
     opkg install qrencode
 
     Display_QRCode ${CONFIG_DIR}wg11.conf
-    echo -e $cBGRE"\n\tWireGuard install COMPLETED.\n"$cRESET
+    echo -e $cBGRE"\tWireGuard install COMPLETED.\n"$cRESET
 
 }
 Show_Peer_Status() {
@@ -1070,15 +1087,6 @@ Show_Peer_Status() {
                 [ -n "$(echo "$LINE" | grep -E "transfer:")" ] && COLOR=$cBWHT
             fi
 
-            # Endpoint: 209.58.188.180:51820
-            if [ -n "$(echo "$LINE" | grep -iE "Endpoint" )" ];then
-                # Don't get the description based on interface, but the IP socket?
-                #SOCKET=$(echo $LINE | awk '{print $2}')
-                #DESC=$(awk -v pattern="$SOCKET" 'match($0,pattern) {print $0}' ${INSTALL_DIR}WireguardVPN.conf | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
-                #LINE=${COLOR}$LINE" ${cBMAG}\t\t\t("$DESC")"
-                :
-            fi
-
             if [ -n "$(echo "$LINE" | grep -iE "peer:" )" ] && [ "$TYPE" == "server" ];then
                 PUB_KEY=$(echo "$LINE" | awk '{print $2}')
                 DESC=$(grep -F "$PUB_KEY" ${INSTALL_DIR}WireguardVPN.conf | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
@@ -1102,14 +1110,6 @@ Show_Peer_Status() {
 }
 Show_Main_Menu() {
 
-        # Reinstate CTRL-C if 'trap 'welcome_message' INT brought us here!
-        trap 'exit_message' INT                                                 # Release lockfile
-
-        # No need to recreate the STATIC menu items on each invocation
-        if [ -z "$MENU_Z" ];then                                # v2.12
-            :
-        fi
-
         Show_credits
 
         if [ "$(WireGuard_Installed)" == "Y" ];then
@@ -1119,7 +1119,6 @@ Show_Main_Menu() {
 
         #
         while true; do
-
 
             # If WireGuard already installed then no need to display FULL HDR - stops confusing idiot users ;-:
             if [ "$HDR" == "ForceDisplay" ];then
@@ -1165,15 +1164,15 @@ Show_Main_Menu() {
 
                 if [ -z "$SUPPRESSMENU" ];then
 
-                    # Generate v3.00 Easy (dynamically context aware) menu
-                    if [ -f ${INSTALL_DIR}WireguardVPN.conf ];then
+                    # Generate dynamically context aware menu
+                    if [ "$(WireGuard_Installed)" == "Y" ];then
                         MENU_I="$(printf '%b1 %b = %bUpdate%b Wireguard modules' "${cBYEL}" "${cRESET}" "${cBGRE}" "${cRESET}")"
                         MENU_Z="$(printf '%b2 %b = %bRemove%b WireGuard/wg_manager\n' "${cBYEL}" "${cRESET}" "${cBRED}" "${cRESET}")"
                     else
                         MENU_I="$(printf '%b1 %b = %bBegin%b WireGuard Installation Process' "${cBYEL}" "${cRESET}" "${cBGRE}" "${cRESET}")"
                     fi
 
-                    if [ -f ${INSTALL_DIR}WireguardVPN.conf ];then
+                    if [ "$(WireGuard_Installed)" == "Y" ];then
 
                         MENU_VX="$(printf '%bv %b = View %b%s\n' "${cBYEL}" "${cRESET}" "$cBGRE" "('${INSTALL_DIR}WireguardVPN.conf')")"
                         MENU_RS="$(printf '%brs%b = %bRestart%b (or %bStart%b) WireGuard Sessions(%b)\n' "${cBYEL}" "${cRESET}" "$cBGRE" "${cRESET}" "$cBGRE" "${cRESET}" )"
@@ -1187,20 +1186,19 @@ Show_Main_Menu() {
                         MENU_R="$(printf '%b6 %b = %bRestart%b WireGuard Peer [Peer]\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
                         MENU_Q="$(printf '%b7 %b = %bDisplay QR code for a Peer {device} e.g. iPhone%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
                         MENU_P="$(printf '%b8 %b = %bPeer management [ {Peer} [ add | del | {auto [y|n|p]}] ] ]%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
-						MENU_C="$(printf '%b9 %b = %bCreate Key-pair for Peer {Device} e.g. Nokia6310i (creates Nokia6310i.conf etc.)%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
+                        MENU_C="$(printf '%b9 %b = %bCreate Key-pair for Peer {Device} e.g. Nokia6310i (creates Nokia6310i.conf etc.)%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
 
                     fi
-
 
                     MENU__="$(printf '%b? %b = About Configuration\n' "${cBYEL}" "${cRESET}")"
                     echo -e ${cWGRE}"\n"$cRESET      # Separator line
 
-					echo -e
-					printf "%s\t\t\t\t\t\t%s\n"                 "$MENU_I" "$MENU_Q"
-                    printf "%s\t\t\t\t\t%s\n"                   "$MENU_Z" "$MENU_P"
-					printf "\t\t\t\t\t\t\t\t\t%s\n"                       "$MENU_C"
+                    echo -e
+                    printf "%s\t\t\t\t\t\t%s\n"                 "$MENU_I" "$MENU_Q"
 
-                    if [ -f ${INSTALL_DIR}WireguardVPN.conf ];then
+                    if [ "$(WireGuard_Installed)" == "Y" ];then
+                        printf "%s\t\t\t\t\t%s\n"                   "$MENU_Z" "$MENU_P"
+                        printf "\t\t\t\t\t\t\t\t\t%s\n"                       "$MENU_C"
                         printf "%s\t\t\t\t\t\t\t\t\t%s\n"           "$MENU_L"
                         printf "%s\t\t\t\t\t\t\t\t\t%s\n"           "$MENU_S"
                         printf "%s\t\t\t\t\t\t\t\t\t%s\n"           "$MENU_T"
@@ -1252,7 +1250,7 @@ Show_Main_Menu() {
                     6*|restart*) menu1=$(echo "$menu1" | awk '{$1="restart"}1') ;;
                     7*|qrcode*) menu1=$(echo "$menu1" | awk '{$1="qrcode"}1') ;;
                     8*|peer*) menu1=$(echo "$menu1" | awk '{$1="peer"}1') ;;
-                    u|uf*) ;;                           # v3.14
+                    u|uf" "*) ;;                           # v3.14
                     "?") ;;
                     v|vx) ;;
                     peer*) ;;
@@ -1266,7 +1264,6 @@ Show_Main_Menu() {
                     debug) ;;                   # v3.04
                     kill*) ip link del dev $(echo "$menu1" | awk '{print $2}') ;;
                     "") ;;
-                    easy|adv*) ;;
                     e*) ;;
                     *) printf '\n\a\t%bInvalid Option%b "%s"%b Please enter a valid option\n' "$cBRED" "$cRESET" "$menu1" "$cBRED"
                        continue
@@ -1299,7 +1296,7 @@ Show_Main_Menu() {
 
                     if [ -n "$(which wg)" ];then
 
-						echo -e $cBWHT"\n\t\t WireGuard VPN Peer Status\n"$cRESET
+                        echo -e $cBWHT"\n\t\t WireGuard VPN Peer Status\n"$cRESET
                         Show_Peer_Status
 
                         if [ "$ACTION" == "diag" ];then
@@ -1385,9 +1382,9 @@ Show_Main_Menu() {
                     ;;
                 uninstall)
 
-                    echo -e $cBCYA"\n\tUninstalling Wireguard Kernel module and Userspace Tools for $HARDWARE_MODEL (v$BUILDNO)"$cBGRA
+                    echo -e $cBCYA"\tUninstalling Wireguard Kernel module and Userspace Tool for $HARDWARE_MODEL (v$BUILDNO)"$cBGRA
                     opkg remove wireguard-kernel wireguard-tools
-                    echo -e $cBCYA"\n\tDeleting Wireguard install directories and files"$cRESET
+                    echo -e $cBCYA"\tDeleting Wireguard install directories and files"$cRESET
                     echo -en $cBRED
                     [ -f ${INSTALL_DIR}WireguardVPN.conf ] && rm ${INSTALL_DIR}WireguardVPN.conf
                         # legacy tidy-up!
@@ -1398,15 +1395,18 @@ Show_Main_Menu() {
                     echo -e "\tPress$cBRED Y$cRESET to$cBRED delete ALL WireGuard DATA files (Peer *.config etc.) $cRESET('${CONFIG_DIR}') or press$cBGRE [Enter] to keep custom WireGuard DATA files."
                     read -r "ANS"
                     if [ "$ANS" == "Y" ];then
-                       echo -e $cBCYA"\n\tDeleting $cRESET'${CONFIG_DIR}'\n"
-                       [ -d /opt/etc/wireguard ] && rm -rf ${CONFIG_DIR}
+                       echo -e $cBCYA"\n\tDeleting $cRESET'${CONFIG_DIR}'"
+                       [ -d "${CONFIG_DIR}" ] && rm -rf ${CONFIG_DIR}
                     fi
+
+                    echo -e $cBCYA"\tDeleted Peer Auto-start @BOOT\n"$cRESET
+                    [ -n "$(grep -i "WireGuard" /jffs/scripts/post-mount)" ] && sed -i '/WireGuard/d' /jffs/scripts/post-mount  # v2.01
 
                     Edit_nat_start "del"
 
                     Manage_alias "del"                  # v1.11
 
-                    Edit_DNSMasq "del"                      # v1.12
+                    Edit_DNSMasq "del"                  # v1.12
 
                     echo -e $cBGRE"\n\tWireGuard Uninstall complete for $HARDWARE_MODEL (v$BUILDNO)\n"$cRESET
 
@@ -1822,41 +1822,50 @@ if [ "$1" == "debug" ] || [ "$1" == "debugall" ];then
    [ "$1" == "debug" ] && set +x
 fi
 
-modprobe xt_comment                                 # v2.01
+[ ! -L "/opt/bin/wg_manager" ] && Manage_alias "create"
+
+# Retain commandline comaptibility
+if [ "$1" != "install" ];then   # v2.01
+    if [ "$(WireGuard_Installed)" == "Y" ];then             # v2.01
+        case "$1" in
+
+            start|init)
+                Manage_Wireguard_Sessions "start"               # Post mount should start ALL defined sessions @BOOT
+                echo -e $cRESET
+                exit_message
+            ;;
+            stop)
+                Manage_Wireguard_Sessions "stop"
+                echo -e $cRESET
+                exit_message
+            ;;
+            restart)
+                Manage_Wireguard_Sessions "restart"
+                echo -e $cRESET
+                exit_message
+            ;;
+            show)
+                Show_Peer_Status "show+"                        # Force verbose detail
+                echo -e $cRESET
+                exit_message
+            ;;
+        esac
+    else
+        SayT "***ERROR WireGuard Manager/WireGuard Tool module 'wg' NOT installed"
+        echo -e $cBRED"\a\n\t***ERROR WireGuard Tool module 'wg' NOT installed\n"$cRESET
+        exit_message
+    fi
+fi
 
 clear
 
-#Check_Lock "wg"
+Check_Lock "wg"
 
-# Retain commandline comaptibility
-case "$1" in
-
-    start|init)
-        Manage_Wireguard_Sessions "start"               # Post mount should start ALL defined sessions @BOOT
-    ;;
-    stop)
-        Manage_Wireguard_Sessions "stop"
-    ;;
-    restart)
-        Manage_Wireguard_Sessions "restart"
-    ;;
-    show)
-        Show_Peer_Status "show+"                        # Force verbose detail
-    ;;
-    install)
-        # Install_WireGuard_Manager
-        # Show_Main_Menu "$@"
-        # exit 0
-        :
-    ;;
-    *)
-        Show_Main_Menu "$@"
-    ;;
-esac
+Show_Main_Menu "$@"
 
 echo -e $cRESET
 
-#rm -rf /tmp/wg.lock
+rm -rf /tmp/wg.lock
 
 exit 0
 
