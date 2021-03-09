@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v2.01b8"
-#============================================================================================ © 2021 Martineau v2.01b8
+VERSION="v2.01b9"
+#============================================================================================ © 2021 Martineau v2.01b9
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -1262,6 +1262,7 @@ Show_Main_Menu() {
                     alias*) ;;
                     diag) ;;
                     debug) ;;                   # v3.04
+                    wg*) ;;
                     kill*) ip link del dev $(echo "$menu1" | awk '{print $2}') ;;
                     "") ;;
                     e*) ;;
@@ -1761,6 +1762,11 @@ EOF
                     else
                         DEBUGMODE=
                     fi
+                ;;
+                wg*)
+                    # Expose the WireGuard Userspace Tool
+                    echo -e $cBWHT"WireGuard Userspace Tool:\n"
+                    $menu1
                 ;;
                 *)
 
