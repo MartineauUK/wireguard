@@ -1,26 +1,26 @@
 #!/bin/sh
-VERSION="v2.01b4"
-#============================================================================================ © 2021 Martineau v2.01b4
+VERSION="v2.01b5"
+#============================================================================================ © 2021 Martineau v2.01b5
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
 #       wg_manager   start 0
-#                      Initialises remote peer 'client' 'wg0'
+#                    Initialises remote peer 'client' 'wg0'
 #       wg_manager   start client 0
-#                      Initialises remote peer 'client' 'wg0'
+#                    Initialises remote peer 'client' 'wg0'
 #       wg_manager   start 1
-#                      Initialises local peer 'server' 'wg1'
+#                    Initialises local peer 'server' 'wg1'
 #       wg_manager   start server 1
-#                      Initialises local peer 'server' 'wg21'
+#                    Initialises local peer 'server' 'wg21'
 #       wg_manager   start client 1
-#                      Initialises remote peer 'client' 'wg11' uses interface naming convention as per OpenVPN e.g. tun11
+#                    Initialises remote peer 'client' 'wg11' uses interface naming convention as per OpenVPN e.g. tun11
 #       wg_manager   start client 1 policy
-#                      Initialises remote peer 'client' 'wg11' in 'policy' Selective Routing mode
+#                    Initialises remote peer 'client' 'wg11' in 'policy' Selective Routing mode
 #       wg_manager   stop client 3
-#                      Terminates remote peer 'client' 'wg13'
+#                    Terminates remote peer 'client' 'wg13'
 #       wg_manager   stop 1
 #       wg_manager   restart SGS8
-#                      Restart legacy-named Peer and auto-detect if it's a 'client' or 'server'
+#                    Restart legacy-named Peer and auto-detect if it's a 'client' or 'server'
 #
 
 # Maintainer: Martineau
@@ -703,9 +703,9 @@ Get_scripts() {                                                         # v1.12
 
     echo -e $cBCYA"\n\tDownloading scripts\n"$cRESET 2>&1
 
-    download_file ${INSTALL_DIR} wg_manager.sh martineau $BRANCH dos2unix 755
-    download_file ${INSTALL_DIR} wg_client martineau $BRANCH dos2unix 755
-    download_file ${INSTALL_DIR} wg_server martineau $BRANCH dos2unix 755
+    download_file ${INSTALL_DIR} wg_manager.sh martineau $BRANCH dos2unix 777
+    download_file ${INSTALL_DIR} wg_client martineau $BRANCH dos2unix 777
+    download_file ${INSTALL_DIR} wg_server martineau $BRANCH dos2unix 777
 
 }
 Read_INPUT() {
@@ -998,8 +998,8 @@ EOF
         echo -e $cBCYA"\n\tTest WireGuard Peer Status"
         ${INSTALL_DIR}$SCRIPT_NAME show               # v1.11
 
-        #echo -e $cBCYA"\n\tTerminating ACTIVE WireGuard Peers...\n"$cRESET
-        #${INSTALL_DIR}$SCRIPT_NAME stop
+        echo -e $cBCYA"\n\tTerminating ACTIVE WireGuard Peers ...\n"$cRESET
+        ${INSTALL_DIR}$SCRIPT_NAME stop
     else
         echo -e $cBRED"\a\n\t***ERROR: WireGuard install FAILED!\n"$cRESET
         # rm -rF /jffs/addons/wireguard
