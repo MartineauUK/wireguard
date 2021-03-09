@@ -15,40 +15,115 @@ Enable SSH on router, then use your preferred SSH Client e.g. Xshell6,MobaXterm,
     
 Example successful install.....
 
-	Retrieving scripts 'wg_manager.sh/wg_server'
+    +======================================================================+
+    |  Welcome to the WireGuard Manager/Installer script (Asuswrt-Merlin)  |
+    |                                                                      |
+    |                      Version v2.01b8 by Martineau                    |
+    |                                                                      |
+    | Requirements: USB drive with Entware installed                       |
+    |                                                                      |
+    |   1 = Install WireGuard                                              |
+    |       o1. Enable nat-start protection for Firewall rules             |
+    |       o2. Enable DNS                                                 |
+    |                                                                      |
+    |                                                                      |
+    +======================================================================+
 
-    <snip> 100.0%
-    <snip> 100.0%
+	    WireGuard ACTIVE Peer Status: Clients 0, Servers 0
 
-	Retrieving Wireguard Kernel module for RT-AC86U (v386.2)
-    
-    % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                 Dload  Upload   Total   Spent    Left  Speed
-    100   190  100   190    0     0    822      0 --:--:-- --:--:-- --:--:--   833
-    100 57251  100 57251    0     0   166k      0 --:--:-- --:--:-- --:--:--  166k
+	    v2.01b8 - No WireGuard Manager updates available - you have the latest version
 
-	Retrieving WireGuard User space Tools for RT-AC86U (v386.2)
-    
-    % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                 Dload  Upload   Total   Spent    Left  Speed                            
-    100   187  100   187    0     0    820      0 --:--:-- --:--:-- --:--:--   834
-    100 46503  100 46503    0     0  98315      0 --:--:-- --:--:-- --:--:-- 98315
+    1  = Begin WireGuard Installation Process						
 
-	Loading WireGuard Kernel module and Userspace Tools for RT-AC86U (v386.2)
+    e  = Exit Script [?]
 
+    E:Option ==> 1
+
+	Installing WireGuard Manager - Router RT-AC86U (v386.1)
+	Downloading scripts
+	wg_client downloaded successfully 
+	wg_server downloaded successfully 
+
+	Downloading Wireguard Kernel module for RT-AC86U (v386.1)
+
+	Downloading WireGuard Kernel module 'wireguard-kernel_1.0.20210219-k27_aarch64-3.10.ipk' for RT-AC86U (v386.1)...
+
+    ##################################################################################################################################################################################### 100.0%##################################################################################################################################################################################### 100.0%
+
+	Downloading WireGuard User space Tool 'wireguard-tools_1.0.20210223-1_aarch64-3.10.ipk' for RT-AC86U (v386.1)
+
+     ##################################################################################################################################################################################### 100.0%##################################################################################################################################################################################### 100.0%
+
+	Loading WireGuard Kernel module and Userspace Tool for RT-AC86U (v386.1)
     Installing wireguard-kernel (1.0.20210219-k27) to root...
     Configuring wireguard-kernel.
 
-    Installing wireguard-tools (1.0.20210223-1) to root...
-    Configuring wireguard-tools.
+Installing wireguard-tools (1.0.20210223-1) to root...
+Configuring wireguard-tools.
+	wireguard: WireGuard 1.0.20210219 loaded. See www.wireguard.com for information.
+	wireguard: Copyright (C) 2015-2019 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
 
-    wireguard: WireGuard 1.0.20210219 loaded. See www.wireguard.com for information.
 
-	Creating WireGuard configuration file '/jffs/configs/WireguardVPN_map'
-
+	Creating WireGuard configuration file '/jffs/addons/wireguard/WireguardVPN.conf'
 	Creating WireGuard 'Client' and 'Server' Peer templates 'wg11.conf' and wg21.conf'
+	Creating WireGuard Private/Public key-pairs for RT-AC86U (v386.1)
+	Test Initialising the Sample WireGuard 'client' and 'server' Peers, BUT ONLY the Sample 'server' (wg21) will Initialise WITHOUT errors!!!! :-)
+
+    (wg_manager.sh): 26628 v2.01b8 Requesting WireGuard VPN Peer auto-start (wg11 wg21 )
+
+
+	wireguard-client1: Initialising Wireguard VPN 'client' Peer (wg11) to 86.106.143.93:51820 (# ****THIS IS NOT A REAL PEER** Edit 'wg11.conf' with real DATA!)
+	wireguard-client1: Initialisation complete.
+
+	wireguard-server1: Initialising Wireguard VPN 'Server' Peer (wg21) on 0.0.0.0:51820 (# RT-AC86U Local Host Peer 1)
+	wireguard-server1: Initialisation complete.
+
+
+
+	WireGuard Peer Status
+	interface: wg11 	('client' # ****THIS IS NOT A REAL PEER** Edit 'wg11.conf' with real DATA!)
+		 listening port: 34465
+		
+	interface: wg21 	('server' # RT-AC86U Local Host Peer 1)
+		 public key: RPLF0ksVHyLvffhzNG7agfvaAbN3L3QIl08qkZ3pH0U=
+		 private key: (hidden)
+		 listening port: 51820
+
+
+	Terminating ACTIVE WireGuard Peers ...
+
+
+
+	Requesting termination of Active WireGuard VPN Peers (wg11 wg21)
+
+
+    (wg_manager.sh): 27073 v2.01b8 Requesting termination of WireGuard VPN 'client' Peer ('wg11')
+	wireguard-client1: Wireguard VPN 'client' Peer (wg11) to 86.106.143.93:51820 (# ****THIS IS NOT A REAL PEER** Edit 'wg11.conf' with real DATA!) DELETED
+
+    (wg_manager.sh): 27073 v2.01b8 Requesting termination of WireGuard VPN 'server' Peer ('wg21')
+	wireguard-server1: Wireguard VPN '' Peer (wg21) on 0.0.0.0:51820 (# RT-AC86U Local Host Peer 1) DELETED
+
+
+
+	nat-start updated to protect WireGuard firewall rules
+	Added 'wg*' interfaces to DNSMasq
+
+    Done.
+	Creating 'wg_manager' alias for 'wg_manager.sh'
+	Adding Peer Auto-start @BOOT
+	Installing QR rendering module
+    Package qrencode (4.1.1-1) installed in root is up to date.
+	Press y to Display QR Code for Scanning into WireGuard App on device '' or press [Enter] to SKIP.
+y
+
+***QR code image goes here
 
 	WireGuard install COMPLETED.
+
+
+	WireGuard ACTIVE Peer Status: Clients 0, Servers 0
+
+
 
 WireGuard Manager v2.0 now uses a menu (amtm compatible)
 
