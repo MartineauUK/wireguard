@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v2.01bD"
-#============================================================================================ © 2021 Martineau v2.01bD
+VERSION="v2.01bE"
+#============================================================================================ © 2021 Martineau v2.01bE
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -30,7 +30,7 @@ VERSION="v2.01bD"
 #
 # Acknowledgement:
 #
-# Contributors: odkrys,Torson,ZebMcKayhan
+# Contributors: odkrys,Torson,ZebMcKayhan,jobhax
 
 GIT_REPO="wireguard"
 GITHUB_MARTINEAU="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/main"
@@ -412,8 +412,8 @@ Manage_Wireguard_Sessions() {
             fi
 
             # Commandline request overrides entry in config file                            # v1.10 Hotfix
+            #[ -n "$(echo "$@" | grep -w "policy")" ] && { Route="policy"; POLICY_MODE="Policy Mode"; } || Route="default"      # v2.01 @jobhax v1.09
             [ -n "$(echo "$@" | grep -w "nopolicy")" ] && Route="default"                   # v1.11 Hotfix
-            [ -n "$(echo "$@" | grep -w "policy")" ] && { Route="policy"; POLICY_MODE="Policy Mode"; } || Route="default"      # v1.09
 
             echo -e
 
@@ -1387,10 +1387,8 @@ Show_Main_Menu() {
                     fi
 
                     ;;
-                uninstall)
+                z|uninstall)
 
-                    echo -e $cBCYA"\tUninstalling Wireguard Kernel module and Userspace Tool for $HARDWARE_MODEL (v$BUILDNO)"$cBGRA
-                    opkg remove wireguard-kernel wireguard-tools
                     echo -e $cBCYA"\tDeleting Wireguard install directories and files"$cRESET
                     echo -en $cBRED
                     [ -f ${INSTALL_DIR}WireguardVPN.conf ] && rm ${INSTALL_DIR}WireguardVPN.conf
@@ -1399,11 +1397,15 @@ Show_Main_Menu() {
 
                     rm -rf /jffs/addons/wireguard
 
+                    # Only remove WireGuard Entware packages if user DELETES '/opt/etc/wireguard'
                     echo -e "\tPress$cBRED Y$cRESET to$cBRED delete ALL WireGuard DATA files (Peer *.config etc.) $cRESET('${CONFIG_DIR}') or press$cBGRE [Enter] to keep custom WireGuard DATA files."
                     read -r "ANS"
                     if [ "$ANS" == "Y" ];then
                        echo -e $cBCYA"\n\tDeleting $cRESET'${CONFIG_DIR}'"
                        [ -d "${CONFIG_DIR}" ] && rm -rf ${CONFIG_DIR}
+
+                       echo -e $cBCYA"\tUninstalling Wireguard Kernel module and Userspace Tool for $HARDWARE_MODEL (v$BUILDNO)"$cBGRA
+                       opkg remove wireguard-kernel wireguard-tools
                     fi
 
                     echo -e $cBCYA"\tDeleted Peer Auto-start @BOOT\n"$cRESET
@@ -1747,7 +1749,7 @@ EOF
                     ;;
                 restart*|stop*|start*)                              # start [client|server] Peer [policy]
                                                                     # start Peer                 [policy]
-                    local TYPE="?"
+                    local TYPE=
                     local PEER=
                     local POLICY=
 
@@ -1822,6 +1824,8 @@ TS=$(date +"%Y%m%d-%H%M%S")    # current date and time 'yyyymmdd-hhmmss'
 ACTION=$1
 PEER=$2
 TYPE=
+POLICY=
+
 [ -f ${CONFIG_DIR}$PEER.conf ] && TYPE=$(Server_or_Client "$PEER")
 
 # Legacy tidy-up! to adopt a new name for the configuration file
@@ -1854,17 +1858,17 @@ if [ "$1" != "install" ];then   # v2.01
         case "$1" in
 
             start|init)
-                Manage_Wireguard_Sessions "start" "$TYPE" "$PEER"             # Post mount should start ALL defined sessions @BOOT
+                Manage_Wireguard_Sessions "start" "$TYPE" "$PEER" "$POLICY"             # Post mount should start ALL defined sessions @BOOT
                 echo -e $cRESET
                 exit_message
             ;;
             stop)
-                Manage_Wireguard_Sessions "stop" "$TYPE" "$PEER"
+                Manage_Wireguard_Sessions "stop" "$TYPE" "$PEER" "$POLICY"
                 echo -e $cRESET
                 exit_message
             ;;
             restart)
-                Manage_Wireguard_Sessions "restart" "$TYPE" "$PEER"
+                Manage_Wireguard_Sessions "restart" "$TYPE" "$PEER" "$POLICY"
                 echo -e $cRESET
                 exit_message
             ;;
