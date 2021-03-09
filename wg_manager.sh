@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v2.01b6"
-#============================================================================================ © 2021 Martineau v2.01b6
+VERSION="v2.01b7"
+#============================================================================================ © 2021 Martineau v2.01b7
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -200,7 +200,7 @@ Check_Version_Update() {
         echo -e "\a\n\t"$UPDATE_SCRIPT_ALERT"\n"
         [ -n "$(echo "$UPDATE_SCRIPT_ALERT" | grep -o "Push to Github")" ] && return 2 || return 1 # v1.03
     else
-        echo -e $cBGRE"\n\tNo updates available - you have the latest version"              # v1.03
+        echo -e $cBGRE"\n\t$VERSION - No WireGuard Manager updates available - you have the latest version\n"              # v1.03
         return 0
     fi
 
@@ -1185,16 +1185,20 @@ Show_Main_Menu() {
                             MENU_T="$(printf '%b5 %b = %bStop%b    WireGuard Peer [Peer]\n' "${cBYEL}" "${cRESET}" "${cGRA}" "${cBGRA}")"
                         fi
                         MENU_R="$(printf '%b6 %b = %bRestart%b WireGuard Peer [Peer]\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
-                        MENU_Q="$(printf '%b7 %b = %bDisplay QR code for a Peer {Peer}%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
+                        MENU_Q="$(printf '%b7 %b = %bDisplay QR code for a Peer {device} e.g. iPhone%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
                         MENU_P="$(printf '%b8 %b = %bPeer management [ {Peer} [ add | del | {auto [y|n|p]}] ] ]%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
+						MENU_C="$(printf '%b9 %b = %bCreate Key-pair for Peer {Device} e.g. Nokia6310i (creates Nokia6310i.conf etc.)%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
 
                     fi
 
 
                     MENU__="$(printf '%b? %b = About Configuration\n' "${cBYEL}" "${cRESET}")"
                     echo -e ${cWGRE}"\n"$cRESET      # Separator line
-                    printf "%s\t\t\t\t\t\t%s\n"                 "$MENU_I" "$MENU_Q"
+
+					echo -e
+					printf "%s\t\t\t\t\t\t%s\n"                 "$MENU_I" "$MENU_Q"
                     printf "%s\t\t\t\t\t%s\n"                   "$MENU_Z" "$MENU_P"
+					printf "\t\t\t\t\t\t\t\t\t%s\n"                       "$MENU_C"
 
                     if [ -f ${INSTALL_DIR}WireguardVPN.conf ];then
                         printf "%s\t\t\t\t\t\t\t\t\t%s\n"           "$MENU_L"
@@ -1286,7 +1290,7 @@ Show_Main_Menu() {
 
                     local ACTION="$(echo "$menu1"| awk '{print $1}')"
 
-                    echo -e $cBWHT"\n\t\t WireGuard VPN Peer Status\n"$cRESET
+
 
                     local ARG=
                     if [ "$(echo "$menu1" | wc -w)" -ge 2 ];then
@@ -1295,6 +1299,7 @@ Show_Main_Menu() {
 
                     if [ -n "$(which wg)" ];then
 
+						echo -e $cBWHT"\n\t\t WireGuard VPN Peer Status\n"$cRESET
                         Show_Peer_Status
 
                         if [ "$ACTION" == "diag" ];then
@@ -1320,7 +1325,7 @@ Show_Main_Menu() {
                             echo -e $cRESET
                         fi
                     else
-                        echo -en $cRED"\a\n\t";Say "Wireguard VPN module 'wg' NOT installed (use 'install')"$cRESET
+                        echo -en $cRED"\a\n\t";Say "Wireguard VPN module 'wg' NOT installed\n"$cRESET
                         echo -e
                     fi
                     ;;
