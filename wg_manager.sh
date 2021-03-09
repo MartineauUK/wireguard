@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v2.01b3"
-#============================================================================================ © 2021 Martineau v2.01b3
+VERSION="v2.01b4"
+#============================================================================================ © 2021 Martineau v2.01b4
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v2.01b3"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 08-Mar-2021
+# Last Updated Date: 09-Mar-2021
 #
 # Description:
 #
@@ -42,10 +42,10 @@ CHECK_GITHUB="Y"                                   # Check versions on Github
 SILENT="s"                                         # Default is no progress messages for file downloads
 DEBUGMODE=
 
-Say(){
+Say() {
    echo -e $$ $@ | logger -st "($(basename $0))"
 }
-SayT(){
+SayT() {
    echo -e $$ $@ | logger -t "($(basename $0))"
 }
 # shellcheck disable=SC2034
@@ -205,7 +205,6 @@ Check_Version_Update() {
     fi
 
 }
-Download_Modules() {                                                    # v1.03
 _Get_File() {
 
     local WEBFILE=$1
@@ -217,15 +216,17 @@ _Get_File() {
 
     return $?
 }
+Download_Modules() {
+
 
     local ROUTER=$1
 
-    [ ! -d "${INSTALL_DIR}" ] && mkdir "${INSTALL_DIR}"
+    #[ ! -d "${INSTALL_DIR}" ] && mkdir -p "${INSTALL_DIR}"
 
     local WEBFILE_NAMES=$(curl -${SILENT}fL https://www.snbforums.com/threads/experimental-wireguard-for-hnd-platform-4-1-x-kernels.46164/ | grep "<a href=.*odkrys.*wireguard" | grep -oE "wireguard.*" | sed 's/\"//g' | tr '\n' ' ')
 
     # The file list MAY NOT ALWAYS be in the correct Router Model order for the following 'case' statement?
-    case $ROUTER in
+    case "$ROUTER" in
 
         RT-AC86U|GT-AC2900)     # RT-AC86U, GT-AC2900 - 4.1.27
             _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $1}')"
@@ -247,7 +248,7 @@ _Get_File() {
             #
             #
             _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $1}')"
-            RC=$?
+
             ROUTER_COMPATIBLE="N"
             ;;
     esac
@@ -256,15 +257,10 @@ _Get_File() {
     WEBFILE=$(echo "$WEBFILE_NAMES" | awk '{print $4}')
     echo -e $cBCYA"\n\tDownloading WireGuard User space Tools$cBWHT '$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO)"$cRESET
     _Get_File  "$WEBFILE" "NOMSG"
-    RC=$?
 
-debug="###################################################### 256 THIS"
-    Load_Module_UserspaceTool
-
-    return 0
 }
 Load_Module_UserspaceTool() {                                           # v1.03
-debug="#################################################################################### 258"
+
     if [ ! -d "${INSTALL_DIR}" ];then
         echo -e $cRED"\a\n\tNo modules found - '/${INSTALL_DIR} doesn't exist'\n"
         echo -e "\tPress$cBRED y$cRESET to$cBRED DOWNLOAD WireGuard Kernel and Userspace Tools modules ${cRESET} or press$cBGRE [Enter] to SKIP."
@@ -913,7 +909,7 @@ Install_WireGuard_Manager() {
     fi
 
     # Scripts
-    if [ -d "${CONFIG_DIR}" ];then
+    if [ -d "${INSTALL_DIR}" ];then
         Get_scripts "$2"
     fi
 
@@ -923,11 +919,11 @@ Install_WireGuard_Manager() {
     echo -e $cBCYA"\n\tDownloading Wireguard Kernel module for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
 
     ROUTER_COMPATIBLE="Y"
-debug="############################################################ 919 THIS"
-    #Download_Modules $HARDWARE_MODEL
-debug="############################################################ 921 THIS"
-    #Load_Module_UserspaceTool
-debug="############################################################ 923 THIS"
+
+    Download_Modules $HARDWARE_MODEL
+
+    Load_Module_UserspaceTool
+
     # Create the Sample/template parameter file '${INSTALL_DIR}WireguardVPN.conf'
     Create_Sample_Config
 
@@ -1001,17 +997,13 @@ EOF
         # Test the Status report
         echo -e $cBCYA"\n\tTest WireGuard Peer Status"
         ${INSTALL_DIR}$SCRIPT_NAME show               # v1.11
-        echo -e $cBCYA"\n\tTerminating ACTIVE WireGuard Peers...\n"$cRESET
-        ${INSTALL_DIR}$SCRIPT_NAME stop
+
+        #echo -e $cBCYA"\n\tTerminating ACTIVE WireGuard Peers...\n"$cRESET
+        #${INSTALL_DIR}$SCRIPT_NAME stop
     else
         echo -e $cBRED"\a\n\t***ERROR: WireGuard install FAILED!\n"$cRESET
         # rm -rF /jffs/addons/wireguard
     fi
-
-    echo -e $cBCYA"\n\tInstalling QR rendering module"$cBGRA
-    opkg install qrencode
-
-    Display_QRCode ${CONFIG_DIR}wg11.conf
 
     Edit_nat_start                                      # v1.07
 
@@ -1021,10 +1013,15 @@ EOF
 
     # Auto start ALL defined WireGuard Peers @BOOT
     # Use post-mount
+    echo -e $cBCYA"\n\tAdding Peer Auto-start @BOOT\n"$cRESET
     if [ -z "$(grep -i "WireGuard" /jffs/scripts/post-mount)" ];then
         echo -e "/jffs/addons/wireguard/wg_manager.sh init \"$@\" & # WireGuard Manager" >> /jffs/scripts/post-mount
     fi
 
+    echo -e $cBCYA"\n\tInstalling QR rendering module"$cBGRA
+    opkg install qrencode
+
+    Display_QRCode ${CONFIG_DIR}wg11.conf
     echo -e $cBGRE"\n\tWireGuard install COMPLETED.\n"$cRESET
 
 }
@@ -1240,7 +1237,7 @@ Show_Main_Menu() {
                 case "$menu1" in
                     0) ;;
                     1|i)
-                        [ -n "$(ls ${INSTALL_DIR}*.ipk 2>/dev/null)" ]  && menu1="install" || menu1="getmodules";;
+                        [ -z "$(ls ${INSTALL_DIR}*.ipk 2>/dev/null)" ]  && menu1="install" || menu1="getmodules";;
                     2|z) menu1="uninstall";;
                     3|3+|3*|show*) menu1=$(echo "$menu1" | sed 's/^3/show/');;
                     4*|start*) menu1=$(echo "$menu1" | awk '{$1="start"}1') ;;
@@ -1252,7 +1249,6 @@ Show_Main_Menu() {
                     "?") ;;
                     v|vx) ;;
                     peer*) ;;
-                    getmodules) ;;
                     loadmodules) ;;
                     dns*) ;;                            # v2.01
                     createsplit*|create*) ;;
@@ -1405,6 +1401,8 @@ Show_Main_Menu() {
                     Edit_DNSMasq "del"                      # v1.12
 
                     echo -e $cBGRE"\n\tWireGuard Uninstall complete for $HARDWARE_MODEL (v$BUILDNO)\n"$cRESET
+
+                    exit 0
                     ;;
                 createsplit*|create*)                                                            # {name} [{tag="desciption{"}}]     # v1.11 v1.03
                     # Create a Private/Public key-pair for your mobile phone etc.
@@ -1838,8 +1836,10 @@ case "$1" in
         Show_Peer_Status "show+"                        # Force verbose detail
     ;;
     install)
-        #Install_WireGuard_Manager
-        :                                               # Force menu install
+        # Install_WireGuard_Manager
+        # Show_Main_Menu "$@"
+        # exit 0
+        :
     ;;
     *)
         Show_Main_Menu "$@"
