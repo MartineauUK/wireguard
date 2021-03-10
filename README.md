@@ -31,7 +31,7 @@ Example successful install.....
 
 	    WireGuard ACTIVE Peer Status: Clients 0, Servers 0
 
-	    v2.01b8 - No WireGuard Manager updates available - you have the latest version
+	    v2.02 - No WireGuard Manager updates available - you have the latest version
 
     1  = Begin WireGuard Installation Process						
 
