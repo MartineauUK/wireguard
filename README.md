@@ -18,7 +18,7 @@ Example successful install.....
     +======================================================================+
     |  Welcome to the WireGuard Manager/Installer script (Asuswrt-Merlin)  |
     |                                                                      |
-    |                      Version v2.01b8 by Martineau                    |
+    |                      Version v2.02 by Martineau                      |
     |                                                                      |
     | Requirements: USB drive with Entware installed                       |
     |                                                                      |
