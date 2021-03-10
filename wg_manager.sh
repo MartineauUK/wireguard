@@ -350,45 +350,44 @@ Check_Module_Versions() {
 Manage_Wireguard_Sessions() {
 
     local ACTION=$1;shift
-	local WG_INTERFACE=$1;shift
-	local CATEGORY=
-	
-	# ALL Peers?
-	if [ -z "$WG_INTERFACE" ];then
-			local WG_INTERFACE=
+    local WG_INTERFACE=$1;shift
+    local CATEGORY=
 
-			# If no specific Peer specified, for Stop/Restart retrieve ACTIVE Peers otherwise for Start use Peer configuration
-			if [ "$ACTION" == "start" ];then                  # v1.09
-				WG_INTERFACE=$(awk '$2 == "Y" || $2 =="P" {print $1}' ${INSTALL_DIR}WireguardVPN.conf | tr '\n#' ' ' | sed 's/ $//g')
-			else
-				# Suppose there are Peers that are not under WireGuard control?
-				WG_INTERFACE=$(wg show interfaces)            # v1.09
-			fi
-			SayT "$VERSION Requesting WireGuard VPN Peer ALL-$ACTION ($WG_INTERFACE)"
+    # ALL Peers?
+    if [ -z "$WG_INTERFACE" ];then
+            local WG_INTERFACE=
+
+            # If no specific Peer specified, for Restart retrieve ACTIVE Peers otherwise for Stop/Start use Peer configuration
+            if [ "$ACTION" != "restart" ];then                  # v1.09
+                WG_INTERFACE=$(awk '$2 == "Y" || $2 =="P" {print $1}' ${INSTALL_DIR}WireguardVPN.conf | tr '\n#' ' ')
+            else
+                WG_INTERFACE=$(wg show interfaces)                # v1.09
+            fi
+            SayT "$VERSION Requesting WireGuard VPN Peer ALL-$ACTION ($WG_INTERFACE)"
             #echo -e $cBWHT"n\tRequesting WireGuard VPN Peer ALL-${ACTION}$CATEGORY ($WG_INTERFACE)"$cRESET
     else
         echo -en $cBCYA
-		# Allow category 
+        # Allow category
         case "$WG_INTERFACE" in
             clients)
-				WG_INTERFACE=$(grep -E "^wg1" ${INSTALL_DIR}WireguardVPN.conf | awk '$2 == "Y" || $2 =="P" {print $1}' | tr '\n#' ' ' | sed 's/ $//g')		# v2.02
-				local CATEGORY=" for Category 'Clients'"
-				SayT "$VERSION Requesting WireGuard VPN Peer ${ACTION}$CATEGORY ($WG_INTERFACE)"
-                #echo -e $cBWHT"Requesting WireGuard VPN Peer ${ACTION}$CATEGORY ($WG_INTERFACE)"$cRESET
-			;;
-			servers)
-				WG_INTERFACE=$(grep -E "^wg2" ${INSTALL_DIR}WireguardVPN.conf | awk '$2 == "Y" || $2 =="P" {print $1}' | tr '\n#' ' ' | sed 's/ $//g')		# v2.02
-				local CATEGORY=" for Category 'Servers'"
-				SayT "$VERSION Requesting WireGuard VPN Peer ${ACTION}$CATEGORY ($WG_INTERFACE)"
-				#echo -e $cBWHT"Requesting WireGuard VPN Peer ${$ACTION}$CATEGORY ($WG_INTERFACE)"$cRESET
+                WG_INTERFACE=$(grep -E "^wg1" ${INSTALL_DIR}WireguardVPN.conf | awk '$2 == "Y" || $2 =="P" {print $1}')     # v2.02
+                local CATEGORY=" for Category 'Clients'"
+                SayT "$VERSION Requesting WireGuard VPN Peer auto-$ACTION for Category '$CATEGORY' ($WG_INTERFACE)"
+                #echo -e $cBWHT"Requesting WireGuard VPN Peer auto-$ACTION for Category '$CATEGORY' ($WG_INTERFACE)"$cRESET
             ;;
-			*)
-				WG_INTERFACE=$WG_INTERFACE" "$@
-			;;	
-        esac			
+            servers)
+                WG_INTERFACE=$(grep -E "^wg2" ${INSTALL_DIR}WireguardVPN.conf | awk '$2 == "Y" || $2 =="P" {print $1}')     # v2.02
+                local CATEGORY=" for Category 'Servers'"
+                SayT "$VERSION Requesting WireGuard VPN Peer auto-$ACTION for Category '$CATEGORY' ($WG_INTERFACE)"
+                #echo -e $cBWHT"Requesting WireGuard VPN Peer auto-$ACTION for Category '$CATEGORY' ($WG_INTERFACE)"$cRESET
+            ;;
+            *)
+                WG_INTERFACE=$WG_INTERFACE" "$@
+            ;;
+        esac
     fi
-	
-	echo -e $cBWHT"\n\tRequesting WireGuard VPN Peer ${ACTION}$CATEGORY ($WG_INTERFACE)"$cRESET
+
+    echo -e $cBWHT"n\tRequesting WireGuard VPN Peer ALL-${ACTION}$CATEGORY ($WG_INTERFACE)"$cRESET
 
     case "$ACTION" in
         start|restart)                                  # v1.09
@@ -437,59 +436,61 @@ Manage_Wireguard_Sessions() {
                             echo -e $cBRED"\a\n\t***ERROR: WireGuard ${TXT}Peer (${cBWHT}$WG_INTERFACE${cBRED}) config NOT found?....skipping $ACTION request\n"$cRESET   2>&1  # v1.09
                         fi
                     fi
-					# Reset the Policy flag
-					Route=									# v2.02
+                    # Reset the Policy flag
+                    Route=                                  # v2.02
                 done
             WG_show
             ;;
         stop)
 
-			# Default is to terminate ALL ACTIVE Peers,unless a list of Peers belonging to a category has been provided
+            # Default is to terminate ALL ACTIVE Peers,unless a list of Peers belonging to a category has been provided
             if [ -z "$WG_INTERFACE" ];then
-                WG_INTERFACE=$(wg show interfaces)		# ACTIVE Peers
+                WG_INTERFACE=$(wg show interfaces)      # ACTIVE Peers
                 if [ -n "$WG_INTERFACE" ];then
                     WG_INTERFACE=
                     SayT "$VERSION Requesting termination of ACTIVE WireGuard VPN Peers ($WG_INTERFACE)"
-                    #echo -e $cBWHT"\tRequesting termination of ACTIVE WireGuard VPN Peers ($WG_INTERFACE)\n"$cRESET 2>&1
+                    echo -e $cBWHT"\tRequesting termination of ACTIVE WireGuard VPN Peers ($WG_INTERFACE)\n"$cRESET 2>&1
                 else
                     echo -e $cRED"\tNo WireGuard VPN Peers ACTIVE for Termination request\n" 2>&1
                     SayT "No WireGuard VPN Peers ACTIVE for Termination request"
                     echo -e 2>&1
                     return 0
                 fi
+            else
+                [ -n "$CATEGORY" ] && echo -e $cBWHT"Requesting WireGuard VPN Peer ALL-$ACTION for Category '$CATEGORY' ($WG_INTERFACE)"$cRESET
             fi
 
             echo -e
 
             for WG_INTERFACE in $WG_INTERFACE
                 do
-					if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
-						[ -z "$(grep -iE "^Endpoint" ${CONFIG_DIR}${WG_INTERFACE}.conf)" ] && Mode="server" || Mode="client"
+                    if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
+                        [ -z "$(grep -iE "^Endpoint" ${CONFIG_DIR}${WG_INTERFACE}.conf)" ] && Mode="server" || Mode="client"
 
-						DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' ${INSTALL_DIR}WireguardVPN.conf | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
-						echo -en $cBCYA
-						SayT "$VERSION Requesting termination of WireGuard VPN '$Mode' Peer ('$WG_INTERFACE')"
+                        DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' ${INSTALL_DIR}WireguardVPN.conf | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
+                        echo -en $cBCYA
+                        SayT "$VERSION Requesting termination of WireGuard VPN '$Mode' Peer ('$WG_INTERFACE')"
 
-						if [ -z "$(ifconfig | grep -E "^$WG_INTERFACE")" ];then
-							echo -e $cRED"\a\t";Say "WireGuard VPN '$Mode' Peer ('$WG_INTERFACE') NOT ACTIVE";echo -e
-						else
-							if [ "$Mode" == "server" ]; then
+                        if [ -z "$(ifconfig | grep -E "^$WG_INTERFACE")" ];then
+                            echo -e $cRED"\a\t";Say "WireGuard VPN '$Mode' Peer ('$WG_INTERFACE') NOT ACTIVE";echo -e
+                        else
+                            if [ "$Mode" == "server" ]; then
 
-									sh ${INSTALL_DIR}wg_server $WG_INTERFACE "disable"
+                                    sh ${INSTALL_DIR}wg_server $WG_INTERFACE "disable"
 
-									elif [ "$Mode" == "client" ] && [ "$Route" != "policy" ] ; then
+                                    elif [ "$Mode" == "client" ] && [ "$Route" != "policy" ] ; then
 
-										#wg show $WG_INTERFACE >/dev/null 2>&1 && ${CONFIG_DIR}wg-down $WG_INTERFACE || Say "WireGuard $Mode service ('$WG_INTERFACE') NOT running."
-										/opt/bin/wg show $WG_INTERFACE >/dev/null 2>&1 && sh ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" || Say "WireGuard $Mode service ('$WG_INTERFACE') NOT running."
-									else
-										/opt/bin/wg show $WG_INTERFACE >/dev/null 2>&1 && sh ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" "policy" || Say "WireGuard $Mode (Policy) service ('$WG_INTERFACE') NOT running."
-							fi
+                                        #wg show $WG_INTERFACE >/dev/null 2>&1 && ${CONFIG_DIR}wg-down $WG_INTERFACE || Say "WireGuard $Mode service ('$WG_INTERFACE') NOT running."
+                                        /opt/bin/wg show $WG_INTERFACE >/dev/null 2>&1 && sh ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" || Say "WireGuard $Mode service ('$WG_INTERFACE') NOT running."
+                                    else
+                                        /opt/bin/wg show $WG_INTERFACE >/dev/null 2>&1 && sh ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" "policy" || Say "WireGuard $Mode (Policy) service ('$WG_INTERFACE') NOT running."
+                            fi
 
-						fi
-					else
-						SayT "***ERROR: WireGuard VPN ${TXT}Peer ('$WG_INTERFACE') config NOT found?....skipping $ACTION request"
-						echo -e $cBRED"\a\n\t***ERROR: WireGuard ${TXT}Peer (${cBWHT}$WG_INTERFACE${cBRED}) config NOT found?....skipping $ACTION request\n"$cRESET   2>&1  # v1.09
-					fi
+                        fi
+                    else
+                        SayT "***ERROR: WireGuard VPN ${TXT}Peer ('$WG_INTERFACE') config NOT found?....skipping $ACTION request"
+                        echo -e $cBRED"\a\n\t***ERROR: WireGuard ${TXT}Peer (${cBWHT}$WG_INTERFACE${cBRED}) config NOT found?....skipping $ACTION request\n"$cRESET   2>&1  # v1.09
+                    fi
                 done
 
             WG_show
@@ -1584,8 +1585,8 @@ EOF
 
                     case "$ACTION" in
                         "?")
-						
-						    local CHANGELOG="$cRESET(${cBCYA}Change Log: ${cBYEL}https://github.com/MartineauUK/wireguard/commits/main/wg_manager.sh$cRESET)"	#v2.01
+
+                            local CHANGELOG="$cRESET(${cBCYA}Change Log: ${cBYEL}https://github.com/MartineauUK/wireguard/commits/main/wg_manager.sh$cRESET)"   #v2.01
                             [ -n "$(echo $VERSION | grep "b")" ] && local CHANGELOG="$cRESET(${cBCYA}Change Log: ${cBYEL}https://github.com/MartineauUK/wireguard/commits/dev/wg_manager.sh$cRESET)" #v2.01
                             echo -e $cBMAG"\n\t${VERSION}$cBWHT WireGuard Session Manager" ${CHANGELOG}$cRESET  # v2.01
                             echo -e $cBWHT"\n\tChecking GitHub for software updates...."$cRESET
@@ -1676,11 +1677,11 @@ EOF
                     case $ARG in
                         list|"")
                             echo -e $cBWHT"\n\tList of WireGuard Peers\n"$cBCYA
-							if [ -n "$(which column)" ];then 
-								awk '($2=="Y" || $2=="N" || $2=="P") {print $0}' $FN | column -t		# v2.02
-							else
-								awk '($2=="Y" || $2=="N" || $2=="P") {print $0}' $FN
-							fi
+                            if [ -n "$(which column)" ];then
+                                awk '($2=="Y" || $2=="N" || $2=="P") {print $0}' $FN | column -t        # v2.02
+                            else
+                                awk '($2=="Y" || $2=="N" || $2=="P") {print $0}' $FN
+                            fi
                             echo -e "\n"$cRESET
                         ;;
                         *)
@@ -1740,8 +1741,8 @@ EOF
                     esac
 
                     ;;
-                restart*|stop*|start*)                              # start [ Peer [policy] | [client|server]] ] 
-				
+                restart*|stop*|start*)                              # start [ Peer [policy] | [client|server]] ]
+
                     Manage_Wireguard_Sessions $menu1
 
                 ;;
