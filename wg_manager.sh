@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v2.02b"
-#============================================================================================ © 2021 Martineau v2.02b
+VERSION="v2.03b"
+#============================================================================================ © 2021 Martineau v2.03b
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,23 +24,26 @@ VERSION="v2.02b"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 10-Mar-2021
+# Last Updated Date: 11-Mar-2021
 #
 # Description:
 #
 # Acknowledgement:
 #
-# Contributors: odkrys,Torson,ZebMcKayhan,jobhax
+# Contributors: odkrys,Torson,ZebMcKayhan,jobhax,elorimer
 
 GIT_REPO="wireguard"
 GITHUB_MARTINEAU="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/main"
 GITHUB_MARTINEAU_DEV="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/dev"
 GITHUB_DIR=$GITHUB_MARTINEAU                       # default for script
-CONFIG_DIR="/opt/etc/wireguard/"
+CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v2.03 @elorimer
 INSTALL_DIR="/jffs/addons/wireguard/"
 CHECK_GITHUB="Y"                                   # Check versions on Github
 SILENT="s"                                         # Default is no progress messages for file downloads
 DEBUGMODE=
+READLINE="ReadLine"                                # Emulate 'readline' for 'read'  # v2.03
+CMDLINE=                                           # Command line INPUT             # v2.03
+CMD1=;CMD2=;CMD3=;CMD4=;CMD5=                      # Command recall push stack      # v2.03
 
 Say() {
    echo -e $$ $@ | logger -st "($(basename $0))"
@@ -148,68 +151,6 @@ download_file() {
             exit 1
         fi
 }
-Check_Version_Update() {
-
-    GITHUB_DIR=$GITHUB_MARTINEAU
-
-    local localmd5="$(md5sum "$0" | awk '{print $1}')"
-
-    if [ "$1" != "nochk" ];then
-        local REMOTE_VERSION_NUMDOT="$(curl -${SILENT}fLN --retry 3 --connect-timeout 3 "${GITHUB_DIR}/wg_manager.sh" | grep -E "^VERSION\=" | tr -d '"' | sed 's/VER.*\=//')" || REMOTE_VERSION_NUMDOT="?.??"   # v3.23
-        if [ -z "$REMOTE_VERSION_NUMDOT" ] || [ "$REMOTE_VERSION_NUMDOT" == "?.??" ];then
-            echo -e ${cRESET}$cRED_"\a\t***ERROR Unable to verify Github version...check DNS/Internet access!\n\n"$cRESET
-            local REMOTE_VERSION_NUMDOT=
-        else
-            [ "$1" != "nochk" ] && remotemd5="$(curl -${SILENT}fL  --retry 3 --connect-timeout 3 "${GITHUB_DIR}/wg_manager.sh" | md5sum | awk '{print $1}')"
-            local REMOTE_VERSION_NUM=$(echo $REMOTE_VERSION_NUMDOT | sed 's/[^0-9]*//g')
-        fi
-    fi
-
-    local LOCAL_VERSION_NUMDOT=$VERSION                                     # v1.03
-    local LOCAL_VERSION_NUM=$(echo $VERSION | sed 's/[^0-9]*//g')
-
-    local CHANGELOG="$cRESET(${cBCYA}Change Log: ${cBYEL}https://github.com/MartineauUK/${GIT_REPO}/commits/main/wg_manager.sh$cRESET)"
-    [ -n "$(echo $VERSION | grep "b")" ] && local CHANGELOG="$cRESET(${cBCYA}Change Log: ${cBYEL}https://github.com/MartineauUK/${GIT_REPO}/commits/dev/wg_manager.sh$cRESET)"
-
-    # As the developer, I need to differentiate between the GitHub md5sum hasn't changed, which means I've tweaked it locally
-    if [ -n "$REMOTE_VERSION_NUMDOT" ];then
-        [ ! -f ${INSTALL_DIR}wg_manager.sh.md5 ] && echo $remotemd5 > ${INSTALL_DIR}wg_manager.sh.md5
-    fi
-
-    [ -z "$REMOTE_VERSION_NUM" ] && REMOTE_VERSION_NUM=0
-
-    # Local Version higher than GitHub version or MD5 Mismatch due to local development?
-    if [ ${REMOTE_VERSION_NUM:0:3} -lt ${LOCAL_VERSION_NUM:0:3} ] || [ "$(echo "$VERSION" | grep -om1 "b")" == "b" ] || [ $REMOTE_VERSION_NUM -lt $LOCAL_VERSION_NUM ] || { [ "$(awk '{print $1}' ${INSTALL_DIR}wg_manager.sh.md5)" == "$remotemd5" ]; } && [ "$localmd5" != "$remotemd5" ];then  # v1.03
-        local VERSION=$LOCAL_VERSION_NUMDOT                             # v1.03
-        if [ $REMOTE_VERSION_NUM -lt $LOCAL_VERSION_NUM ];then
-            ALLOWUPGRADE="N"
-            UPDATE_SCRIPT_ALERT="$(printf '%b[✔] Push to Github PENDING for %b(Major) %b%s%b UPDATE %b%s%b >>>> %b%s\n' "${cGRE}" "${cBGRE}" "$cRESET" "$(basename $0)" "$cBRED" "$cBMAG" "$VERSION" "$cRESET" "$cBGRE" "$REMOTE_VERSION_NUMDOT")"
-        else
-            ALLOWUPGRADE="N"
-            UPDATE_SCRIPT_ALERT="$(printf '%b[✔] Push to Github PENDING for %b(Minor Hotfix) %b%s update >>>> %b%s %b%s\n' "${cGRE}" "$cBRED" "$cBGRE" "$cRESET" "$(basename $0)" "$cRESET" "$cBMAG" "$VERSION")"
-        fi
-    else
-        if [ "$localmd5" != "$remotemd5" ]; then
-            if [ $REMOTE_VERSION_NUM -ge $LOCAL_VERSION_NUM ];then
-                if [ $REMOTE_VERSION_NUM -gt $LOCAL_VERSION_NUM ];then
-                    local UPDATE_SCRIPT_ALERT="$(printf '%bu%b  = %bUpdate (Major) %b%s %b%s -> %b %s\n' "${cBYEL}" "${cRESET}" "$cBGRE" "$cRESET" "$(basename $0)" "$cBMAG" "$VERSION" "$REMOTE_VERSION_NUMDOT" "$CHANGELOG")"
-                else
-                    local UPDATE_SCRIPT_ALERT="$(printf '%bu%b  = %bUpdate (Minor Hotfix) %b%s %b%s -> %b %s\n' "${cBYEL}" "${cRESET}" "$cBGRE" "$cRESET" "$(basename $0)" "$cBMAG" "$VERSION" "$REMOTE_VERSION_NUMDOT" "$CHANGELOG")"
-                fi
-            fi
-        fi
-    fi
-
-
-    if [ -n "$UPDATE_SCRIPT_ALERT" ];then                                                       # v1.03
-        echo -e "\a\n\t"$UPDATE_SCRIPT_ALERT"\n"
-        [ -n "$(echo "$UPDATE_SCRIPT_ALERT" | grep -o "Push to Github")" ] && return 2 || return 1 # v1.03
-    else
-        echo -e $cBGRE"\n\t$VERSION - No WireGuard Manager updates available - you have the latest version\n"              # v1.03
-        return 0
-    fi
-
-}
 _Get_File() {
 
     local WEBFILE=$1
@@ -282,7 +223,6 @@ Load_Module_UserspaceTool() {                                           # v1.03
         do
             opkg install $MODULE
             if [ $? -eq 0 ];then
-                cp $MODULE  ${INSTALL_DIR}                   # v1.03
                 MODULE_NAME=$(echo "$(basename $MODULE)" | sed 's/_.*$//')
                 md5sum $MODULE > ${INSTALL_DIR}$MODULE_NAME".md5"
                 sed -i 's~/jffs/addons/wireguard/~~' ${INSTALL_DIR}$MODULE_NAME".md5"
@@ -304,17 +244,21 @@ Load_Module_UserspaceTool() {                                           # v1.03
 
 }
 Show_MD5() {
-    echo -e $cBCYA"\tMD5="$(awk '{print $0}' ${INSTALL_DIR}wireguard-kernel.md5)
-    echo -e $cBCYA"\tMD5="$(awk '{print $0}' ${INSTALL_DIR}wireguard-tools.md5)
+
+    local TYPE=$1
+
+    if [ "$TYPE" == "script" ];then
+        echo -e $cBCYA"\tMD5="$(awk '{print $0}' ${INSTALL_DIR}wg_manager.md5)
+    else
+        echo -e $cBCYA"\tMD5="$(awk '{print $0}' ${INSTALL_DIR}wireguard-kernel.md5)
+        echo -e $cBCYA"\tMD5="$(awk '{print $0}' ${INSTALL_DIR}wireguard-tools.md5)
+    fi
 }
 Check_Module_Versions() {
 
-    local FILES=$(curl -${SILENT}fL https://www.snbforums.com/threads/experimental-wireguard-for-hnd-platform-4-1-x-kernels.46164/ | grep "<a href=.*odkrys.*wireguard" | sed 's/"//g; s/\n/ /g' | grep -oE "wireguard.*")
+    local ACTION=$1
 
     local UPDATES="N"
-
-    # Check if Kernel and User Tools Update available
-    echo -e $cBWHT"\tChecking for WireGuard Kernel and Userspace Tool updates..."
 
     echo -e $cBGRA"\t"$(dmesg | grep -a "WireGuard")
     echo -e $cBGRA"\t"$(dmesg | grep -a "wireguard: Copyright")"\n"$cRESET
@@ -331,20 +275,28 @@ Check_Module_Versions() {
     fi
 
     Show_MD5
-    [ -z "$(echo "$FILES" | grep -F "$WGKERNEL")" ] && { echo -e $cBYEL"\t\tKernel UPDATE available" $FILE; local UPDATES="Y"; }
-    [ -z "$(echo "$FILES" | grep -F "$WGTOOLS")" ] && { echo -e $cBYEL"\t\tUserspace Tool UPDATE available" $FILE; local UPDATES="Y"; }
 
-    if [ "$UPDATES" == "Y" ];then
-        echo -e $cRESET"\n\tPress$cBRED y$cRESET to$cBRED Update WireGuard Kernel and Userspace Tool${cRESET} or press$cBGRE [Enter] to SKIP."
-        read -r "ANS"
-        if [ "$ANS" == "y" ];then
-            Download_Modules $HARDWARE_MODEL
-            Load_Module_UserspaceTool
+    if [ "$ACTION" != "report" ];then
+
+        # Check if Kernel and User Tools Update available
+        echo -e $cBWHT"\tChecking for WireGuard Kernel and Userspace Tool updates..."
+        local FILES=$(curl -${SILENT}fL https://www.snbforums.com/threads/experimental-wireguard-for-hnd-platform-4-1-x-kernels.46164/ | grep "<a href=.*odkrys.*wireguard" | sed 's/"//g; s/\n/ /g' | grep -oE "wireguard.*")
+
+        [ -z "$(echo "$FILES" | grep -F "$WGKERNEL")" ] && { echo -e $cBYEL"\t\tKernel UPDATE available" $FILE; local UPDATES="Y"; }
+        [ -z "$(echo "$FILES" | grep -F "$WGTOOLS")" ] && { echo -e $cBYEL"\t\tUserspace Tool UPDATE available" $FILE; local UPDATES="Y"; }
+
+        if [ "$UPDATES" == "Y" ];then
+            echo -e $cRESET"\n\tPress$cBRED y$cRESET to$cBRED Update WireGuard Kernel and Userspace Tool${cRESET} or press$cBGRE [Enter] to SKIP."
+            read -r "ANS"
+            if [ "$ANS" == "y" ];then
+                Download_Modules $HARDWARE_MODEL
+                Load_Module_UserspaceTool
+            else
+                echo -e $cBWHT"\n\tUpdate skipped\n"$cRESET
+            fi
         else
-            echo -e $cBWHT"\n\tUpdate skipped\n"$cRESET
+            echo -e $cBGRE"\n\tWireGuard Kernel and Userspace Tool up to date.\n"$cRESET
         fi
-    else
-        echo -e $cBGRE"\n\tWireGuard Kernel and Userspace Tool up to date.\n"$cRESET
     fi
 }
 Manage_Wireguard_Sessions() {
@@ -357,29 +309,30 @@ Manage_Wireguard_Sessions() {
     if [ -z "$WG_INTERFACE" ];then
             local WG_INTERFACE=
 
-            # If no specific Peer specified, for Restart retrieve ACTIVE Peers otherwise for Stop/Start use Peer configuration
-            if [ "$ACTION" != "restart" ];then                  # v1.09
+            # If no specific Peer specified, for Stop/Restart retrieve ACTIVE Peers otherwise for Start use Peer configuration
+            if [ "$ACTION" == "start" ];then                  # v2.02 v1.09
                 WG_INTERFACE=$(awk '$2 == "Y" || $2 =="P" {print $1}' ${INSTALL_DIR}WireguardVPN.conf | tr '\n#' ' ')
             else
+                # Whot if there are Peers we don't control?
                 WG_INTERFACE=$(wg show interfaces)                # v1.09
             fi
-            SayT "$VERSION Requesting WireGuard VPN Peer ALL-$ACTION ($WG_INTERFACE)"
+            SayT "$VERSION Requesting WireGuard VPN Peer $ACTION ($WG_INTERFACE)"
             #echo -e $cBWHT"n\tRequesting WireGuard VPN Peer ALL-${ACTION}$CATEGORY ($WG_INTERFACE)"$cRESET
     else
         echo -en $cBCYA
         # Allow category
         case "$WG_INTERFACE" in
             clients)
-                WG_INTERFACE=$(grep -E "^wg1" ${INSTALL_DIR}WireguardVPN.conf | awk '$2 == "Y" || $2 =="P" {print $1}')     # v2.02
+                WG_INTERFACE=$(grep -E "^wg1" ${INSTALL_DIR}WireguardVPN.conf | awk '$2 == "Y" || $2 =="P" {print $1}' | tr '\n' ' ' | sed 's/ $//')     # v2.02
                 local CATEGORY=" for Category 'Clients'"
-                SayT "$VERSION Requesting WireGuard VPN Peer auto-$ACTION for Category '$CATEGORY' ($WG_INTERFACE)"
-                #echo -e $cBWHT"Requesting WireGuard VPN Peer auto-$ACTION for Category '$CATEGORY' ($WG_INTERFACE)"$cRESET
+                SayT "$VERSION Requesting WireGuard VPN Peer ${ACTION}$CATEGORY ($WG_INTERFACE)"
+                #echo -e $cBWHT"Requesting WireGuard VPN Peer ${ACTION}$CATEGORY ($WG_INTERFACE)"$cRESET
             ;;
             servers)
-                WG_INTERFACE=$(grep -E "^wg2" ${INSTALL_DIR}WireguardVPN.conf | awk '$2 == "Y" || $2 =="P" {print $1}')     # v2.02
+                WG_INTERFACE=$(grep -E "^wg2" ${INSTALL_DIR}WireguardVPN.conf | awk '$2 == "Y" || $2 =="P" {print $1}' | tr '\n' ' ' | sed 's/ $//')     # v2.02
                 local CATEGORY=" for Category 'Servers'"
-                SayT "$VERSION Requesting WireGuard VPN Peer auto-$ACTION for Category '$CATEGORY' ($WG_INTERFACE)"
-                #echo -e $cBWHT"Requesting WireGuard VPN Peer auto-$ACTION for Category '$CATEGORY' ($WG_INTERFACE)"$cRESET
+                SayT "$VERSION Requesting WireGuard VPN Peer ${ACTION}$CATEGORY ($WG_INTERFACE)"
+                #echo -e $cBWHT"Requesting WireGuard VPN Peer ${ACTION}$CATEGORY ($WG_INTERFACE)"$cRESET
             ;;
             *)
                 WG_INTERFACE=$WG_INTERFACE" "$@
@@ -387,7 +340,8 @@ Manage_Wireguard_Sessions() {
         esac
     fi
 
-    echo -e $cBWHT"n\tRequesting WireGuard VPN Peer ALL-${ACTION}$CATEGORY ($WG_INTERFACE)"$cRESET
+    WG_INTERFACE=$(echo "$WG_INTERFACE" | sed 's/ $//')
+    echo -e $cBWHT"\n\tRequesting WireGuard VPN Peer ${ACTION}$CATEGORY (${cBMAG}$WG_INTERFACE"$cRESET")"
 
     case "$ACTION" in
         start|restart)                                  # v1.09
@@ -398,8 +352,19 @@ Manage_Wireguard_Sessions() {
 
             echo -e
 
+            LOOKAHEAD=$WG_INTERFACE
+
             for WG_INTERFACE in $WG_INTERFACE
                 do
+
+                    [ "$WG_INTERFACE" == "nopolicy" ] && continue                           # v2.02
+
+                    LOOKAHEAD=$(echo "$LOOKAHEAD" | awk '{$1=""}1')
+                    if [ "$(echo "$LOOKAHEAD" | awk '{print $1}')" == "nopolicy" ];then     # v2.02
+                        Route="default"
+                        POLICY_MODE="Policy override ENFORCED"
+                    fi
+
                     if [ -z "$Route" ];then
                         [ "$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' ${INSTALL_DIR}WireguardVPN.conf)" == "P" ] && Route="policy" || Route="default"
                     fi
@@ -451,13 +416,11 @@ Manage_Wireguard_Sessions() {
                     SayT "$VERSION Requesting termination of ACTIVE WireGuard VPN Peers ($WG_INTERFACE)"
                     echo -e $cBWHT"\tRequesting termination of ACTIVE WireGuard VPN Peers ($WG_INTERFACE)\n"$cRESET 2>&1
                 else
-                    echo -e $cRED"\tNo WireGuard VPN Peers ACTIVE for Termination request\n" 2>&1
+                    echo -e $cRED"\n\tNo WireGuard VPN Peers ACTIVE for Termination request\n" 2>&1
                     SayT "No WireGuard VPN Peers ACTIVE for Termination request"
                     echo -e 2>&1
                     return 0
                 fi
-            else
-                [ -n "$CATEGORY" ] && echo -e $cBWHT"Requesting WireGuard VPN Peer ALL-$ACTION for Category '$CATEGORY' ($WG_INTERFACE)"$cRESET
             fi
 
             echo -e
@@ -550,7 +513,6 @@ Manage_alias() {
     esac
 }
 Create_Sample_Config() {
-
     if [ -f ${INSTALL_DIR}WireguardVPN.conf ];then
         echo -e $cBYEL"\a\n\tWarning: WireGuard configuration file '${INSTALL_DIR}WireguardVPN.conf' already exists!...renamed to 'WireguardVPN.conf$TS'"
         mv ${INSTALL_DIR}WireguardVPN.conf ${INSTALL_DIR}WireguardVPN.conf.$TS
@@ -598,7 +560,6 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=      10.50.1.11/32       # A Cell p
 EOF
     return 0
 }
-
 _quote() {
   echo "$1" | sed 's/[]\/()$*.^|[]/\\&/g'
 }
@@ -628,29 +589,54 @@ Edit_nat_start() {
         [ ! -f /jffs/scripts/nat-start ] && { echo -e "#!/bin/sh\n\n"    > /jffs/scripts/nat-start; chmod +x /jffs/scripts/nat-start; }
         if [ -z "$(grep "WireGuard" /jffs/scripts/nat-start)" ];then
             echo -e "/jffs/addons/wireguard/wg_firewall            # WireGuard" >> /jffs/scripts/nat-start
-            cat >> /jffs/addons/wireguard/wg_firewall << EOF
+            cat > /jffs/addons/wireguard/wg_firewall << EOF                     # v2.04
 #!/bin/sh
-
+VERSION="$TS"
 # Reinstate WireGuard firewall rules by restarting WireGuard as nat-start has executed
 #
+Get_WAN_IF_Name() {
+
+    local IF_NAME=\$(nvram get wan0_ifname)              # DHCP/Static ?
+
+    # Usually this is probably valid for both eth0/ppp0e ?
+    if [ "\$(nvram get wan0_gw_ifname)" != "\$IF_NAME" ];then
+        local IF_NAME=\$(nvram get wan0_gw_ifname)
+    fi
+
+    if [ ! -z "$(nvram get wan0_pppoe_ifname)" ];then
+        local IF_NAME="\$(nvram get wan0_pppoe_ifname)"      # PPPoE
+    fi
+
+    echo \$IF_NAME
+}
+
+logger -st "(\$(basename "\$0"))" \$\$ "Checking if WireGuard VPN Peer KILL-Switch is required....."
+if [ -n "\$(grep -E "^KILLSWITCH" /jffs/addons/wireguard/WireguardVPN.conf)" ];then
+    iptables -D FORWARD -i br0 -o \$(nvram get wan0_ifname) -j REJECT -m comment --comment "WireGuard KILL-Switch" 2>/dev/null
+    iptables -I FORWARD -i br0 -o \$(nvram get wan0_ifname) -j REJECT -m comment --comment "WireGuard KILL-Switch" 2>/dev/null
+    logger -st "(\$(basename "\$0"))" \$\$ "WireGuard VPN Peer KILL-Switch ENABLED"
+fi
+
 if [ -n "\$(wg show interfaces)" ];then
     logger -st "(\$(basename "\$0"))" \$\$ "Restarting WireGuard to reinstate RPDB/firewall rules"
-    /jffs/addons/wireguard/$SCRIPT_NAME restart
+    /jffs/addons/wireguard/wg_manager.sh stop
+    /jffs/addons/wireguard/wg_manager.sh start
+
 fi
 EOF
 
             chmod +x /jffs/addons/wireguard/wg_firewall
         fi
-        echo -e $cBCYA"\tnat-start updated to protect WireGuard firewall rules"$cRESET
+        echo -e $cBCYA"\n\tnat-start updated to protect WireGuard firewall rules"$cRESET
         SayT "nat-start updated to protect WireGuard firewall rules"
     else
         sed -i '/WireGuard/d' /jffs/scripts/nat-start
-        echo -e $cBCYA"\tnat-start updated - no longer protecting WireGuard firewall rules"$cRESET
+        echo -e $cBCYA"\n\tnat-start updated - no longer protecting WireGuard firewall rules"$cRESET
         SayT "nat-start updated - no longer protecting WireGuard firewall rules"
     fi
 
 }
-Server_or_Client() {                                                                    # v1.09
+Server_or_Client() {
 
     local WG_INTERFACE=$1
     local PEER_TYPE=
@@ -689,21 +675,45 @@ Edit_DNSMasq() {
 
     if [ -z "$1"  ];then                           # v2.01
         # Allow dnmsasq to listen on Wireguard interfaces for DNS
+        [ ! -f /jffs/configs/dnsmasq.conf.add ] && true > /jffs/configs/dnsmasq.conf.add # v2.03
         if [ -z "$(grep -E "^interface=wg\*" /jffs/configs/dnsmasq.conf.add)" ];then
             echo -e $cBGRE"\tAdded 'wg*' interfaces to DNSMasq"$cRESET 2>&1
             echo -e "interface=wg*     # WireGuard" >> /jffs/configs/dnsmasq.conf.add
             service restart_dnsmasq 2>/dev/null
         fi
     else
-        [ -n "$(grep "WireGuard" /jffs/configs/dnsmasq.conf.add)" ] && sed -i '/WireGuard/d' /jffs/configs/dnsmasq.conf.add     # v1.12
-        service restart_dnsmasq 2>/dev/null
-
+        if [ -f /jffs/configs/dnsmasq.conf.add ];then
+            if [ -n "$(grep "WireGuard" /jffs/configs/dnsmasq.conf.add)" ];then
+                sed -i '/WireGuard/d' /jffs/configs/dnsmasq.conf.add     # v1.12
+                service restart_dnsmasq 2>/dev/null
+            fi
+        fi
     fi
 
     sleep 1
 }
-Get_scripts() {                                                         # v1.12
+Manage_KILL_Switch() {
 
+    local ACTION=$1
+
+    local SILENT="N"
+
+    if [ -n "$ACTION" ];then
+        if [ "$ACTION" != "off" ];then
+                iptables -D FORWARD -i br0 -o $(nvram get wan0_ifname) -j REJECT -m comment --comment "WireGuard KILL-Switch" 2>/dev/null
+                iptables -I FORWARD -i br0 -o $(nvram get wan0_ifname) -j REJECT -m comment --comment "WireGuard KILL-Switch" 2>/dev/null
+                [ "$SILENT" == "N" ] && echo -e $cBGRE"\n\tWireGuard WAN KILL Switch ${cBRED}${aREVERSE}ENABLED"$cRESET 2>&1
+        else
+                iptables -D FORWARD -i br0 -o $(nvram get wan0_ifname) -j REJECT -m comment --comment "WireGuard KILL-Switch" 2>/dev/null
+                [ "$SILENT" == "N" ] && echo -e $cBGRE"\n\tWireGuard WAN KILL Switch ${cBRED}${aREVERSE}DISABLED"$cRESET 2>&1
+        fi
+    fi
+
+    [ -n "$(iptables -L FORWARD | grep "WireGuard KILL-Switch")" ] && STATUS="Y" || STATUS="N"
+
+    echo "$STATUS"      # Y/N
+}
+Get_scripts() {
     local BRANCH="$1"
 
     echo -e $cBCYA"\tDownloading scripts"$cRESET 2>&1
@@ -716,6 +726,9 @@ Get_scripts() {                                                         # v1.12
     chmod +x ${INSTALL_DIR}wg_client
     chmod +x ${INSTALL_DIR}wg_server
 
+    md5sum ${INSTALL_DIR}wg_manager.sh > ${INSTALL_DIR}"wg_manager.md5"
+    md5sum ${INSTALL_DIR}wg_client     > ${INSTALL_DIR}"wg_client.md5"
+    md5sum ${INSTALL_DIR}wg_server     > ${INSTALL_DIR}"wg_server.md5"
 }
 Read_INPUT() {
 
@@ -857,6 +870,7 @@ Peer_Status() {
     local TYPE=
     local CLIENT_PEERS=0
     local SERVER_PEERS=0
+    local PEER_STATUS=
 
     [ -n "$(which wg)" ] && ACTIVE_PEERS="$(wg show interfaces)"
 
@@ -873,7 +887,9 @@ Peer_Status() {
             esac
         done
 
-        echo -e "Clients ${cBWHT}$CLIENT_PEERS${cBMAG}, Servers ${cBWHT}$SERVER_PEERS"
+        PEER_STATUS="Clients ${cBWHT}$CLIENT_PEERS${cBMAG}, Servers ${cBWHT}$SERVER_PEERS"
+        echo -e "$PEER_STATUS" 2>&1
+        SayT "$PEER_STATUS"
 }
 Show_credits() {
     printf '\n+======================================================================+\n'
@@ -901,7 +917,7 @@ exit_message() {
 }
 Install_WireGuard_Manager() {
 
-    echo -e $cBWHT"\n\tInstalling WireGuard Manager - Router$cBMAG $HARDWARE_MODEL (v$BUILDNO)"$cRESET
+    echo -e $cBWHT"\n\tInstalling WireGuard Manager - Router$cBMAG $HARDWARE_MODEL (v$BUILDNO)\n"$cRESET
 
     if [ "$(Is_AX)" == "N" ] && [ "$(Is_HND)" == "N" ];then
         echo -e $cBRED"\a\n\tERROR: Router$cRESET $HARDWARE_MODEL (v$BUILDNO)$cBRED is not currently compatible with WireGuard!\n"
@@ -926,6 +942,7 @@ Install_WireGuard_Manager() {
     fi
 
     modprobe xt_comment
+    opkg install column                     # v2.02
 
     # Kernel module
     echo -e $cBCYA"\tDownloading Wireguard Kernel module for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
@@ -940,7 +957,7 @@ Install_WireGuard_Manager() {
     Create_Sample_Config
 
     # Create dummy 'Client' and 'Server' templates
-    echo -e $cBCYA"\tCreating WireGuard 'Client' and 'Server' Peer templates 'wg11.conf' and wg21.conf'"$cRESET
+    echo -e $cBCYA"\tCreating WireGuard 'Client' and 'Server' Peer templates '${cBMAG}wg11.conf$cBCYA' and ${cBMAG}wg21.conf${cBCYA}'"$cRESET
 
     cat > ${CONFIG_DIR}wg11.conf << EOF
 [Interface]
@@ -1004,7 +1021,7 @@ EOF
     if  [ -n "$(which wg)" ] && [ "$ROUTER_COMPATIBLE" == "Y" ];then
 
         # Test 'wg' and this script - (well actually the one used @BOOT) against the two Sample Peers (wg11 and Wg21)
-        echo -e $cBCYA"\t${cRESET}${cYBLU}Test ${cRESET}${cBCYA}Initialising the Sample WireGuard 'client' and 'server' Peers, ${cYBLU}BUT ONLY the Sample 'server' (wg21) will Initialise WITHOUT errors!!!! :-)${cYBLU}"$cRESET
+        echo -e $cBCYA"\t${cRESET}${cYBLU}Test ${cRESET}${cBCYA}Initialising the Sample WireGuard 'client' and 'server' Peers, ${cYBLU}but ONLY the Sample 'server' (wg21) is VALID :-)${cYBLU}"$cRESET
         ${INSTALL_DIR}$SCRIPT_NAME start
         # Test the Status report
         echo -e $cBCYA"\tWireGuard Peer Status"
@@ -1099,6 +1116,69 @@ Show_Peer_Status() {
         echo -e "\tNo WireGuard Peers active\n" 2>&1
     fi
 }
+Check_Version_Update() {
+
+    GITHUB_DIR=$GITHUB_MARTINEAU
+
+    local localmd5="$(md5sum "$0" | awk '{print $1}')"
+
+    if [ "$1" != "nochk" ];then
+        local REMOTE_VERSION_NUMDOT="$(curl -${SILENT}fLN --retry 3 --connect-timeout 3 "${GITHUB_DIR}/wg_manager.sh" | grep -E "^VERSION\=" | tr -d '"' | sed 's/VER.*\=//')" || REMOTE_VERSION_NUMDOT="?.??"   # v3.23
+        if [ -z "$REMOTE_VERSION_NUMDOT" ] || [ "$REMOTE_VERSION_NUMDOT" == "?.??" ];then
+            echo -e ${cRESET}$cRED_"\a\t***ERROR Unable to verify Github version...check DNS/Internet access!\n\n"$cRESET
+            local REMOTE_VERSION_NUMDOT=
+        else
+            [ "$1" != "nochk" ] && remotemd5="$(curl -${SILENT}fL  --retry 3 --connect-timeout 3 "${GITHUB_DIR}/wg_manager.sh" | md5sum | awk '{print $1}')"
+            local REMOTE_VERSION_NUM=$(echo $REMOTE_VERSION_NUMDOT | sed 's/[^0-9]*//g')
+        fi
+    fi
+
+    local LOCAL_VERSION_NUMDOT=$VERSION                                     # v1.03
+    local LOCAL_VERSION_NUM=$(echo $VERSION | sed 's/[^0-9]*//g')
+
+    local CHANGELOG="$cRESET(${cBCYA}Change Log: ${cBYEL}https://github.com/MartineauUK/${GIT_REPO}/commits/main/wg_manager.sh$cRESET)"
+    [ -n "$(echo $VERSION | grep "b")" ] && local CHANGELOG="$cRESET(${cBCYA}Change Log: ${cBYEL}https://github.com/MartineauUK/${GIT_REPO}/commits/dev/wg_manager.sh$cRESET)"
+
+    # As the developer, I need to differentiate between the GitHub md5sum hasn't changed, which means I've tweaked it locally
+    if [ -n "$REMOTE_VERSION_NUMDOT" ];then
+        [ ! -f ${INSTALL_DIR}wg_manager.sh.md5 ] && echo $remotemd5 > ${INSTALL_DIR}wg_manager.sh.md5
+    fi
+
+    [ -z "$REMOTE_VERSION_NUM" ] && REMOTE_VERSION_NUM=0
+
+    # Local Version higher than GitHub version or MD5 Mismatch due to local development?
+    if [ ${REMOTE_VERSION_NUM:0:3} -lt ${LOCAL_VERSION_NUM:0:3} ] || [ "$(echo "$VERSION" | grep -om1 "b")" == "b" ] || [ $REMOTE_VERSION_NUM -lt $LOCAL_VERSION_NUM ] || { [ "$(awk '{print $1}' ${INSTALL_DIR}wg_manager.sh.md5)" == "$remotemd5" ]; } && [ "$localmd5" != "$remotemd5" ];then  # v1.03
+        local VERSION=$LOCAL_VERSION_NUMDOT                             # v1.03
+        if [ $REMOTE_VERSION_NUM -lt $LOCAL_VERSION_NUM ];then
+            ALLOWUPGRADE="N"
+            UPDATE_SCRIPT_ALERT="$(printf '%b[✔] Push to Github PENDING for %b(Major) %b%s%b UPDATE %b%s%b >>>> %b%s\n' "${cGRE}" "${cBGRE}" "$cRESET" "$(basename $0)" "$cBRED" "$cBMAG" "$VERSION" "$cRESET" "$cBGRE" "$REMOTE_VERSION_NUMDOT")"
+        else
+            ALLOWUPGRADE="N"
+            UPDATE_SCRIPT_ALERT="$(printf '%b[✔] Push to Github PENDING for %b(Minor Hotfix) %b%s update >>>> %b%s %b%s\n' "${cGRE}" "$cBRED" "$cBGRE" "$cRESET" "$(basename $0)" "$cRESET" "$cBMAG" "$VERSION")"
+        fi
+    else
+        if [ "$localmd5" != "$remotemd5" ]; then
+            if [ $REMOTE_VERSION_NUM -ge $LOCAL_VERSION_NUM ];then
+                if [ $REMOTE_VERSION_NUM -gt $LOCAL_VERSION_NUM ];then
+                    local UPDATE_SCRIPT_ALERT="$(printf '%bu%b  = %bUpdate (Major) %b%s %b%s -> %b %s\n' "${cBYEL}" "${cRESET}" "$cBGRE" "$cRESET" "$(basename $0)" "$cBMAG" "$VERSION" "$REMOTE_VERSION_NUMDOT" "$CHANGELOG")"
+                else
+                    local UPDATE_SCRIPT_ALERT="$(printf '%bu%b  = %bUpdate (Minor Hotfix) %b%s %b%s -> %b %s\n' "${cBYEL}" "${cRESET}" "$cBGRE" "$cRESET" "$(basename $0)" "$cBMAG" "$VERSION" "$REMOTE_VERSION_NUMDOT" "$CHANGELOG")"
+                fi
+            fi
+        fi
+    fi
+
+
+    if [ -n "$UPDATE_SCRIPT_ALERT" ];then   # v1.03
+        [ -z "$(echo "$UPDATE_SCRIPT_ALERT" | grep -F "Push to Github")" ] && local BEL="\a" || local BEL=
+        echo -e "${BEL}\n\t"$UPDATE_SCRIPT_ALERT"\n"
+        [ -n "$(echo "$UPDATE_SCRIPT_ALERT" | grep -o "Push to Github")" ] && return 2 || return 1 # v1.03
+    else
+        echo -e $cBGRE"\n\t$VERSION - No WireGuard Manager updates available - you have the latest version\n"              # v1.03
+        return 0
+    fi
+
+}
 Show_Main_Menu() {
 
         Show_credits
@@ -1143,8 +1223,9 @@ Show_Main_Menu() {
                 HDR="N"
             fi
 
-            STATUS_LINE="WireGuard ACTIVE Peer Status: "$(Peer_Status)                  # v2.01
-            echo -e ${cRESET}$cBMAG"\n\t"${STATUS_LINE}$cRESET
+            local STATUS_LINE="WireGuard ACTIVE Peer Status: "$(Peer_Status)                  # v2.01
+            [ "$(Manage_KILL_Switch)" == "Y" ] && local KILL_STATUS="${cBGRE}${aREVERSE}ENABLED$cRESET" || local KILL_STATUS="        "
+            echo -e $cRESET"\n"${KILL_STATUS}"\t"${cRESET}${cBMAG}${STATUS_LINE}$cRESET
 
             [ "$CHECK_GITHUB" != "N" ] && Check_Version_Update      # v2.01
             CHECK_GITHUB="N"
@@ -1167,11 +1248,12 @@ Show_Main_Menu() {
 
                         MENU_VX="$(printf '%bv %b = View %b%s\n' "${cBYEL}" "${cRESET}" "$cBGRE" "('${INSTALL_DIR}WireguardVPN.conf')")"
                         MENU_RS="$(printf '%brs%b = %bRestart%b (or %bStart%b) WireGuard Sessions(%b)\n' "${cBYEL}" "${cRESET}" "$cBGRE" "${cRESET}" "$cBGRE" "${cRESET}" )"
-                        MENU_L="$(printf '%b3 %b = %bList%b ACTIVE Peers [%b3x%b - lists ALL details]\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cBYEL}" "${cRESET}" )"
-                        MENU_S="$(printf '%b4 %b = %bStart%b   [ [Peer... ] | category ] e.g. start clients \n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
+                        MENU_S="$(printf '%b4 %b = %bStart%b   [ [Peer [nopolicy]...] | category ] e.g. start clients \n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"        # v2.02
                         if [ -n "$(wg show interfaces)" ];then
+                            MENU_L="$(printf '%b3 %b = %bList%b ACTIVE Peers [%b3x%b - lists ALL details]\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cBYEL}" "${cRESET}" )"
                             MENU_T="$(printf '%b5 %b = %bStop%b    [ [Peer... ] | category ] e.g. stop clients\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
                         else
+                            MENU_L="$(printf '%b3 %b = %bList%b ACTIVE Peers [%b3x%b - lists ALL details]\n' "${cBYEL}" "${cRESET}" "${cGRA}" "${cBGRA}" "${cBYEL}" "${cBGRA}" )"   # v2.03
                             MENU_T="$(printf '%b5 %b = %bStop%b    [ [Peer... ] | category ] e.g. stop clients\n' "${cBYEL}" "${cRESET}" "${cGRA}" "${cBGRA}")"
                         fi
                         MENU_R="$(printf '%b6 %b = %bRestart%b [ [Peer... ] | category ]%b e.g. restart servers\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
@@ -1235,7 +1317,7 @@ Show_Main_Menu() {
                     1|i)
                         [ -z "$(ls ${INSTALL_DIR}*.ipk 2>/dev/null)" ]  && menu1="install" || menu1="getmodules";;
                     2|z) menu1="uninstall";;
-                    3|3+|3*|show*) menu1=$(echo "$menu1" | sed 's/^3/show/');;
+                    3*|list*|show*) menu1=$(echo "$menu1" | awk '{$1="show"}1');;
                     4*|start*) menu1=$(echo "$menu1" | awk '{$1="start"}1') ;;
                     5*|stop*) menu1=$(echo "$menu1" | awk '{$1="stop"}1') ;;
                     6*|restart*) menu1=$(echo "$menu1" | awk '{$1="restart"}1') ;;
@@ -1252,7 +1334,8 @@ Show_Main_Menu() {
                     diag) ;;
                     debug) ;;                   # v3.04
                     wg*) ;;
-                    kill*) ip link del dev $(echo "$menu1" | awk '{print $2}') ;;
+                    killswitch*) ;;             # v2.03
+                    killinterface*) ip link del dev $(echo "$menu1" | awk '{print $2}'); continue ;;
                     "") ;;
                     e*) ;;
                     *) printf '\n\a\t%bInvalid Option%b "%s"%b Please enter a valid option\n' "$cBRED" "$cRESET" "$menu1" "$cBRED"
@@ -1278,11 +1361,9 @@ Show_Main_Menu() {
                     [ -n "$(echo "$menu1" | grep -E "e.*\?")" ] && exit_message "0" || exit_message
                     break
                     ;;
-                diag*|show*)
+                diag*|list|show*)
 
                     local ACTION="$(echo "$menu1"| awk '{print $1}')"
-
-
 
                     local ARG=
                     if [ "$(echo "$menu1" | wc -w)" -ge 2 ];then
@@ -1291,28 +1372,40 @@ Show_Main_Menu() {
 
                     if [ -n "$(which wg)" ];then
 
-                        echo -e $cBWHT"\n\t\t WireGuard VPN Peer Status\n"$cRESET
+                        echo -e $cBYEL"\n\t\t WireGuard VPN Peer Status\n"$cRESET
                         Show_Peer_Status
 
                         if [ "$ACTION" == "diag" ];then
                             #echo -e $cBWHT"\n\tDEBUG: Routing Table main\n";ip route | grep "wg.";for WG_INTERFACE in $(wg show interfaces);do I=${WG_INTERFACE:3:1};echo -e "\n\tDEBUG: Routing Table 12$I";ip route show table 12$I;done
-                            echo -e $cBWHT"\n\tDEBUG: Routing Table main\n"
+                            echo -e $cBYEL"\n\tDEBUG: Routing Table main\n"$cBCYA
                             ip route | grep "wg."
                             for WG_INTERFACE in $(wg show interfaces)
-                                do I=${WG_INTERFACE:3:1}
-                                    [ "${WG_INTERFACE:0:3}" != "wg2" ] && echo -e "\n\tDEBUG: Routing Table 12$I"
-                                    ip route show table 12$I
+                                do
+                                    I=${WG_INTERFACE:3:1}
+                                    if [ "${WG_INTERFACE:0:3}" != "wg2" ];then
+                                        DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' ${INSTALL_DIR}WireguardVPN.conf | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
+                                        echo -e $cBYEL"\n\tDEBUG: Routing Table 12$I (wg1$I) ${cBMAG}$DESC\n"$cBCYA
+                                        ip route show table 12$I
+                                    fi
                                 done
 
-                            echo -e $cBWHT"\n\tDEBUG: RPDB rules"
+                            echo -e $cBYEL"\n\tDEBUG: RPDB rules\n"$cBCYA
                             #ip rule | grep -E "lookup 12[1-5]"
                             ip rule
 
-                            echo -e $cBWHT"\n\tDEBUG: Routing info MTU etc.\n"          # v1.07
+                            echo -e $cBYEL"\n\tDEBUG: Routing info MTU etc.\n"$cBCYA          # v1.07
                             for WG_INTERFACE in $(wg show interfaces)
                                 do
                                     ip a l $WG_INTERFACE                                # v1.07
                                 done
+
+                            echo -e $cBYEL"\n\tDEBUG: UDP sockets.\n"$cBCYA
+                            netstat -l -n -p | grep -e "^udp\s.*\s-$"
+
+                            echo -e $cBYEL"\n\tDEBUG: Firewall rules \n"$cBCYA
+                            iptables --line -t filter -nvL FORWARD | grep -i wireguard
+
+                            [ "$(nvram get ipv6_service)" != "disabled" ] && ip -6 rule show
 
                             echo -e $cRESET
                         fi
@@ -1377,7 +1470,7 @@ Show_Main_Menu() {
                     ;;
                 z|uninstall)
 
-                    echo -e $cBCYA"\tDeleting Wireguard install directories and files"$cRESET
+                    echo -e $cBCYA"\n\tUninstalling WireGuard Session Manager"$cRESET
                     echo -en $cBRED
                     [ -f ${INSTALL_DIR}WireguardVPN.conf ] && rm ${INSTALL_DIR}WireguardVPN.conf
                         # legacy tidy-up!
@@ -1386,7 +1479,7 @@ Show_Main_Menu() {
                     rm -rf /jffs/addons/wireguard
 
                     # Only remove WireGuard Entware packages if user DELETES '/opt/etc/wireguard'
-                    echo -e "\tPress$cBRED Y$cRESET to$cBRED delete ALL WireGuard DATA files (Peer *.config etc.) $cRESET('${CONFIG_DIR}') or press$cBGRE [Enter] to keep custom WireGuard DATA files."
+                    echo -e "\n\tPress$cBRED Y$cRESET to$cBRED delete ALL WireGuard DATA files (Peer *.config etc.) $cRESET('${CONFIG_DIR}') or press$cBGRE [Enter] to keep custom WireGuard DATA files."
                     read -r "ANS"
                     if [ "$ANS" == "Y" ];then
                        echo -e $cBCYA"\n\tDeleting $cRESET'${CONFIG_DIR}'"
@@ -1589,18 +1682,23 @@ EOF
                             local CHANGELOG="$cRESET(${cBCYA}Change Log: ${cBYEL}https://github.com/MartineauUK/wireguard/commits/main/wg_manager.sh$cRESET)"   #v2.01
                             [ -n "$(echo $VERSION | grep "b")" ] && local CHANGELOG="$cRESET(${cBCYA}Change Log: ${cBYEL}https://github.com/MartineauUK/wireguard/commits/dev/wg_manager.sh$cRESET)" #v2.01
                             echo -e $cBMAG"\n\t${VERSION}$cBWHT WireGuard Session Manager" ${CHANGELOG}$cRESET  # v2.01
-                            echo -e $cBWHT"\n\tChecking GitHub for software updates...."$cRESET
-                            Check_Version_Update
-                            echo -en $cRESET
+                            Show_MD5 "script"
+                            echo -e
+                            Check_Module_Versions "report"
 
-                            Check_Module_Versions
-
+                            echo -e $cRESET
                             DNSmasq_Listening_WireGuard_Status
 
                             if [ -z "$(grep -i "wireguard" /jffs/scripts/nat-start)" ];then     # v1.11
                                 echo -e $cBRED"\t[✖]${cBWHT} nat-start$${cBRED} is NOT monitoring WireGuard Firewall rules - ${cBWHT}use 'wgm natstart' to ENABLE\n"$cRESET
                             else
                                 echo -e $cBGRE"\t[✔]${cBWHT} nat-start ${cBGRE}is monitoring WireGuard Firewall rules\n"$cRESET
+                            fi
+
+                            if [ "$(Manage_KILL_Switch)" == "Y" ];then
+                                echo -e $cBGRE"\t[✔]$cBWHT WAN ${cBGRE}KILL-Switch is ENABLED$cRESET"
+                            else
+                                echo -e $cRED"\t[✖]$cBWHT WAN ${cBGRE}KILL-Switch is ${cBRED}${aREVERSE}DISABLED$cRESET"
                             fi
 
                             ;;
@@ -1700,7 +1798,7 @@ EOF
                                     ;;
                                     del)
                                         sed -i "/^$WG_INTERFACE/d" $FN
-                                        echo -e $cBGRE"\n\tWireGuard Peer '$WG_INTERFACE' DELETED\n"$cRESET
+                                        echo -e $cBGRE"\n\tWireGuard Peer '$WG_INTERFACE' ${cBRED}${aREVERSE}DELETED\n"$cRESET
                                     ;;
                                     add)
                                         if [ -z "$(grep "^$WG_INTERFACE" $FN )" ];then
@@ -1759,6 +1857,16 @@ EOF
                     echo -e $cBWHT"WireGuard Userspace Tool:\n"
                     $menu1
                 ;;
+                killswitch*)
+                    local ACTION="$(echo "$menu1"| awk '{print $1}')"
+
+                    local ARG=
+                    if [ "$(echo "$menu1" | wc -w)" -ge 2 ];then
+                        local ARG="$(printf "%s" "$menu1" | cut -d' ' -f2)"
+                    fi
+
+                    RC=$(Manage_KILL_Switch "$ARG")
+                ;;
                 *)
 
                     ShowHelp
@@ -1796,10 +1904,7 @@ TS=$(date +"%Y%m%d-%H%M%S")    # current date and time 'yyyymmdd-hhmmss'
 
 ACTION=$1
 PEER=$2
-TYPE=
-POLICY=
-
-[ -f ${CONFIG_DIR}$PEER.conf ] && TYPE=$(Server_or_Client "$PEER")
+NOPOLICY=$3
 
 # Legacy tidy-up! to adopt a new name for the configuration file
 [ -f /jffs/configs/WireguardVPN_map ] && mv /jffs/configs/WireguardVPN_map ${INSTALL_DIR}WireguardVPN.conf      # v2.01
@@ -1831,17 +1936,19 @@ if [ "$1" != "install" ];then   # v2.01
         case "$1" in
 
             start|init)
-                Manage_Wireguard_Sessions "start" "$TYPE" "$PEER" "$POLICY"             # Post mount should start ALL defined sessions @BOOT
+                Manage_Wireguard_Sessions "start" "$PEER" "$NOPOLICY"             # Post mount should start ALL defined sessions @BOOT
                 echo -e $cRESET
                 exit_message
             ;;
             stop)
-                Manage_Wireguard_Sessions "stop" "$TYPE" "$PEER" "$POLICY"
+                Manage_Wireguard_Sessions "stop" "$PEER" "$NOPOLICY"
                 echo -e $cRESET
                 exit_message
             ;;
             restart)
-                Manage_Wireguard_Sessions "restart" "$TYPE" "$PEER" "$POLICY"
+                /jffs/addons/wireguard/wg_firewall "KILLSWITCH"                     # v2.03
+                Manage_Wireguard_Sessions "stop" "$PEER" "$NOPOLICY"    # v2.03
+                Manage_Wireguard_Sessions "start" "$PEER" "$NOPOLICY"   # v2.03
                 echo -e $cRESET
                 exit_message
             ;;
