@@ -525,7 +525,7 @@ Create_Sample_Config() {
 #
 #
 # VPN   Auto   Local Peer IP         Remote Peer Socket     DNS               Annotation Comment
-wg11    Y      12.34.56.78/32        86.106.143.93:51820    193.138.218.74    # ****THIS IS NOT A REAL PEER** Edit 'wg11.conf' with real DATA!
+wg11    N      12.34.56.78/32        86.106.143.93:51820    193.138.218.74    # ****THIS IS NOT A REAL PEER** Edit 'wg11.conf' with real DATA!
 wg12    N      xxx.xxx.xxx.xxx/32    209.58.188.180:51820   193.138.218.74    # Mullvad China, Hong Kong
 wg13    N      xxx.xxx.xxx.xxx/32    103.231.88.18:51820    193.138.218.74    # Mullvad Oz, Melbourne
 wg14    N      xxx.xxx.xxx.xxx/32    193.32.126.66:51820    193.138.218.74    # Mullvad France, Paris
