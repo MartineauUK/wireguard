@@ -930,8 +930,8 @@ Install_WireGuard_Manager() {
     # mkdir -p /jffs/addons/wireguard
     if [ -d /opt/etc/ ];then
         # Legacy pre v2.03 install?
-        if [ -d /opt/etc/wireguard ];then			# v2.03
-            echo -e $cRED"\a\n\tWarning obsolete WireGuard Session Manager v1.xx config directory Found!!! (${cBWHT}'/opt/etc/wireguard'{$BRED})"$cRESET
+        if [ -d /opt/etc/wireguard ];then
+            echo -e $cRED"\a\n\tWarning obsolete WireGuard Session Manager v1.xx config directory Found!!! (${cBWHT}'/opt/etc/wireguard'{$cBRED})\n"$cRESET
             SayT "Warning obsolete WireGuard Session Manager config directory Found!!! ('/opt/etc/wireguard')"
         fi
         [ ! -d ${CONFIG_DIR} ] && mkdir -p ${CONFIG_DIR}
