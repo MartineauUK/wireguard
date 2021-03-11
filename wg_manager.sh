@@ -1679,7 +1679,7 @@ EOF
                             echo -e $cBWHT"\a\n\tWireGuard 'server' Peer needs to be ${CMD}ed to listen for 'client' Peer $DEVICE_NAME $TAG"
                             echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer ($SERVER_PEER) or press$cBGRE [Enter] to SKIP."
                             read -r "ANS"
-                            [ "$ANS" == "y" ] && { ${INSTALL_DIR}/wg_manager.sh restart server "$INSTANCE"; ${INSTALL_DIR}wg_manager.sh "show"; }
+                            [ "$ANS" == "y" ] && { ${INSTALL_DIR}/wg_manager.sh restart $SERVER_PEER "$INSTANCE"; ${INSTALL_DIR}wg_manager.sh "show"; }
 
                         fi
                     else
