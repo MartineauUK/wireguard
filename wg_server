@@ -97,21 +97,21 @@ if [ "$2" != "disable" ];then
 
     Firewall_delete
 
-    iptables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
-    iptables -t mangle -I FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
-    iptables -t mangle -I FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7
-    iptables -t mangle -I PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7
+    iptables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'server'"
+    iptables -t mangle -I FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'server'"
+    iptables -t mangle -I FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'server'"
+    iptables -t mangle -I PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'server'"
 
-    iptables -I INPUT -p udp --dport $wgport -j ACCEPT
-    iptables -I INPUT -i $VPN_ID -j ACCEPT
-    iptables -I FORWARD -i $VPN_ID -j ACCEPT
-    iptables -I FORWARD -o $VPN_ID -j ACCEPT
-    iptables -I OUTPUT -o $VPN_ID -j ACCEPT
-    iptables -t nat -I PREROUTING -p udp --dport $wgport -j ACCEPT
+    iptables -I INPUT -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'"
+    iptables -I INPUT -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
+    iptables -I FORWARD -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
+    iptables -I FORWARD -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
+    iptables -I OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
+    iptables -t nat -I PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'"
 
     ###############################################################EIC Hack 5 of 5##############################
     #logger -st "($(basename $0))" "Configuring Wireguard to VPN Client (pass-thru)"
-    [ -n "$(wg show interfaces | grep -E "wg[0-1]")" ] && iptables -I POSTROUTING -t nat -s $Subnet -o wg1+ -j MASQUERADE
+    [ -n "$(wg show interfaces | grep -E "wg[0-1]")" ] && iptables -I POSTROUTING -t nat -s $Subnet -o wg1+ -j MASQUERADE -m comment --comment "WireGuard 'server'"
     echo -en $cBGRE"\t"
     logger -st "wireguard-server${VPN_ID:3:1}" "Initialisation complete."
     echo -e $cRESET
