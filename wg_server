@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v1.09"
-#============================================================================================ © 2021 Martineau v1.09
+VERSION="v1.10"
+#============================================================================================ © 2021 Martineau v1.10
 #
 
 # Maintainer: Martineau
@@ -28,17 +28,17 @@ Is_IPv4_CIDR () {
 }
 Firewall_delete() {
 
-    iptables -t mangle -D PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 2>/dev/null
-    iptables -t mangle -D FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 2>/dev/null
-    iptables -t mangle -D FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null
-    iptables -t mangle -D FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null
+    iptables -t mangle -D PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'server'" 2>/dev/null
+    iptables -t mangle -D FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'server'" 2>/dev/null
+    iptables -t mangle -D FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'server'" 2>/dev/null
+    iptables -t mangle -D FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'server'" 2>/dev/null
 
-    iptables -D INPUT -p udp --dport $wgport -j ACCEPT 2>/dev/null
-    iptables -D INPUT -i $VPN_ID -j ACCEPT 2>/dev/null
-    iptables -D FORWARD -i $VPN_ID -j ACCEPT 2>/dev/null
-    iptables -D FORWARD -o $VPN_ID -j ACCEPT 2>/dev/null
-    iptables -D OUTPUT -o $VPN_ID -j ACCEPT 2>/dev/null
-    iptables -t nat -D PREROUTING -p udp --dport $wgport -j ACCEPT 2>/dev/null
+    iptables -D INPUT -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
+    iptables -D INPUT -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
+    iptables -D FORWARD -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
+    iptables -D FORWARD -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
+    iptables -D OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
+    iptables -t nat -D PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
 }
 
 
