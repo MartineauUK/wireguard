@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v3.01b"
-#============================================================================================ © 2021 Martineau v3.01b
+VERSION="v3.01b2"
+#============================================================================================ © 2021 Martineau v3.01b2
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -551,6 +551,9 @@ rp15    <Router>192.168.1.0/24>>VPN<LAN>192.168.1.1>>WAN
 SGS8    N      1.2.3.4            xxx.xxx.xxx.xxx        dns.xxx.xxx.xxx      # A comment here
 wg0-client5 N  4.3.2.1                                                        # Mullvad UK, London
 
+# WAN KILL-Switch
+#KILLSWITCH
+
 # Optionally define the 'server' Peer 'clients' so they can be identified by name in the enhanced WireGuard Peer status report
 # (These entries are automatically added below when the 'create' command is used)
 # Public Key                                      DHCP IP             Annotation Comment
@@ -716,7 +719,6 @@ Manage_KILL_Switch() {
 Get_scripts() {
     local BRANCH="$1"
     local BRANCH="dev" ############## DO NOT USE IN PRODUCTION #################
-
     echo -e $cBCYA"\tDownloading scripts"$cRESET 2>&1
 
     # Allow use of custom script for debugging
@@ -978,9 +980,11 @@ AllowedIPs = 0.0.0.0/0
 PersistentKeepalive = 25
 EOF
 
-    # Create Server template
-    cat > ${CONFIG_DIR}wg21.conf << EOF
-# $HARDWARE_MODEL 'server' Peer #1 (wg21)
+    # Create Server templates
+    for I in 1 2                                            # v3.02
+        do
+            cat > ${CONFIG_DIR}wg2${I}.conf << EOF
+# $HARDWARE_MODEL 'server' Peer #1 (wg2$I)
 [Interface]
 PrivateKey = Ha1rgO/plL4wCB+pRdc6Qh8bIAWNeNgPZ7L+HFBhoE4=
 ListenPort = 51820
@@ -995,6 +999,7 @@ ListenPort = 51820
 # Peer Example End
 EOF
 
+        done
     # Create 'server' Peer wg21
     echo -e $cBCYA"\tCreating WireGuard Private/Public key-pairs for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
     if [ -n "$(which wg)" ];then
@@ -1015,12 +1020,6 @@ EOF
         PRIV_KEY=$(cat ${CONFIG_DIR}wg21_private.key)
         PRIV_KEY=$(Convert_Key "$PRIV_KEY")
         sed -i "/^PrivateKey/ s~[^ ]*[^ ]~$PRIV_KEY~3" ${CONFIG_DIR}wg21.conf
-
-        # Create a Private/Public key-pair for your mobile phone
-        wg genkey | tee ${CONFIG_DIR}mobilephone_private.key | wg pubkey > ${CONFIG_DIR}mobilephone_public.key
-        PUB_KEY=$(cat ${CONFIG_DIR}mobilephone_public.key)
-        PUB_KEY=$(Convert_Key "$PUB_KEY")
-        sed -i "/^PublicKey/ s~[^ ]*[^ ]~$PUB_KEY~3" ${CONFIG_DIR}wg21.conf
 
     fi
 
@@ -1558,8 +1557,8 @@ Show_Main_Menu() {
                             # Extract the Public keys from the first 'server' Peer Public key file  # v1.06
                             for I in 1 2
                                 do
-                                    if [ -f ${CONFIG_DIR}server2${I}_public.key ];then
-                                        PUB_SERVER_KEY=$(awk '{print $1}' ${CONFIG_DIR}server2${I}_public.key)  #v1.06
+                                    if [ -f ${CONFIG_DIR}wg2${I}_public.key ];then
+                                        PUB_SERVER_KEY=$(awk '{print $1}' ${CONFIG_DIR}wg2${I}_public.key)  #v1.06
                                         echo -e $cBCYA"\tUsing 'server' Peer 'wg2"${I}"'s Public\n"
                                         SERVER_PEER="wg2"${I}                                   # v1.06
                                         break
@@ -1569,7 +1568,7 @@ Show_Main_Menu() {
 
                         PRI_KEY=$(cat ${CONFIG_DIR}${DEVICE_NAME}_private.key)
                         ROUTER_DDNS=$(nvram get ddns_hostname_x)
-                        [ -z "$ROUTER_DDNS" ] && ROUTER_DDNS="DDNS_of_YOUR_home_$HARDWARE_MODEL"
+                        [ -z "$ROUTER_DDNS" ] && ROUTER_DDNS="IP_of_YOUR_DDNS_$HARDWARE_MODEL"
                         CREATE_DEVICE_CONFIG="Y"
                         if [ -f ${CONFIG_DIR}${DEVICE_NAME}.conf ];then
                             echo -e $cRED"\a\tWarning: Peer device ${cBMAG}'$DEVICE_NAME'${cRESET}${cRED} WireGuard config already EXISTS!"
