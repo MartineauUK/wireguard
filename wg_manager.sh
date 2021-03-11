@@ -1417,7 +1417,7 @@ Show_Main_Menu() {
                             echo -e
                             iptables --line -nvL INPUT | grep -iE "WireGuard|Chain|pkts"
                             echo -e
-                            iptables --line -nvL INPUT | grep -iE "WireGuard|Chain|pkts"
+                            iptables --line -nvL OUTPUT | grep -iE "WireGuard|Chain|pkts"
 
 
                             [ "$(nvram get ipv6_service)" != "disabled" ] && ip -6 rule show
