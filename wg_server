@@ -12,7 +12,7 @@ VERSION="v1.08"
 #
 # Contributors: odkrys
 
-CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v1.08 @elorimer
+CONFIG_DIR="/opt/etc/wireguard/"                
 INSTALL_DIR="/jffs/addons/wireguard/"
 
 
