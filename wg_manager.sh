@@ -505,7 +505,7 @@ Manage_alias() {
                 # echo "alias wgdiag='/jffs/addons/wireguard/$SCRIPT_NAME diag'"                 >>/jffs/configs/profile.add
 
                 # Shell function!
-                echo -e "wgm()  { ${INSTALL_DIR}$SCRIPT_NAME \$@; }"                  >>/jffs/configs/profile.add
+                echo -e "wgm()  { ${INSTALL_DIR}$SCRIPT_NAME \$@; }          # WireGuard Session Manager"   >>/jffs/configs/profile.add
             else
                 echo -e $cRED"\n\tWarning: Aliases and shell functions for $SCRIPT_NAME already exist\n"$cRESET
             fi
@@ -715,7 +715,7 @@ Manage_KILL_Switch() {
 }
 Get_scripts() {
     local BRANCH="$1"
-	local BRANCH="dev"
+    local BRANCH="dev" ############## DO NOT USE IN PRODUCTION #################
 
     echo -e $cBCYA"\tDownloading scripts"$cRESET 2>&1
 
@@ -1409,7 +1409,16 @@ Show_Main_Menu() {
                             netstat -l -n -p | grep -e "^udp\s.*\s-$"
 
                             echo -e $cBYEL"\n\tDEBUG: Firewall rules \n"$cBCYA
-                            iptables --line -t filter -nvL FORWARD | grep -i wireguard
+                            iptables --line -nvL FORWARD | grep -iE "WireGuard|Chain|pkts"
+                            echo -e
+                            iptables --line -t nat -nvL POSTROUTING | grep -iE "WireGuard|Chain|pkts"
+                            echo -e
+                            iptables --line -t mangle -nvL POSTROUTING | grep -iE "WireGuard|Chain|pkts"
+                            echo -e
+                            iptables --line -nvL INPUT | grep -iE "WireGuard|Chain|pkts"
+                            echo -e
+                            iptables --line -nvL INPUT | grep -iE "WireGuard|Chain|pkts"
+
 
                             [ "$(nvram get ipv6_service)" != "disabled" ] && ip -6 rule show
 
