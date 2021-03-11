@@ -47,9 +47,6 @@ Main() { true; }            # Syntax that is Atom Shellchecker compatible!
 
 ANSIColours
 
-CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v1.08 @elorimer
-INSTALL_DIR="/jffs/addons/wireguard/"
-
 ############################################################################################################
 modprobe xt_set
 #############################################################################EIC Hack 2 of 3################
