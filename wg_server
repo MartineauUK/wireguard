@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v1.08"
-#============================================================================================ © 2021 Martineau v1.08
+VERSION="v1.09"
+#============================================================================================ © 2021 Martineau v1.09
 #
 
 # Maintainer: Martineau
@@ -22,6 +22,9 @@ ANSIColours() {
     cBGRA="\e[90m";cBRED="\e[91m";cBGRE="\e[92m";cBYEL="\e[93m";cBBLU="\e[94m";cBMAG="\e[95m";cBCYA="\e[96m";cBWHT="\e[97m"
     aBOLD="\e[1m";aDIM="\e[2m";aUNDER="\e[4m";aBLINK="\e[5m";aREVERSE="\e[7m"
     cWRED="\e[41m";cWGRE="\e[42m";cWYEL="\e[43m";cWBLU="\e[44m";cWMAG="\e[45m";cWCYA="\e[46m";cWGRA="\e[47m"
+}
+Is_IPv4_CIDR () {
+        grep -oE '^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$'         # IPv4 CIDR range notation
 }
 Firewall_delete() {
 
@@ -69,14 +72,11 @@ DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' ${INSTAL
 
 if [ "$2" != "disable" ];then
     wgport=$(awk '/Listen/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)
-    if [ "$VPN_ID" == "wg1" ];then
-        WG_INTERFACE="wg1"
-        Subnet=10.50.1.1/24
-        #wgport="1151"
-    else
-        WG_INTERFACE=$1
-        Subnet=10.50.${VPN_ID:3:1}.1/24
-        #wgport="115"${VPN_ID:3:1}
+    Subnet=$(grep -E "^$WG_INTERFACE" ${INSTALL_DIR}WireguardVPN.conf | awk '{print $3}') # v1.09 @here1310
+    # CIDR ?
+    if [ -z "$(echo "$Subnet" | Is_IPv4_CIDR)" ];then
+        SUBNET_PREFIX=${Subnet%.*}
+        Subnet=$SUBNET_PREFIX".0/24"
     fi
 
     DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' ${INSTALL_DIR}WireguardVPN.conf | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
