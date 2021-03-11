@@ -1,16 +1,19 @@
 #!/bin/sh
-VERSION="v1.07"
-#============================================================================================ © 2021 Martineau v1.07
+VERSION="v1.08"
+#============================================================================================ © 2021 Martineau v1.08
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 09-Mar-2021
+# Last Updated Date: 11-Mar-2021
 #
 # Description:
 #
 # Acknowledgement:
 #
 # Contributors: odkrys
+
+CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v1.08 @elorimer
+INSTALL_DIR="/jffs/addons/wireguard/"
 
 
 # shellcheck disable=SC2034
@@ -44,7 +47,7 @@ Main() { true; }            # Syntax that is Atom Shellchecker compatible!
 
 ANSIColours
 
-CONFIG_DIR="/opt/etc/wireguard/"
+CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v1.08 @elorimer
 INSTALL_DIR="/jffs/addons/wireguard/"
 
 ############################################################################################################
