@@ -715,6 +715,7 @@ Manage_KILL_Switch() {
 }
 Get_scripts() {
     local BRANCH="$1"
+	local BRANCH="dev"
 
     echo -e $cBCYA"\tDownloading scripts"$cRESET 2>&1
 
@@ -997,21 +998,21 @@ EOF
     # Create 'server' Peer wg21
     echo -e $cBCYA"\tCreating WireGuard Private/Public key-pairs for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
     if [ -n "$(which wg)" ];then
-        for I in 1 2 3 4 5
+        for I in 1
             do
-                wg genkey | tee ${CONFIG_DIR}client1${I}_private.key | wg pubkey > ${CONFIG_DIR}client1${I}_public.key
+                wg genkey | tee ${CONFIG_DIR}wg1${I}_private.key | wg pubkey > ${CONFIG_DIR}wg1${I}_public.key
             done
         for I in 1 2
             do
-                wg genkey | tee ${CONFIG_DIR}server2${I}_private.key | wg pubkey > ${CONFIG_DIR}server2${I}_public.key
+                wg genkey | tee ${CONFIG_DIR}wg2${I}_private.key | wg pubkey > ${CONFIG_DIR}wg2${I}_public.key
             done
 
         # Update the Sample Peer templates with the router's real keys
-        PRIV_KEY=$(cat ${CONFIG_DIR}client11_private.key)
+        PRIV_KEY=$(cat ${CONFIG_DIR}wg11_private.key)
         PRIV_KEY=$(Convert_Key "$PRIV_KEY")
         sed -i "/^PrivateKey/ s~[^ ]*[^ ]~$PRIV_KEY~3" ${CONFIG_DIR}wg11.conf
 
-        PRIV_KEY=$(cat ${CONFIG_DIR}server21_private.key)
+        PRIV_KEY=$(cat ${CONFIG_DIR}wg21_private.key)
         PRIV_KEY=$(Convert_Key "$PRIV_KEY")
         sed -i "/^PrivateKey/ s~[^ ]*[^ ]~$PRIV_KEY~3" ${CONFIG_DIR}wg21.conf
 
