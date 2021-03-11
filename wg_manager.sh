@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v2.03b"
-#============================================================================================ © 2021 Martineau v2.03b
+VERSION="v3.01b"
+#============================================================================================ © 2021 Martineau v3.01b
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
