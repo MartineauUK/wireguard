@@ -929,7 +929,12 @@ Install_WireGuard_Manager() {
     # Amtm
     # mkdir -p /jffs/addons/wireguard
     if [ -d /opt/etc/ ];then
-       [ ! -d /opt/etc/wireguard ] && mkdir -p /opt/etc/wireguard
+        # Legacy pre v2.03 install?
+        if [ -d /opt/etc/wireguard ];then			# v2.03
+            echo -e $cRED"\a\n\tWarning obsolete WireGuard Session Manager v1.xx config directory Found!!! (${cBWHT}'/opt/etc/wireguard'{$BRED})"$cRESET
+            SayT "Warning obsolete WireGuard Session Manager config directory Found!!! ('/opt/etc/wireguard')"
+        fi
+        [ ! -d ${CONFIG_DIR} ] && mkdir -p ${CONFIG_DIR}
     else
         echo -e $cBRED"\a\n\t***ERROR: Entware directory '${cRESET}/opt/etc/${cBRED}' not found? - Please install Entware (amtm Diversion)\n"$cRESET
         exit 95
