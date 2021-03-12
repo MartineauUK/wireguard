@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v1.10"
-#============================================================================================ © 2021 Martineau v1.10
+VERSION="v1.11"
+#============================================================================================ © 2021 Martineau v1.11
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 11-Mar-2021
+# Last Updated Date: 12-Mar-2021
 #
 # Description:
 #
@@ -39,6 +39,7 @@ Firewall_delete() {
     iptables -D FORWARD -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
     iptables -D OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
     iptables -t nat -D PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
+    iptables -t nat -D POSTROUTING -s $Subnet -o wg1+ -j MASQUERADE -m comment --comment "WireGuard 'server'"  2>/dev/null  # v1.11
 }
 
 
