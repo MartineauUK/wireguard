@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v3.01b5"
-#============================================================================================ © 2021 Martineau v3.01b5
+VERSION="v3.01b6"
+#============================================================================================ © 2021 Martineau v3.01b6
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -311,7 +311,7 @@ Manage_Wireguard_Sessions() {
 
             # If no specific Peer specified, for Stop/Restart retrieve ACTIVE Peers otherwise for Start use Peer configuration
             if [ "$ACTION" == "start" ];then                  # v2.02 v1.09
-                WG_INTERFACE=$(awk '$2 == "Y" || $2 =="P" {print $1}' ${INSTALL_DIR}WireguardVPN.conf | tr '\n#' ' ')
+                WG_INTERFACE=$(awk '$2 == "Y" || $2 =="P" {print $1}' ${INSTALL_DIR}WireguardVPN.conf | grep -vE "^#" | tr '\n#' ' ')
             else
                 # Whot if there are Peers we don't control?
                 WG_INTERFACE=$(wg show interfaces)                # v1.09
@@ -1178,6 +1178,50 @@ Show_Peer_Status() {
             fi
         done
 }
+Diag_Dump() {
+
+    echo -e $cBYEL"\n\tDEBUG: Routing Table main\n"$cBCYA 2>&1
+
+    ip route | grep "wg."
+    for WG_INTERFACE in $(wg show interfaces)
+        do
+            local I=${WG_INTERFACE:3:1}
+            if [ "${WG_INTERFACE:0:3}" != "wg2" ];then
+                local DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' ${INSTALL_DIR}WireguardVPN.conf | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
+                echo -e $cBYEL"\n\tDEBUG: Routing Table 12$I (wg1$I) ${cBMAG}$DESC\n"$cBCYA 2>&1
+                ip route show table 12$I
+            fi
+        done
+
+    echo -e $cBYEL"\n\tDEBUG: RPDB rules\n"$cBCYA 2>&1
+    #ip rule | grep -E "lookup 12[1-5]"
+    ip rule
+
+    echo -e $cBYEL"\n\tDEBUG: Routing info MTU etc.\n"$cBCYA 2>&1          # v1.07
+    for WG_INTERFACE in $(wg show interfaces)
+        do
+            ip a l $WG_INTERFACE                                # v1.07
+        done
+
+    echo -e $cBYEL"\n\tDEBUG: UDP sockets.\n"$cBCYA 2>&1
+    netstat -l -n -p | grep -e "^udp\s.*\s-$"
+
+    echo -e $cBYEL"\n\tDEBUG: Firewall rules \n"$cBCYA 2>&1
+    iptables --line -nvL FORWARD | grep -iE "WireGuard|Chain|pkts"
+    echo -e
+    iptables --line -t nat -nvL POSTROUTING | grep -iE "WireGuard|Chain|pkts"
+    echo -e
+    iptables --line -t mangle -nvL POSTROUTING | grep -iE "WireGuard|Chain|pkts"
+    echo -e
+    iptables --line -nvL INPUT | grep -iE "WireGuard|Chain|pkts"
+    echo -e
+    iptables --line -nvL OUTPUT | grep -iE "WireGuard|Chain|pkts"
+
+
+    [ "$(nvram get ipv6_service)" != "disabled" ] && ip -6 rule show
+
+    echo -e $cRESET 2>&1
+}
 Check_Version_Update() {
 
     GITHUB_DIR=$GITHUB_MARTINEAU
@@ -1384,47 +1428,7 @@ Process_User_Choice() {
                     Show_Peer_Status $menu1
 
                     if [ "$ACTION" == "diag" ];then
-                        #echo -e $cBWHT"\n\tDEBUG: Routing Table main\n";ip route | grep "wg.";for WG_INTERFACE in $(wg show interfaces);do I=${WG_INTERFACE:3:1};echo -e "\n\tDEBUG: Routing Table 12$I";ip route show table 12$I;done
-                        echo -e $cBYEL"\n\tDEBUG: Routing Table main\n"$cBCYA
-                        ip route | grep "wg."
-                        for WG_INTERFACE in $(wg show interfaces)
-                            do
-                                I=${WG_INTERFACE:3:1}
-                                if [ "${WG_INTERFACE:0:3}" != "wg2" ];then
-                                    DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' ${INSTALL_DIR}WireguardVPN.conf | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
-                                    echo -e $cBYEL"\n\tDEBUG: Routing Table 12$I (wg1$I) ${cBMAG}$DESC\n"$cBCYA
-                                    ip route show table 12$I
-                                fi
-                            done
-
-                        echo -e $cBYEL"\n\tDEBUG: RPDB rules\n"$cBCYA
-                        #ip rule | grep -E "lookup 12[1-5]"
-                        ip rule
-
-                        echo -e $cBYEL"\n\tDEBUG: Routing info MTU etc.\n"$cBCYA          # v1.07
-                        for WG_INTERFACE in $(wg show interfaces)
-                            do
-                                ip a l $WG_INTERFACE                                # v1.07
-                            done
-
-                        echo -e $cBYEL"\n\tDEBUG: UDP sockets.\n"$cBCYA
-                        netstat -l -n -p | grep -e "^udp\s.*\s-$"
-
-                        echo -e $cBYEL"\n\tDEBUG: Firewall rules \n"$cBCYA
-                        iptables --line -nvL FORWARD | grep -iE "WireGuard|Chain|pkts"
-                        echo -e
-                        iptables --line -t nat -nvL POSTROUTING | grep -iE "WireGuard|Chain|pkts"
-                        echo -e
-                        iptables --line -t mangle -nvL POSTROUTING | grep -iE "WireGuard|Chain|pkts"
-                        echo -e
-                        iptables --line -nvL INPUT | grep -iE "WireGuard|Chain|pkts"
-                        echo -e
-                        iptables --line -nvL OUTPUT | grep -iE "WireGuard|Chain|pkts"
-
-
-                        [ "$(nvram get ipv6_service)" != "disabled" ] && ip -6 rule show
-
-                        echo -e $cRESET
+                        Diag_Dump
                     fi
                 else
                     echo -en $cRED"\a\n\t";Say "Wireguard VPN module 'wg' NOT installed\n"$cRESET
@@ -1823,7 +1827,18 @@ Create_RoadWarrior_Device() {
 
         local PRI_KEY=$(cat ${CONFIG_DIR}${DEVICE_NAME}_private.key)
         local ROUTER_DDNS=$(nvram get ddns_hostname_x)
-        [ -z "$ROUTER_DDNS" ] && ROUTER_DDNS="IP_of_YOUR_DDNS_$HARDWARE_MODEL"
+
+        # If no formal DDNS, if there are no WireGuard or OpenVPN forcing the router via the VPN, try and get the WAN IP...
+        if [ -z "$ROUTER_DDNS" ];then
+            if [ -z "$(ip route show table main | grep -E "^0\.|^128\.")" ];then
+                ROUTER_DDNS_IP=$(curl ipecho.net/plain)                     # v3.01
+            fi
+            [ -z "$ROUTER_DDNS_IP" ] && ROUTER_DDNS_IP="IP_of_YOUR_DDNS_$HARDWARE_MODEL"
+        else
+            # Resolve the DDNS name
+            ROUTER_DDNS_IP=$(nslookup $1 | awk '/([0-9]{1,3}\.){3}[0-9]{1,3}/ {a=$3} END{print a;end}') # v3.01
+        fi
+
         local CREATE_DEVICE_CONFIG="Y"
         if [ -f ${CONFIG_DIR}${DEVICE_NAME}.conf ];then
             echo -e $cRED"\a\tWarning: Peer device ${cBMAG}'$DEVICE_NAME'${cRESET}${cRED} WireGuard config already EXISTS!"
@@ -1890,7 +1905,8 @@ DNS = 1.1.1.1
 [Peer]
 PublicKey = $PUB_SERVER_KEY
 AllowedIPs = $ALLOWED_IPS     ${SPLIT_TXT}
-Endpoint = $ROUTER_DDNS:51820
+# DDNS $ROUTER_DDNS
+Endpoint = $ROUTER_DDNS_IP:51820
 PersistentKeepalive = 25
 # $DEVICE_NAME End
 EOF
@@ -1994,6 +2010,8 @@ fi
 # Retain commandline comaptibility
 if [ "$1" != "install" ];then   # v2.01
     if [ "$(WireGuard_Installed)" == "Y" ];then             # v2.01
+DEBUG="###################################################################### 2001"
+DEBUGCASE=$1
         case "$1" in
 
             start|init)
@@ -2014,17 +2032,24 @@ if [ "$1" != "install" ];then   # v2.01
                 exit_message
             ;;
             show)
-                Show_Peer_Status "show+"                        # Force verbose detail
+                Show_Peer_Status "full"                        # Force verbose detail
+                echo -e $cRESET
+                exit_message
+            ;;
+            diag)
+                Diag_Dump                        # Force verbose detail
                 echo -e $cRESET
                 exit_message
             ;;
         esac
+
     else
         SayT "***ERROR WireGuard Manager/WireGuard Tool module 'wg' NOT installed"
         echo -e $cBRED"\a\n\t***ERROR WireGuard Tool module 'wg' NOT installed\n"$cRESET
         exit_message
     fi
 fi
+DEBUG="###################################################################### 2010"
 
 clear
 
