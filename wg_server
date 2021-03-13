@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v1.11"
-#============================================================================================ © 2021 Martineau v1.11
+VERSION="v1.12"
+#============================================================================================ © 2021 Martineau v1.12
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 12-Mar-2021
+# Last Updated Date: 13-Mar-2021
 #
 # Description:
 #
@@ -121,9 +121,9 @@ else
     ip link del dev $VPN_ID 2>/dev/null
     Firewall_delete
 
-    logger -t "wireguard-server${VPN_ID:3:1}" "Wireguard VPN 'server' Peer ($VPN_ID) on" $SOCKET "DELETED"
+    logger -t "wireguard-server${VPN_ID:3:1}" "Wireguard VPN 'server' Peer ($VPN_ID) on" $SOCKET "Terminated"
 
-    echo -en $cBGRE"\twireguard-server${VPN_ID:3:1}: Wireguard VPN '$MODE' Peer (${cBMAG}$VPN_ID$cBGRE) on $SOCKET (${cBMAG}$DESC${cBGRE}) ${cBRED}${aREVERSE}DELETED\n"$cRESET
+    echo -en $cBGRE"\twireguard-server${VPN_ID:3:1}: Wireguard VPN '$MODE' Peer (${cBMAG}$VPN_ID$cBGRE) on $SOCKET (${cBMAG}$DESC${cBGRE}) ${cBRED}${aREVERSE}Terminated\n"$cRESET
 
     echo -e $cRESET
 fi
