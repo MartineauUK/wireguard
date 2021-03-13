@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v3.02b2"
-#============================================================================================ © 2021 Martineau v3.02b2
+VERSION="v3.02b3"
+#============================================================================================ © 2021 Martineau v3.02b3
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -1777,7 +1777,8 @@ Show_Main_Menu() {
             printf '\n%b%s%bOption ==>%b ' "$cBCYA" "${TXT}$DEBUGMODE" "${cBYEL}" "${cRESET}"
             echo -en $xCSRPOS
 
-            [ "$READLINE" == "ReadLine" ] && Read_INPUT || read -r "CMDLINE"
+            unset $menu1; unset $CMDLINE
+            read -r "CMDLINE"
 
             menu1="$CMDLINE"
 
