@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v1.06"
-#============================================================================================ © 2021 Martineau v1.06
+VERSION="v1.07"
+#============================================================================================ © 2021 Martineau v1.07
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 11-Mar-2021
+# Last Updated Date: 13-Mar-2021
 #
 # Description:
 #
@@ -45,7 +45,7 @@ Firewall_delete() {
     iptables -t mangle -D FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'" 2>/dev/null
     iptables -t mangle -D FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'" 2>/dev/null
     iptables -t mangle -D FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'" 2>/dev/null
-    iptables -t mangle -D PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 2>/dev/null
+    iptables -t mangle -D PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'"2>/dev/null
 
     if [ $FIRMWARE -ge 38601 ];then         # Guest #1 SSID VLANs SNB @ZebMcKayhan
             iptables -t filter -D FORWARD -i br1 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN" 2>/dev/null
@@ -296,8 +296,8 @@ else
 #############################################################################EIC Hack 6 of 7################
     #service restart_dnsmasq
     #service restart_dnsmasq 2>&1 1>/dev/null
-    logger -t "wireguard-${MODE}${VPN_NUM}" "Wireguard VPN '$MODE' Peer ($VPN_ID) $TXT $SOCKET ($DESC) DELETED"
-    echo -e $cBGRE"\twireguard-${MODE}${VPN_NUM}: Wireguard VPN '$MODE' Peer (${cBMAG}$VPN_ID${cBGRE}) $TXT $SOCKET (${cBMAG}$DESC${cBGRE}) ${cBRED}${aREVERSE}DELETED"$cRESET
+    logger -t "wireguard-${MODE}${VPN_NUM}" "Wireguard VPN '$MODE' Peer ($VPN_ID) $TXT $SOCKET ($DESC) Terminated"
+    echo -e $cBGRE"\twireguard-${MODE}${VPN_NUM}: Wireguard VPN '$MODE' Peer (${cBMAG}$VPN_ID${cBGRE}) $TXT $SOCKET (${cBMAG}$DESC${cBGRE}) ${cBRED}${aREVERSE}Terminated"$cRESET
     echo -e $cRESET
 fi
 
