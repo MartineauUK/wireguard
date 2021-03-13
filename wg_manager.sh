@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v3.02b"
-#============================================================================================ © 2021 Martineau v3.02b
+VERSION="v3.02b2"
+#============================================================================================ © 2021 Martineau v3.02b2
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v3.02b"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 11-Mar-2021
+# Last Updated Date: 13-Mar-2021
 #
 # Description:
 #
@@ -1853,7 +1853,7 @@ Create_RoadWarrior_Device() {
             [ -z "$ROUTER_DDNS_IP" ] && ROUTER_DDNS_IP="IP_of_YOUR_DDNS_$HARDWARE_MODEL"
         else
             # Resolve the DDNS name
-            ROUTER_DDNS_IP=$(nslookup $1 | awk '/([0-9]{1,3}\.){3}[0-9]{1,3}/ {a=$3} END{print a;end}') # v3.01
+            ROUTER_DDNS_IP=$(nslookup "$ROUTER_DDNS" | awk '/([0-9]{1,3}\.){3}[0-9]{1,3}/ {a=$3} END{print a;end}') # v3.02 @Torson v3.01
         fi
 
         local CREATE_DEVICE_CONFIG="Y"
