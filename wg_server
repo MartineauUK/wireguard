@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v1.08"
-#============================================================================================ © 2021 Martineau v1.08
+VERSION="v1.12"
+#============================================================================================ © 2021 Martineau v1.12
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 11-Mar-2021
+# Last Updated Date: 13-Mar-2021
 #
 # Description:
 #
@@ -12,7 +12,7 @@ VERSION="v1.08"
 #
 # Contributors: odkrys
 
-CONFIG_DIR="/opt/etc/wireguard/"                
+CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v1.08 @elorimer
 INSTALL_DIR="/jffs/addons/wireguard/"
 
 
@@ -23,19 +23,23 @@ ANSIColours() {
     aBOLD="\e[1m";aDIM="\e[2m";aUNDER="\e[4m";aBLINK="\e[5m";aREVERSE="\e[7m"
     cWRED="\e[41m";cWGRE="\e[42m";cWYEL="\e[43m";cWBLU="\e[44m";cWMAG="\e[45m";cWCYA="\e[46m";cWGRA="\e[47m"
 }
+Is_IPv4_CIDR () {
+        grep -oE '^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$'         # IPv4 CIDR range notation
+}
 Firewall_delete() {
 
-    iptables -t mangle -D PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 2>/dev/null
-    iptables -t mangle -D FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 2>/dev/null
-    iptables -t mangle -D FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null
-    iptables -t mangle -D FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null
+    iptables -t mangle -D PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'server'" 2>/dev/null
+    iptables -t mangle -D FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'server'" 2>/dev/null
+    iptables -t mangle -D FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'server'" 2>/dev/null
+    iptables -t mangle -D FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'server'" 2>/dev/null
 
-    iptables -D INPUT -p udp --dport $wgport -j ACCEPT 2>/dev/null
-    iptables -D INPUT -i $VPN_ID -j ACCEPT 2>/dev/null
-    iptables -D FORWARD -i $VPN_ID -j ACCEPT 2>/dev/null
-    iptables -D FORWARD -o $VPN_ID -j ACCEPT 2>/dev/null
-    iptables -D OUTPUT -o $VPN_ID -j ACCEPT 2>/dev/null
-    iptables -t nat -D PREROUTING -p udp --dport $wgport -j ACCEPT 2>/dev/null
+    iptables -D INPUT -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
+    iptables -D INPUT -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
+    iptables -D FORWARD -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
+    iptables -D FORWARD -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
+    iptables -D OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
+    iptables -t nat -D PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
+    iptables -t nat -D POSTROUTING -s $Subnet -o wg1+ -j MASQUERADE -m comment --comment "WireGuard 'server'"  2>/dev/null  # v1.11
 }
 
 
@@ -46,6 +50,9 @@ Firewall_delete() {
 Main() { true; }            # Syntax that is Atom Shellchecker compatible!
 
 ANSIColours
+
+CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v1.08 @elorimer
+INSTALL_DIR="/jffs/addons/wireguard/"
 
 ############################################################################################################
 modprobe xt_set
@@ -66,14 +73,11 @@ DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' ${INSTAL
 
 if [ "$2" != "disable" ];then
     wgport=$(awk '/Listen/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)
-    if [ "$VPN_ID" == "wg1" ];then
-        WG_INTERFACE="wg1"
-        Subnet=10.50.1.1/24
-        #wgport="1151"
-    else
-        WG_INTERFACE=$1
-        Subnet=10.50.${VPN_ID:3:1}.1/24
-        #wgport="115"${VPN_ID:3:1}
+    Subnet=$(grep -E "^$WG_INTERFACE" ${INSTALL_DIR}WireguardVPN.conf | awk '{print $3}') # v1.09 @here1310
+    # CIDR ?
+    if [ -z "$(echo "$Subnet" | Is_IPv4_CIDR)" ];then
+        SUBNET_PREFIX=${Subnet%.*}
+        Subnet=$SUBNET_PREFIX".0/24"
     fi
 
     DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' ${INSTALL_DIR}WireguardVPN.conf | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
@@ -94,21 +98,21 @@ if [ "$2" != "disable" ];then
 
     Firewall_delete
 
-    iptables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
-    iptables -t mangle -I FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
-    iptables -t mangle -I FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7
-    iptables -t mangle -I PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7
+    iptables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'server'"
+    iptables -t mangle -I FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'server'"
+    iptables -t mangle -I FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'server'"
+    iptables -t mangle -I PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'server'"
 
-    iptables -I INPUT -p udp --dport $wgport -j ACCEPT
-    iptables -I INPUT -i $VPN_ID -j ACCEPT
-    iptables -I FORWARD -i $VPN_ID -j ACCEPT
-    iptables -I FORWARD -o $VPN_ID -j ACCEPT
-    iptables -I OUTPUT -o $VPN_ID -j ACCEPT
-    iptables -t nat -I PREROUTING -p udp --dport $wgport -j ACCEPT
+    iptables -I INPUT -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'"
+    iptables -I INPUT -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
+    iptables -I FORWARD -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
+    iptables -I FORWARD -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
+    iptables -I OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
+    iptables -t nat -I PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'"
 
     ###############################################################EIC Hack 5 of 5##############################
     #logger -st "($(basename $0))" "Configuring Wireguard to VPN Client (pass-thru)"
-    [ -n "$(wg show interfaces | grep -E "wg[0-1]")" ] && iptables -I POSTROUTING -t nat -s $Subnet -o wg1+ -j MASQUERADE
+    [ -n "$(wg show interfaces | grep -E "wg[0-1]")" ] && iptables -I POSTROUTING -t nat -s $Subnet -o wg1+ -j MASQUERADE -m comment --comment "WireGuard 'server'"
     echo -en $cBGRE"\t"
     logger -st "wireguard-server${VPN_ID:3:1}" "Initialisation complete."
     echo -e $cRESET
@@ -117,9 +121,9 @@ else
     ip link del dev $VPN_ID 2>/dev/null
     Firewall_delete
 
-    logger -t "wireguard-server${VPN_ID:3:1}" "Wireguard VPN 'server' Peer ($VPN_ID) on" $SOCKET "DELETED"
+    logger -t "wireguard-server${VPN_ID:3:1}" "Wireguard VPN 'server' Peer ($VPN_ID) on" $SOCKET "Terminated"
 
-    echo -en $cBGRE"\twireguard-server${VPN_ID:3:1}: Wireguard VPN '$MODE' Peer (${cBMAG}$VPN_ID$cBGRE) on $SOCKET (${cBMAG}$DESC${cBGRE}) ${cBRED}${aREVERSE}DELETED\n"$cRESET
+    echo -en $cBGRE"\twireguard-server${VPN_ID:3:1}: Wireguard VPN '$MODE' Peer (${cBMAG}$VPN_ID$cBGRE) on $SOCKET (${cBMAG}$DESC${cBGRE}) ${cBRED}${aREVERSE}Terminated\n"$cRESET
 
     echo -e $cRESET
 fi
