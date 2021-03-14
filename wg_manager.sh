@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v3.03b2"
-#============================================================================================ © 2021 Martineau v3.03b2
+VERSION="v3.03"
+#============================================================================================ © 2021 Martineau v3.03
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v3.03b2"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 11-Mar-2021
+# Last Updated Date: 14-Mar-2021
 #
 # Description:
 #
@@ -827,7 +827,7 @@ Manage_KILL_Switch() {
 }
 Get_scripts() {
     local BRANCH="$1"
-    local BRANCH="dev" ############## DO NOT USE IN PRODUCTION #################
+
     echo -e $cBCYA"\tDownloading scripts"$cRESET 2>&1
 
     # Allow use of custom script for debugging
@@ -1687,6 +1687,8 @@ Process_User_Choice() {
                         [ "$2" == "dev" ] && DEV="dev" || DEV="main"
                         DOWNLOAD="N"
 
+                        Check_Module_Versions
+
                         if [ "$ACTION" == "uf" ];then
                             echo -e ${cRESET}$cWRED"\n\tForced Update"$cRESET"\n"
                             DOWNLOAD="Y"
@@ -1696,12 +1698,13 @@ Process_User_Choice() {
                         fi
 
                         if [ "$DOWNLOAD" == "Y" ];then
+                            # Protect against curl download failures i.e. Github DOWN
+                            cp $0 $0.u                                             # v3.03
                             Get_scripts "$DEV"
+                            [ -f ${INSTALL_DIR}$SCRIPT_NAME ] && { rm $0.u; sleep 3; exec "$0" "$@"; } || mv $0.u $0
+                            # Never get here!!!
+                            echo -e $cRESET
                         fi
-
-                        Check_Module_Versions
-
-                        echo -e $cRESET
                         ;;
                 esac
                 ;;
@@ -2164,9 +2167,6 @@ ACTION=$1
 PEER=$2
 NOPOLICY=$3
 
-# Legacy tidy-up! to adopt a new name for the configuration file
-[ -f /jffs/configs/WireguardVPN_map ] && mv /jffs/configs/WireguardVPN_map ${INSTALL_DIR}WireguardVPN.conf      # v2.01
-
 source /usr/sbin/helper.sh                                  # v2.07 Required for external 'am_settings_set()/am_settings_get()'
 
 # Need assistance ?
@@ -2190,6 +2190,35 @@ fi
 
 # Retain commandline compatibility
 if [ "$1" != "install" ];then   # v2.01
+
+    # v3.00 uses '/opt/etc/wireguard.d' rather than '/opt/etc/wireguard'
+    # Check if v2.00 was installed, then offer to rename it
+    VERSION_NUMDOT=$VERSION                                             # v3.03
+    VERSION_NUM=$(echo "$VERSION" | sed 's/[^0-9]*//g')
+    if [ "${VERSION_NUM:0:1}" -eq 3 ] && [ ! -d ${CONFIG_DIR} ];then    # v3.03
+
+        if [ -d /opt/etc/wireguard ] && [ "$(ls -1 /opt/etc/wireguard | wc -l)" -gt "5" ];then
+
+            echo -e $cBRED"\a\n\tWireGuard Session Manager v3.0 requires '${CONFIG_DIR}'\n\n\t${cBWHT}Do you want to rename '/opt/etc/wireguard' to '${CONFIG_DIR}' ?"
+            echo -e "\tPress$cBRED y$cRESET to$cBRED auto-migrate to WireGuard Session Manager v3.0${cRESET} or press$cBGRE [Enter] to SKIP."
+                read -r "ANS"
+                if [ "$ANS" == "y" ];then
+
+                    mv /opt/etc/wireguard ${CONFIG_DIR}
+
+                    # Legacy tidy-up! to adopt the new name for the configuration file
+                    if [ -f /jffs/configs/WireguardVPN_map ];then
+                        mv /jffs/configs/WireguardVPN_map /jffs/configs/WireguardVPN_map.bak
+                        cp /jffs/configs/WireguardVPN_map.bak ${INSTALL_DIR}WireguardVPN.conf      # v2.01
+                    fi
+
+                else
+                    echo -e $cBYEL"\n\tManually migrate by \n\n\t1. Reinstalling from Github\n\t2. Copy '/jffs/configs/WireguardVPN_map' to '${INSTALL_DIR}WireguardVPN.conf\n\t3. Copy /opt/etc/wireguard/'*.conf'/'*_key' to '${CONFIG_DIR}'\n"$cRESET
+                    exit 99
+                fi
+        fi
+    fi
+
     if [ "$(WireGuard_Installed)" == "Y" ];then             # v2.01
 
         case "$1" in
