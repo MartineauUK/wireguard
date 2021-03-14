@@ -1,16 +1,19 @@
 #!/bin/sh
-VERSION="v1.04"
-#============================================================================================ © 2021 Martineau v1.04
+VERSION="v1.07"
+#============================================================================================ © 2021 Martineau v1.07
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 09-Mar-2021
+# Last Updated Date: 13-Mar-2021
 #
 # Description:
 #
 # Acknowledgement:
 #
 # Contributors: odkrys
+
+CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v1.05 @elorimer
+INSTALL_DIR="/jffs/addons/wireguard/"
 
 
 #For verbose debugging, uncomment the following two lines, and uncomment the last line of this script
@@ -39,18 +42,18 @@ Is_AX() {
 }
 Firewall_delete() {
 
-    if [ $FIRMWARE -ge 38601 ];then         # Allow Guest #1 SSID VLANs @ZebMcKayhan
-        iptables -t filter -D FORWARD -i br1 -o $VPN_ID -j ACCEPT 2>/dev/null
-        iptables -t filter -D FORWARD -i br2 -o $VPN_ID -j ACCEPT 2>/dev/null
-        iptables -t nat -D POSTROUTING -s $(nvram get lan_ipaddr)/16 -o $VPN_ID -j MASQUERADE 2>/dev/null
-    else
-        iptables -t nat -D POSTROUTING -s $(nvram get lan_ipaddr)/24 -o $VPN_ID -j MASQUERADE 2>/dev/null
-    fi
+    iptables -t mangle -D FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'" 2>/dev/null
+    iptables -t mangle -D FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'" 2>/dev/null
+    iptables -t mangle -D FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'" 2>/dev/null
+    iptables -t mangle -D PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'" 2>/dev/null
 
-    iptables -t mangle -D FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 2>/dev/null
-    iptables -t mangle -D FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null
-    iptables -t mangle -D FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null
-    iptables -t mangle -D PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 2>/dev/null
+    if [ $FIRMWARE -ge 38601 ];then         # Guest #1 SSID VLANs SNB @ZebMcKayhan
+            iptables -t filter -D FORWARD -i br1 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN" 2>/dev/null
+            iptables -t filter -D FORWARD -i br2 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN" 2>/dev/null
+            iptables -t nat -D POSTROUTING -s $(nvram get lan_ipaddr)/16 -o $VPN_ID -j MASQUERADE -m comment --comment "WireGuard 'client'" 2>/dev/null
+    else
+            iptables -t nat -D POSTROUTING -s $(nvram get lan_ipaddr)/24 -o $VPN_ID -j MASQUERADE -m comment --comment "WireGuard 'client'" 2>/dev/null
+    fi
 
 }
 # Taken/Adapted from 'vpnrouting.sh' by RMerlin
@@ -124,8 +127,7 @@ ANSIColours
 
 FIRMWARE=$(echo $(nvram get buildno) | awk 'BEGIN { FS = "." } {printf("%03d%02d",$1,$2)}')
 
-CONFIG_DIR="/opt/etc/wireguard/"
-INSTALL_DIR="/jffs/addons/wireguard/"
+
 
 modprobe xt_set
 modprobe xt_comment
@@ -232,17 +234,17 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
 
         Firewall_delete
 
-        iptables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
-        iptables -t mangle -I FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
-        iptables -t mangle -I FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7
-        iptables -t mangle -I PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7
+        iptables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'"
+        iptables -t mangle -I FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'"
+        iptables -t mangle -I FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'"
+        iptables -t mangle -I PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'"
 
         if [ $FIRMWARE -ge 38601 ];then         # Allow Guest #1 SSID VLANs SNB @ZebMcKayhan
             iptables -t filter -I FORWARD -i br1 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN"
             iptables -t filter -I FORWARD -i br2 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN"
-            iptables -t nat -I POSTROUTING -s $(nvram get lan_ipaddr)/16 -o $VPN_ID -j MASQUERADE
+            iptables -t nat -I POSTROUTING -s $(nvram get lan_ipaddr)/16 -o $VPN_ID -j MASQUERADE -m comment --comment "WireGuard 'client'"
         else
-            iptables -t nat -I POSTROUTING -s $(nvram get lan_ipaddr)/24 -o $VPN_ID -j MASQUERADE
+            iptables -t nat -I POSTROUTING -s $(nvram get lan_ipaddr)/24 -o $VPN_ID -j MASQUERADE -m comment --comment "WireGuard 'client'"
         fi
 
         if [ "$wgdns" != "" ] && [ ! -f /tmp/resolv.dnsmasq_backup ]; then {
@@ -275,6 +277,7 @@ else
             done
 
     ip link del dev $VPN_ID 2>/dev/null
+
     Firewall_delete
 
     ip rule del from $(nvram get lan_ipaddr | cut -d"." -f1-3).0/24 table 12$VPN_NUM prio 992$VPN_NUM   2>/dev/null
@@ -293,8 +296,8 @@ else
 #############################################################################EIC Hack 6 of 7################
     #service restart_dnsmasq
     #service restart_dnsmasq 2>&1 1>/dev/null
-    logger -t "wireguard-${MODE}${VPN_NUM}" "Wireguard VPN '$MODE' Peer ($VPN_ID) $TXT $SOCKET ($DESC) DELETED"
-    echo -e $cBGRE"\twireguard-${MODE}${VPN_NUM}: Wireguard VPN '$MODE' Peer (${cBMAG}$VPN_ID${cBGRE}) $TXT $SOCKET (${cBMAG}$DESC${cBGRE}) ${cBRED}${aREVERSE}DELETED"$cRESET
+    logger -t "wireguard-${MODE}${VPN_NUM}" "Wireguard VPN '$MODE' Peer ($VPN_ID) $TXT $SOCKET ($DESC) Terminated"
+    echo -e $cBGRE"\twireguard-${MODE}${VPN_NUM}: Wireguard VPN '$MODE' Peer (${cBMAG}$VPN_ID${cBGRE}) $TXT $SOCKET (${cBMAG}$DESC${cBGRE}) ${cBRED}${aREVERSE}Terminated"$cRESET
     echo -e $cRESET
 fi
 
