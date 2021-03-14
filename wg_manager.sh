@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v3.03b"
-#============================================================================================ © 2021 Martineau v3.03b
+VERSION="v3.03b2"
+#============================================================================================ © 2021 Martineau v3.03b2
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -334,15 +334,16 @@ Create_Peer() {
     if [ -z "$SERVER_PEER" ];then
 
         SERVER_PEER=$(grep "^wg2" ${INSTALL_DIR}WireguardVPN.conf | awk '{print $1" "$3}' | sort | tail -n 1)
+        AUTO_VPN_POOL=$(echo "$SERVER_PEER" | awk '{print $2}')
         SERVER_PEER=$(echo "$SERVER_PEER" | awk '{print $1}')
 
         # User specified VPN Tunnel subnet?
         if [ -z "$VPN_POOL_USER" ];then
-            VPN_POOL=$(echo "$SERVER_PEER" | awk '{print $2}')
-            ONE_OCTET=$(echo "$VPN_POOL" | cut -d'.' -f1)
-            TWO_OCTET=$(echo "$VPN_POOL" | cut -d'.' -f2)
-            THIRD_OCTET=$(echo "$VPN_POOL" | cut -d'.' -f3)
-            REST=$(echo "$VPN_POOL" | cut -d'.' -f4-)
+
+            ONE_OCTET=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f1)
+            TWO_OCTET=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f2)
+            THIRD_OCTET=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f3)
+            REST=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f4-)
             NEW_THIRD_OCTET=$((THIRD_OCTET+1))
             VPN_POOL=$(echo -e "$ONE_OCTET.$TWO_OCTET.$NEW_THIRD_OCTET.$REST")
         fi
