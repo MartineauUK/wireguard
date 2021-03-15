@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v3.03"
-#============================================================================================ © 2021 Martineau v3.03
+VERSION="v3.04"
+#============================================================================================ © 2021 Martineau v3.04
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v3.03"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 14-Mar-2021
+# Last Updated Date: 15-Mar-2021
 #
 # Description:
 #
@@ -96,6 +96,14 @@ Repeat() {
 }
 Is_IPv4_CIDR () {
         grep -oE '^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$'         # IPv4 CIDR range notation
+}
+Is_Private_IPv4 () {
+    # 127.  0.0.0 – 127.255.255.255     127.0.0.0 /8
+    # 10.   0.0.0 –  10.255.255.255      10.0.0.0 /8
+    # 172. 16.0.0 – 172. 31.255.255    172.16.0.0 /12
+    # 192.168.0.0 – 192.168.255.255   192.168.0.0 /16
+    #grep -oE "(^192\.168\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])$)|(^172\.([1][6-9]|[2][0-9]|[3][0-1])\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])$)|(^10\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])$)"
+    grep -oE "(^127\.)|(^(0)?10\.)|(^172\.(0)?1[6-9]\.)|(^172\.(0)?2[0-9]\.)|(^172\.(0)?3[0-1]\.)|(^169\.254\.)|(^192\.168\.)"
 }
 Check_Lock() {
         if [ -f "/tmp/wg.lock" ] && [ -d "/proc/$(sed -n '2p' /tmp/wg.lock)" ] && [ "$(sed -n '2p' /tmp/wg.lock)" != "$$" ]; then
@@ -274,7 +282,7 @@ Check_Module_Versions() {
     local WGTOOLS=$(opkg list-installed | grep "wireguard-tools" | awk '{print $3}' | sed 's/\-.*$//')
 
     if [ -n "$WGKERNEL" ];then                  # v1.04
-        [ "$WGKERNEL" != "$BOOTLOADED" ] && echo -e $cRED"\a\n\tWarning Reboot required for (dmesg) WireGuard $WGKERNEL $BOOTLOADED\n"
+        [ "$WGKERNEL" != "$BOOTLOADED" ] && echo -e $cRED"\a\n\tWarning: Reboot required for (dmesg) WireGuard $WGKERNEL $BOOTLOADED\n"
     fi
 
     Show_MD5
@@ -321,6 +329,7 @@ Create_Peer() {
             ;;
         *)
             local SERVER_PEER=$1
+            [ "$SERVER_PEER" == "new" ] &&  local SERVER_PEER= || local SERVER_PEER=$1
             ;;
         esac
         shift
@@ -367,6 +376,8 @@ Create_Peer() {
         return 1
     fi
 
+    local WANIPADDR=$(nvram get wan0_ipaddr)
+    [ -n "$(echo "$WANIPADDR" | Is_Private_IPv4)" ] && echo -e ${cRESET}${cBRED}${aBOLD}"\a\n\t*** Ensure Upstream router Port Foward entry for port:${cBMAG}${LISTEN_PORT}${cRESET}${cBRED}${aBOLD} ***"$cRESET
     echo -e $cBWHT"\n\tPress$cBRED y$cRESET to$cBRED Create 'server' Peer (${cBMAG}${SERVER_PEER}) ${cBWHT}${VPN_POOL}${cRESET}:${LISTEN_PORT}${cBWHT} or press$cBGRE [Enter] to SKIP."
     read -r "ANS"
     [ "$ANS" == "y" ] || return 1
@@ -403,7 +414,227 @@ EOF
     read -r "ANS"
     [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "start" "$SERVER_PEER"; Show_Peer_Status "show"; } # v3.03
 
+    # Firewall rule to listen on multiple ports?
+    #   e.g. iptables -t nat -I PREROUTING -i $WAN_IF -d <yourIP/32> -p udp -m multiport --dports 53,80,4444  -j REDIRECT --to-ports $LISTEN_PORT
 
+}
+Delete_Peer() {
+
+    for WG_INTERFACE in $@
+        do
+
+            if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
+
+                local Mode=$(Server_or_Client "$WG_INTERFACE")
+
+                echo -e $cBWHT"\n\tDeleting '$Mode' Peer (${cBMAG}${WG_INTERFACE})\n"$cBRED
+
+                if [ "$Mode" == "server" ];then
+                        # Check how many 'client' Peers exist
+                        CNT=$(grep -cE "^AllowedIPs" ${CONFIG_DIR}${WG_INTERFACE}.conf )
+                        if [ $CNT -gt 0 ];then
+                            echo -e $cBRED"\n\tWarning: 'server' Peer ${cBMAG}${WG_INTERFACE}${cBRED} has ${cBWHT}${CNT}${cBRED} 'client' Peer\n"$cBYEL
+                            grep -E -B 3 -A 1 "^AllowedIPs" ${CONFIG_DIR}${WG_INTERFACE}.conf
+                            echo -e $cBWHT"\n\tYou can manually reassign them to a different 'server' Peer by recreating the 'client' Peer then rescan the QR code on the device"
+                        fi
+                fi
+
+                echo -e $cBWHT"\tPress$cBRED y$cRESET to ${aBOLD}CONFIRM${cRESET}${cBRED} or press$cBGRE [Enter] to SKIP."
+                read -r "ANS"
+
+                if [ "$ANS" == "y" ];then
+
+                    [ -n "$(wg show $WG_INTERFACE 2>/dev/null)" ] && Manage_Wireguard_Sessions "stop" "$WG_INTERFACE"
+
+                    #echo -e $cBCYA"\tDeleting ${WG_INTERFACE} '$Mode' Peer from '${INSTALL_DIR}WireguardVPN.conf'"$cBRED
+                    sed -i "/^$WG_INTERFACE/d" ${INSTALL_DIR}WireguardVPN.conf
+
+                    if [ "$Mode" == "client" ];then
+
+                        # Remove the 'client' from any 'server' Peers
+                        #   # SGS8
+                        #   ..........
+                        #   # SGS8 End
+
+
+                            # Scan for 'server' Peer that accepts this 'client' connection
+                            SERVER_PEER=$(grep -E "^#.*$WG_INTERFACE$" /opt/etc/wireguard.d/wg2*.conf | awk -F '[\/:\._]' '{print $6}')
+
+                            for SERVER_PEER in $SERVER_PEER
+                                do
+                                    echo -e $cBMAG"$WG_INTERFACE ${cBGRE} 'client' Peer removed from 'server' Peer (${cBMAG}${SERVER_PEER}${cBGRE})"
+                                    sed -i "/^# $WG_INTERFACE$/,/^# $WG_INTERFACE End$/d" ${CONFIG_DIR}${SERVER_PEER}.conf
+                                done
+                    fi
+
+                    #echo -e $cBCYA"\tDeleting '${CONFIG_DIR}${WG_INTERFACE}*.*'"$cBRED
+                    rm ${CONFIG_DIR}${WG_INTERFACE}*
+
+                    echo -e $cBGRE"\t'$Mode' Peer ${cBMAG}${WG_INTERFACE}${cBGRE} ${cBRED}${aREVERSE}DELETED"$cRESET
+
+                fi
+
+            else
+                [ -n "$Mode" ] && TXT="'$Mode' " || TXT=            # v3.03
+                SayT "***ERROR: WireGuard VPN ${TXT}Peer ('$WG_INTERFACE') config NOT found?....skipping $ACTION request"
+                echo -e $cBRED"\a\n\t***ERROR: WireGuard ${TXT}Peer (${cBWHT}$WG_INTERFACE${cBRED}) config NOT found?....skipping delete Peer '${cBMAG}${WG_INTERACE}${cBRED}' request\n"$cRESET   2>&1  # v1.09
+            fi
+
+        done
+
+}
+Manage_Peer() {
+
+    local ACTION=$1;shift
+
+    WG_INTERFACE=$1;shift
+    local CMD=$1
+
+    [ "$WG_INTERFACE" == "new" ] && { CMD="new"; WG_INTERFACE=; }
+
+    [ -z "$CMD" ] && CMD="list"
+
+        case $CMD in
+            list)
+
+                if [ "$WG_INTERFACE" != "category" ];then                   # v3.04
+                    Show_Peer_Config_Entry
+                else
+                    echo -e $cBWHT"\n\tPeer categories\n"$cBCYA
+                    grep -E "^[[:alpha:]].*=wg" ${INSTALL_DIR}WireguardVPN.conf | tr ',' ' '
+                    echo -e "\n"$cRESET
+                fi
+            ;;
+            *)
+
+                local FN=${INSTALL_DIR}WireguardVPN.conf
+
+                if [ "$WG_INTERFACE" == "new" ] || [ "$WG_INTERFACE" == "add" ];then
+                    CMD=$WG_INTERFACE
+                    shift
+                    WG_INTERFACE=$1
+                fi
+
+
+                if [ "$WG_INTERFACE" != "category" ];then                   # v3.04
+
+                    if [ "$CMD" == "new" ] || [ "$CMD" == "add" ] || [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ] || [ -n "$(grep "^$WG_INTERFACE" $FN )" ];then
+                        case $CMD in
+                            new*)
+                                # New 'server' Peer    [port=nnnnn] [ip=xxx.xxx.xxx.1/24] [auto={y|n}]
+                                Create_Peer $menu1
+                            ;;
+                            auto)
+                                if [ "$(echo "$ARG3" | grep "^[yYnNpP]$" )" ];then
+                                    FLAG=$(echo "$ARG3" | tr 'a-z' 'A-Z')
+                                    sed -i "/^$WG_INTERFACE/ s~[^ ]*[^ ]~$FLAG~2" ${INSTALL_DIR}WireguardVPN.conf
+                                    echo -e $cBGRE"\n\tUpdated AUTO=$FLAG: $(grep -E "^$WG_INTERFACE[[:space:]]" $FN)\n"$cRESET
+                                else
+                                    echo -e $cBRED"\a\n\t***ERROR Invalid Peer Auto='$ARG3''$WG_INTERFACE'\n"$cRESET
+                                fi
+                            ;;
+                            del)
+                                Delete_Peer "$WG_INTERFACE"
+                            ;;
+                            add)
+                                if [ -z "$(grep "^$WG_INTERFACE" $FN )" ];then
+                                    shift 3
+                                    LINE=$WG_INTERFACE"   $@"
+                                    [ $(echo "$LINE" | wc -w) -eq 1 ] && LINE=$LINE"     N     #"
+                                    [ -z "$(echo "$LINE" grep -F "#")" ] && LINE=$LINE" # "
+                                    LINE=$(_quote "$LINE")
+                                    POS=$(awk '($2=="Y"|| $2=="N"||$2=="P") {print NR":"$0}' $FN | tail -n 1 | cut -d':' -f1)
+                                    AUTO="$(echo "$LINE" | awk '{print $2}')"
+                                    if [ -n "$(echo "$AUTO" | grep "^[yYnNpP]$" )" ];then
+                                        [ -n "$POS" ] && sed -i "$POS a $LINE" ${INSTALL_DIR}WireguardVPN.conf
+                                        echo -e $cBGRE"\n\tWireGuard Peer '$WG_INTERFACE' added\n"$cRESET
+                                    else
+                                        echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard Peer Auto='$AUTO' flag for '$WG_INTERFACE'\n"$cRESET
+                                    fi
+                                else
+                                    echo -e $cBRED"\a\n\t***ERROR WireGuard Peer '$WG_INTERFACE' already exists\n"$cRESET
+                                fi
+                            ;;
+                            comment)
+                                echo -e $cBCYA"\n\tPeer Comment (Before): $(grep -E "^$WG_INTERFACE[[:space:]]" $FN)"$cRESET
+                                shift 3
+                                COMMENT="$@"
+                                [ "${COMMENT:0:1}" != "#" ] && COMMENT="# "$COMMENT
+                                sed -i "/^$WG_INTERFACE/ s~\#.*$~$COMMENT~" ${INSTALL_DIR}WireguardVPN.conf
+                                echo -e $cBGRE"\tPeer Comment (After) : $(grep -E "^$WG_INTERFACE[[:space:]]" $FN)\n"$cRESET
+
+                            ;;
+                            dump|show)
+
+                                local Mode=$(Server_or_Client "$WG_INTERFACE")
+                                if [ "$CMD" == "show" ] && [ "$Mode" == "server" ];then
+                                    echo -e $cBWHT"\n\t'$Mode' Peer ${cBMAG}${WG_INTERFACE}${cBWHT} Configuration Summary\n"$cBYEL
+                                    Show_Peer_Config_Entry "$WG_INTERFACE"
+                                    echo -en $cBYEL
+                                    echo -e "Public Key = "$(cat ${CONFIG_DIR}${WG_INTERFACE}_public.key)
+                                    grep -ivE "example" ${CONFIG_DIR}${WG_INTERFACE}.conf | awk '( $1=="PrivateKey" || $1=="ListenPort" || $3=="End") {print $0}' | sed 's/End//g; s/^#/Client Peer:/g'
+                                else
+                                    echo -e $cBWHT"\n\t'$Mode' Peer ${cBMAG}${WG_INTERFACE}${cBWHT} Configuration Detail\n"$cBYEL
+                                    cat ${CONFIG_DIR}${WG_INTERFACE}.conf
+                                fi
+
+                                echo -e $cRESET
+                            ;;
+                            *)
+                                echo -e $cBCYA"\n\tPeer Entry: $(grep -E "^$WG_INTERFACE[[:space:]]" $FN)\n"$cRESET
+                            ;;
+                        esac
+                    else
+                        echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard Peer '$WG_INTERFACE'\n"$cRESET
+                    fi
+                else
+
+                    local CATEGORY_NAME=$1;shift                                    # v3.04
+
+                    local CMD=$1;shift
+
+                    case $CMD in
+                        add*)
+                            if [ -z "$(grep "^${CATEGORY_NAME}\=" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                                POS=$(awk '/^# Categories/ {print NR}' ${INSTALL_DIR}WireguardVPN.conf)
+                                local PEERS=
+                                echo -e
+                                for PEER in $@
+                                    do
+                                        [ ${PEER:0:2} != "wg" ] && { echo -e $cRED"\a\tInvalid Peer prefix 'wg*' '${cBWHT}$PEER${cRED}' ignored"$cRESET; PEER=; }
+                                        if [ -n "$PEER" ] && [ ! -f ${CONFIG_DIR}${PEER}.conf ];then
+                                            echo -e $cRED"\a\tPeer '${cBWHT}$PEER${cRED}' not found... ignored"$cRESET
+                                            PEER=
+                                        fi
+                                        [ -n "$PEER" ] && PEERS=$PEERS" "$PEER
+                                    done
+
+                                PEERS=$(printf "%s" "$PEERS" | sed 's/^[ \t]*//;s/[ \t]*$//')
+                                if [ -n "$PEERS" ];then
+                                    LINE="$CATEGORY_NAME="$PEERS
+                                    sed -i "$POS a $LINE" ${INSTALL_DIR}WireguardVPN.conf
+                                    echo -e $cBGRE"\n\t'Peer category '$CATEGORY_NAME' ${cBRED}created\n"$cRESET
+                                else
+                                    echo -e $cBRED"\a\n\t***ERROR Category name '$CATEGORY_NAME' must contain VALID Peers!\n"$cBYEL
+                                fi
+                            else
+                                echo -e $cBRED"\a\n\t***ERROR Category name '$CATEGORY_NAME' already EXISTS!\n"$cBYEL
+                                grep "^$CATEGORY_NAME\=" ${INSTALL_DIR}WireguardVPN.conf
+                                echo -e $cBWHT
+                            fi
+                        ;;
+                        del)
+                            if [ -n "$(grep "^${CATEGORY_NAME}\=" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                                sed -i "/^$CATEGORY_NAME\=/d" ${INSTALL_DIR}WireguardVPN.conf
+                                echo -e $cBGRE"\n\t'Peer category '$CATEGORY_NAME' ${cBRED}Deleted\n"$cRESET
+                            else
+                                echo -e $cBRED"\a\n\t***ERROR Invalid Category name '$CATEGORY_NAME'\n"$cRESET
+                            fi
+                        ;;
+                    esac
+                fi
+            ;;
+        esac
 }
 Manage_Wireguard_Sessions() {
 
@@ -441,12 +672,28 @@ Manage_Wireguard_Sessions() {
                 #echo -e $cBWHT"Requesting WireGuard VPN Peer ${ACTION}$CATEGORY ($WG_INTERFACE)"$cRESET
             ;;
             *)
-                WG_INTERFACE=$WG_INTERFACE" "$@
+
+                local PEERS=$WG_INTERFACE" "$@              # v3.04
+
+                for PEER in $PEERS
+                    do
+                        # Category  list (CSV or space delimited) ?     # v3.04
+                        local VALID_CATEGORY_PEERS=$(grep -E "^[[:alpha:]].*=wg" ${INSTALL_DIR}WireguardVPN.conf | grep -F "$PEER" | tr ',' ' ')
+                        if [ -n "$VALID_CATEGORY_PEERS" ];then
+                            local CATEGORY_PEERS=$CATEGORY_PEERS" "${VALID_CATEGORY_PEERS#*=}       # v3.04
+                            local CATEGORY=" expanded category..."                                  # v3.04
+                        else
+                            local INTERFACES=$INTERFACES" "$PEER
+                        fi
+
+                    done
+                WG_INTERFACE=$INTERFACES" "$CATEGORY_PEERS              # v3.04
             ;;
         esac
     fi
 
-    WG_INTERFACE=$(echo "$WG_INTERFACE" | sed 's/ $//')
+    WG_INTERFACE=$(printf "%s" "$WG_INTERFACE" | sed 's/^[ \t]*//;s/[ \t]*$//')
+
     echo -e $cBWHT"\n\tRequesting WireGuard VPN Peer ${ACTION}$CATEGORY (${cBMAG}$WG_INTERFACE"$cRESET")"
 
     case "$ACTION" in
@@ -659,6 +906,9 @@ rp15    <Router>192.168.1.0/24>>VPN<LAN>192.168.1.1>>WAN
 # Custom 'client' Peer interfaces - simply to annotate
 SGS8    N      1.2.3.4            xxx.xxx.xxx.xxx        dns.xxx.xxx.xxx      # A comment here
 wg0-client5 N  4.3.2.1                                                        # Mullvad UK, London
+
+# Categories
+NoNe=
 
 # WAN KILL-Switch
 #KILLSWITCH
@@ -977,7 +1227,7 @@ WireGuard_Installed() {
         return 1
     fi
 }
-Peer_Status() {
+Peer_Status_Summary() {
 
     local TYPE=
     local CLIENT_PEERS=0
@@ -1043,7 +1293,7 @@ Install_WireGuard_Manager() {
     if [ -d /opt/etc/ ];then
         # Legacy pre v2.03 install?
         if [ -d /opt/etc/wireguard ];then
-            echo -e $cRED"\a\n\tWarning obsolete WireGuard Session Manager v1.xx config directory Found!!! (${cBWHT}'/opt/etc/wireguard'{$cBRED})\n"$cRESET
+            echo -e $cRED"\a\n\tWarning: obsolete WireGuard Session Manager v1.xx config directory Found!!! (${cBWHT}'/opt/etc/wireguard'{$cBRED})\n"$cRESET
             SayT "Warning obsolete WireGuard Session Manager config directory Found!!! ('/opt/etc/wireguard')"
         fi
         [ ! -d ${CONFIG_DIR} ] && mkdir -p ${CONFIG_DIR}
@@ -1256,7 +1506,8 @@ Show_Peer_Status() {
                         if [ -z "$(grep -iE "^Endpoint" ${CONFIG_DIR}${WG_INTERFACE}.conf)" ];then
                             local TYPE="server"
                             local VPN_ADDR=$(ip addr | grep $WG_INTERFACE | awk '/inet/ {print $2}')
-                            local VPN_IP_TXT="${VPN_ADDR} ${cBYEL}VPN Tunnel Network$cBMAG\t"
+                            local LISTEN_PORT=$(awk '/^Listen/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)
+                            local VPN_IP_TXT="Port:${LISTEN_PORT}\t${VPN_ADDR} ${cBYEL}\t\tVPN Tunnel Network"
                         else
                             local TYPE="client"
                         fi
@@ -1268,7 +1519,7 @@ Show_Peer_Status() {
                             local DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' ${INSTALL_DIR}WireguardVPN.conf | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
                         fi
 
-                        local LINE=${COLOR}$LINE" ${cBMAG}\t${cBWHT}$VPN_IP_TXT${cBMAG}('$TYPE'\t\t$DESC)"  # v3.01
+                        local LINE=${COLOR}$LINE" ${cBMAG}\t${cBWHT}$VPN_IP_TXT\t${cBMAG}$DESC"  # v3.01
                     else
                         local TAB="\t\t"
                         [ -n "$(echo "$LINE" | grep -E "transfer:")" ] && COLOR=$cBWHT
@@ -1282,7 +1533,7 @@ Show_Peer_Status() {
                             local PUB_KEY=$(echo $LINE | awk '{print $2}')
                             WG_INTERFACE=$(grep -F "$PUB_KEY" /opt/etc/wireguard.d/*_public.key | awk -F '[\/:\._]' '{print $6}')
                             local VPN_ADDR=$(awk '/^Address/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf )
-                            local LINE=${COLOR}$LINE" ${cBMAG}\t('$TYPE client'\t${DESC}\t${cBWHT}${VPN_ADDR}"
+                            local LINE=${COLOR}$LINE" \t${cBWHT}${VPN_ADDR}\t\t${cBMAG}${DESC}\t"
                         fi
                     fi
 
@@ -1300,6 +1551,19 @@ Show_Peer_Status() {
                 echo -e "\tNo WireGuard Peers active\n" 2>&1
             fi
         done
+}
+Show_Peer_Config_Entry() {
+
+    local WG_INTERFACE=$1
+
+    echo -e $cBWHT"\n\tPeers (Start=P - Policy, Start=X - External i.e. Cell/Mobile)\n"$cBCYA
+    [ -z "$WG_INTERFACE" ] && local MATCH="." || local MATCH=$WG_INTERFACE
+    if [ -n "$(which column)" ];then
+        awk '($2=="Y" || $2=="N" || $2=="P" || $2=="X") {print $0}' ${INSTALL_DIR}WireguardVPN.conf | grep -viE "^[#]*kill" | grep "$MATCH" | column -t  --table-columns Peer,Start,IP/Subnet   # v3.04 v2.02
+    else
+        awk '($2=="Y" || $2=="N" || $2=="P" || $2=="X") {print $0}' ${INSTALL_DIR}WireguardVPN.conf | grep -viE "^[#]*kill" | grep "$MATCH"
+    fi
+    echo -en $cRESET
 }
 Show_VPN_Pool() {
 
@@ -1471,7 +1735,7 @@ Build_Menu() {
             fi
             MENU_R="$(printf '%b6 %b = %bRestart%b [ [Peer... ] | category ]%b e.g. restart servers\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
             MENU_Q="$(printf '%b7 %b = %bDisplay QR code for a Peer {device} e.g. iPhone%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
-            MENU_P="$(printf '%b8 %b = %bPeer management ['list'] | [ {Peer} [ add | del | {auto [y|n|p]}] ] ]%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
+            MENU_P="$(printf '%b8 %b = %bPeer management [ "list" | "category" | "new" ] | [ {Peer | category} [ 'del' | 'show' | 'add' [{"auto="[y|n|p]}] ]%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
             MENU_C="$(printf '%b9 %b = %bCreate Key-pair for Peer {Device} e.g. Nokia6310i (creates Nokia6310i.conf etc.)%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
 
         fi
@@ -1525,7 +1789,6 @@ Validate_User_Choice() {
             alias*) ;;
             diag) ;;
             debug) ;;
-            new*) ;;                    # v3.03
             wg*) ;;
             killswitch*) ;;             # v2.03
             killinterface*) ip link del dev $(echo "$menu1" | awk '{print $2}'); menu1=;;
@@ -1568,7 +1831,7 @@ Process_User_Choice() {
                 if [ -n "$(which wg)" ];then
 
                     echo -e $cBYEL"\n\t\t WireGuard VPN Peer Status"$cRESET
-                    Show_Peer_Status $menu1
+                    Show_Peer_Status "full"
 
                     if [ "$ACTION" == "diag" ];then
                         Diag_Dump
@@ -1657,13 +1920,15 @@ Process_User_Choice() {
 
                 local ACTION="$(echo "$menu1"| awk '{print $1}')"
 
+                local CHANGELOG="$cRESET(${cBCYA}Change Log: ${cBYEL}https://github.com/MartineauUK/wireguard/commits/main/wg_manager.sh$cRESET)"   #v2.01
+                [ -n "$(echo $VERSION | grep "b")" ] && local CHANGELOG="$cRESET(${cBCYA}Change Log: ${cBYEL}https://github.com/MartineauUK/wireguard/commits/dev/wg_manager.sh$cRESET)" #v2.01
+                echo -e $cBMAG"\n\t${VERSION}$cBWHT WireGuard Session Manager" ${CHANGELOG}$cRESET  # v2.01
+                Show_MD5 "script"
+
                 case "$ACTION" in
                     "?")
 
-                        local CHANGELOG="$cRESET(${cBCYA}Change Log: ${cBYEL}https://github.com/MartineauUK/wireguard/commits/main/wg_manager.sh$cRESET)"   #v2.01
-                        [ -n "$(echo $VERSION | grep "b")" ] && local CHANGELOG="$cRESET(${cBCYA}Change Log: ${cBYEL}https://github.com/MartineauUK/wireguard/commits/dev/wg_manager.sh$cRESET)" #v2.01
-                        echo -e $cBMAG"\n\t${VERSION}$cBWHT WireGuard Session Manager" ${CHANGELOG}$cRESET  # v2.01
-                        Show_MD5 "script"
+
                         echo -e
                         Check_Module_Versions "report"
 
@@ -1687,6 +1952,7 @@ Process_User_Choice() {
                         [ "$2" == "dev" ] && DEV="dev" || DEV="main"
                         DOWNLOAD="N"
 
+                        echo -e
                         Check_Module_Versions
 
                         if [ "$ACTION" == "uf" ];then
@@ -1737,90 +2003,7 @@ Process_User_Choice() {
             ;;
             peer*)                                           # peer [ 'list' | interface { [auto y|n|p ] 'del' | 'add' | 'comment' {'#'comment}'} ]  # v1.10
 
-                FN="${INSTALL_DIR}WireguardVPN.conf"
-
-                local ACTION="$(echo "$menu1"| awk '{print $1}')"
-
-                local ARG=
-                if [ "$(echo "$menu1" | wc -w)" -ge 2 ];then
-                    local ARG="$(printf "%s" "$menu1" | cut -d' ' -f2)"
-                fi
-                local ARG2=
-                if [ "$(echo "$menu1" | wc -w)" -ge 3 ];then
-                    local ARG2="$(printf "%s" "$menu1" | cut -d' ' -f3)"
-                fi
-                local ARG3=
-                if [ "$(echo "$menu1" | wc -w)" -ge 3 ];then
-                    local ARG3="$(printf "%s" "$menu1" | cut -d' ' -f4)"
-                fi
-
-                [ -z "$ARG" ] && ARG="list"                 # default
-
-                case $ARG in
-                    list|"")
-                        echo -e $cBWHT"\n\tList of WireGuard Peers\n"$cBCYA
-                        if [ -n "$(which column)" ];then
-                            awk '($2=="Y" || $2=="N" || $2=="P") {print $0}' $FN | column -t        # v2.02
-                        else
-                            awk '($2=="Y" || $2=="N" || $2=="P") {print $0}' $FN
-                        fi
-                        echo -e "\n"$cRESET
-                    ;;
-                    *)
-                        WG_INTERFACE=$ARG
-
-                        if [ "$ARG2" == "add" ] || [ -n "$(grep "^$WG_INTERFACE" $FN )" ];then
-                            case $ARG2 in
-                                auto)
-                                    if [ "$(echo "$ARG3" | grep "^[yYnNpP]$" )" ];then
-                                        FLAG=$(echo "$ARG3" | tr 'a-z' 'A-Z')
-                                        sed -i "/^$WG_INTERFACE/ s~[^ ]*[^ ]~$FLAG~2" $FN
-                                        echo -e $cBGRE"\n\tUpdated AUTO=$FLAG: $(grep -E "^$WG_INTERFACE[[:space:]]" $FN)\n"$cRESET
-                                    else
-                                        echo -e $cBRED"\a\n\t***ERROR Invalid Peer Auto='$ARG3''$WG_INTERFACE'\n"$cRESET
-                                    fi
-                                ;;
-                                del)
-                                    sed -i "/^$WG_INTERFACE/d" $FN
-                                    echo -e $cBGRE"\n\tWireGuard Peer '$WG_INTERFACE' ${cBRED}${aREVERSE}DELETED\n"$cRESET
-                                ;;
-                                add)
-                                    if [ -z "$(grep "^$WG_INTERFACE" $FN )" ];then
-                                        shift 3
-                                        LINE=$WG_INTERFACE"   $@"
-                                        [ $(echo "$LINE" | wc -w) -eq 1 ] && LINE=$LINE"     N     #"
-                                        [ -z "$(echo "$LINE" grep -F "#")" ] && LINE=$LINE" # "
-                                        LINE=$(_quote "$LINE")
-                                        POS=$(awk '($2=="Y"|| $2=="N"||$2=="P") {print NR":"$0}' $FN | tail -n 1 | cut -d':' -f1)
-                                        AUTO="$(echo "$LINE" | awk '{print $2}')"
-                                        if [ -n "$(echo "$AUTO" | grep "^[yYnNpP]$" )" ];then
-                                            [ -n "$POS" ] && sed -i "$POS a $LINE" $FN
-                                            echo -e $cBGRE"\n\tWireGuard Peer '$WG_INTERFACE' added\n"$cRESET
-                                        else
-                                            echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard Peer Auto='$AUTO' flag for '$WG_INTERFACE'\n"$cRESET
-                                        fi
-                                    else
-                                        echo -e $cBRED"\a\n\t***ERROR WireGuard Peer '$WG_INTERFACE' already exists\n"$cRESET
-                                    fi
-                                ;;
-                                comment)
-                                    echo -e $cBCYA"\n\tPeer Comment (Before): $(grep -E "^$WG_INTERFACE[[:space:]]" $FN)"$cRESET
-                                    shift 3
-                                    COMMENT="$@"
-                                    [ "${COMMENT:0:1}" != "#" ] && COMMENT="# "$COMMENT
-                                    sed -i "/^$WG_INTERFACE/ s~\#.*$~$COMMENT~" $FN
-                                    echo -e $cBGRE"\tPeer Comment (After) : $(grep -E "^$WG_INTERFACE[[:space:]]" $FN)\n"$cRESET
-
-                                ;;
-                                *)
-                                    echo -e $cBCYA"\n\tPeer Entry: $(grep -E "^$WG_INTERFACE[[:space:]]" $FN)\n"$cRESET
-                                ;;
-                            esac
-                        else
-                            echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard Peer '$WG_INTERFACE'\n"$cRESET
-                        fi
-                    ;;
-                esac
+                Manage_Peer $menu1
 
                 ;;
             restart*|stop*|start*)                              # start [ Peer [policy] | [client|server]] ]
@@ -1856,13 +2039,8 @@ Process_User_Choice() {
                 Show_VPN_Pool                       # v3.03
 
             ;;
-            new*)
-                Create_Peer $menu1
-            ;;
             *)
-
-                ShowHelp
-                echo -e $cBWHT"$VERSION wg_manager.sh WireGuard Session Manager\n\n\t${cBRED}***ERROR Invalid/missing arg '$ACTION'\n"$cRESET    # v1.09
+                echo -e $cBWHT"\n\t$VERSION WireGuard Session Manager\n\n\t${cBRED}***ERROR $menu1\n"$cRESET    # v3.04 v1.09
                 ;;
         esac
 }
@@ -1890,12 +2068,14 @@ Show_Main_Menu() {
                 HDR="N"
             fi
 
-            local STATUS_LINE="WireGuard ACTIVE Peer Status: "$(Peer_Status)                  # v2.01
+            local STATUS_LINE="WireGuard ACTIVE Peer Status: "$(Peer_Status_Summary)                  # v3.04 v2.01
             [ "$(Manage_KILL_Switch)" == "Y" ] && local KILL_STATUS="${cBGRE}${aREVERSE}ENABLED$cRESET" || local KILL_STATUS="        "
             echo -e $cRESET"\n"${KILL_STATUS}"\t"${cRESET}${cBMAG}${STATUS_LINE}$cRESET
 
-            [ "$CHECK_GITHUB" != "N" ] && Check_Version_Update      # v2.01
-            CHECK_GITHUB="N"
+            if [ -z "$NOCHK" ];then
+                [ "$CHECK_GITHUB" != "N" ] && Check_Version_Update      # v2.01
+                CHECK_GITHUB="N"
+            fi
 
             if [ "$1" = "uninstall" ]; then
                 menu1="z"
@@ -1941,6 +2121,7 @@ Create_RoadWarrior_Device() {
     local DEVICE_NAME=$2
 
     local TAG="$(echo "$@" | sed -n "s/^.*tag=//p" | awk '{print $0}')"
+    local ADD_ALLOWED_IPS="$(echo "$@" | sed -n "s/^.*ip=//p" | awk '{print $0}')"
 
     # List of 'server' Peers for device to be added to?
     local SERVER_PEER=
@@ -1993,6 +2174,9 @@ Create_RoadWarrior_Device() {
 
                     local PUB_SERVER_KEY=$(cat ${CONFIG_DIR}${SERVER_PEER}_public.key)                  # v1.06
                     echo -e $cBCYA"\tUsing Public key for 'server' Peer '"${cBMAG}${SERVER_PEER}${cBCYA}"'\n"
+
+                    # Use the 'server' Peer LISTEN_PORT rather than default to 51820
+                    local LISTEN_PORT=$(awk '/^ListenPort/ {print $3}' ${CONFIG_DIR}${SERVER_PEER}.conf)                # v3.04
                 fi
 
                 local PRI_KEY=$(cat ${CONFIG_DIR}${DEVICE_NAME}_private.key)
@@ -2056,12 +2240,15 @@ Create_RoadWarrior_Device() {
                 fi
 
                 # Should the Peer ONLY have access to LAN ? e.g. 192.168.0.0/24         # v1.06
+                # NOTE: These are routes, so a savvy user could simply tweak the allowed IPs to 0.0.0.0/0 on his Peer device!!!
+                #
                 if [ "$SPLIT_TUNNEL" == "Y" ];then
 
                     local LAN_ADDR=$(nvram get lan_ipaddr)
                     local LAN_SUBNET=${LAN_ADDR%.*}
 
-                    local IP=$LAN_SUBNET".0/24"
+                    # Any other custom routes say to a specific server on the LAN?
+                    [ -z "$ADD_ALLOWED_IPS" ] && local IP=$LAN_SUBNET".0/24" || local IP=$LAN_SUBNET".0/24,"$ADD_ALLOWED_IPS
 
                     local SPLIT_TXT="# Split Traffic LAN Only"
                 else
@@ -2086,7 +2273,7 @@ DNS = 1.1.1.1
 PublicKey = $PUB_SERVER_KEY
 AllowedIPs = $ALLOWED_IPS     ${SPLIT_TXT}
 # DDNS $ROUTER_DDNS
-Endpoint = $ROUTER_DDNS:51820
+Endpoint = $ROUTER_DDNS:$LISTEN_PORT
 PersistentKeepalive = 25
 # $DEVICE_NAME End
 EOF
@@ -2096,7 +2283,7 @@ EOF
 
                 Display_QRCode "${CONFIG_DIR}${DEVICE_NAME}.conf"
 
-                echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED ADD device '${cBMAG}${DEVICE_NAME}${cBRED}' ${cRESET}to 'server' Peer ($SERVER_PEER) or press$cBGRE [Enter] to SKIP."
+                echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED ADD device '${cBMAG}${DEVICE_NAME}${cBRED}' ${cRESET}to 'server' Peer (${cBMAG}${SERVER_PEER}${cRESET}) or press$cBGRE [Enter] to SKIP."
                 read -r "ANS"
                 if [ "$ANS" == "y" ];then
 
@@ -2124,7 +2311,12 @@ EOF
 
                     # Add device IP address and identifier to config
                     [ -z "$TAG" ] && TAG=$(echo -e "\"Device\"")                                   # v1.03
-                    [ -z "$(grep "$PUB_KEY" ${INSTALL_DIR}WireguardVPN.conf)" ] && echo -e "$PUB_KEY      $VPN_POOL_IP     # $DEVICE_NAME $TAG" >> ${INSTALL_DIR}WireguardVPN.conf     # v.03
+                    if [ -z "$(grep "$PUB_KEY" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                        echo -e "$PUB_KEY      $VPN_POOL_IP     # $DEVICE_NAME $TAG" >> ${INSTALL_DIR}WireguardVPN.conf     # v.03
+                        LINE=$(echo "$DEVICE_NAME\tX\t\t$VPN_POOL_IP\t\t# $DEVICE_NAME $TAG")
+                        POS=$(awk '/^# Custom.*Peers/ {print NR}' ${INSTALL_DIR}WireguardVPN.conf)
+                        [ -n "$POS" ] && sed -i "$POS a $LINE" ${INSTALL_DIR}WireguardVPN.conf
+                    fi
                     #tail -n 1 ${INSTALL_DIR}WireguardVPN.conf
 
                     # Need to Restart the Peer (if it is UP) or Start it so it can listen for new 'client' Peer device
@@ -2187,6 +2379,10 @@ if [ "$1" == "debug" ] || [ "$1" == "debugall" ];then
 fi
 
 [ ! -L "/opt/bin/wg_manager" ] && Manage_alias "create"
+
+NOCHK=
+NOCHK="Martineau Disabled hack"
+[ -n "$(echo "$@" | grep -w "nochk")" ] & NOCHK="Y"
 
 # Retain commandline compatibility
 if [ "$1" != "install" ];then   # v2.01
