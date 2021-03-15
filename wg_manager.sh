@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v3.04b"
-#============================================================================================ © 2021 Martineau v3.04b
+VERSION="v3.04b2"
+#============================================================================================ © 2021 Martineau v3.04b2
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -96,6 +96,14 @@ Repeat() {
 }
 Is_IPv4_CIDR () {
         grep -oE '^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$'         # IPv4 CIDR range notation
+}
+Is_Private_IPv4 () {
+    # 127.  0.0.0 – 127.255.255.255     127.0.0.0 /8
+    # 10.   0.0.0 –  10.255.255.255      10.0.0.0 /8
+    # 172. 16.0.0 – 172. 31.255.255    172.16.0.0 /12
+    # 192.168.0.0 – 192.168.255.255   192.168.0.0 /16
+    #grep -oE "(^192\.168\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])$)|(^172\.([1][6-9]|[2][0-9]|[3][0-1])\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])$)|(^10\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])$)"
+    grep -oE "(^127\.)|(^(0)?10\.)|(^172\.(0)?1[6-9]\.)|(^172\.(0)?2[0-9]\.)|(^172\.(0)?3[0-1]\.)|(^169\.254\.)|(^192\.168\.)"
 }
 Check_Lock() {
         if [ -f "/tmp/wg.lock" ] && [ -d "/proc/$(sed -n '2p' /tmp/wg.lock)" ] && [ "$(sed -n '2p' /tmp/wg.lock)" != "$$" ]; then
@@ -368,6 +376,8 @@ Create_Peer() {
         return 1
     fi
 
+    local WANIPADDR=$(nvram get wan0_ipaddr)
+    [ -n "$(echo "$WANIPADDR" | Is_Private_IPv4)" ] && echo -e ${cRESET}${cBRED}${aBOLD}"\a\n\t*** Ensure Upstream router Port Foward entry for port:${cBMAG}${LISTEN_PORT}${cRESET}${cBRED}${aBOLD} ***"$cRESET
     echo -e $cBWHT"\n\tPress$cBRED y$cRESET to$cBRED Create 'server' Peer (${cBMAG}${SERVER_PEER}) ${cBWHT}${VPN_POOL}${cRESET}:${LISTEN_PORT}${cBWHT} or press$cBGRE [Enter] to SKIP."
     read -r "ANS"
     [ "$ANS" == "y" ] || return 1
@@ -404,6 +414,8 @@ EOF
     read -r "ANS"
     [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "start" "$SERVER_PEER"; Show_Peer_Status "show"; } # v3.03
 
+    # Firewall rule to listen on multiple ports?
+    #   e.g. iptables -t nat -I PREROUTING -i $WAN_IF -d <yourIP/32> -p udp -m multiport --dports 53,80,4444  -j REDIRECT --to-ports $LISTEN_PORT
 
 }
 Delete_Peer() {
@@ -559,6 +571,7 @@ Manage_Peer() {
                                     echo -e $cBWHT"\n\t'$Mode' Peer ${cBMAG}${WG_INTERFACE}${cBWHT} Configuration Summary\n"$cBYEL
                                     Show_Peer_Config_Entry "$WG_INTERFACE"
                                     echo -en $cBYEL
+                                    echo -e "Public Key = "$(cat ${CONFIG_DIR}${WG_INTERFACE}_public.key)
                                     grep -ivE "example" ${CONFIG_DIR}${WG_INTERFACE}.conf | awk '( $1=="PrivateKey" || $1=="ListenPort" || $3=="End") {print $0}' | sed 's/End//g; s/^#/Client Peer:/g'
                                 else
                                     echo -e $cBWHT"\n\t'$Mode' Peer ${cBMAG}${WG_INTERFACE}${cBWHT} Configuration Detail\n"$cBYEL
@@ -1493,7 +1506,8 @@ Show_Peer_Status() {
                         if [ -z "$(grep -iE "^Endpoint" ${CONFIG_DIR}${WG_INTERFACE}.conf)" ];then
                             local TYPE="server"
                             local VPN_ADDR=$(ip addr | grep $WG_INTERFACE | awk '/inet/ {print $2}')
-                            local VPN_IP_TXT="${VPN_ADDR} ${cBYEL}\t\t\t\tVPN Tunnel Network"
+                            local LISTEN_PORT=$(awk '/^Listen/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)
+                            local VPN_IP_TXT="Port:${LISTEN_PORT}\t${VPN_ADDR} ${cBYEL}\t\tVPN Tunnel Network"
                         else
                             local TYPE="client"
                         fi
@@ -1817,7 +1831,7 @@ Process_User_Choice() {
                 if [ -n "$(which wg)" ];then
 
                     echo -e $cBYEL"\n\t\t WireGuard VPN Peer Status"$cRESET
-                    Show_Peer_Status $menu1
+                    Show_Peer_Status "full"
 
                     if [ "$ACTION" == "diag" ];then
                         Diag_Dump
@@ -1906,13 +1920,15 @@ Process_User_Choice() {
 
                 local ACTION="$(echo "$menu1"| awk '{print $1}')"
 
+                local CHANGELOG="$cRESET(${cBCYA}Change Log: ${cBYEL}https://github.com/MartineauUK/wireguard/commits/main/wg_manager.sh$cRESET)"   #v2.01
+                [ -n "$(echo $VERSION | grep "b")" ] && local CHANGELOG="$cRESET(${cBCYA}Change Log: ${cBYEL}https://github.com/MartineauUK/wireguard/commits/dev/wg_manager.sh$cRESET)" #v2.01
+                echo -e $cBMAG"\n\t${VERSION}$cBWHT WireGuard Session Manager" ${CHANGELOG}$cRESET  # v2.01
+                Show_MD5 "script"
+
                 case "$ACTION" in
                     "?")
 
-                        local CHANGELOG="$cRESET(${cBCYA}Change Log: ${cBYEL}https://github.com/MartineauUK/wireguard/commits/main/wg_manager.sh$cRESET)"   #v2.01
-                        [ -n "$(echo $VERSION | grep "b")" ] && local CHANGELOG="$cRESET(${cBCYA}Change Log: ${cBYEL}https://github.com/MartineauUK/wireguard/commits/dev/wg_manager.sh$cRESET)" #v2.01
-                        echo -e $cBMAG"\n\t${VERSION}$cBWHT WireGuard Session Manager" ${CHANGELOG}$cRESET  # v2.01
-                        Show_MD5 "script"
+
                         echo -e
                         Check_Module_Versions "report"
 
@@ -1936,6 +1952,7 @@ Process_User_Choice() {
                         [ "$2" == "dev" ] && DEV="dev" || DEV="main"
                         DOWNLOAD="N"
 
+                        echo -e
                         Check_Module_Versions
 
                         if [ "$ACTION" == "uf" ];then
@@ -2104,6 +2121,7 @@ Create_RoadWarrior_Device() {
     local DEVICE_NAME=$2
 
     local TAG="$(echo "$@" | sed -n "s/^.*tag=//p" | awk '{print $0}')"
+    local ADD_ALLOWED_IPS="$(echo "$@" | sed -n "s/^.*ip=//p" | awk '{print $0}')"
 
     # List of 'server' Peers for device to be added to?
     local SERVER_PEER=
@@ -2156,6 +2174,9 @@ Create_RoadWarrior_Device() {
 
                     local PUB_SERVER_KEY=$(cat ${CONFIG_DIR}${SERVER_PEER}_public.key)                  # v1.06
                     echo -e $cBCYA"\tUsing Public key for 'server' Peer '"${cBMAG}${SERVER_PEER}${cBCYA}"'\n"
+
+                    # Use the 'server' Peer LISTEN_PORT rather than default to 51820
+                    local LISTEN_PORT=$(awk '/^ListenPort/ {print $3}' ${CONFIG_DIR}${SERVER_PEER}.conf)                # v3.04
                 fi
 
                 local PRI_KEY=$(cat ${CONFIG_DIR}${DEVICE_NAME}_private.key)
@@ -2219,12 +2240,15 @@ Create_RoadWarrior_Device() {
                 fi
 
                 # Should the Peer ONLY have access to LAN ? e.g. 192.168.0.0/24         # v1.06
+                # NOTE: These are routes, so a savvy user could simply tweak the allowed IPs to 0.0.0.0/0 on his Peer device!!!
+                #
                 if [ "$SPLIT_TUNNEL" == "Y" ];then
 
                     local LAN_ADDR=$(nvram get lan_ipaddr)
                     local LAN_SUBNET=${LAN_ADDR%.*}
 
-                    local IP=$LAN_SUBNET".0/24"
+                    # Any other custom routes say to a specific server on the LAN?
+                    [ -z "$ADD_ALLOWED_IPS" ] && local IP=$LAN_SUBNET".0/24" || local IP=$LAN_SUBNET".0/24,"$ADD_ALLOWED_IPS
 
                     local SPLIT_TXT="# Split Traffic LAN Only"
                 else
@@ -2249,7 +2273,7 @@ DNS = 1.1.1.1
 PublicKey = $PUB_SERVER_KEY
 AllowedIPs = $ALLOWED_IPS     ${SPLIT_TXT}
 # DDNS $ROUTER_DDNS
-Endpoint = $ROUTER_DDNS:51820
+Endpoint = $ROUTER_DDNS:$LISTEN_PORT
 PersistentKeepalive = 25
 # $DEVICE_NAME End
 EOF
