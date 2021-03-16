@@ -24,7 +24,7 @@ VERSION="v3.04"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 15-Mar-2021
+# Last Updated Date: 16-Mar-2021
 #
 # Description:
 #
@@ -1831,10 +1831,12 @@ Process_User_Choice() {
                 if [ -n "$(which wg)" ];then
 
                     echo -e $cBYEL"\n\t\t WireGuard VPN Peer Status"$cRESET
-                    Show_Peer_Status "full"
 
                     if [ "$ACTION" == "diag" ];then
+                        Show_Peer_Status "full"             # v3.04 Hotfix
                         Diag_Dump
+                    else
+                        Show_Peer_Status                    # v3.04 Hotfix
                     fi
                 else
                     echo -en $cRED"\a\n\t";Say "Wireguard VPN module 'wg' NOT installed\n"$cRESET
