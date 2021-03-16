@@ -2124,6 +2124,7 @@ Create_RoadWarrior_Device() {
 
     local TAG="$(echo "$@" | sed -n "s/^.*tag=//p" | awk '{print $0}')"
     local ADD_ALLOWED_IPS="$(echo "$@" | sed -n "s/^.*ip=//p" | awk '{print $0}')"
+    local DNS_RESOLVER="$(echo "$@" | sed -n "s/^.*dns=//p" | awk '{print $0}')"        # v3.04 Hotfix
 
     # List of 'server' Peers for device to be added to?
     local SERVER_PEER=
@@ -2262,13 +2263,19 @@ Create_RoadWarrior_Device() {
 
                 local ALLOWED_IPS=${IP}${IPV6}
 
+                # User specifed DNS ?
+                if [ -z "$DNS_RESOLVER" ];then                               # v3.04 Hotfix
+                    local DNS_RESOLVER=$(nvram get wan0_dns)             # v3.04 Hotfix
+                    [ "$USE_IPV6" == "Y" ] && DNS_RESOLVER=$DNS_RESOLVER","$(nvram get ipv6_dns1)   # v3.04 Hotfix
+                fi
+
                 if [ "$CREATE_DEVICE_CONFIG" == "Y" ];then
                     cat > ${CONFIG_DIR}${DEVICE_NAME}.conf << EOF
 # $DEVICE_NAME
 [Interface]
 PrivateKey = $PRI_KEY
 Address = $VPN_POOL_IP
-DNS = 1.1.1.1
+DNS = $DNS_RESOLVER
 
 # $HARDWARE_MODEL 'server' ($SERVER_PEER)
 [Peer]
