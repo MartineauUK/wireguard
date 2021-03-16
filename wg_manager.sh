@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v3.04b2"
-#============================================================================================ © 2021 Martineau v3.04b2
+VERSION="v3.05b"
+#============================================================================================ © 2021 Martineau v3.05b
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v3.04b2"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 15-Mar-2021
+# Last Updated Date: 16-Mar-2021
 #
 # Description:
 #
@@ -737,26 +737,25 @@ Manage_Wireguard_Sessions() {
                     if [ -n "$(ifconfig | grep -E "^$WG_INTERFACE")" ];then
                         SayT "Warning: WireGuard '$Mode' Peer ('$WG_INTERFACE') ALREADY ACTIVE"
                         echo -e $cRED"\tWarning: WireGuard '$Mode' Peer (${cBWHT}$WG_INTERFACE${cBRED}) ALREADY ACTIVE\n"$cRESET 2>&1
-                    fi
+                    else                                                                    # v3.04 Hotfix
+                        if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
+                            # Rather than rely on naming convention; verify the content
+                            [ -z "$(grep -iE "^Endpoint" ${CONFIG_DIR}${WG_INTERFACE}.conf)" ] && Mode="server" || Mode="client"
 
-                    if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
-                        # Rather than rely on naming convention; verify the content
-                        [ -z "$(grep -iE "^Endpoint" ${CONFIG_DIR}${WG_INTERFACE}.conf)" ] && Mode="server" || Mode="client"
+                            if [ "$Mode" == "server" ] ; then
+                                sh ${INSTALL_DIR}wg_server $WG_INTERFACE
 
-                        if [ "$Mode" == "server" ] ; then
-                            sh ${INSTALL_DIR}wg_server $WG_INTERFACE
-
-                            elif [ "$Mode" == "client" ] && [ "$Route" != "policy" ] ; then
-                                sh ${INSTALL_DIR}wg_client $WG_INTERFACE
-                            else
-                                sh ${INSTALL_DIR}wg_client $WG_INTERFACE "policy"
+                                elif [ "$Mode" == "client" ] && [ "$Route" != "policy" ] ; then
+                                    sh ${INSTALL_DIR}wg_client $WG_INTERFACE
+                                else
+                                    sh ${INSTALL_DIR}wg_client $WG_INTERFACE "policy"
+                            fi
+                        else
+                            [ -n "$Mode" ] && TXT="'$Mode' " || TXT=            # v1.09
+                            SayT "***ERROR: WireGuard VPN ${TXT}Peer ('$WG_INTERFACE') config NOT found?....skipping $ACTION request"
+                            echo -e $cBRED"\a\n\t***ERROR: WireGuard ${TXT}Peer (${cBWHT}$WG_INTERFACE${cBRED}) config NOT found?....skipping $ACTION request\n"$cRESET   2>&1  # v1.09
                         fi
-                    else
-                        [ -n "$Mode" ] && TXT="'$Mode' " || TXT=            # v1.09
-                        SayT "***ERROR: WireGuard VPN ${TXT}Peer ('$WG_INTERFACE') config NOT found?....skipping $ACTION request"
-                        echo -e $cBRED"\a\n\t***ERROR: WireGuard ${TXT}Peer (${cBWHT}$WG_INTERFACE${cBRED}) config NOT found?....skipping $ACTION request\n"$cRESET   2>&1  # v1.09
                     fi
-
                     # Reset the Policy flag
                     Route=                                  # v2.02
                 done
@@ -1831,10 +1830,12 @@ Process_User_Choice() {
                 if [ -n "$(which wg)" ];then
 
                     echo -e $cBYEL"\n\t\t WireGuard VPN Peer Status"$cRESET
-                    Show_Peer_Status "full"
 
                     if [ "$ACTION" == "diag" ];then
+                        Show_Peer_Status "full"             # v3.04 Hotfix
                         Diag_Dump
+                    else
+                        Show_Peer_Status                    # v3.04 Hotfix
                     fi
                 else
                     echo -en $cRED"\a\n\t";Say "Wireguard VPN module 'wg' NOT installed\n"$cRESET
@@ -2122,6 +2123,7 @@ Create_RoadWarrior_Device() {
 
     local TAG="$(echo "$@" | sed -n "s/^.*tag=//p" | awk '{print $0}')"
     local ADD_ALLOWED_IPS="$(echo "$@" | sed -n "s/^.*ip=//p" | awk '{print $0}')"
+    local DNS_RESOLVER="$(echo "$@" | sed -n "s/^.*dns=//p" | awk '{print $0}')"        # v3.04 Hotfix
 
     # List of 'server' Peers for device to be added to?
     local SERVER_PEER=
@@ -2260,13 +2262,19 @@ Create_RoadWarrior_Device() {
 
                 local ALLOWED_IPS=${IP}${IPV6}
 
+                # User specifed DNS ?
+                if [ -z "$DNS_RESOLVER" ];then                               # v3.04 Hotfix
+                    local DNS_RESOLVER=$(nvram get wan0_dns)             # v3.04 Hotfix
+                    [ "$USE_IPV6" == "Y" ] && DNS_RESOLVER=$DNS_RESOLVER","$(nvram get ipv6_dns1)   # v3.04 Hotfix
+                fi
+
                 if [ "$CREATE_DEVICE_CONFIG" == "Y" ];then
                     cat > ${CONFIG_DIR}${DEVICE_NAME}.conf << EOF
 # $DEVICE_NAME
 [Interface]
 PrivateKey = $PRI_KEY
 Address = $VPN_POOL_IP
-DNS = 1.1.1.1
+DNS = $DNS_RESOLVER
 
 # $HARDWARE_MODEL 'server' ($SERVER_PEER)
 [Peer]
