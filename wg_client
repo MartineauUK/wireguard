@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v1.07"
-#============================================================================================ © 2021 Martineau v1.07
+VERSION="v1.08"
+#============================================================================================ © 2021 Martineau v1.08
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 13-Mar-2021
+# Last Updated Date: 16-Mar-2021
 #
 # Description:
 #
@@ -15,6 +15,7 @@ VERSION="v1.07"
 CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v1.05 @elorimer
 INSTALL_DIR="/jffs/addons/wireguard/"
 
+CHAIN="WireGuard"                                   # v1.08
 
 #For verbose debugging, uncomment the following two lines, and uncomment the last line of this script
 #set -x
@@ -40,16 +41,44 @@ Is_AX() {
     # [ -n "$(uname -r | grep "^4")" ] && [ -z "$(uname -m | grep "aarch64")" ] && echo Y || echo N
     [ -n "$(uname -r | grep "^4")" ] && [ -z "$(uname -m | grep "aarch64")" ] && { echo Y; return 0; } || { echo N; return 1; }
 }
+Chain_exists() {
+
+    # Args: {chain_name} [table_name]
+
+    local CHAIN="$1"
+    shift
+
+    [ $# -eq 1 ] && local TABLE="-t $1"
+
+    iptables $TABLE -n -L $CHAIN >/dev/null 2>&1
+    local RC=$?
+    if [ $RC -ne 0 ];then
+        echo "N"
+        return 1
+    else
+        echo "Y"
+        return 0
+    fi
+}
 Firewall_delete() {
 
     iptables -t mangle -D FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'" 2>/dev/null
     iptables -t mangle -D FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'" 2>/dev/null
     iptables -t mangle -D FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'" 2>/dev/null
+
+    iptables -t mangle -D $CHAIN -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'" 2>/dev/null
+    iptables -t mangle -D $CHAIN -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'" 2>/dev/null
+    iptables -t mangle -D $CHAIN -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'" 2>/dev/null
+
     iptables -t mangle -D PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'" 2>/dev/null
 
     if [ $FIRMWARE -ge 38601 ];then         # Guest #1 SSID VLANs SNB @ZebMcKayhan
             iptables -t filter -D FORWARD -i br1 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN" 2>/dev/null
             iptables -t filter -D FORWARD -i br2 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN" 2>/dev/null
+
+            iptables -t filter -D $CHAIN -i br1 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN" 2>/dev/null
+            iptables -t filter -D $CHAIN  -i br2 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN" 2>/dev/null
+
             iptables -t nat -D POSTROUTING -s $(nvram get lan_ipaddr)/16 -o $VPN_ID -j MASQUERADE -m comment --comment "WireGuard 'client'" 2>/dev/null
     else
             iptables -t nat -D POSTROUTING -s $(nvram get lan_ipaddr)/24 -o $VPN_ID -j MASQUERADE -m comment --comment "WireGuard 'client'" 2>/dev/null
@@ -127,8 +156,6 @@ ANSIColours
 
 FIRMWARE=$(echo $(nvram get buildno) | awk 'BEGIN { FS = "." } {printf("%03d%02d",$1,$2)}')
 
-
-
 modprobe xt_set
 modprobe xt_comment
 insmod /opt/lib/modules/wireguard 2> /dev/null
@@ -179,6 +206,28 @@ if [ -f ${INSTALL_DIR}WireguardVPN.conf ];then
     fi
     DESC=$(awk -v pattern="${VPN_ID}" 'match($0,"^"pattern) {print $0}' ${INSTALL_DIR}WireguardVPN.conf | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
     [ -z "$DESC" ] && DESC="# Unidentified"
+fi
+
+# Keep things tidy use dedicated WirGuard chain             # v1.08
+if [ "$(Chain_exists "$CHAIN")" == "N" ];then               # v1.08
+    iptables -N $CHAIN
+fi
+if [ "$(Chain_exists "$CHAIN" "mangle")" == "N" ];then      # v1.08
+    iptables -t mangle -N $CHAIN
+fi
+
+iptables -t mangle -C FORWARD -j WireGuard -m comment --comment "WireGuard" 2>/dev/null
+if [ $? -gt 0 ];then
+    iptables -t mangle -I FORWARD -j WireGuard -m comment --comment "WireGuard"
+fi
+
+iptables -C FORWARD -j $CHAIN -m comment --comment "WireGuard"
+if [ $? -gt 0 ];then
+    if [ "$(Chain_exists "other2wan")" == "Y" ];then
+        iptables -I FORWARD "$(iptables -nvL FORWARD --line | grep -E -m 1 "other2wan" | awk '{print $1}')" -j $CHAIN -m comment --comment "WireGuard"
+    else
+        iptables -I FORWARD "$(iptables -nvL FORWARD --line | grep -E "ACCEPT     all.*state RELATED,ESTABLISHED" | awk '{print $1+1}')" -j $CHAIN -m comment --comment "WireGuard"
+    fi
 fi
 
 if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
@@ -234,14 +283,14 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
 
         Firewall_delete
 
-        iptables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'"
-        iptables -t mangle -I FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'"
-        iptables -t mangle -I FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'"
+        iptables -t mangle -I $CHAIN -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'"
+        iptables -t mangle -I $CHAIN -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'"
+        iptables -t mangle -I $CHAIN -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'"
         iptables -t mangle -I PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'"
 
         if [ $FIRMWARE -ge 38601 ];then         # Allow Guest #1 SSID VLANs SNB @ZebMcKayhan
-            iptables -t filter -I FORWARD -i br1 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN"
-            iptables -t filter -I FORWARD -i br2 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN"
+            iptables -t filter -I $CHAIN -i br1 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN"
+            iptables -t filter -I $CHAIN -i br2 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN"
             iptables -t nat -I POSTROUTING -s $(nvram get lan_ipaddr)/16 -o $VPN_ID -j MASQUERADE -m comment --comment "WireGuard 'client'"
         else
             iptables -t nat -I POSTROUTING -s $(nvram get lan_ipaddr)/24 -o $VPN_ID -j MASQUERADE -m comment --comment "WireGuard 'client'"
