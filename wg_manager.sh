@@ -1109,7 +1109,7 @@ Initialise_SQL() {
 
     ACTION=$2
 
-    [ -n "$(which sqlite3)" ] && opkg install sqlite3-cli
+    #[ -n "$(which sqlite3)" ] && opkg install sqlite3-cli
 
     local TS=$(date +"%Y%m%d-%H%M%S")    # current date and time 'yyyymmdd-hhmmss'
 
@@ -1690,7 +1690,7 @@ EOF
                 PRIV_KEY=$(Convert_Key "$PRIV_KEY")
                 sed -i "/^PrivateKey/ s~[^ ]*[^ ]~$PRIV_KEY~3" ${CONFIG_DIR}wg2${I}.conf
 
-                local WG_INTERFACE-"wg21"
+                local WG_INTERFACE="wg21"
                 local AUTO="Y"
                 local SUBNET="10.50.1.1/24"
                 local PORT=51820
