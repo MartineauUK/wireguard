@@ -1109,6 +1109,8 @@ Initialise_SQL() {
 
     ACTION=$2
 
+    [ -n "$(which sqlite3)" ] && opkg install sqlite3-cli
+
     local TS=$(date +"%Y%m%d-%H%M%S")    # current date and time 'yyyymmdd-hhmmss'
 
     cp $SQL_DATABASE ${SQL_DATABASE}.$TS
@@ -1632,7 +1634,7 @@ Install_WireGuard_Manager() {
 
     Initialise_SQL                                      # v3.04
 
-    # Create dummy 'Client' and 'Server' templates
+    # Create 'Server' Peer
     echo -e $cBCYA"\tCreating WireGuard 'Server' Peer ${cBMAG}(wg21)${cBCYA}'"$cRESET
 
     #cat > ${CONFIG_DIR}wg11.conf << EOF
@@ -1671,7 +1673,7 @@ EOF
 
     echo -e $cBCYA"\tCreating WireGuard Private/Public key-pairs for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
     if [ -n "$(which wg)" ];then
-        # for I in 1
+
             # do
                 # wg genkey | tee ${CONFIG_DIR}wg1${I}_private.key | wg pubkey > ${CONFIG_DIR}wg1${I}_public.key
             # done
@@ -1688,7 +1690,8 @@ EOF
                 PRIV_KEY=$(Convert_Key "$PRIV_KEY")
                 sed -i "/^PrivateKey/ s~[^ ]*[^ ]~$PRIV_KEY~3" ${CONFIG_DIR}wg2${I}.conf
 
-                local AUTO="N"
+                local WG_INTERFACE-"wg21"
+                local AUTO="Y"
                 local SUBNET="10.50.1.1/24"
                 local PORT=51820
                 local ANNOTATE="# $HARDWARE_MODEL Server Peer #1"
@@ -1712,8 +1715,8 @@ EOF
         # Let the user see the two Peers are actually running
         sleep 2
 
-        echo -e $cBCYA"\tTerminating ACTIVE WireGuard Peers ...\n"$cRESET
-        ${INSTALL_DIR}$SCRIPT_NAME stop
+        #echo -e $cBCYA"\tTerminating ACTIVE WireGuard Peers ...\n"$cRESET
+        #${INSTALL_DIR}$SCRIPT_NAME stop
     else
         echo -e $cBRED"\a\n\t***ERROR: WireGuard install FAILED!\n"$cRESETd
     fi
