@@ -585,7 +585,10 @@ Delete_Peer() {
 }
 Import_Peer() {
 
+    local ACTION=$1;shift
     local WG_INTERFACE=$1
+
+    local ANNOTATE="$(echo "$@" | sed -n "s/^.*tag=//p" | awk '{print $0}')"
 
     for WG_INTERFACE in $@
         do
@@ -593,7 +596,7 @@ Import_Peer() {
                 if [ "$(Server_or_Client "$WG_INTERFACE")" != "server" ];then
                     if [ -z "$(sqlite3 $SQL_DATABASE "SELECT peer FROM clients where peer='$WG_INTERFACE';")" ];then
                         local AUTO="N"
-                        local ANNOTATE="N/A"
+                        [ -z "$ANNOTATE" ] && local ANNOTATE="N/A"
 
                         while IFS='' read -r LINE || [ -n "$LINE" ]; do
 
@@ -610,7 +613,7 @@ Import_Peer() {
                         done < ${CONFIG_DIR}${WG_INTERFACE}.conf
                         sqlite3 $SQL_DATABASE "INSERT INTO clients values('$WG_INTERFACE','$AUTO','$SUBNET','$SOCKET','$DNS','$PUB_KEY','$PRI_KEY','$ANNOTATE');"
 
-
+                         echo -e $cBGRE"\n\t[✔] Peer ${cBMAG}${WG_INTERFACE}${cBGRE} import success"$cRESET 2>&1
                     else
                         SayT "***ERROR: WireGuard VPN 'client' Peer ('$WG_INTERFACE') ALREADY exists in database?....skipping import request"
                         echo -e $cBRED"\a\n\t***ERROR: WireGuard 'client' Peer (${cBWHT}$WG_INTERFACE${cBRED}) ALREADY exists in database?....skipping import Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
@@ -623,6 +626,8 @@ Import_Peer() {
                 SayT "***ERROR: WireGuard VPN 'client' Peer ('$WG_INTERFACE') config NOT found?....skipping import request"
                 echo -e $cBRED"\a\n\t***ERROR: WireGuard 'client' Peer (${cBWHT}$WG_INTERFACE${cBRED}) config NOT found?....skipping import Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
             fi
+
+            [ "$ANNOTATE" != "N/A" ] && break
 
         done
 
@@ -743,7 +748,7 @@ Manage_Peer() {
                                 echo -en $cBCYA"\nConnected Session duration: $cBGRE"$(Session_Duration "$WG_INTERFACE")"\n"${cRESET}
 
                             ;;
-                            import)
+                            import*)
                                 Import_Peer "$WG_INTERFACE"
                             ;;
                             *)
@@ -2393,10 +2398,11 @@ Validate_User_Choice() {
             alias*) ;;
             diag*) ;;
             debug) ;;
-            initsql*|migrate*);;
+            initsql*|migrate*);;            # 4.01
             stats*);;
             wg*) ;;
-            udpmon*) ;;
+            import*) ;;                     # 4.01
+            udpmon*) ;;                     # 4.01
             killsw*) ;;             # v2.03
             killinter*) ip link del dev $(echo "$menu1" | awk '{print $2}'); menu1=;;
             "") ;;
@@ -2675,6 +2681,11 @@ Process_User_Choice() {
                     echo -e $cRED"\n\t[✖]${cBWHT} UDP ${cBGRE}monitor is ${cBRED}${aREVERSE}DISABLED$cRESET"
                 fi
 
+            ;;
+            import*)
+
+                Import_Peer $menu1                                              # v4.01
+                Manage_Peer
             ;;
             *)
                 echo -e $cBWHT"\n\t$VERSION WireGuard Session Manager\n\n\t${cBRED}***ERROR $menu1\n"$cRESET    # v3.04 v1.09
