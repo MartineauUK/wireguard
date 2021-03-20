@@ -1090,10 +1090,7 @@ Create_Sample_Config() {
     echo -e $cBCYA"\a\n\tCreating WireGuard configuration file '${INSTALL_DIR}WireguardVPN.conf'"
 
     cat > ${INSTALL_DIR}WireguardVPN.conf << EOF
-                                                                    #
-#       RPDB Selection Routing rules same format as 'nvram get vpn_clientX_clientlist'
-#       < Desciption > Source IP/CIDR > [Target IP/CIDR] > WAN_or_VPN[...]
-# WireGuard Session Manger v4.01
+# WireGuard Session Manager v4.01
 
 # Categories
 None=
@@ -1398,7 +1395,7 @@ Get_scripts() {
     md5sum ${INSTALL_DIR}wg_manager.sh      > ${INSTALL_DIR}"wg_manager.md5"
     md5sum ${INSTALL_DIR}wg_client          > ${INSTALL_DIR}"wg_client.md5"
     md5sum ${INSTALL_DIR}wg_server          > ${INSTALL_DIR}"wg_server.md5"
-    md5sum ${INSTALL_DIR}UDP_Updater.sh     > ${INSTALL_DIR}"wUDP_Updater.md5"          # v4.01
+    md5sum ${INSTALL_DIR}UDP_Updater.sh     > ${INSTALL_DIR}"UDP_Updater.md5"          # v4.01
 }
 Read_INPUT() {
 
