@@ -1194,8 +1194,6 @@ EOF
     done < /tmp/wireguard.txt
 
     rm /tmp/wireguard.txt
-
-    Manage_Stats "enable"
 }
 _quote() {
   echo "$1" | sed 's/[]\/()$*.^|[]/\\&/g'
@@ -1693,14 +1691,17 @@ EOF
 
         # Test 'wg' and this script - (well actually the one used @BOOT) against the 'server' Peers e.g. wg21
         #echo -e $cBCYA"\t${cRESET}${cYBLU}Test ${cRESET}${cBCYA}Initialising the Sample WireGuard 'client' and 'server' Peers, ${cYBLU}but ONLY the Sample 'server' (wg21) is VALID :-)${cYBLU}"$cRESET
-        echo -e $cBCYA"\tInitialising WireGuard VPN 'server' Peer"$cRESET
-        ${INSTALL_DIR}$SCRIPT_NAME start
+        #echo -e $cBCYA"\tInitialising WireGuard VPN 'server' Peer"$cRESET
+        #${INSTALL_DIR}$SCRIPT_NAME start
         # Test the Status report
-        echo -e $cBCYA"\tWireGuard Peer Status"
-        ${INSTALL_DIR}$SCRIPT_NAME show               # v1.11
+
+        Manage_Stats "enable"
+
+        #echo -e $cBCYA"\tWireGuard Peer Status"
+        #${INSTALL_DIR}$SCRIPT_NAME show               # v1.11
 
         # Let the user see the two Peers are actually running
-        sleep 2
+        #sleep 2
 
         #echo -e $cBCYA"\tTerminating ACTIVE WireGuard Peers ...\n"$cRESET
         #${INSTALL_DIR}$SCRIPT_NAME stop
@@ -1713,8 +1714,6 @@ EOF
     Edit_DNSMasq                                        # v1.12
 
     Manage_alias
-
-    Manage_Stats "enable"
 
     # Auto start ALL defined WireGuard Peers @BOOT
     # Use post-mount
