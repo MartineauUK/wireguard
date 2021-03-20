@@ -4,7 +4,7 @@ VERSION="v1.08"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 16-Mar-2021
+# Last Updated Date: 20-Mar-2021
 #
 # Description:
 #
@@ -191,13 +191,13 @@ fi
 [ -n "$(echo "$@" | grep "policy")" ] && POLICY_MODE="in Policy Mode " || POLICY_MODE=
 
 # Read the Peer config to set the Annotation Description and LOCAL peer endpoint etc.
-if [ -f ${INSTALL_DIR}WireguardVPN.conf ];then
+#if [ -f ${INSTALL_DIR}WireguardVPN.conf ];then
     if [ "$MODE" == "client" ];then                         # v1.03
         if [ -z "$LOCALIP" ];then
-           LOCALIP=$(awk -v pattern="${VPN_ID}" 'match($0,"^"pattern) {print $3}' ${INSTALL_DIR}WireguardVPN.conf)       # v1.03
+           LOCALIP=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM clients where peer='$WG_INTERFACE';")
            export LocalIP=$LOCALIP
         fi
-        [ -z "$SOCKET" ] && SOCKET=$(awk -v pattern="${VPN_ID}" 'match($0,"^"pattern) {print $4}' ${INSTALL_DIR}WireguardVPN.conf)
+        [ -z "$SOCKET" ] && SOCKET=$(sqlite3 $SQL_DATABASE "SELECT socket FROM clients where peer='$WG_INTERFACE';")
         START_PRIO=99${VPN_NUM}0
         END_PRIO=99${VPN_NUM}9
         WAN_PRIO=99${VPN_NUM}0
@@ -207,11 +207,12 @@ if [ -f ${INSTALL_DIR}WireguardVPN.conf ];then
     else
         SOCKET=$(nvram get wan_gateway)":"$(awk '/Listen/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)      # v1.03
     fi
-    DESC=$(awk -v pattern="${VPN_ID}" 'match($0,"^"pattern) {print $0}' ${INSTALL_DIR}WireguardVPN.conf | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
+    DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM clients where peer='$WG_INTERFACE';")
+    DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')
     [ -z "$DESC" ] && DESC="# Unidentified"
-fi
+#fi
 
-# Keep things tidy use dedicated WirGuard chain             # v1.08
+# Keep things tidy use dedicated WireGuard chain            # v1.08
 if [ "$(Chain_exists "$CHAIN")" == "N" ];then               # v1.08
     iptables -N $CHAIN
 fi
@@ -268,7 +269,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
             ip route add 128/1 dev $VPN_ID 2>/dev/null
         else
             #ip rule add from $(nvram get lan_ipaddr | cut -d"." -f1-3).0/24 table 12$VPN_NUM prio 99$VPN_NUM"9"
-            VPN_IP_LIST=$(awk -v pattern="${VPN_NUM}" 'match($0,"^rp1"pattern) {print $0}' ${INSTALL_DIR}WireguardVPN.conf | grep -oE "<.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
+            VPN_IP_LIST=$(sqlite3 $SQL_DATABASE "SELECT rules FROM policy where peer='$WG_INTERFACE';")
 
             create_client_list
 
