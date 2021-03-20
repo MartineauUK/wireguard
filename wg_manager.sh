@@ -1637,19 +1637,6 @@ Install_WireGuard_Manager() {
     # Create 'Server' Peer
     echo -e $cBCYA"\tCreating WireGuard 'Server' Peer ${cBMAG}(wg21)${cBCYA}'"$cRESET
 
-    #cat > ${CONFIG_DIR}wg11.conf << EOF
-[Interface]
-#Address = 10.10.10.2/24
-#DNS = 10.10.10.1
-PrivateKey = Ba1dgO/plL4wCB+p111h8bIAWNeNgPZ7L+HFBhoE4=
-
-[Peer]
-Endpoint = 10.11.12.13:51820
-PublicKey = Ba1dgO/plL4wCB+pRdabQh8bIAWNeNgPZ7L+HFBhoE4=
-AllowedIPs = 0.0.0.0/0
-PersistentKeepalive = 25
-EOF
-
     # Create Server template
     for I in 1                                            # v3.02
         do
@@ -1740,7 +1727,7 @@ EOF
     opkg install qrencode
 
     # Create a sample Road-Warrior device and QR code for import into WireGuard App on the say an iPhone
-    Create_RoadWarrior_Device "create" "iPhone"         # v3.01
+    #Create_RoadWarrior_Device "create" "iPhone"         # v3.01
 
     echo -e $cBGRE"\tWireGuard install COMPLETED.\n"$cRESET
 
