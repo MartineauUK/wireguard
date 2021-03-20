@@ -423,9 +423,8 @@ Create_Peer() {
 
     if [ -z "$SERVER_PEER" ];then
 
-        SERVER_PEER=$(grep "^wg2" ${INSTALL_DIR}WireguardVPN.conf | awk '{print $1" "$3}' | sort | tail -n 1)
-        AUTO_VPN_POOL=$(echo "$SERVER_PEER" | awk '{print $2}')
-        SERVER_PEER=$(echo "$SERVER_PEER" | awk '{print $1}')
+        SERVER_PEER=$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers;" | sort | tail -n 1)
+        AUTO_VPN_POOL=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers where peer='$SERVER_PEER';")
 
         # User specified VPN Tunnel subnet?
         if [ -z "$VPN_POOL_USER" ];then
@@ -439,7 +438,7 @@ Create_Peer() {
         fi
 
         # Add the new 'server' Peer at the end of the list in the config
-        POS=$(awk -v pattern="$SERVER_PEER" 'match($0,"^"pattern) {print NR":"$0}' ${INSTALL_DIR}WireguardVPN.conf | tail -n 1 | cut -d':' -f1)
+        #POS=$(awk -v pattern="$SERVER_PEER" 'match($0,"^"pattern) {print NR":"$0}' ${INSTALL_DIR}WireguardVPN.conf | tail -n 1 | cut -d':' -f1)
         INDEX=$(echo "$SERVER_PEER" | sed 's/^wg2//')
         INDEX=$((INDEX+1))
         SERVER_PEER="wg2"$INDEX
@@ -488,7 +487,8 @@ EOF
         sed -i "/^PrivateKey/ s~[^ ]*[^ ]~$PRIV_KEY~3" ${CONFIG_DIR}${SERVER_PEER}.conf
 
         local LINE=$(echo  -e "$SERVER_PEER\t$AUTO\t\t$VPN_POOL\t\t\t\t\t\t\t\t\t# $HARDWARE_MODEL Host Peer")
-        [ -n "$POS" ] && sed -i "$POS a $LINE" ${INSTALL_DIR}WireguardVPN.conf
+        local ANNOTATE="# $HARDWARE_MODEL Server $INDEX"
+        sqlite3 $SQL_DATABASE "INSERT INTO servers values('$SERVER_PEER','$AUTO','$VPN_POOL','$LISTEN_PORT','$PUB_KEY','$PRI_KEY','$ANNOTATE');"
     fi
 
     echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED Start 'server' Peer ($SERVER_PEER) or press$cBGRE [Enter] to SKIP."
@@ -931,7 +931,7 @@ Manage_Wireguard_Sessions() {
 
                                 local TS=$(date +%s)
                                 sh ${INSTALL_DIR}wg_server $WG_INTERFACE
-                                local UDP_MONITOR=$(Manage_UDP_Monitor "server" "enable")
+                                [ "$(wg show interfaces | grep "wg2[1-9]" | wc -w)" -eq 1 ] && local UDP_MONITOR=$(Manage_UDP_Monitor "server" "enable")
 
                                 # Reset all its 'client' Peers...well HACK until 'client' peer ACTUALLY connects...
                                 # Update the Start time for ALL 'client' device Peers hosted by the server
@@ -1009,7 +1009,7 @@ Manage_Wireguard_Sessions() {
                                 sh ${INSTALL_DIR}wg_server $WG_INTERFACE "disable"
 
                                 # If there are no 'sever' Peers ACTIVE then terminate UDP monitoring
-                                [ "$(wg show interfaces | grep -c "wg2" )" -eq 0 ] && local UDP_MONITOR=$(Manage_UDP_Monitor "server" "disable")
+                                [ "$(wg show interfaces | grep "wg2[1-9]" | wc -w)" -eq 0 ] && local UDP_MONITOR=$(Manage_UDP_Monitor "server" "disable")
 
                             else
                                 if [ "$Mode" == "client" ] && [ "$Route" != "policy" ] ; then
@@ -1694,7 +1694,7 @@ EOF
                 local AUTO="Y"
                 local SUBNET="10.50.1.1/24"
                 local PORT=51820
-                local ANNOTATE="# $HARDWARE_MODEL Server Peer #1"
+                local ANNOTATE="# $HARDWARE_MODEL Server #1"
                 local PUB_KEY=$(cat ${CONFIG_DIR}${WG_INTERFACE}_public.key)
                 local PRI_KEY=$(cat ${CONFIG_DIR}${WG_INTERFACE}_private.key)
 
