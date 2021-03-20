@@ -1750,17 +1750,17 @@ Uninstall_WireGuard() {
        echo -e $cBCYA"\tUninstalling Wireguard Kernel module and Userspace Tool for $HARDWARE_MODEL (v$BUILDNO)"$cBGRA
        opkg remove wireguard-kernel wireguard-tools
     fi
-
+	
     echo -e $cBCYA"\tDeleted Peer Auto-start @BOOT\n"$cRESET
     [ -n "$(grep -i "WireGuard" /jffs/scripts/post-mount)" ] && sed -i '/WireGuard/d' /jffs/scripts/post-mount  # v2.01
-
+	
+	Manage_Stats "disable"
+	
     Edit_nat_start "del"
 
     Manage_alias "del"                  # v1.11
 
     Edit_DNSMasq "del"                  # v1.12
-
-    Manage_Stats "disable"
 
     echo -e $cBGRE"\n\tWireGuard Uninstall complete for $HARDWARE_MODEL (v$BUILDNO)\n"$cRESET
 
