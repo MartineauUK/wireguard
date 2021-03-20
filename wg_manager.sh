@@ -1093,17 +1093,13 @@ Create_Sample_Config() {
                                                                     #
 #       RPDB Selection Routing rules same format as 'nvram get vpn_clientX_clientlist'
 #       < Desciption > Source IP/CIDR > [Target IP/CIDR] > WAN_or_VPN[...]
-rp11    <>
-rp12
-rp13    <Dummy VPN 3>172.16.1.3>>VPN<Plex>172.16.1.123>1.1.1.1>VPN<Router>172.16.1.1>>WAN<All LAN>172.16.1.0/24>>VPN
-rp14
-rp15    <Router>192.168.1.0/24>>VPN<LAN>192.168.1.1>>WAN
+# WireGuard Session Manger v4.01
 
 # Categories
-NoNe=
+None=
 
 # WAN KILL-Switch
-KILLSWITCH=Y
+KILLSWITCH=N
 
 # Statistics Gathering
 STATS=Y"
@@ -1385,6 +1381,7 @@ Manage_Stats() {
 Get_scripts() {
     local BRANCH="$1"
     local BRANCH="dev"      #********** NOT FOR STABLE BRANCH **********
+
     echo -e $cBCYA"\tDownloading scripts"$cRESET 2>&1
 
     # Allow use of custom script for debugging
