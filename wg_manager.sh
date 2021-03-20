@@ -1181,20 +1181,20 @@ EOF
             fi
         done
 
-        awk '/^rp1/ {print $0}' ${INSTALL_DIR}WireguardVPN.conf >/tmp/wireguard.txt
-        while IFS='' read -r POLICY || [ -n "$LINE" ]; do
+    awk '/^rp1/ {print $0}' ${INSTALL_DIR}WireguardVPN.conf >/tmp/wireguard.txt
+    while IFS='' read -r POLICY || [ -n "$LINE" ]; do
 
-            local PEER=${POLICY%% *}
-            local PEER=${PEER#??}
+        local PEER=${POLICY%% *}
+        local PEER=${PEER#??}
 
-            POLICY=${POLICY#* }
-            POLICY=$(printf "%s" "$POLICY" | sed 's/^[ \t]*//;s/[ \t]*$//')
-            [ "${POLICY:0:2}" == "rp" ] && POLICY="<>"
+        POLICY=${POLICY#* }
+        POLICY=$(printf "%s" "$POLICY" | sed 's/^[ \t]*//;s/[ \t]*$//')
+        [ "${POLICY:0:2}" == "rp" ] && POLICY="<>"
 
-            sqlite3 $SQL_DATABASE "INSERT INTO policy values('wg$PEER','$POLICY');"
-        done < /tmp/wireguard.txt
+        sqlite3 $SQL_DATABASE "INSERT INTO policy values('wg$PEER','$POLICY');"
+    done < /tmp/wireguard.txt
 
-        rm /tmp/wireguard.txt
+    rm /tmp/wireguard.txt
 
     Manage_Stats "enable"
 }
@@ -1633,8 +1633,10 @@ Install_WireGuard_Manager() {
     # Create the Sample/template parameter file '${INSTALL_DIR}WireguardVPN.conf'
     Create_Sample_Config
 
+    Initialise_SQL                                      # v3.04
+
     # Create dummy 'Client' and 'Server' templates
-    echo -e $cBCYA"\tCreating WireGuard 'Client' and 'Server' Peer templates '${cBMAG}wg11.conf$cBCYA' and ${cBMAG}wg21.conf${cBCYA}'"$cRESET
+    echo -e $cBCYA"\tCreating WireGuard 'Server' Peer ${cBMAG}(wg21)${cBCYA}'"$cRESET
 
     #cat > ${CONFIG_DIR}wg11.conf << EOF
 [Interface]
@@ -1679,22 +1681,30 @@ EOF
         for I in 1
             do
                 wg genkey | tee ${CONFIG_DIR}wg2${I}_private.key | wg pubkey > ${CONFIG_DIR}wg2${I}_public.key
+
+                # Update the Sample Peer templates with the router's real keys
+                # PRIV_KEY=$(cat ${CONFIG_DIR}wg11_private.key)
+                # PRIV_KEY=$(Convert_Key "$PRIV_KEY")
+                # sed -i "/^PrivateKey/ s~[^ ]*[^ ]~$PRIV_KEY~3" ${CONFIG_DIR}wg11.conf
+
+                PRIV_KEY=$(cat ${CONFIG_DIR}wg21_private.key)
+                PRIV_KEY=$(Convert_Key "$PRIV_KEY")
+                sed -i "/^PrivateKey/ s~[^ ]*[^ ]~$PRIV_KEY~3" ${CONFIG_DIR}wg2${I}.conf
+
+                local AUTO="N"
+                local SUBNET="10.50.1.1/24"
+                local PORT=51820
+                local ANNOTATE="# $HARDWARE_MODEL Server Peer #1"
+                local PUB_KEY=$(cat ${CONFIG_DIR}${WG_INTERFACE}_public.key)
+                local PRI_KEY=$(cat ${CONFIG_DIR}${WG_INTERFACE}_private.key)
+
+                sqlite3 $SQL_DATABASE "INSERT INTO servers values('$WG_INTERFACE','$AUTO','$SUBNET','$PORT','$PUB_KEY','$PRI_KEY','$ANNOTATE');"
             done
-
-        # Update the Sample Peer templates with the router's real keys
-        # PRIV_KEY=$(cat ${CONFIG_DIR}wg11_private.key)
-        # PRIV_KEY=$(Convert_Key "$PRIV_KEY")
-        # sed -i "/^PrivateKey/ s~[^ ]*[^ ]~$PRIV_KEY~3" ${CONFIG_DIR}wg11.conf
-
-        PRIV_KEY=$(cat ${CONFIG_DIR}wg21_private.key)
-        PRIV_KEY=$(Convert_Key "$PRIV_KEY")
-        sed -i "/^PrivateKey/ s~[^ ]*[^ ]~$PRIV_KEY~3" ${CONFIG_DIR}wg21.conf
-
     fi
 
     if  [ -n "$(which wg)" ] && [ "$ROUTER_COMPATIBLE" == "Y" ];then
 
-        # Test 'wg' and this script - (well actually the one used @BOOT) against the two Sample Peers (wg11 and Wg21)
+        # Test 'wg' and this script - (well actually the one used @BOOT) against the 'server' Peers e.g. wg21
         #echo -e $cBCYA"\t${cRESET}${cYBLU}Test ${cRESET}${cBCYA}Initialising the Sample WireGuard 'client' and 'server' Peers, ${cYBLU}but ONLY the Sample 'server' (wg21) is VALID :-)${cYBLU}"$cRESET
         echo -e $cBCYA"\tInitialising WireGuard VPN 'server' Peer"$cRESET
         ${INSTALL_DIR}$SCRIPT_NAME start
@@ -1716,8 +1726,6 @@ EOF
     Edit_DNSMasq                                        # v1.12
 
     Manage_alias
-
-    Initialise_SQL                                      # v3.04
 
     Manage_Stats "enable"
 
