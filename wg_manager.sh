@@ -595,7 +595,7 @@ Import_Peer() {
             if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
                 if [ "$(Server_or_Client "$WG_INTERFACE")" != "server" ];then
                     if [ -z "$(sqlite3 $SQL_DATABASE "SELECT peer FROM clients where peer='$WG_INTERFACE';")" ];then
-                        local AUTO="N"
+                        local AUTO="Y"
                         [ -z "$ANNOTATE" ] && local ANNOTATE="N/A"
 
                         while IFS='' read -r LINE || [ -n "$LINE" ]; do
@@ -612,8 +612,8 @@ Import_Peer() {
 
                         done < ${CONFIG_DIR}${WG_INTERFACE}.conf
                         sqlite3 $SQL_DATABASE "INSERT INTO clients values('$WG_INTERFACE','$AUTO','$SUBNET','$SOCKET','$DNS','$PUB_KEY','$PRI_KEY','$ANNOTATE');"
-
-                         echo -e $cBGRE"\n\t[✔] Peer ${cBMAG}${WG_INTERFACE}${cBGRE} import success"$cRESET 2>&1
+                        sqlite3 $SQL_DATABASE "INSERT INTO policy values('$WG_INTERFACE','<>');"
+                        echo -e $cBGRE"\n\t[✔] Peer ${cBMAG}${WG_INTERFACE}${cBGRE} import success"$cRESET 2>&1
                     else
                         SayT "***ERROR: WireGuard VPN 'client' Peer ('$WG_INTERFACE') ALREADY exists in database?....skipping import request"
                         echo -e $cBRED"\a\n\t***ERROR: WireGuard 'client' Peer (${cBWHT}$WG_INTERFACE${cBRED}) ALREADY exists in database?....skipping import Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
@@ -673,16 +673,30 @@ Manage_Peer() {
                                 # New 'server' Peer    [port=nnnnn] [ip=xxx.xxx.xxx.1/24] [auto={y|n}]
                                 Create_Peer $menu1
                             ;;
-                            auto)
-                                if [ "$(echo "$ARG3" | grep "^[yYnNpP]$" )" ];then
-                                    FLAG=$(echo "$ARG3" | tr 'a-z' 'A-Z')
+                            auto*)
+                                #shift 1
+                                local AUTO=$(echo "$CMD" | awk -F '=' '{print $2}')
+
+                                if [ "$(echo "$AUTO" | grep "^[yYnNpP]$" )" ];then
+                                    FLAG=$(echo "$AUTO" | tr 'a-z' 'A-Z')
 
                                     [ ${WG_INTERFACE:0:3} == "wg2" ] && local TABLE="servers" || TABLE="clients"
                                     sqlite3 $SQL_DATABASE "UPDATE $TABLE SET auto='$FLAG' WHERE peer='$WG_INTERFACE';"
 
                                     echo -e $cBGRE"\n\t[✔] Updated AUTO=$FLAG:\n"$cRESET
+
+                                    # If Auto='P' then request RPDB Selective Routing rules
+                                    if [ "$FLAG" == "P" ];then
+                                        echo -e $cBWHT"\n\tEnter RPDB Selective Routing rules e.g. ${cBYEL}<Router>192.168.1.0/24>>VPN<LAN>192.168.1.1>>WAN ${cBGRE}or hit ENTER to skip"${cRESET}
+                                        read -r "RPDB"
+                                        if [ -n "$RPDB" ];then
+                                            [ "$RPDB" == "reset" ] && local RPDB="<>"
+                                            sqlite3 $SQL_DATABASE "UPDATE policy SET rules='$RPDB' WHERE peer='$WG_INTERFACE';"
+                                            echo -e $cBGRE"\n\t[✔] Updated RPDB Selective Routing rules for $WG_INTERFACE \n"$cRESET
+                                        fi
+                                    fi
                                 else
-                                    echo -e $cBRED"\a\n\t***ERROR Invalid Peer Auto='$ARG3''$WG_INTERFACE'\n"$cRESET
+                                    echo -e $cBRED"\a\n\t***ERROR Invalid Peer Auto='$AUTO' $WG_INTERFACE'\n"$cRESET
                                 fi
                             ;;
                             delX|del)
@@ -750,6 +764,12 @@ Manage_Peer() {
                             ;;
                             import*)
                                 Import_Peer "$WG_INTERFACE"
+                            ;;
+                            policy*|rpdb*|rul*)
+                                shift 1
+                                local RPDB="$@"
+                                sqlite3 $SQL_DATABASE "UPDATE policy SET rules='$RPDB' WHERE peer='$WG_INTERFACE';"
+                                echo -e $cBGRE"\n\t[✔] Updated RPDB Selective Routing rules for $WG_INTERFACE \n"$cRESET
                             ;;
                             *)
                                 echo -e $cBCYA"\n\tPeer Entry: $(grep -E "^$WG_INTERFACE[[:space:]]" $FN)\n"$cRESET
@@ -2102,6 +2122,7 @@ Diag_Dump() {
                 echo -e $cBYEL"\n\tDEBUG: SQL '$SQL_DATABASE'\n"$cBCYA 2>&1
                 sqlite3 $SQL_DATABASE "SELECT * FROM servers;" |
                 sqlite3 $SQL_DATABASE "SELECT * FROM clients;"
+                sqlite3 $SQL_DATABASE "SELECT * FROM policy;"
                 sqlite3 $SQL_DATABASE "SELECT * FROM devices;"
                 sqlite3 $SQL_DATABASE "SELECT * FROM session;"
                 sqlite3 $SQL_DATABASE "SELECT * FROM traffic;"
