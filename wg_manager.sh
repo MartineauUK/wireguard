@@ -1384,7 +1384,7 @@ Manage_Stats() {
 }
 Get_scripts() {
     local BRANCH="$1"
-
+    local BRANCH="dev"      #********** NOT FOR STABLE BRANCH **********
     echo -e $cBCYA"\tDownloading scripts"$cRESET 2>&1
 
     # Allow use of custom script for debugging
