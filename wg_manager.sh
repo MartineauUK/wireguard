@@ -532,14 +532,11 @@ Delete_Peer() {
                     if [ "$ANS" == "y" ];then
 
                     [ -n "$(wg show $WG_INTERFACE 2>/dev/null)" ] && Manage_Wireguard_Sessions "stop" "$WG_INTERFACE"
-
-                    #echo -e $cBCYA"\tDeleting ${WG_INTERFACE} '$Mode' Peer from '${INSTALL_DIR}WireguardVPN.conf'"$cBRED
-                    sed -i "/^$WG_INTERFACE/d" ${INSTALL_DIR}WireguardVPN.conf
                     sqlite3 $SQL_DATABASE "DELETE FROM $TABLE where $SQL_COL='$WG_INTERFACE';"
 
                     #   DDNS martineau.homeip.net
                     #   Endpoint = martineau.homeip.net:51820
-                    if [ -n "$(awk -F '[ :]' '{print $3}'  ${CONFIG_DIR}${WG_INTERFACE}.conf)" == "$(nvram get ddns_hostname_x)" ];then
+                    if [ "$(awk '/^Endpoint/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)" == "$(nvram get ddns_hostname_x)" ];then
 
                         # Remove the 'client' from any 'server' Peers
                         #   # SGS8
@@ -1053,7 +1050,7 @@ Manage_alias() {
 
             rm -rf "/opt/bin/wg_manager" 2>/dev/null                                        # v2.01
             if [ -d "/opt/bin" ] && [ ! -L "/opt/bin/wg_manager" ]; then
-                echo -e $cBCYA"\tCreating 'wg_manager' alias for '$SCRIPT_NAME'" 2>&1
+                echo -e $cBCYA"\n\tCreating 'wg_manager' alias for '$SCRIPT_NAME'" 2>&1
                 ln -s /jffs/addons/wireguard/wg_manager.sh /opt/bin/wg_manager              # v2.01
             fi
 
@@ -1750,12 +1747,12 @@ Uninstall_WireGuard() {
        echo -e $cBCYA"\tUninstalling Wireguard Kernel module and Userspace Tool for $HARDWARE_MODEL (v$BUILDNO)"$cBGRA
        opkg remove wireguard-kernel wireguard-tools
     fi
-	
+
     echo -e $cBCYA"\tDeleted Peer Auto-start @BOOT\n"$cRESET
     [ -n "$(grep -i "WireGuard" /jffs/scripts/post-mount)" ] && sed -i '/WireGuard/d' /jffs/scripts/post-mount  # v2.01
-	
-	Manage_Stats "disable"
-	
+
+    Manage_Stats "disable"
+
     Edit_nat_start "del"
 
     Manage_alias "del"                  # v1.11
@@ -2022,7 +2019,6 @@ Show_VPN_Pool() {
             local VPN_POOL_PREFIX=${VPN_POOL_CIDR%.*}
             echo -e $cBYEL"\n\t\t${cBMAG}$WG_INTERFACE IP Pool allocation\t\t  ${cBWHT}$VPN_POOL_CIDR"$cBCYA
             if [ -n "$(echo "$VPN_POOL_CIDR" | Is_IPv4_CIDR)" ];then
-                #grep -F "$VPN_POOL_PREFIX" ${INSTALL_DIR}WireguardVPN.conf | grep -vE "^$WG_INTERFACE"      # v3.03
                 sqlite3 $SQL_DATABASE "SELECT name, ip FROM devices WHERE ip LIKE '$VPN_POOL_PREFIX%';" | column -t  -s '|' --table-columns 'Device Name','IP address'
             else
                 echo -e $cBRED"\a\n\t***ERROR: Invalid IPv4 CIDR '$VPN_POOL_CIDR'"
@@ -2802,6 +2798,7 @@ Create_RoadWarrior_Device() {
 
     if [ -n "$DEVICE_NAME" ];then
 
+        if [ ! -f ${CONFIG_DIR}${DEVICE_NAME} ] && [ -z "$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE name='$DEVICE_NAME';")" ];then
                 echo -e $cBCYA"\n\tCreating Wireguard Private/Public key pair for device '${cBMAG}${DEVICE_NAME}${cBCYA}'"$cBYEL
                 wg genkey | tee ${CONFIG_DIR}${DEVICE_NAME}_private.key | wg pubkey > ${CONFIG_DIR}${DEVICE_NAME}_public.key
                 echo -e $cBYEL"\tDevice '"$DEVICE_NAME"' Public key="$(cat ${CONFIG_DIR}${DEVICE_NAME}_public.key)"\n"$cRESET
@@ -2852,19 +2849,14 @@ Create_RoadWarrior_Device() {
                     [ "$ANS" != "y" ] && CREATE_DEVICE_CONFIG="N"
                 fi
 
-                # Reuse the IP if device already exists in '${INSTALL_DIR}WireguardVPN.conf'
-                if [ -z "$(grep -F "# $DEVICE_NAME $TAG" ${INSTALL_DIR}WireguardVPN.conf)" ];then
-                    local VPN_POOL=$(awk -v pattern="$SERVER_PEER" 'match($0,"^"pattern) {print $3}' ${INSTALL_DIR}WireguardVPN.conf | tr '/' ' ' | awk '{print $1}') # v1.06
-                else
-                    local VPN_POOL_IP=$(grep -w "$DEVICE_NAME" ${INSTALL_DIR}WireguardVPN.conf | awk '{print $2}')  # v1.06
-                    sed -i "/# $DEVICE_NAME $TAG/d" ${INSTALL_DIR}WireguardVPN.conf  # v1.06
-                fi
-
+                [ -z "$VPN_POOL_IP" ] && local VPN_POOL=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers WHERE peer='$SERVER_PEER';")
+                local VPN_POOL_PREFIX=${VPN_POOL_POOL%.*}
                 if [ -z "$VPN_POOL_IP" ];then
-                    if [ -n "VPN_POOL" ];then
+                    if [ -n "$VPN_POOL" ];then
                         local VPN_POOL_SUBNET=${VPN_POOL%.*}
-                        local VPN_POOL_IP=$(grep -F "$VPN_POOL_SUBNET." ${INSTALL_DIR}WireguardVPN.conf | grep -Ev "^#" | grep -v "$SERVER_PEER" | awk '{print $2}' | sed 's~/32.*$~~g' | sort -n -t . -k 1,1 -k 2,2 -k 3,3 -k 4,4 | tail -n 1)
-                        local IP=${VPN_POOL_IP##*.}        # 4th octet
+                        #local VPN_POOL_IP=$(grep -F "$VPN_POOL_SUBNET." ${INSTALL_DIR}WireguardVPN.conf | grep -Ev "^#" | grep -v "$SERVER_PEER" | awk '{print $2}' | sed 's~/32.*$~~g' | sort -n -t . -k 1,1 -k 2,2 -k 3,3 -k 4,4 | tail -n 1)
+                        local IP=$(sqlite3 $SQL_DATABASE "SELECT COUNT(ip) FROM devices WHERE ip LIKE '$VPN_POOL_PREFIX%';")
+                        #local IP=${VPN_POOL_IP##*.}        # 4th octet
                         local IP=$((IP+1))
 
                         if [ $IP -le 254 ];then
@@ -2876,7 +2868,7 @@ Create_RoadWarrior_Device() {
                         fi
 
                     else
-                        echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) subnet NOT defined in '${INSTALL_DIR}WireguardVPN.conf'"
+                        echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) subnet NOT defined 'device' Peers?"
                         return 1
                     fi
                 fi
@@ -2960,7 +2952,7 @@ EOF
                     #POS=$(awk '/^# Custom.*Peers/ {print NR}' ${INSTALL_DIR}WireguardVPN.conf)
                     #[ -n "$POS" ] && sed -i "$POS a $LINE" ${INSTALL_DIR}WireguardVPN.conf
                     TAG=$(echo "$TAG" | sed "s/'/''/g")
-                    sqlite3 $SQL_DATABASE "INSERT into devices values('$DEVICE_NAME','X','$VPN_POOL_IP','$DNS_RESOLVER','$ALLOWED_IPS','$PUB_KEY','$PRI_KEY','# $DEVICE_NAME $TAG');"
+                    sqlite3 $SQL_DATABASE "INSERT into devices values('$DEVICE_NAME','X','$VPN_POOL_IP','$DNS_RESOLVER','$ALLOWED_IPS','$PUB_KEY','$PRI_KEY','# $DEVICE_NAME $TAG','0');"
 
                     #tail -n 1 ${INSTALL_DIR}WireguardVPN.conf
 
@@ -2972,6 +2964,9 @@ EOF
                     [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$SERVER_PEER"; Show_Peer_Status "show"; }  # v3.03
 
                 fi
+        else
+            echo -e $cRED"\a\n\t***ERROR: Peer device '${cBMAG}${DEVICE_NAME}${cRED}' already EXISTS!"
+        fi
     else
         echo -e $cBRED"\a\n\t***ERROR Missing name of 'client' Peer device! e.g. iPhone\n"$cRESET
     fi
