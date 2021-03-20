@@ -4,7 +4,7 @@ VERSION="v1.13"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 16-Mar-2021
+# Last Updated Date: 20-Mar-2021
 #
 # Description:
 #
@@ -96,8 +96,6 @@ wgport=$(awk '/Listen/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)
 SOCKET=$(nvram get wan_gateway)":"$wgport
 
 WG_INTERFACE=$1
-DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' ${INSTALL_DIR}WireguardVPN.conf | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
-[ -z "$DESC" ] && DESC="# Unidentified"
 
 # Keep things tidy use dedicated WirGuard chain         # v1.13
 if [ "$(Chain_exists "$CHAIN")" == "N" ];then               # v1.13
@@ -123,17 +121,17 @@ fi
 
 if [ "$2" != "disable" ];then
     wgport=$(awk '/Listen/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)
-    Subnet=$(grep -E "^$WG_INTERFACE" ${INSTALL_DIR}WireguardVPN.conf | awk '{print $3}') # v1.09 @here1310
+    Subnet=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers where peer='$WG_INTERFACE';") # v1.09 @here1310
     # CIDR ?
     if [ -z "$(echo "$Subnet" | Is_IPv4_CIDR)" ];then
         SUBNET_PREFIX=${Subnet%.*}
         Subnet=$SUBNET_PREFIX".0/24"
     fi
 
-    DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' ${INSTALL_DIR}WireguardVPN.conf | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
+    DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM servers where peer='$WG_INTERFACE';")
     [ -z "$DESC" ] && DESC="# Unidentified"
 
-    logger -t "wireguard-server${VPN_ID:3:1}" "Initialising Wireguard VPN 'Server' Peer (${cBMAG}$VPN_ID$cBGRE) on $SOCKET"
+    logger -t "wireguard-server${VPN_ID:3:1}" "Initialising Wireguard VPN 'Server' Peer ($VPN_ID) on $SOCKET"
     echo -e $cBCYA"\twireguard-server${VPN_ID:3:1}: Initialising Wireguard VPN 'Server' Peer (${cBMAG}$VPN_ID$cBCYA) on $SOCKET (${cBMAG}$DESC${cBCYA})"$cRESET
 
     ip link del dev $VPN_ID 2>/dev/null
@@ -143,7 +141,7 @@ if [ "$2" != "disable" ];then
     ip link set up dev $VPN_ID
     #ifconfig $VPN_ID mtu 1380
     ifconfig $VPN_ID mtu 1420                       # v1.02
-    
+
     TIMESTAMP=$(date +%s)
     sqlite3 $SQL_DATABASE "INSERT into session values('$WG_INTERFACE','Start','$TIMESTAMP');"   # v1.13
 
@@ -172,10 +170,10 @@ if [ "$2" != "disable" ];then
     ############################################################################################################
 else
     ip link del dev $VPN_ID 2>/dev/null
-    
+
     TIMESTAMP=$(date +%s)
     sqlite3 $SQL_DATABASE "INSERT into session values('$WG_INTERFACE','End','$TIMESTAMP');" # v1.13
-    
+
     Firewall_delete
 
     logger -t "wireguard-server${VPN_ID:3:1}" "Wireguard VPN 'server' Peer ($VPN_ID) on" $SOCKET "Terminated"
