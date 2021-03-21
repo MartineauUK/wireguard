@@ -4,7 +4,7 @@ VERSION="v1.08"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 20-Mar-2021
+# Last Updated Date: 21-Mar-2021
 #
 # Description:
 #
@@ -195,6 +195,8 @@ fi
     if [ "$MODE" == "client" ];then                         # v1.03
         if [ -z "$LOCALIP" ];then
            LOCALIP=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM clients where peer='$WG_INTERFACE';")
+           # Strip IPv6
+           [ "$(nvram get ipv6_service)" == "disabled" ] && LOCALIP=$(echo "$LOCALIP" | cut -d',' -f1)
            export LocalIP=$LOCALIP
         fi
         [ -z "$SOCKET" ] && SOCKET=$(sqlite3 $SQL_DATABASE "SELECT socket FROM clients where peer='$WG_INTERFACE';")
