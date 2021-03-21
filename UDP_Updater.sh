@@ -62,6 +62,8 @@ tail -F "$FN" | \
                             51820)
                                 SERVER=$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers where port='51820';")
                                 PEER="SGS8"
+                                sqlite3 $SQL_DATABASE "INSERT into session values('$WG_INTERFACE','End','$((TS-1))');"
+                                sqlite3 $SQL_DATABASE "INSERT into session values('$WG_INTERFACE','Start','$TS');"
                                 sqlite3 $SQL_DATABASE "UPDATE devices SET conntrack='$TS' WHERE name='$PEER';"
                             ;;
                             11502)
