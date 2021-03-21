@@ -24,7 +24,7 @@ VERSION="v4.01b2"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 20-Mar-2021
+# Last Updated Date: 21-Mar-2021
 #
 # Description:
 #
@@ -656,7 +656,7 @@ Manage_Peer() {
             ;;
             *)
 
-                local FN=${INSTALL_DIR}WireguardVPN.conf
+                local FN=${INSTALL_DIR}WireguardVPN.confXXX
 
                 if [ "$WG_INTERFACE" == "new" ] || [ "$WG_INTERFACE" == "add" ];then
                     CMD=$WG_INTERFACE
@@ -667,7 +667,7 @@ Manage_Peer() {
 
                 if [ "$WG_INTERFACE" != "category" ];then                   # v3.04
 
-                    if [ "$CMD" == "import" ] || [ "$CMD" == "delX" ] || [ "$CMD" == "new" ] || [ "$CMD" == "add" ] || [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ] || [ -n "$(grep "^$WG_INTERFACE" $FN )" ];then
+                    if [ "$CMD" == "import" ] || [ "$CMD" == "delX" ] || [ "$CMD" == "new" ] || [ "$CMD" == "add" ] || [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
                         case $CMD in
                             new*)
                                 # New 'server' Peer    [port=nnnnn] [ip=xxx.xxx.xxx.1/24] [auto={y|n}]
@@ -703,25 +703,6 @@ Manage_Peer() {
 
                                 [ "$CMD" == "delX" ] && Delete_Peer "$WG_INTERFACE" "force" || Delete_Peer "$WG_INTERFACE"  # v3.05
                             ;;
-                            add)
-                                if [ -z "$(grep "^$WG_INTERFACE" $FN )" ];then
-                                    shift 3
-                                    LINE=$WG_INTERFACE"   $@"
-                                    [ $(echo "$LINE" | wc -w) -eq 1 ] && LINE=$LINE"     N     #"
-                                    [ -z "$(echo "$LINE" grep -F "#")" ] && LINE=$LINE" # "
-                                    LINE=$(_quote "$LINE")
-                                    POS=$(awk '($2=="Y"|| $2=="N"||$2=="P") {print NR":"$0}' $FN | tail -n 1 | cut -d':' -f1)
-                                    AUTO="$(echo "$LINE" | awk '{print $2}')"
-                                    if [ -n "$(echo "$AUTO" | grep "^[yYnNpP]$" )" ];then
-                                        [ -n "$POS" ] && sed -i "$POS a $LINE" ${INSTALL_DIR}WireguardVPN.conf
-                                        echo -e $cBGRE"\n\tWireGuard Peer '$WG_INTERFACE' added\n"$cRESET
-                                    else
-                                        echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard Peer Auto='$AUTO' flag for '$WG_INTERFACE'\n"$cRESET
-                                    fi
-                                else
-                                    echo -e $cBRED"\a\n\t***ERROR WireGuard Peer '$WG_INTERFACE' already exists\n"$cRESET
-                                fi
-                            ;;
                             comment)
                                 #echo -e $cBCYA"\n\tPeer Comment (Before): $(grep -E "^$WG_INTERFACE[[:space:]]" $FN)"$cRESET
                                 shift 1
@@ -733,10 +714,10 @@ Manage_Peer() {
                                 #echo -e $cBGRE"\tPeer Comment (After) : $(grep -E "^$WG_INTERFACE[[:space:]]" $FN)\n"$cRESET
                                 echo -e $cBGRE"\n\t[✔] Updated Annotation tag "$COMMENT"\n"$cRESET
                             ;;
-                            dump|show)
+                            dump|config)
 
                                 local Mode=$(Server_or_Client "$WG_INTERFACE")
-                                if [ "$CMD" == "show" ] && [ "$Mode" == "server" ];then
+                                if [ "$CMD" == "config" ] && [ "$Mode" == "server" ];then
                                     local TABLE="servers"
                                     echo -e $cBWHT"\n\t'$Mode' Peer ${cBMAG}${WG_INTERFACE}${cBWHT} Configuration Summary\n"$cBYEL
                                     Show_Peer_Config_Entry "$WG_INTERFACE"
@@ -771,8 +752,58 @@ Manage_Peer() {
                                 sqlite3 $SQL_DATABASE "UPDATE policy SET rules='$RPDB' WHERE peer='$WG_INTERFACE';"
                                 echo -e $cBGRE"\n\t[✔] Updated RPDB Selective Routing rules for $WG_INTERFACE \n"$cRESET
                             ;;
+                            ip*)
+                                shift
+                                local Mode=$(Server_or_Client "$WG_INTERFACE")
+                                local IP_SUBNET="$(echo "$CMD" | sed -n "s/^.*ip=//p" | awk '{print $1}')"
+                                local IPADDR="subnet"
+                                local ID="peer"
+                                case $Mode in
+                                    server) local TABLE="servers";;
+                                    client) local TABLE="clients";;
+                                esac
+
+                                [ "${WG_INTERFACE:0:2}" != "wg" ] && local TABLE="devices"; local ID="name"; local IPADDR="ip"
+
+                                # If it a 'server' Peer then all of its 'device' Peers are now invalid?
+                                # It may be that a 'device' Peer needs a static IP in its 'server' Peer Subnet?
+                                sqlite3 $SQL_DATABASE "UPDATE $TABLE SET $IPADDR='$IP_SUBNET' WHERE $ID='$WG_INTERFACE';"
+                                sed -i "/^Address/ s~[^ ]*[^ ]~$IP_SUBNET~3" ${CONFIG_DIR}${WG_INTERFACE}.conf
+
+                                echo -e $cBGRE"\n\t[✔] Updated IP/Subnet\n"$cRESET
+                            ;;
+                            dns*)
+                                shift
+                                local Mode=$(Server_or_Client "$WG_INTERFACE")
+                                local DNS=$(echo "$CMD" | sed -n "s/^.*dns=//p" | awk '{print $1}')
+                                local ID="peer"
+                                case $Mode in
+                                    client) local TABLE="clients";;
+                                esac
+
+                                [ "${WG_INTERFACE:0:2}" != "wg" ] && local TABLE="devices"; local ID="name"
+
+                                if [ "$Mode" != "server" ];then
+                                    sqlite3 $SQL_DATABASE "UPDATE $TABLE SET dns='$DNS' WHERE $ID='$WG_INTERFACE';"
+                                    sed -i "/^DNS/ s~[^ ]*[^ ]~$DNS~3" ${CONFIG_DIR}${WG_INTERFACE}.conf
+
+                                    echo -e $cBGRE"\n\t[✔] Updated DNS\n"$cRESET
+                                else
+                                     echo -e $cBRED"\a\n\t***ERROR 'server' Peer '$WG_INTERFACE' cannot set DNS\n"$cRESET
+                                fi
+                            ;;
                             *)
-                                echo -e $cBCYA"\n\tPeer Entry: $(grep -E "^$WG_INTERFACE[[:space:]]" $FN)\n"$cRESET
+                                #echo -e $cBCYA"\n\tPeer Entry: $(grep -E "^$WG_INTERFACE[[:space:]]" $FN)\n"$cRESET
+                                local Mode=$(Server_or_Client "$WG_INTERFACE")
+                                case $Mode in
+                                    server) local TABLE="servers";;
+                                    client) local TABLE="clients";;
+                                esac
+
+                                [ "${WG_INTERFACE:0:2}" != "wg" ] && local TABLE="devices"
+
+                                echo -e $cBYEL"\tTable:$TABLE"$cBCYA 2>&1
+                                sqlite3 $SQL_DATABASE "SELECT * FROM $TABLE;"
                             ;;
                         esac
                     else
@@ -2025,7 +2056,7 @@ Show_Peer_Config_Entry() {
         ;;
         *)
             echo -e
-            COLUMN_TXT="Device,Auto,IP,DNS,'Allowed IP',Public,Annotate"
+            COLUMN_TXT="Device,Auto,IP,DNS,Allowed IP,Public,Private,Annotate,Conntrack"
             sqlite3 $SQL_DATABASE "SELECT * from devices WHERE name='$WG_INTERFACE';" | column -t  -s '|' --table-columns "$COLUMN_TXT"
 
         ;;
