@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v3.04"
-#============================================================================================ © 2021 Martineau v3.04
+VERSION="v3.05"
+#============================================================================================ © 2021 Martineau v3.05
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -30,7 +30,7 @@ VERSION="v3.04"
 #
 # Acknowledgement:
 #
-# Contributors: odkrys,Torson,ZebMcKayhan,jobhax,elorimer
+# Contributors: odkrys,Torson,ZebMcKayhan,jobhax,elorimer,Sh0cker54
 
 GIT_REPO="wireguard"
 GITHUB_MARTINEAU="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/main"
@@ -2264,7 +2264,7 @@ Create_RoadWarrior_Device() {
 
                 # User specifed DNS ?
                 if [ -z "$DNS_RESOLVER" ];then                               # v3.04 Hotfix
-                    local DNS_RESOLVER=$(nvram get wan0_dns)             # v3.04 Hotfix
+                    local DNS_RESOLVER=$(nvram get wan0_dns | awk '{print $1}')             # v3.05 Hotfix @Sh0cker54 v3.04 Hotfix
                     [ "$USE_IPV6" == "Y" ] && DNS_RESOLVER=$DNS_RESOLVER","$(nvram get ipv6_dns1)   # v3.04 Hotfix
                 fi
 
