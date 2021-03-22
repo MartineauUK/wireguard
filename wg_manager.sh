@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.01b4"
-#============================================================================================ © 2021 Martineau v4.01b4
+VERSION="v4.01b5"
+#============================================================================================ © 2021 Martineau v4.01b5
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -1867,7 +1867,7 @@ EOF
         Show_Peer_Status
     fi
 
-    echo -e $cBGRE$"\n\t{aREVERSE}$VERSION WireGuard Session Manager install COMPLETED.\n"$cRESET
+    echo -e $cBGRE$"\n\t${aREVERSE}$VERSION WireGuard Session Manager install COMPLETED.\n"$cRESET
 
 }
 Uninstall_WireGuard() {
