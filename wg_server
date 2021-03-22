@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v1.13"
-#============================================================================================ © 2021 Martineau v1.13
+VERSION="v1.14"
+#============================================================================================ © 2021 Martineau v1.14
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 20-Mar-2021
+# Last Updated Date: 22-Mar-2021
 #
 # Description:
 #
@@ -15,7 +15,7 @@ VERSION="v1.13"
 CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v1.08 @elorimer
 INSTALL_DIR="/jffs/addons/wireguard/"
 
-CHAIN="WireGuard"                                   # v1.13
+CHAIN="wireguard"                                   # v1.13
 SQL_DATABASE="/opt/etc/wireguard.d/WireGuard.db"        # v1.13
 
 # shellcheck disable=SC2034
@@ -71,7 +71,7 @@ Firewall_delete() {
 
     iptables -D OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
     iptables -t nat -D PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
-    iptables -t nat -D POSTROUTING -s $Subnet -o wg1+ -j MASQUERADE -m comment --comment "WireGuard 'server'"  2>/dev/null  # v1.11
+    iptables -t nat -D POSTROUTING -s $Subnet -o wg1+ -j MASQUERADE  -m comment --comment "WireGuard 'server'" 2>/dev/null  # v1.11
 }
 
 
@@ -83,31 +83,31 @@ Main() { true; }            # Syntax that is Atom Shellchecker compatible!
 
 ANSIColours
 
-############################################################################################################
-modprobe xt_set
-#############################################################################EIC Hack 2 of 3################
 #insmod /opt/lib/modules/wireguard
 VPN_ID=$1
 [ -z "$1" ] && VPN_ID="wg21"
 #logger -st "wireguard-server${VPN_ID:2:1}" "Configuring Wireguard VPN Server ($VPN_ID) on Port:"$wgport
 insmod /opt/lib/modules/wireguard 2> /dev/null
+
+modprobe xt_set
+modprobe xt_comment                                                                 # v1.13 Hotfix
 ############################################################################################################
 wgport=$(awk '/Listen/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)
 SOCKET=$(nvram get wan_gateway)":"$wgport
 
 WG_INTERFACE=$1
 
-# Keep things tidy use dedicated WirGuard chain         # v1.13
+# Keep things tidy use dedicated WireGuard chain         # v1.13
 if [ "$(Chain_exists "$CHAIN")" == "N" ];then               # v1.13
-    iptables -N $CHAIN
+    iptables -N $CHAIN 2>/dev/null
 fi
 if [ "$(Chain_exists "$CHAIN" "mangle")" == "N" ];then      # v1.13
-    iptables -t mangle -N $CHAIN
+    iptables -t mangle -N $CHAIN  2>/dev/null
 fi
 
-iptables -t mangle -C FORWARD -j WireGuard -m comment --comment "WireGuard" 2>/dev/null
+iptables -t mangle -C FORWARD -j $CHAIN -m comment --comment "WireGuard" 2>/dev/null
 if [ $? -gt 0 ];then
-    iptables -t mangle -I FORWARD -j WireGuard -m comment --comment "WireGuard"
+    iptables -t mangle -I FORWARD -j $CHAIN -m comment --comment "WireGuard"
 fi
 
 iptables -C FORWARD -j $CHAIN -m comment --comment "WireGuard"
