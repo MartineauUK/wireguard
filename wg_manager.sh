@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.01b5"
-#============================================================================================ © 2021 Martineau v4.01b5
+VERSION="v4.01b6"
+#============================================================================================ © 2021 Martineau v4.01b6
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -37,6 +37,7 @@ GITHUB_MARTINEAU="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/main"
 GITHUB_MARTINEAU_DEV="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/dev"
 GITHUB_DIR=$GITHUB_MARTINEAU                       # default for script
 CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v2.03 @elorimer
+IMPORT_DIR=$CONFIG_DIR                             # Allow custom Peer .config import directory v4.01
 INSTALL_DIR="/jffs/addons/wireguard/"
 CHECK_GITHUB="Y"                                   # Check versions on Github
 SILENT="s"                                         # Default is no progress messages for file downloads
@@ -511,7 +512,7 @@ Delete_Peer() {
             if [ -n "$FORCE" ] || [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then     # v3.05
 
                 if [ "$WG_INTERFACE" != "force" ];then
-                    local Mode=$(Server_or_Client "$WG_INTERFACE")
+                    [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ] && local Mode=$(Server_or_Client "$WG_INTERFACE") || local Mode="?"
                     local SQL_COL="peer"
                     [ "$Mode" == "server" ] && local TABLE="servers" || TABLE="clients"
                     [  "${WG_INTERFACE:0:2}" != "wg" ] && { TABLE="devices"; local SQL_COL="name"; Mode="device"; }
@@ -533,48 +534,55 @@ Delete_Peer() {
 
                     if [ "$ANS" == "y" ];then
 
-                    [ -n "$(wg show $WG_INTERFACE 2>/dev/null)" ] && Manage_Wireguard_Sessions "stop" "$WG_INTERFACE"
-                    sqlite3 $SQL_DATABASE "DELETE FROM $TABLE where $SQL_COL='$WG_INTERFACE';"
+                        [ -n "$(wg show $WG_INTERFACE 2>/dev/null)" ] && Manage_Wireguard_Sessions "stop" "$WG_INTERFACE"
+                        sqlite3 $SQL_DATABASE "DELETE FROM $TABLE where $SQL_COL='$WG_INTERFACE';"
 
-                    #   DDNS martineau.homeip.net
-                    #   Endpoint = martineau.homeip.net:51820
-                    if [ "$(awk '/^Endpoint/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)" == "$(nvram get ddns_hostname_x)" ];then
+                        # If Policy client then delete associated RPDB Selective Routing rules
+                        #if [ "$Mode" == "client" ];then
+                            local RP=$(echo "$WG_INTERFACE" | sed 's/wg/rp/')
+                            sqlite3 $SQL_DATABASE "DELETE FROM policy where peer='$RP';"
+                        #fi
 
-                        # Remove the 'client' from any 'server' Peers
-                        #   # SGS8
-                        #   ..........
-                        #   # SGS8 End
+                        #   DDNS martineau.homeip.net
+                        #   Endpoint = martineau.homeip.net:51820
+                        if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
+                            if [ "$(awk '/^Endpoint/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)" == "$(nvram get ddns_hostname_x)" ];then
 
-                            # Scan for 'server' Peer that accepts this 'client' connection
-                            SERVER_PEER=$(grep -E "^#.*$WG_INTERFACE$" /opt/etc/wireguard.d/wg2*.conf | awk -F '[\/:\._]' '{print $6}')
+                                # Remove the 'client' from any 'server' Peers
+                                #   # SGS8
+                                #   ..........
+                                #   # SGS8 End
 
-                            for SERVER_PEER in $SERVER_PEER
-                                do
-                                    echo -e $cBGRE"\t'client' Peer ${cBMAG}${WG_INTERFACE}${cBGRE}removed from 'server' Peer (${cBMAG}${SERVER_PEER}${cBGRE})"
-                                    sed -i "/^# $WG_INTERFACE$/,/^# $WG_INTERFACE End$/d" ${CONFIG_DIR}${SERVER_PEER}.conf
-                                    local RESTART_SERVERS=$RESTART_SERVERS" "$SERVER_PEER
-                                done
-                    fi
+                                    # Scan for 'server' Peer that accepts this 'client' connection
+                                    SERVER_PEER=$(grep -E "^#.*$WG_INTERFACE$" /opt/etc/wireguard.d/wg2*.conf | awk -F '[\/:\._]' '{print $6}')
 
-                    #echo -e $cBCYA"\tDeleting '${CONFIG_DIR}${WG_INTERFACE}*.*'"$cBRED
-                    rm ${CONFIG_DIR}${WG_INTERFACE}* 2>/dev/null
-
-                    echo -e $cBGRE"\t'$Mode' Peer ${cBMAG}${WG_INTERFACE}${cBGRE} ${cBRED}${aREVERSE}DELETED"$cRESET
-
-                    # Do we need to restart any 'server' Peers?.....Remove duplicates from the restart list
-                    RESTART_SERVERS=$(echo "$RESTART_SERVERS" | xargs -n1 | sort -u | xargs)        # v3.05
-                    for SERVER_PEER in $RESTART_SERVERS
-                        do
-                            # Need to Restart the 'server' Peer if it is UP
-                            if [ -n "$(wg show interfaces | grep "$SERVER_PEER")" ];then
-                                CMD="restart"
-                                echo -e $cBWHT"\a\n\tWireGuard 'server' Peer needs to be ${CMD}ed to remove 'client' Peer ${cBMAG}$DEVICE_NAME $TAG"
-                                echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer ($SERVER_PEER) or press$cBGRE [Enter] to SKIP."
-                                read -r "ANS"
-                                [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$SERVER_PEER"; Show_Peer_Status "show"; }  # v3.03
+                                    for SERVER_PEER in $SERVER_PEER
+                                        do
+                                            echo -e $cBGRE"\t'client' Peer ${cBMAG}${WG_INTERFACE}${cBGRE}removed from 'server' Peer (${cBMAG}${SERVER_PEER}${cBGRE})"
+                                            sed -i "/^# $WG_INTERFACE$/,/^# $WG_INTERFACE End$/d" ${CONFIG_DIR}${SERVER_PEER}.conf
+                                            local RESTART_SERVERS=$RESTART_SERVERS" "$SERVER_PEER
+                                        done
                             fi
-                        done
-                fi
+                        fi
+                        #echo -e $cBCYA"\tDeleting '${CONFIG_DIR}${WG_INTERFACE}*.*'"$cBRED
+                        rm ${CONFIG_DIR}${WG_INTERFACE}* 2>/dev/null
+
+                        echo -e $cBGRE"\t'$Mode' Peer ${cBMAG}${WG_INTERFACE}${cBGRE} ${cBRED}${aREVERSE}DELETED"$cRESET
+
+                        # Do we need to restart any 'server' Peers?.....Remove duplicates from the restart list
+                        RESTART_SERVERS=$(echo "$RESTART_SERVERS" | xargs -n1 | sort -u | xargs)        # v3.05
+                        for SERVER_PEER in $RESTART_SERVERS
+                            do
+                                # Need to Restart the 'server' Peer if it is UP
+                                if [ -n "$(wg show interfaces | grep "$SERVER_PEER")" ];then
+                                    CMD="restart"
+                                    echo -e $cBWHT"\a\n\tWireGuard 'server' Peer needs to be ${CMD}ed to remove 'client' Peer ${cBMAG}$DEVICE_NAME $TAG"
+                                    echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer ($SERVER_PEER) or press$cBGRE [Enter] to SKIP."
+                                    read -r "ANS"
+                                    [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$SERVER_PEER"; Show_Peer_Status "show"; }  # v3.03
+                                fi
+                            done
+                    fi
                 fi
             else
                 [ -n "$Mode" ] && TXT="'$Mode' " || TXT=            # v3.03
@@ -590,11 +598,25 @@ Import_Peer() {
     local ACTION=$1;shift
     local WG_INTERFACE=$1
 
+    if [ "$1" == "dir" ];then
+
+        IMPORT_DIR=$2
+        [ "${IMPORT_DIR:0:1}" != "/" ] && IMPORT_DIR="/opt/etc/"$IMPORT_DIR
+        [  ${IMPORT_DIR#"${IMPORT_DIR%?}"} != "/" ] && IMPORT_DIR=$IMPORT_DIR"/"
+        if [ -d $IMPORT_DIR ];then
+            echo -e $cBGRE"\n\t[✔] Import directory set $IMPORT_DIR"$cRESET 2>&1
+        else
+            echo -e $cBRED"\a\n\t***ERROR: Invalid directory ${cBWHT}'$IMPORT_DIR'"$cRESET 2>&1
+            return 1
+        fi
+        shift 2
+    fi
+
     local ANNOTATE="$(echo "$@" | sed -n "s/^.*tag=//p" | awk '{print $0}')"
 
     for WG_INTERFACE in $@
         do
-            if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
+            if [ -f ${IMPORT_DIR}${WG_INTERFACE}.conf ];then
                 if [ "$(Server_or_Client "$WG_INTERFACE")" != "server" ];then
                     if [ -z "$(sqlite3 $SQL_DATABASE "SELECT peer FROM clients where peer='$WG_INTERFACE';")" ];then
                         local AUTO="Y"
@@ -608,6 +630,8 @@ Import_Peer() {
                                 PublicKey) local PUB_KEY=${LINE##* };;
                                 AllowedIP) local PUB_KEY=${LINE##* };;
                                 Endpoint) local SOCKET=${LINE##* };;
+                                "#"DNS) local DNS=${LINE##* };;
+                                "#"Address) local SUBNET=${LINE##* };;
                                 DNS) local DNS=${LINE##* }
                                     # This must be commented out!
                                     COMMENT_OUT="Y"
@@ -616,26 +640,33 @@ Import_Peer() {
                                     # This must be commented out!
                                     COMMENT_OUT="Y"
                                 ;;
-                                "#"DNS) local DNS=${LINE##* };;
-                                "#"Address) local SUBNET=${LINE##* };;
                             esac
+                        done < ${IMPORT_DIR}${WG_INTERFACE}.conf
 
-                        done < ${CONFIG_DIR}${WG_INTERFACE}.conf
+                        # Strip IPV6
+                        if [ "$(nvram get ipv6_service)" == "disabled" ];then
+                            local SUBNET=$(echo "$SUBNET" | tr ',' ' ' | awk '{print $1}')
+                            [ -z "$(echo "$SUBNET" | Is_IPv4_CIDR)" ] && $SUBNET=$SUBNET"/32"
+                        fi
                         sqlite3 $SQL_DATABASE "INSERT INTO clients values('$WG_INTERFACE','$AUTO','$SUBNET','$SOCKET','$DNS','$PUB_KEY','$PRI_KEY','$ANNOTATE');"
-                        sqlite3 $SQL_DATABASE "INSERT INTO policy values('$WG_INTERFACE','<>');"
+                        #sqlite3 $SQL_DATABASE "INSERT INTO policy values('$WG_INTERFACE','<>');"
                         echo -e $cBGRE"\n\t[✔] Peer ${cBMAG}${WG_INTERFACE}${cBGRE} import success"$cRESET 2>&1
 
                         if [ "$COMMENT_OUT" == "Y" ];then
-                            sed -i 's/^DNS/#DNS/' ${CONFIG_DIR}${WG_INTERFACE}.conf
-                            sed -i 's/^Address/#Address/' ${CONFIG_DIR}${WG_INTERFACE}.conf
+                            sed -i 's/^DNS/#DNS/' ${IMPORT_DIR}${WG_INTERFACE}.conf
+                            sed -i 's/^Address/#Address/' ${IMPORT_DIR}${WG_INTERFACE}.conf
                         fi
 
-                        # Should 'Endpoint' be moved from the end of the config?
-                        #  LASTLINE=$(tail -n 1 ${CONFIG_DIR}${WG_INTERFACE}.conf)
+                        # Should 'Endpoint' be moved from the End of the config?
+                        #LASTLINE=$(tail -n 1 ${IMPORT_DIR}${WG_INTERFACE}.conf)
                         #if [ "${LASTLINE:0:4}" == "Endp" ];then
-                            #local POS=$(awk '/^\[Peer]/ {print NR}' ${CONFIG_DIR}${WG_INTERFACE}.conf)
-                            #sed -i "$POS a $LASTLINE" ${CONFIG_DIR}${WG_INTERFACE}.conf
+                            #local POS=$(awk '/^\[Peer]/ {print NR}' ${IMPORT_DIR}${WG_INTERFACE}.conf)
+                            #sed -i "$POS a $LASTLINE" ${IMPORT_DIR}${WG_INTERFACE}.conf
                         #fi
+                        # or to the End?
+                        #sed -n '/^Endpoint/{h;$p;$b;:a;n;p;$!ba;x};p' ${IMPORT_DIR}${WG_INTERFACE}.conf
+
+                        cp ${IMPORT_DIR}${WG_INTERFACE}.conf ${CONFIG_DIR}${WG_INTERFACE}.conf
 
                         local COMMENTOUT=
                     else
@@ -647,8 +678,8 @@ Import_Peer() {
                     echo -e $cBRED"\a\n\t***ERROR: WireGuard Peer (${cBWHT}$WG_INTERFACE${cBRED}) must be 'client'....skipping import Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
                 fi
             else
-                SayT "***ERROR: WireGuard VPN 'client' Peer ('$WG_INTERFACE') config NOT found?....skipping import request"
-                echo -e $cBRED"\a\n\t***ERROR: WireGuard 'client' Peer (${cBWHT}$WG_INTERFACE${cBRED}) config NOT found?....skipping import Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
+                SayT "***ERROR: WireGuard VPN 'client' Peer ('${IMPORT_DIR}$WG_INTERFACE') config NOT found?....skipping import request"
+                echo -e $cBRED"\a\n\t***ERROR: WireGuard 'client' Peer (${cBWHT}${IMPORT_DIR}$WG_INTERFACE${cBRED}) config NOT found?....skipping import Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
             fi
 
             [ "$ANNOTATE" != "N/A" ] && break
@@ -1203,6 +1234,8 @@ CREATE UNIQUE INDEX peerserverx on servers(peer);
 CREATE UNIQUE INDEX peerclientx on clients(peer);
 #CREATE UNIQUE INDEX peerx on session(peer);
 CREATE UNIQUE INDEX namex on devices(name);
+CREATE UNIQUE INDEX peerpolicyx on policy(peer);
+
 EOF
     echo -en $cBRED
     sqlite3 $SQL_DATABASE < /tmp/sql_cmds.txt
@@ -1492,10 +1525,10 @@ Manage_Stats() {
 
     case $ACTION in
         disable|off)
-            cru d generatestats 2>/dev/null
+            cru d WireGuard 2>/dev/null
         ;;
         enable|on)
-            cru d generatestats 2>/dev/null
+            cru d WireGuard 2>/dev/null
             cru a WireGuard 59 "* * * *" /jffs/addons/wireguard/wg_manager.sh generatestats
         ;;
     esac
@@ -1867,7 +1900,7 @@ EOF
         Show_Peer_Status
     fi
 
-    echo -e $cBGRE$"\n\t${aREVERSE}$VERSION WireGuard Session Manager install COMPLETED.\n"$cRESET
+    echo -e $cBGRE"\n\t${aREVERSE}$VERSION WireGuard Session Manager install COMPLETED.\n"$cRESET
 
 }
 Uninstall_WireGuard() {
@@ -1895,7 +1928,9 @@ Uninstall_WireGuard() {
     echo -e $cBCYA"\tDeleted Peer Auto-start @BOOT\n"$cRESET
     [ -n "$(grep -i "WireGuard" /jffs/scripts/post-mount)" ] && sed -i '/WireGuard/d' /jffs/scripts/post-mount  # v2.01
 
-    Manage_Stats "uninstall" "disable"
+    cru d "WireGuard"
+
+    Manage_Stats "DISABLE" "disable"
 
     Edit_nat_start "del"
 
