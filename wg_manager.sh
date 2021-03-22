@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.01b3"
-#============================================================================================ © 2021 Martineau v4.01b3
+VERSION="v4.01b4"
+#============================================================================================ © 2021 Martineau v4.01b4
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,13 +24,13 @@ VERSION="v4.01b3"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 21-Mar-2021
+# Last Updated Date: 22-Mar-2021
 #
 # Description:
 #
 # Acknowledgement:
 #
-# Contributors: odkrys,Torson,ZebMcKayhan,jobhax,elorimer
+# Contributors: odkrys,Torson,ZebMcKayhan,jobhax,elorimer,Sh0cker54
 
 GIT_REPO="wireguard"
 GITHUB_MARTINEAU="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/main"
@@ -430,6 +430,7 @@ Create_Peer() {
         # User specified VPN Tunnel subnet?
         if [ -z "$VPN_POOL_USER" ];then
 
+            [ -z "$AUTO_VPN_POOL" ] && AUTO_VPN_POOL="10.50.1.1/24"
             ONE_OCTET=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f1)
             TWO_OCTET=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f2)
             THIRD_OCTET=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f3)
@@ -607,6 +608,14 @@ Import_Peer() {
                                 PublicKey) local PUB_KEY=${LINE##* };;
                                 AllowedIP) local PUB_KEY=${LINE##* };;
                                 Endpoint) local SOCKET=${LINE##* };;
+                                DNS) local DNS=${LINE##* }
+                                    # This must be commented out!
+                                    COMMENT_OUT="Y"
+                                ;;
+                                Address) local SUBNET=${LINE##* }
+                                    # This must be commented out!
+                                    COMMENT_OUT="Y"
+                                ;;
                                 "#"DNS) local DNS=${LINE##* };;
                                 "#"Address) local SUBNET=${LINE##* };;
                             esac
@@ -615,6 +624,20 @@ Import_Peer() {
                         sqlite3 $SQL_DATABASE "INSERT INTO clients values('$WG_INTERFACE','$AUTO','$SUBNET','$SOCKET','$DNS','$PUB_KEY','$PRI_KEY','$ANNOTATE');"
                         sqlite3 $SQL_DATABASE "INSERT INTO policy values('$WG_INTERFACE','<>');"
                         echo -e $cBGRE"\n\t[✔] Peer ${cBMAG}${WG_INTERFACE}${cBGRE} import success"$cRESET 2>&1
+
+                        if [ "$COMMENT_OUT" == "Y" ];then
+                            sed -i 's/^DNS/#DNS/' ${CONFIG_DIR}${WG_INTERFACE}.conf
+                            sed -i 's/^Address/#Address/' ${CONFIG_DIR}${WG_INTERFACE}.conf
+                        fi
+
+                        # Should 'Endpoint' be moved from the end of the config?
+                        #  LASTLINE=$(tail -n 1 ${CONFIG_DIR}${WG_INTERFACE}.conf)
+                        #if [ "${LASTLINE:0:4}" == "Endp" ];then
+                            #local POS=$(awk '/^\[Peer]/ {print NR}' ${CONFIG_DIR}${WG_INTERFACE}.conf)
+                            #sed -i "$POS a $LASTLINE" ${CONFIG_DIR}${WG_INTERFACE}.conf
+                        #fi
+
+                        local COMMENTOUT=
                     else
                         SayT "***ERROR: WireGuard VPN 'client' Peer ('$WG_INTERFACE') ALREADY exists in database?....skipping import request"
                         echo -e $cBRED"\a\n\t***ERROR: WireGuard 'client' Peer (${cBWHT}$WG_INTERFACE${cBRED}) ALREADY exists in database?....skipping import Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
@@ -764,9 +787,10 @@ Manage_Peer() {
                                 case $Mode in
                                     server) local TABLE="servers";;
                                     client) local TABLE="clients";;
+                                    device)local TABLE="devices"; local ID="name"; local IPADDR="ip";;
                                 esac
 
-                                [ "${WG_INTERFACE:0:2}" != "wg" ] && local TABLE="devices"; local ID="name"; local IPADDR="ip"
+                                #[ "${WG_INTERFACE:0:2}" != "wg" ] && local TABLE="devices"; local ID="name"; local IPADDR="ip"
 
                                 # If it a 'server' Peer then all of its 'device' Peers are now invalid?
                                 # It may be that a 'device' Peer needs a static IP in its 'server' Peer Subnet?
@@ -875,6 +899,10 @@ Manage_Wireguard_Sessions() {
             if [ "$ACTION" == "start" ];then                  # v2.02 v1.09
                 WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM clients where auto='Y' OR auto='P';" | tr '\n' ' ')
                 WG_INTERFACE=$WG_INTERFACE" "$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers where auto='Y' OR auto='P';" | tr '\n' ' ')
+                if [ -z "$WG_INTERFACE" ];then
+                    echo -e $cRED"\a\n\t***ERROR: No WireGuard Peers where (${cBWHT}Auto='Y'${cBRED}) defined\n"$cRESET 2>&1
+                    return 1
+                fi
             else
                 # Wot if there are Peers we don't control?
                 WG_INTERFACE=$(wg show interfaces)                # v1.09
@@ -890,12 +918,20 @@ Manage_Wireguard_Sessions() {
                 local CATEGORY=" for Category 'Clients'"
                 SayT "$VERSION Requesting WireGuard VPN Peer ${ACTION}$CATEGORY ($WG_INTERFACE)"
                 local TABLE="clients"
+                if [ -z "$WG_INTERFACE" ];then
+                    echo -e $cRED"\a\n\t***ERROR: No Peers$CATEGORY where (${cBWHT}Auto='Y' or 'P'${cBRED}) defined\n"$cRESET 2>&1
+                    return 1
+                fi
             ;;
             servers)
                 WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers where auto='Y' OR auto='P';" | tr '\n' ' ')
                 local CATEGORY=" for Category 'Servers'"
                 SayT "$VERSION Requesting WireGuard VPN Peer ${ACTION}$CATEGORY ($WG_INTERFACE)"
                 local TABLE="servers"
+                if [ -z "$WG_INTERFACE" ];then
+                    echo -e $cRED"\a\n\t***ERROR: No Peers$CATEGORY where (${cBWHT}Auto='Y'${cBRED}) defined\n"$cRESET 2>&1
+                    return 1
+                fi
             ;;
             *)
 
@@ -987,7 +1023,7 @@ Manage_Wireguard_Sessions() {
 
                                 local TS=$(date +%s)
                                 sh ${INSTALL_DIR}wg_server $WG_INTERFACE
-                                [ "$(wg show interfaces | grep "wg2[1-9]" | wc -w)" -eq 1 ] && local UDP_MONITOR=$(Manage_UDP_Monitor "server" "enable")
+#[ "$(wg show interfaces | grep "wg2[1-9]" | wc -w)" -eq 1 ] && local UDP_MONITOR=$(Manage_UDP_Monitor "server" "enable")
 
                                 # Reset all its 'client' Peers...well HACK until 'client' peer ACTUALLY connects...
                                 # Update the Start time for ALL 'client' device Peers hosted by the server
@@ -1064,7 +1100,8 @@ Manage_Wireguard_Sessions() {
 
                                 sh ${INSTALL_DIR}wg_server $WG_INTERFACE "disable"
 
-                                # If there are no 'sever' Peers ACTIVE then terminate UDP monitoring
+                                # If there are no 'server' Peers ACTIVE then terminate UDP monitoring
+                                # Will require REBOOT to reinstate! or 'wgm init'
                                 [ "$(wg show interfaces | grep "wg2[1-9]" | wc -w)" -eq 0 ] && local UDP_MONITOR=$(Manage_UDP_Monitor "server" "disable")
 
                             else
@@ -1411,13 +1448,14 @@ Edit_DNSMasq() {
         # Allow dnmsasq to listen on Wireguard interfaces for DNS
         [ ! -f /jffs/configs/dnsmasq.conf.add ] && true > /jffs/configs/dnsmasq.conf.add # v2.03
         if [ -z "$(grep -E "^interface=wg\*" /jffs/configs/dnsmasq.conf.add)" ];then
-            echo -e $cBGRE"\tAdded 'wg*' interfaces to DNSMasq"$cRESET 2>&1
+            echo -e $cBCYA"\tRestarting DNSmasq to add 'wg*' interfaces"$cRESET 2>&1
             echo -e "interface=wg*     # WireGuard" >> /jffs/configs/dnsmasq.conf.add
             service restart_dnsmasq 2>/dev/null
         fi
     else
         if [ -f /jffs/configs/dnsmasq.conf.add ];then
             if [ -n "$(grep "WireGuard" /jffs/configs/dnsmasq.conf.add)" ];then
+                echo -e $cBCYA"\tRestarting DNSMASQ to remove 'wg*' interfaces"$cRESET 2>&1
                 sed -i '/WireGuard/d' /jffs/configs/dnsmasq.conf.add     # v1.12
                 service restart_dnsmasq 2>/dev/null
             fi
@@ -1684,7 +1722,7 @@ exit_message() {
 }
 Install_WireGuard_Manager() {
 
-    echo -e $cBWHT"\n\tInstalling WireGuard Manager - Router$cBMAG $HARDWARE_MODEL (v$BUILDNO)\n"$cRESET
+    echo -e $cBWHT"\n\tInstalling WireGuard Manager - Router$cBMAG $HARDWARE_MODEL (v$BUILDNO) $(grep -E "^arch" $ENTWARE_INFO)\n"$cRESET
 
     if [ "$(Is_AX)" == "N" ] && [ "$(Is_HND)" == "N" ];then
         echo -e $cBRED"\a\n\tERROR: Router$cRESET $HARDWARE_MODEL (v$BUILDNO)$cBRED is not currently compatible with WireGuard!\n"
@@ -1735,7 +1773,8 @@ Install_WireGuard_Manager() {
     echo -e $cBCYA"\tCreating WireGuard 'Server' Peer ${cBMAG}(wg21)${cBCYA}'"$cRESET
 
     # Create Server template
-    for I in 1                                            # v3.02
+    local PEER_LIST="1"
+    for I in $PEER_LIST                                            # v3.02
         do
             cat > ${CONFIG_DIR}wg2${I}.conf << EOF
 # $HARDWARE_MODEL 'server' Peer #1 (wg2$I)
@@ -1744,24 +1783,23 @@ PrivateKey = Ha1rgO/plL4wCB+pRdc6Qh8bIAWNeNgPZ7L+HFBhoE4=
 ListenPort = 51820
 
 # e.g. Accept a WireGuard connection from say YOUR mobile device to the router
-# see '${CONFIG_DIR}mobilephone_private.key'
 
-# Peer Example
+# DeviceExample
 #[Peer]
 #PublicKey = This_should_be_replaced_with_the_Public_Key_of_YOUR_mobile_device
-#AllowedIPs = PEER.ip.xxx.xxx/32
-# Peer Example End
+#AllowedIPs = 0.0.0.0/0 # All Access or [192.168.1.0/24,10.8.0.21/32] i.e. List of IP/Subnet/networks YOUR mobile device may access.
+# DeviceExample End
 EOF
 
         done
 
-    echo -e $cBCYA"\tCreating WireGuard Private/Public key-pairs for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
+    echo -e $cBCYA"\tCreating WireGuard Private/Public key-pairs for ${cBMAG}$HARDWARE_MODEL (v$BUILDNO)"$cRESET
     if [ -n "$(which wg)" ];then
 
             # do
                 # wg genkey | tee ${CONFIG_DIR}wg1${I}_private.key | wg pubkey > ${CONFIG_DIR}wg1${I}_public.key
             # done
-        for I in 1
+        for I in $PEER_LIST
             do
                 wg genkey | tee ${CONFIG_DIR}wg2${I}_private.key | wg pubkey > ${CONFIG_DIR}wg2${I}_public.key
 
@@ -1770,11 +1808,11 @@ EOF
                 # PRIV_KEY=$(Convert_Key "$PRIV_KEY")
                 # sed -i "/^PrivateKey/ s~[^ ]*[^ ]~$PRIV_KEY~3" ${CONFIG_DIR}wg11.conf
 
-                PRIV_KEY=$(cat ${CONFIG_DIR}wg21_private.key)
+                PRIV_KEY=$(cat ${CONFIG_DIR}wg2${I}_private.key)
                 PRIV_KEY=$(Convert_Key "$PRIV_KEY")
                 sed -i "/^PrivateKey/ s~[^ ]*[^ ]~$PRIV_KEY~3" ${CONFIG_DIR}wg2${I}.conf
 
-                local WG_INTERFACE="wg21"
+                local WG_INTERFACE="wg2"${I}
                 local AUTO="Y"
                 local SUBNET="10.50.1.1/24"
                 local PORT=51820
@@ -1790,20 +1828,11 @@ EOF
 
         # Test 'wg' and this script - (well actually the one used @BOOT) against the 'server' Peers e.g. wg21
         #echo -e $cBCYA"\t${cRESET}${cYBLU}Test ${cRESET}${cBCYA}Initialising the Sample WireGuard 'client' and 'server' Peers, ${cYBLU}but ONLY the Sample 'server' (wg21) is VALID :-)${cYBLU}"$cRESET
-        #echo -e $cBCYA"\tInitialising WireGuard VPN 'server' Peer"$cRESET
-        #${INSTALL_DIR}$SCRIPT_NAME start
-        # Test the Status report
 
-        Manage_Stats "enable"
+        echo -e $cBCYA"\tInitialising WireGuard VPN 'server' Peer"$cRESET
+        Manage_Wireguard_Sessions "start" "wg21"
 
-        #echo -e $cBCYA"\tWireGuard Peer Status"
-        #${INSTALL_DIR}$SCRIPT_NAME show               # v1.11
-
-        # Let the user see the two Peers are actually running
-        #sleep 2
-
-        #echo -e $cBCYA"\tTerminating ACTIVE WireGuard Peers ...\n"$cRESET
-        #${INSTALL_DIR}$SCRIPT_NAME stop
+        Manage_Stats "init" "enable"
     else
         echo -e $cBRED"\a\n\t***ERROR: WireGuard install FAILED!\n"$cRESETd
     fi
@@ -1825,11 +1854,20 @@ EOF
     opkg install qrencode
 
     # Create a sample Road-Warrior device and QR code for import into WireGuard App on the say an iPhone
-    echo -e $cBWHT"\tDo you want to create a 'device' Peer for 'server' Peer (${cBMAG}wg21${cBWHT}) ?\n\t${cBGRE}Press y$cRESET to$cBRED create 'device' Peer ${cBMAG}'iPhone'${cRESET} or press$cBGRE [Enter] to skip"
+    echo -e $cBWHT"\tDo you want to create a 'device' Peer for 'server' Peer (${cBMAG}wg21${cBWHT}) ?\n\t${cBWHT}Press ${cBGRE}y$cRESET to ${cBWHT}create 'device' Peer ${cRESET}or press$cBGRE [Enter] to skip"
     read -r "ANS"
-    [ "$ANS" == "Y" ] && Create_RoadWarrior_Device "create" "iPhone"         # v3.01
+    if [ "$ANS" == "y" ];then
+        echo -e $cBWHT"Enter the device name e.g. ${cBGRE}iPhone"$cBWHT
+        read -r "ANS"
+        if [ -n "$ANS" ];then
+            Create_RoadWarrior_Device "create" "$ANS"         # v4.01 v3.01
+        fi
+    else
+        echo -e $cBCYA"\tWireGuard Peer Status"
+        Show_Peer_Status
+    fi
 
-    echo -e $cBGRE"\tWireGuard install COMPLETED.\n"$cRESET
+    echo -e $cBGRE$"\n\t{aREVERSE}$VERSION WireGuard Session Manager install COMPLETED.\n"$cRESET
 
 }
 Uninstall_WireGuard() {
@@ -1840,7 +1878,7 @@ Uninstall_WireGuard() {
         # legacy tidy-up!
         [ -f ${CONFIG_DIR}WireguardVPN_map ] && rm ${CONFIG_DIR}WireguardVPN_map
 
-    rm -rf /jffs/addons/wireguard
+    rm -rf ${INSTALL_DIR}
 
     # Only remove WireGuard Entware packages if user DELETES '/opt/etc/wireguard'
     echo -e "\n\tPress$cBRED Y$cRESET to$cBRED delete ALL WireGuard DATA files (Peer *.config etc.) $cRESET('${CONFIG_DIR}') or press$cBGRE [Enter] to keep custom WireGuard DATA files."
@@ -1851,6 +1889,7 @@ Uninstall_WireGuard() {
 
        echo -e $cBCYA"\tUninstalling Wireguard Kernel module and Userspace Tool for $HARDWARE_MODEL (v$BUILDNO)"$cBGRA
        opkg remove wireguard-kernel wireguard-tools
+       rm -rf /opt/etc/wireguard/
     fi
 
     echo -e $cBCYA"\tDeleted Peer Auto-start @BOOT\n"$cRESET
@@ -1991,7 +2030,10 @@ Show_Peer_Status() {
                             fi
 
                             local LOCALIP=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM $TABLE where peer='$WG_INTERFACE';")
-                            local SOCKET=$(sqlite3 $SQL_DATABASE "SELECT socket FROM $TABLE where peer='$WG_INTERFACE';")
+                            [ "$(nvram get ipv6_service)" == "disabled"  ] && local LOCALIP=$(echo "$LOCALIP" | awk -F ',' '{print $1}')
+                            #local SOCKET=$(sqlite3 $SQL_DATABASE "SELECT socket FROM $TABLE where peer='$WG_INTERFACE';")
+                            local SOCKET=$(awk '/^^Endpoint/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)
+
                             local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM $TABLE where peer='$WG_INTERFACE';")
                             local DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')
                             local VPN_IP_TXT=${SOCKET}"\t\t\t${cBYEL}${LOCALIP}\t"
@@ -2179,7 +2221,7 @@ Diag_Dump() {
         echo -e $cBYEL"\n\tDEBUG: -t filter \n"$cBCYA 2>&1
         iptables --line -nvL FORWARD | grep -iE "WireGuard|Chain|pkts"
         echo -e
-        iptables --line -nvL WireGuard | grep -iE "WireGuard|Chain|pkts"
+        iptables --line -nvL wireguard | grep -iE "WireGuard|Chain|pkts"
         echo -e
         iptables --line -nvL INPUT | grep -iE "WireGuard|Chain|pkts"
         echo -e
@@ -2403,10 +2445,10 @@ EOF
 
             fi
 
-            [ -z "$(pidof UDP_Monitor.sh)" ] &&  ${INSTALL_DIR}UDP_Monitor.sh &
+            [ -z "$(pidof UDP_Monitor.sh)" ] && ( ${INSTALL_DIR}UDP_Monitor.sh & )
 
 
-            [ -z "$(pidof UDP_Updater.sh)" ] && ${INSTALL_DIR}UDP_Updater.sh &
+            [ -z "$(pidof UDP_Updater.sh)" ] && ( ${INSTALL_DIR}UDP_Updater.sh & )
 
         fi
 
@@ -2645,8 +2687,7 @@ Process_User_Choice() {
                 case "$ACTION" in
                     "?")
 
-
-                        echo -e
+                        echo -e $cBGRE"\n\t[✔]$cBWHT $(grep -E "^arch" $ENTWARE_INFO)\n"$cRESET     # v4.01 @Torson
                         Check_Module_Versions "report"
 
                         echo -e $cRESET
@@ -2893,7 +2934,7 @@ Create_RoadWarrior_Device() {
 
     # If user did not specify 'server' Peers, use the oldest 'server' Peer found ACTIVE or the first defined in the config
     [ -z "$SERVER_PEER" ] && SERVER_PEER=$(wg show interfaces | grep -vE "wg1")
-    [ -z "$SERVER_PEER" ] && SERVER_PEER=$(awk '/^wg2/ {print $1;exit}' ${INSTALL_DIR}WireguardVPN.conf)
+    [ -z "$SERVER_PEER" ] && SERVER_PEER=$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers order by peer;" | head -n 1)
     [ -z "$SERVER_PEER" ] && { echo -e $cBRED"\a\n\t***ERROR: no 'server' Peers specified or found (wg2*)"$cRESET; return 1; }
     for SERVER_PEER in $SERVER_PEER
         do
@@ -3008,7 +3049,7 @@ Create_RoadWarrior_Device() {
 
                 # User specifed DNS ?
                 if [ -z "$DNS_RESOLVER" ];then                               # v3.04 Hotfix
-                    local DNS_RESOLVER=$(nvram get wan0_dns)             # v3.04 Hotfix
+                    local DNS_RESOLVER=$(nvram get wan0_dns | awk '{print $1}')             # v3.04 Hotfix @Sh0cker54 #v3.04 Hotfix
                     [ "$USE_IPV6" == "Y" ] && DNS_RESOLVER=$DNS_RESOLVER","$(nvram get ipv6_dns1)   # v3.04 Hotfix
                 fi
 
@@ -3099,6 +3140,7 @@ HARDWARE_MODEL=$(Get_Router_Model)
 [ -n "$(nvram get computer_name)" ] && MYROUTER=$(nvram get computer_name) || MYROUTER=$(nvram get lan_hostname)
 BUILDNO=$(nvram get buildno)
 SCRIPT_NAME="${0##*/}"
+ENTWARE_INFO="/opt/etc/entware_release"
 
 EASYMENU="Y"
 
