@@ -512,7 +512,7 @@ Delete_Peer() {
             if [ -n "$FORCE" ] || [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then     # v3.05
 
                 if [ "$WG_INTERFACE" != "force" ];then
-                    [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ] && 2 || local Mode="?"
+                    [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ] && local Mode=$(Server_or_Client "$WG_INTERFACE") || local Mode="?"
                     local SQL_COL="peer"
                     [ "$Mode" == "server" ] && local TABLE="servers" || TABLE="clients"
                     [  "${WG_INTERFACE:0:2}" != "wg" ] && { TABLE="devices"; local SQL_COL="name"; Mode="device"; }
