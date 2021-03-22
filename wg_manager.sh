@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.01b6"
-#============================================================================================ © 2021 Martineau v4.01b6
+VERSION="v4.01b7"
+#============================================================================================ © 2021 Martineau v4.01b7
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -426,7 +426,7 @@ Create_Peer() {
     if [ -z "$SERVER_PEER" ];then
 
         SERVER_PEER=$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers;" | sort | tail -n 1)
-        AUTO_VPN_POOL=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers where peer='$SERVER_PEER';")
+        AUTO_VPN_POOL=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers WHERE peer='$SERVER_PEER';")
 
         # User specified VPN Tunnel subnet?
         if [ -z "$VPN_POOL_USER" ];then
@@ -512,7 +512,7 @@ Delete_Peer() {
             if [ -n "$FORCE" ] || [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then     # v3.05
 
                 if [ "$WG_INTERFACE" != "force" ];then
-                    [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ] && local Mode=$(Server_or_Client "$WG_INTERFACE") || local Mode="?"
+                    [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ] && 2 || local Mode="?"
                     local SQL_COL="peer"
                     [ "$Mode" == "server" ] && local TABLE="servers" || TABLE="clients"
                     [  "${WG_INTERFACE:0:2}" != "wg" ] && { TABLE="devices"; local SQL_COL="name"; Mode="device"; }
@@ -535,9 +535,9 @@ Delete_Peer() {
                     if [ "$ANS" == "y" ];then
 
                         [ -n "$(wg show $WG_INTERFACE 2>/dev/null)" ] && Manage_Wireguard_Sessions "stop" "$WG_INTERFACE"
-                        sqlite3 $SQL_DATABASE "DELETE FROM $TABLE where $SQL_COL='$WG_INTERFACE';"
+                        sqlite3 $SQL_DATABASE "DELETE FROM $TABLE WHERE $SQL_COL='$WG_INTERFACE';"
                         # ... and delete associated RPDB Selective Routing rule
-                        sqlite3 $SQL_DATABASE "DELETE FROM policy where peer='$WG_INTERFACE';"
+                        sqlite3 $SQL_DATABASE "DELETE FROM policy WHERE peer='$WG_INTERFACE';"
 
                         #   DDNS martineau.homeip.net
                         #   Endpoint = martineau.homeip.net:51820
@@ -594,6 +594,12 @@ Import_Peer() {
     local ACTION=$1;shift
     local WG_INTERFACE=$1
 
+    if [ "$1" == "?" ];then
+        local CONFIGS=$(ls -1 ${CONFIG_DIR}*.conf 2>/dev/null | awk -F '/' '{print $5}' | grep -v "wg[1-2]" | sort )
+        echo -e $cBYEL"\n\t Available Peer Configs for import:\n${cRESET}$CONFIGS"
+        return 0
+    fi
+
     if [ "$1" == "dir" ];then
 
         IMPORT_DIR=$2
@@ -614,7 +620,7 @@ Import_Peer() {
         do
             if [ -f ${IMPORT_DIR}${WG_INTERFACE}.conf ];then
                 if [ "$(Server_or_Client "$WG_INTERFACE")" != "server" ];then
-                    if [ -z "$(sqlite3 $SQL_DATABASE "SELECT peer FROM clients where peer='$WG_INTERFACE';")" ];then
+                    if [ -z "$(sqlite3 $SQL_DATABASE "SELECT peer FROM clients WHERE peer='$WG_INTERFACE';")" ];then
                         local AUTO="Y"
                         [ -z "$ANNOTATE" ] && local ANNOTATE="N/A"
 
@@ -783,15 +789,15 @@ Manage_Peer() {
                                     cat ${CONFIG_DIR}${WG_INTERFACE}.conf
                                 fi
 
-                                if [ -n "$(sqlite3 $SQL_DATABASE "SELECT rules FROM policy where peer='$WG_INTERFACE';")" ];then
+                                if [ -n "$(sqlite3 $SQL_DATABASE "SELECT rules FROM policy WHERE peer='$WG_INTERFACE';")" ];then
                                     echo -e $cBWHT"\n\t'$Mode' Peer ${cBMAG}${WG_INTERFACE}${cBWHT} RPDB Selective Routing Policy rules\n"$cBYEL
-                                    sqlite3 $SQL_DATABASE "SELECT * FROM policy where peer='$WG_INTERFACE';" | column -t  -s '|' --table-columns Peer,'RPDB Selective Routing rules'
+                                    sqlite3 $SQL_DATABASE "SELECT * FROM policy WHERE peer='$WG_INTERFACE';" | column -t  -s '|' --table-columns Peer,'RPDB Selective Routing rules'
                                     echo -e
                                 fi
 
                                 [ ${WG_INTERFACE:0:2} == "wg" ] && local HDR="Peer" || local HDR="Device"
                                 echo -en $cBMAG
-                                sqlite3 $SQL_DATABASE "SELECT peer,tag FROM $TABLE where peer='$WG_INTERFACE';" | column -t  -s '|' --table-columns $HDR,'Annotation'
+                                sqlite3 $SQL_DATABASE "SELECT peer,tag FROM $TABLE WHERE peer='$WG_INTERFACE';" | column -t  -s '|' --table-columns $HDR,'Annotation'
 
                                 echo -en $cBCYA"\nConnected Session duration: $cBGRE"$(Session_Duration "$WG_INTERFACE")"\n"${cRESET}
 
@@ -924,10 +930,10 @@ Manage_Wireguard_Sessions() {
 
             # If no specific Peer specified, for Stop/Restart retrieve ACTIVE Peers otherwise for Start use Peer configuration
             if [ "$ACTION" == "start" ];then                  # v2.02 v1.09
-                WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM clients where auto='Y' OR auto='P';" | tr '\n' ' ')
-                WG_INTERFACE=$WG_INTERFACE" "$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers where auto='Y' OR auto='P';" | tr '\n' ' ')
+                WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM clients WHERE auto='Y' OR auto='P';" | tr '\n' ' ')
+                WG_INTERFACE=$WG_INTERFACE" "$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers WHERE auto='Y' OR auto='P';" | tr '\n' ' ')
                 if [ -z "$WG_INTERFACE" ];then
-                    echo -e $cRED"\a\n\t***ERROR: No WireGuard Peers where (${cBWHT}Auto='Y'${cBRED}) defined\n"$cRESET 2>&1
+                    echo -e $cRED"\a\n\t***ERROR: No WireGuard Peers WHERE (${cBWHT}Auto='Y'${cBRED}) defined\n"$cRESET 2>&1
                     return 1
                 fi
             else
@@ -941,22 +947,22 @@ Manage_Wireguard_Sessions() {
         # Allow category
         case "$WG_INTERFACE" in
             clients)
-                WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM clients where auto='Y' OR auto='P';" | tr '\n' ' ')
+                WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM clients WHERE auto='Y' OR auto='P';" | tr '\n' ' ')
                 local CATEGORY=" for Category 'Clients'"
                 SayT "$VERSION Requesting WireGuard VPN Peer ${ACTION}$CATEGORY ($WG_INTERFACE)"
                 local TABLE="clients"
                 if [ -z "$WG_INTERFACE" ];then
-                    echo -e $cRED"\a\n\t***ERROR: No Peers$CATEGORY where (${cBWHT}Auto='Y' or 'P'${cBRED}) defined\n"$cRESET 2>&1
+                    echo -e $cRED"\a\n\t***ERROR: No Peers$CATEGORY WHERE (${cBWHT}Auto='Y' or 'P'${cBRED}) defined\n"$cRESET 2>&1
                     return 1
                 fi
             ;;
             servers)
-                WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers where auto='Y' OR auto='P';" | tr '\n' ' ')
+                WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers WHERE auto='Y' OR auto='P';" | tr '\n' ' ')
                 local CATEGORY=" for Category 'Servers'"
                 SayT "$VERSION Requesting WireGuard VPN Peer ${ACTION}$CATEGORY ($WG_INTERFACE)"
                 local TABLE="servers"
                 if [ -z "$WG_INTERFACE" ];then
-                    echo -e $cRED"\a\n\t***ERROR: No Peers$CATEGORY where (${cBWHT}Auto='Y'${cBRED}) defined\n"$cRESET 2>&1
+                    echo -e $cRED"\a\n\t***ERROR: No Peers$CATEGORY WHERE (${cBWHT}Auto='Y'${cBRED}) defined\n"$cRESET 2>&1
                     return 1
                 fi
             ;;
@@ -1013,9 +1019,9 @@ Manage_Wireguard_Sessions() {
 
                     if [ -z "$Route" ];then
                         if [ "$Mode" == "client" ];then
-                            if [ "$(sqlite3 $SQL_DATABASE "SELECT auto FROM $TABLE where peer='$WG_INTERFACE';" ) == "P")" ];then
+                            if [ "$(sqlite3 $SQL_DATABASE "SELECT auto FROM $TABLE WHERE peer='$WG_INTERFACE';" ) == "P")" ];then
 
-                                if [ -n "$(sqlite3 $SQL_DATABASE "SELECT rules FROM policy where peer='$WG_INTERFACE';")" ];then
+                                if [ -n "$(sqlite3 $SQL_DATABASE "SELECT rules FROM policy WHERE peer='$WG_INTERFACE';")" ];then
                                     Route="policy"
                                 else
                                     SayT "Warning: WireGuard '$Mode' Peer ('$WG_INTERFACE') defined as Policy mode but no RPDB Selective Routing rules found?"
@@ -1060,7 +1066,7 @@ Manage_Wireguard_Sessions() {
                                 local TIMESTAMP=$(date +%s)
                                 for PUB_KEY in $DEVICE_PUB_KEYS
                                     do
-                                        DEVICE=$(sqlite3 $SQL_DATABASE "SELECT name FROM devices where pubkey='$PUB_KEY';")
+                                        DEVICE=$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE pubkey='$PUB_KEY';")
                                         sqlite3 $SQL_DATABASE "INSERT into session values('$DEVICE','Start','$TIMESTAMP');"
                                         sqlite3 $SQL_DATABASE "UPDATE devices SET conntrack='$TIMESTAMP' WHERE name='$DEVICE';"
                                     done
@@ -1121,7 +1127,7 @@ Manage_Wireguard_Sessions() {
                                 local TIMESTAMP=$(date +%s)
                                 for PUB_KEY in $DEVICE_PUB_KEYS
                                     do
-                                        DEVICE=$(sqlite3 $SQL_DATABASE "SELECT name FROM devices where pubkey='$PUB_KEY';")
+                                        DEVICE=$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE pubkey='$PUB_KEY';")
                                         sqlite3 $SQL_DATABASE "INSERT into session values('$DEVICE','End','$TIMESTAMP');"
                                     done
 
@@ -1213,7 +1219,7 @@ Initialise_SQL() {
 
     [ -f $SQL_DATABASE ] && cp $SQL_DATABASE ${SQL_DATABASE}.$TS
 
-    [ -z "$ACTION" ] && rm $SQL_DATABASE 2>/dev/null
+    mv $SQL_DATABASE ${SQL_DATABASE}.$TS 2>/dev/null
 
     cat > /tmp/sql_cmds.txt << EOF
 CREATE TABLE servers (peer varchar(5) NOT NULL, auto varchar(1) NOT NULL, subnet varchar(19) NOT NULL, port integer(5), pubkey varchar(55), prikey varchar(55) NOT NULL, tag varchar(40));
@@ -1241,24 +1247,24 @@ EOF
     if [ "$INSTALL_MIGRATE" == "Y" ] || [ -n "$FORCE" ];then
 
         local FCNT=$(ls -lah ${CONFIG_DIR}*.conf 2>/dev/null | wc -l)
-        local CCNT=$(grep -E "^wg[1-2]" ${INSTALL_DIR}WireguardVPN.conf | wc -l)
+        [ -f ${INSTALL_DIR}WireguardVPN.conf ] && local CCNT=$(grep -E "^wg[1-2]" ${INSTALL_DIR}WireguardVPN.conf | wc -l) || local CCNT=0
         if [ $((FCNT+CCNT)) -gt 0 ];then
             #SayT "Warning obsolete WireGuard Session Manager config directory Found!!! ('${CONFIG_DIR}') $CNT '*.conf' / $CCNT entries"
             #echo -e $cRED"\a\n\tWarning: obsolete WireGuard Session Manager v3.xx config directory Found!!! (${cBWHT}'/opt/etc/wireguard'${cBRED})\n"$cRESET
-            echo -e $cBCYA"\tDo you want to auto-migrate the ${cBWHT}${CCNT}${cBCYA} entries (You may need to manually import ${cBWHT}${FCNT}${cBCYA} remaining '*.conf' files later)"
+            echo -e $cBCYA"\tDo you want to auto-migrate the ${cBWHT}${CCNT}${cBCYA} entries (You may need to manually import ${cBWHT}$((FCNT-CCNT))${cBCYA} remaining Per '*.conf' files later)"
             echo -e "\n\tPress$cBRED y$cRESET to$cBRED migrate${cRESET} or press$cBGRE [Enter] to skip"
             read -r "ANS"
             if [ "$ANS" == "y" ];then
 
-                for WG_INTERFACE in $(grep -E "^wg2" ${INSTALL_DIR}WireGuardVPN.conf | awk '{print $1}' | tr '\n' ' ')
+                for WG_INTERFACE in $(grep -E "^wg2" ${INSTALL_DIR}WireguardVPN.conf | awk '{print $1}' | tr '\n' ' ')
                     do
                         #if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
-                            local AUTO=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' ${INSTALL_DIR}WireGuardVPN.conf)
-                            local SUBNET=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $3}' ${INSTALL_DIR}WireGuardVPN.conf)
+                            local AUTO=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' ${INSTALL_DIR}WireguardVPN.conf)
+                            local SUBNET=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $3}' ${INSTALL_DIR}WireguardVPN.conf)
 
                             [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ] && local PORT=$(awk '/^ListenPort/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)
 
-                            local ANNOTATE=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {$1="";$2="";$3="";print $0}' ${INSTALL_DIR}WireGuardVPN.conf | sed 's/\t//g')
+                            local ANNOTATE=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {$1="";$2="";$3="";print $0}' ${INSTALL_DIR}WireguardVPN.conf | sed 's/\t//g')
                             local ANNOTATE=$(printf "%s" "$ANNOTATE" | sed 's/^[ \t]*//;s/[ \t]*$//')
                             local ANNOTATE=$(echo "$ANNOTATE" | sed "s/'/''/g")
                             [ -f ${CONFIG_DIR}${WG_INTERFACE}_public.key ]  && local PUB_KEY=$(cat ${CONFIG_DIR}${WG_INTERFACE}_public.key)
@@ -1274,14 +1280,14 @@ EOF
                 for WG_INTERFACE in $(grep -E "^wg1" ${INSTALL_DIR}WireguardVPN.conf | awk '{print $1}' | tr '\n' ' ')
                     do
                         #if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
-                            local AUTO=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' ${INSTALL_DIR}WireGuardVPN.conf)
-                            local SUBNET=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $3}' ${INSTALL_DIR}WireGuardVPN.conf)
+                            local AUTO=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' ${INSTALL_DIR}WireguardVPN.conf)
+                            local SUBNET=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $3}' ${INSTALL_DIR}WireguardVPN.conf)
                             if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
                                 local SOCKET=$(awk '/^Endpoint/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)
                                 local DNS=$(awk '/DNS/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)
                                 local PRI_KEY=$(awk '/^PrivateKey/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)
                             fi
-                            local ANNOTATE=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {$1="";$2="";$3="";$4="";$5="";print $0}' ${INSTALL_DIR}WireGuardVPN.conf | sed 's/\t//g')
+                            local ANNOTATE=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {$1="";$2="";$3="";$4="";$5="";print $0}' ${INSTALL_DIR}WireguardVPN.conf | sed 's/\t//g')
                             local ANNOTATE=$(printf "%s" "$ANNOTATE" | sed 's/^[ \t]*//;s/[ \t]*$//')
                             local ANNOTATE=$(echo "$ANNOTATE" | sed "s/'/''/g")
                             local PUB_KEY=
@@ -1293,16 +1299,16 @@ EOF
                         #fi
                     done
                 echo -e
-                for WG_INTERFACE in $(awk '($2=="X") {print $1}' ${INSTALL_DIR}WireGuardVPN.conf | tr '\n' ' ')
+                for WG_INTERFACE in $(awk '($2=="X") {print $1}' ${INSTALL_DIR}WireguardVPN.conf | tr '\n' ' ')
                     do
                         #if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
-                            local AUTO=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' ${INSTALL_DIR}WireGuardVPN.conf)
+                            local AUTO=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' ${INSTALL_DIR}WireguardVPN.conf)
                             if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
                                 local IP=$(awk '/^Address/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)
                                 local DNS=$(awk '/^DNS/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)
                                 local ALLOWED=$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)
                             fi
-                            local ANNOTATE=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {$1="";$2="";$3="";$4="";print $0}' ${INSTALL_DIR}WireGuardVPN.conf | sed 's/\t//g')
+                            local ANNOTATE=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {$1="";$2="";$3="";$4="";print $0}' ${INSTALL_DIR}WireguardVPN.conf | sed 's/\t//g')
                             local ANNOTATE=$(printf "%s" "$ANNOTATE" | sed 's/^[ \t]*//;s/[ \t]*$//')
                             local ANNOTATE=$(echo "$ANNOTATE" | sed "s/'/''/g")
                             local PRI_KEY=;local PUB_KEY=
@@ -1315,7 +1321,7 @@ EOF
                         #fi
                     done
 
-                awk '/^rp1/ {print $0}' ${INSTALL_DIR}WireGuardVPN.conf >/tmp/wireguard.txt
+                awk '/^rp1/ {print $0}' ${INSTALL_DIR}WireguardVPN.conf >/tmp/wireguard.txt
                 echo -e
                 while IFS='' read -r POLICY || [ -n "$LINE" ]; do
 
@@ -1332,7 +1338,7 @@ EOF
 
                 rm /tmp/wireguard.txt
 
-                [ $(grep -E "^wg[1-2]" ${INSTALL_DIR}WireguardVPN.conf | wc -l) -gt 0 ] && mv ${INSTALL_DIR}WireGuardVPN.conf ${INSTALL_DIR}WireGuardVPN.conf_migrated
+                [ $(grep -E "^wg[1-2]" ${INSTALL_DIR}WireguardVPN.conf | wc -l) -gt 0 ] && mv ${INSTALL_DIR}WireguardVPN.conf ${INSTALL_DIR}WireguardVPN.conf_migrated
 
                 Create_Sample_Config
 
@@ -1947,11 +1953,11 @@ Session_Duration() {
 
     local WG_INTERFACE=$1
 
-    local LAST_START=$(sqlite3 $SQL_DATABASE "SELECT timestamp FROM session where (peer='$WG_INTERFACE' AND state='Start') order by timestamp desc limit 1;")
-    local LAST_END=$(sqlite3 $SQL_DATABASE "SELECT timestamp FROM session where (peer='$WG_INTERFACE' AND state='End') order by timestamp desc limit 1;")
+    local LAST_START=$(sqlite3 $SQL_DATABASE "SELECT timestamp FROM session WHERE (peer='$WG_INTERFACE' AND state='Start') order by timestamp desc limit 1;")
+    local LAST_END=$(sqlite3 $SQL_DATABASE "SELECT timestamp FROM session WHERE (peer='$WG_INTERFACE' AND state='End') order by timestamp desc limit 1;")
 
     if [ "${WG_INTERFACE:0:2}" != "wg" ];then
-        LAST_START=$(sqlite3 $SQL_DATABASE "SELECT conntrack FROM devices where name='$WG_INTERFACE';")
+        LAST_START=$(sqlite3 $SQL_DATABASE "SELECT conntrack FROM devices WHERE name='$WG_INTERFACE';")
         BEGINTAG=$(EpochTime "$LAST_START" "Human")
         LAST_END=$(date +%s)
     else
@@ -2054,7 +2060,7 @@ Show_Peer_Status() {
                             local TABLE="servers"
                             local VPN_ADDR=$(ip addr | grep $WG_INTERFACE | awk '/inet/ {print $2}')
                             local LISTEN_PORT=$(awk '/^ListenPort/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)
-                            local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM $TABLE where peer='$WG_INTERFACE';")
+                            local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM $TABLE WHERE peer='$WG_INTERFACE';")
                             local DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')
                             local VPN_IP_TXT="Port:${LISTEN_PORT}\t${VPN_ADDR} ${cBYEL}\t\tVPN Tunnel Network"
                         else
@@ -2065,12 +2071,12 @@ Show_Peer_Status() {
                                 local TABLE="devices"
                             fi
 
-                            local LOCALIP=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM $TABLE where peer='$WG_INTERFACE';")
+                            local LOCALIP=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM $TABLE WHERE peer='$WG_INTERFACE';")
                             [ "$(nvram get ipv6_service)" == "disabled"  ] && local LOCALIP=$(echo "$LOCALIP" | awk -F ',' '{print $1}')
-                            #local SOCKET=$(sqlite3 $SQL_DATABASE "SELECT socket FROM $TABLE where peer='$WG_INTERFACE';")
+                            #local SOCKET=$(sqlite3 $SQL_DATABASE "SELECT socket FROM $TABLE WHERE peer='$WG_INTERFACE';")
                             local SOCKET=$(awk '/^^Endpoint/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)
 
-                            local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM $TABLE where peer='$WG_INTERFACE';")
+                            local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM $TABLE WHERE peer='$WG_INTERFACE';")
                             local DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')
                             local VPN_IP_TXT=${SOCKET}"\t\t\t${cBYEL}${LOCALIP}\t"
 
@@ -2096,7 +2102,7 @@ Show_Peer_Status() {
                                 TX=$(Convert_1024KMG "$TX" "$TXU")
 
                                 # Need to get the last logged RX/TX values for the device, and only add to SQL if total > 0
-                                Parse "$(sqlite3 $SQL_DATABASE "select rx,tx from traffic where peer='$WG_INTERFACE' order by timestamp desc limit 1;")" "|" RX_OLD TX_OLD
+                                Parse "$(sqlite3 $SQL_DATABASE "select rx,tx from traffic WHERE peer='$WG_INTERFACE' order by timestamp desc limit 1;")" "|" RX_OLD TX_OLD
                                 if [ -n "$RX_OLD" ] && [ -n "$TX_OLD" ];then
                                     local RX_DELTA=$((RX-RX_OLD))
                                     local TX_DELTA=$((TX-TX_OLD))
@@ -2121,9 +2127,9 @@ Show_Peer_Status() {
                     if [ -n "$(echo "$LINE" | grep -iE "peer:" )" ];then
                         if [ "$TYPE" == "server" ];then
                             local PUB_KEY=$(echo "$LINE" | awk '{print $2}')
-                            local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM devices where pubkey='$PUB_KEY';")
+                            local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM devices WHERE pubkey='$PUB_KEY';")
                             [ -z "$DESC" ] && DESC="# Unidentified"
-                            WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT name FROM devices where pubkey='$PUB_KEY';")
+                            WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE pubkey='$PUB_KEY';")
                             [ -z "$WG_INTERFACE" ] && WG_INTERFACE=$(grep -F "$PUB_KEY" /opt/etc/wireguard.d/*_public.key | awk -F '[\/:\._]' '{print $6}')
                             local VPN_ADDR=$(awk '/^Address/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf )
                             local LINE=${COLOR}$LINE" \t${cBWHT}${VPN_ADDR}\t\t${cBMAG}${DESC}\t"
@@ -2169,7 +2175,8 @@ Show_Peer_Config_Entry() {
         ;;
         wg1|wg2)
 
-            if [ "$(Server_or_Client "$WG_INTERFACE")" == "server" ];then
+            local Mode=$(Server_or_Client "$WG_INTERFACE")
+            if [ "$Mode" == "server" ];then
                 TABLE="servers"
                 COLUMN_TXT="Server,Auto,Subnet,Port,Public,Private,Annotate"
             else
@@ -2180,6 +2187,9 @@ Show_Peer_Config_Entry() {
             echo -e
             sqlite3 $SQL_DATABASE "SELECT * from $TABLE WHERE peer='$WG_INTERFACE';" | column -t  -s '|' --table-columns "$COLUMN_TXT"
 
+            if [ "$(sqlite3 $SQL_DATABASE "SELECT rules FROM policy WHERE peer='$WG_INTERFACE';")" ] ;then
+                sqlite3 $SQL_DATABASE "SELECT * FROM policy WHERE peer='$WG_INTERFACE';" | column -t  -s '|' --table-columns Peer,'RPDB Selective Routing rules'
+            fi
         ;;
         *)
             echo -e
@@ -2226,7 +2236,7 @@ Diag_Dump() {
             do
                 local I=${WG_INTERFACE:3:1}
                 if [ "${WG_INTERFACE:0:3}" != "wg2" ];then
-                    local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM clients where peer='$WG_INTERFACE';")
+                    local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM clients WHERE peer='$WG_INTERFACE';")
                     local DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')
                     echo -e $cBYEL"\n\tDEBUG: Routing Table 12$I (wg1$I) ${cBMAG}$DESC\n"$cBCYA 2>&1
                     ip route show table 12$I
@@ -2577,7 +2587,7 @@ Validate_User_Choice() {
             alias*) ;;
             diag*) ;;
             debug) ;;
-            initsql*|migrate*);;            # 4.01
+            initdb*|migrate*);;            # 4.01
             stats*);;
             wg*) ;;
             import*) ;;                     # 4.01
@@ -2840,7 +2850,7 @@ Process_User_Choice() {
                 Show_VPN_Pool                       # v3.03
 
             ;;
-            initsql*|migrate*)                                                  # v4.01
+            initdb*|migrate*)                                                  # v4.01
 
                 Initialise_SQL $menu1
 
