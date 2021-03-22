@@ -1895,7 +1895,7 @@ Uninstall_WireGuard() {
     echo -e $cBCYA"\tDeleted Peer Auto-start @BOOT\n"$cRESET
     [ -n "$(grep -i "WireGuard" /jffs/scripts/post-mount)" ] && sed -i '/WireGuard/d' /jffs/scripts/post-mount  # v2.01
 
-    Manage_Stats "disable"
+    Manage_Stats "uninstall" "disable"
 
     Edit_nat_start "del"
 
