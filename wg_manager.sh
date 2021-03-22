@@ -536,12 +536,8 @@ Delete_Peer() {
 
                         [ -n "$(wg show $WG_INTERFACE 2>/dev/null)" ] && Manage_Wireguard_Sessions "stop" "$WG_INTERFACE"
                         sqlite3 $SQL_DATABASE "DELETE FROM $TABLE where $SQL_COL='$WG_INTERFACE';"
-
-                        # If Policy client then delete associated RPDB Selective Routing rules
-                        #if [ "$Mode" == "client" ];then
-                            local RP=$(echo "$WG_INTERFACE" | sed 's/wg/rp/')
-                            sqlite3 $SQL_DATABASE "DELETE FROM policy where peer='$RP';"
-                        #fi
+                        # ... and delete associated RPDB Selective Routing rule
+                        sqlite3 $SQL_DATABASE "DELETE FROM policy where peer='$WG_INTERFACE';"
 
                         #   DDNS martineau.homeip.net
                         #   Endpoint = martineau.homeip.net:51820
@@ -1242,102 +1238,107 @@ EOF
     [ $? -eq 0 ] &&  echo -e $cBGRE"\n\t[✔] WireGuard Peer SQL Database initialised OK"$cRESET
     echo -en $cRESET
 
-    [ -f ${INSTALL_DIR}WireguardVPN.conf ] && cp ${INSTALL_DIR}WireguardVPN.conf ${INSTALL_DIR}WireguardVPN.conf.$TS
-
     if [ "$INSTALL_MIGRATE" == "Y" ] || [ -n "$FORCE" ];then
 
-        local FCNT=$(ls -lah /opt/etc/wireguard/*.conf 2>/dev/null | wc -l)
-        local CCNT=$(grep -E "^wg[0-9]" /opt/etc/wireguard/WireguardVPN.conf | wc -l )
-        SayT "Warning obsolete WireGuard Session Manager config directory Found!!! ('/opt/etc/wireguard/') $CNT '*.conf' / $CCNT entries"
-        echo -e $cRED"\a\n\tWarning: obsolete WireGuard Session Manager v3.xx config directory Found!!! (${cBWHT}'/opt/etc/wireguard'${cBRED})\n"$cRESET
-        echo -e $cBCYA"\tDo you want to auto-migrate the ${cBWHT}${CCNT}${cBCYA} entries (or you may manually import the ${cBWHT}${CCNT}${cBCYA} '*.conf' files' later)"
-        echo -e "\n\tPress$cBRED y$cRESET to$cBRED migrate${cRESET} or press$cBGRE [Enter] to skip"
-        read -r "ANS"
-        if [ "$ANS" == "y" ];then
-            for WG_INTERFACE in $(grep -E "^wg2" /opt/etc/wireguard/WireguardVPN.conf | awk '{print $1}' | tr '\n' ' ')
-                do
-                    #if [ -f /opt/etc/wireguard/${WG_INTERFACE}.conf ];then
-                        local AUTO=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' /opt/etc/wireguard/WireguardVPN.conf)
-                        local SUBNET=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $3}' /opt/etc/wireguard/WireguardVPN.conf)
+        local FCNT=$(ls -lah ${CONFIG_DIR}*.conf 2>/dev/null | wc -l)
+        local CCNT=$(grep -E "^wg[1-2]" ${INSTALL_DIR}WireguardVPN.conf | wc -l)
+        if [ $((FCNT+CCNT)) -gt 0 ];then
+            #SayT "Warning obsolete WireGuard Session Manager config directory Found!!! ('${CONFIG_DIR}') $CNT '*.conf' / $CCNT entries"
+            #echo -e $cRED"\a\n\tWarning: obsolete WireGuard Session Manager v3.xx config directory Found!!! (${cBWHT}'/opt/etc/wireguard'${cBRED})\n"$cRESET
+            echo -e $cBCYA"\tDo you want to auto-migrate the ${cBWHT}${CCNT}${cBCYA} entries (You may need to manually import ${cBWHT}${FCNT}${cBCYA} remaining '*.conf' files later)"
+            echo -e "\n\tPress$cBRED y$cRESET to$cBRED migrate${cRESET} or press$cBGRE [Enter] to skip"
+            read -r "ANS"
+            if [ "$ANS" == "y" ];then
 
-                        [ -f /opt/etc/wireguard/${WG_INTERFACE}.conf ] && local PORT=$(awk '/^ListenPort/ {print $3}' /opt/etc/wireguard/${WG_INTERFACE}.conf)
+                for WG_INTERFACE in $(grep -E "^wg2" ${INSTALL_DIR}WireGuardVPN.conf | awk '{print $1}' | tr '\n' ' ')
+                    do
+                        #if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
+                            local AUTO=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' ${INSTALL_DIR}WireGuardVPN.conf)
+                            local SUBNET=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $3}' ${INSTALL_DIR}WireGuardVPN.conf)
 
-                        local ANNOTATE=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {$1="";$2="";$3="";print $0}' /opt/etc/wireguard/WireguardVPN.conf | sed 's/\t//g')
-                        local ANNOTATE=$(printf "%s" "$ANNOTATE" | sed 's/^[ \t]*//;s/[ \t]*$//')
-                        local ANNOTATE=$(echo "$ANNOTATE" | sed "s/'/''/g")
-                        [ -f /opt/etc/wireguard/${WG_INTERFACE}_public.key ]  && local PUB_KEY=$(cat /opt/etc/wireguard/${WG_INTERFACE}_public.key)
-                        [ -f /opt/etc/wireguard/${WG_INTERFACE}_private.key ] && local PRI_KEY=$(cat /opt/etc/wireguard/${WG_INTERFACE}_private.key)
+                            [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ] && local PORT=$(awk '/^ListenPort/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)
 
-                        sqlite3 $SQL_DATABASE "INSERT INTO servers values('$WG_INTERFACE','$AUTO','$SUBNET','$PORT','$PUB_KEY','$PRI_KEY','$ANNOTATE');"
-                        echo -e $cBGRE"\t[✔] Peer ${cBMAG}${WG_INTERFACE},'$AUTO','$SUBNET','$PORT','$ANNOTATE'${cBGRE} migrate success"$cRESET 2>&1
+                            local ANNOTATE=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {$1="";$2="";$3="";print $0}' ${INSTALL_DIR}WireGuardVPN.conf | sed 's/\t//g')
+                            local ANNOTATE=$(printf "%s" "$ANNOTATE" | sed 's/^[ \t]*//;s/[ \t]*$//')
+                            local ANNOTATE=$(echo "$ANNOTATE" | sed "s/'/''/g")
+                            [ -f ${CONFIG_DIR}${WG_INTERFACE}_public.key ]  && local PUB_KEY=$(cat ${CONFIG_DIR}${WG_INTERFACE}_public.key)
+                            [ -f ${CONFIG_DIR}${WG_INTERFACE}_private.key ] && local PRI_KEY=$(cat ${CONFIG_DIR}${WG_INTERFACE}_private.key)
 
-                        local AUTO=;local SUBNET=;local ANNOTATE=;local PUB_KEY=;local PRI_KEY=
-                    #fi
-                done
-            echo -e
-            for WG_INTERFACE in $(grep -E "^wg1" /opt/etc/wireguard/WireguardVPN.conf | awk '{print $1}' | tr '\n' ' ')
-                do
-                    #if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
-                        local AUTO=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' /opt/etc/wireguard/WireguardVPN.conf)
-                        local SUBNET=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $3}' /opt/etc/wireguard/WireguardVPN.conf)
-                        if [ -f /opt/etc/wireguard/${WG_INTERFACE}.conf ];then
-                            local SOCKET=$(awk '/^Endpoint/ {print $3}' /opt/etc/wireguard/${WG_INTERFACE}.conf)
-                            local DNS=$(awk '/DNS/ {print $3}' /opt/etc/wireguard/${WG_INTERFACE}.conf)
-                            local PRI_KEY=$(awk '/^PrivateKey/ {print $3}' /opt/etc/wireguard/${WG_INTERFACE}.conf)
-                        fi
-                        local ANNOTATE=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {$1="";$2="";$3="";$4="";$5="";print $0}' /opt/etc/wireguard/WireguardVPN.conf | sed 's/\t//g')
-                        local ANNOTATE=$(printf "%s" "$ANNOTATE" | sed 's/^[ \t]*//;s/[ \t]*$//')
-                        local ANNOTATE=$(echo "$ANNOTATE" | sed "s/'/''/g")
-                        local PUB_KEY=
+                            sqlite3 $SQL_DATABASE "INSERT INTO servers values('$WG_INTERFACE','$AUTO','$SUBNET','$PORT','$PUB_KEY','$PRI_KEY','$ANNOTATE');"
+                            echo -e $cBGRE"\t[✔] Peer ${cBMAG}${WG_INTERFACE},'$AUTO','$SUBNET','$PORT','$ANNOTATE'${cBGRE} migrate success"$cRESET 2>&1
 
-                        sqlite3 $SQL_DATABASE "INSERT INTO clients values('$WG_INTERFACE','$AUTO','$SUBNET','$SOCKET','$DNS','$PUB_KEY','$PRI_KEY','$ANNOTATE');"
-                        echo -e $cBGRE"\t[✔] Peer ${cBMAG}${WG_INTERFACE},'$AUTO','$SUBNET','$SOCKET','$DNS','$ANNOTATE'${cBGRE} migrate success"$cRESET 2>&1
+                            local AUTO=;local SUBNET=;local ANNOTATE=;local PUB_KEY=;local PRI_KEY=
+                        #fi
+                    done
+                echo -e
+                for WG_INTERFACE in $(grep -E "^wg1" ${INSTALL_DIR}WireguardVPN.conf | awk '{print $1}' | tr '\n' ' ')
+                    do
+                        #if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
+                            local AUTO=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' ${INSTALL_DIR}WireGuardVPN.conf)
+                            local SUBNET=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $3}' ${INSTALL_DIR}WireGuardVPN.conf)
+                            if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
+                                local SOCKET=$(awk '/^Endpoint/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)
+                                local DNS=$(awk '/DNS/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)
+                                local PRI_KEY=$(awk '/^PrivateKey/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)
+                            fi
+                            local ANNOTATE=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {$1="";$2="";$3="";$4="";$5="";print $0}' ${INSTALL_DIR}WireGuardVPN.conf | sed 's/\t//g')
+                            local ANNOTATE=$(printf "%s" "$ANNOTATE" | sed 's/^[ \t]*//;s/[ \t]*$//')
+                            local ANNOTATE=$(echo "$ANNOTATE" | sed "s/'/''/g")
+                            local PUB_KEY=
 
-                        local AUTO=;local SUBNET=;local ANNOTATE=;local PUB_KEY=;local PRI_KEY=;local SOCKET=;local DNS=
-                    #fi
-                done
-            echo -e
-            for WG_INTERFACE in $(awk '($2=="X") {print $1}' /opt/etc/wireguard/WireguardVPN.conf | tr '\n' ' ')
-                do
-                    #if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
-                        local AUTO=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' /opt/etc/wireguard/WireguardVPN.conf)
-                        if [ -f /opt/etc/wireguard/${WG_INTERFACE}.conf ];then
-                            local IP=$(awk '/^Address/ {print $3}' /opt/etc/wireguard/${WG_INTERFACE}.conf)
-                            local DNS=$(awk '/^DNS/ {print $3}' /opt/etc/wireguard/${WG_INTERFACE}.conf)
-                            local ALLOWED=$(awk '/^AllowedIPs/ {print $3}' /opt/etc/wireguard/${WG_INTERFACE}.conf)
-                        fi
-                        local ANNOTATE=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {$1="";$2="";$3="";$4="";print $0}' /opt/etc/wireguard/WireguardVPN.conf | sed 's/\t//g')
-                        local ANNOTATE=$(printf "%s" "$ANNOTATE" | sed 's/^[ \t]*//;s/[ \t]*$//')
-                        local ANNOTATE=$(echo "$ANNOTATE" | sed "s/'/''/g")
-                        local PRI_KEY=;local PUB_KEY=
-                        [ -f /opt/etc/wireguard/${WG_INTERFACE}_public.key ] && local PUB_KEY=$(awk 'NR=1{print $0}' /opt/etc/wireguard/${WG_INTERFACE}_public.key)
+                            sqlite3 $SQL_DATABASE "INSERT INTO clients values('$WG_INTERFACE','$AUTO','$SUBNET','$SOCKET','$DNS','$PUB_KEY','$PRI_KEY','$ANNOTATE');"
+                            echo -e $cBGRE"\t[✔] Peer ${cBMAG}${WG_INTERFACE},'$AUTO','$SUBNET','$SOCKET','$DNS','$ANNOTATE'${cBGRE} migrate success"$cRESET 2>&1
 
-                        sqlite3 $SQL_DATABASE "INSERT INTO devices values('$WG_INTERFACE','$AUTO','$IP','$DNS','$ALLOWED','$PUB_KEY','$PRI_KEY','$ANNOTATE');"
-                        echo -e $cBGRE"\t[✔] Peer ${cBMAG}${WG_INTERFACE},'$AUTO','$IP','$DNS','$ALLOWED','$ANNOTATE'${cBGRE} migrate success"$cRESET 2>&1
+                            local AUTO=;local SUBNET=;local ANNOTATE=;local PUB_KEY=;local PRI_KEY=;local SOCKET=;local DNS=
+                        #fi
+                    done
+                echo -e
+                for WG_INTERFACE in $(awk '($2=="X") {print $1}' ${INSTALL_DIR}WireGuardVPN.conf | tr '\n' ' ')
+                    do
+                        #if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
+                            local AUTO=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $2}' ${INSTALL_DIR}WireGuardVPN.conf)
+                            if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
+                                local IP=$(awk '/^Address/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)
+                                local DNS=$(awk '/^DNS/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)
+                                local ALLOWED=$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)
+                            fi
+                            local ANNOTATE=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {$1="";$2="";$3="";$4="";print $0}' ${INSTALL_DIR}WireGuardVPN.conf | sed 's/\t//g')
+                            local ANNOTATE=$(printf "%s" "$ANNOTATE" | sed 's/^[ \t]*//;s/[ \t]*$//')
+                            local ANNOTATE=$(echo "$ANNOTATE" | sed "s/'/''/g")
+                            local PRI_KEY=;local PUB_KEY=
+                            [ -f ${CONFIG_DIR}${WG_INTERFACE}_public.key ] && local PUB_KEY=$(awk 'NR=1{print $0}' ${CONFIG_DIR}${WG_INTERFACE}_public.key)
 
-                        local AUTO=;local IP=;local ANNOTATE=;local PUB_KEY=;local PRI_KEY=;local ALLOWED=;local DNS=
-                    #fi
-                done
+                            sqlite3 $SQL_DATABASE "INSERT INTO devices values('$WG_INTERFACE','$AUTO','$IP','$DNS','$ALLOWED','$PUB_KEY','$PRI_KEY','$ANNOTATE');"
+                            echo -e $cBGRE"\t[✔] Peer ${cBMAG}${WG_INTERFACE},'$AUTO','$IP','$DNS','$ALLOWED','$ANNOTATE'${cBGRE} migrate success"$cRESET 2>&1
 
-            awk '/^rp1/ {print $0}' /opt/etc/wireguard/WireguardVPN.conf >/tmp/wireguard.txt
-            echo -e
-            while IFS='' read -r POLICY || [ -n "$LINE" ]; do
+                            local AUTO=;local IP=;local ANNOTATE=;local PUB_KEY=;local PRI_KEY=;local ALLOWED=;local DNS=
+                        #fi
+                    done
 
-                local PEER=${POLICY%% *}
-                local PEER=${PEER#??}
+                awk '/^rp1/ {print $0}' ${INSTALL_DIR}WireGuardVPN.conf >/tmp/wireguard.txt
+                echo -e
+                while IFS='' read -r POLICY || [ -n "$LINE" ]; do
 
-                POLICY=$(echo "$POLICY" | awk '{$1=""; print $0'})
-                POLICY=$(printf "%s" "$POLICY" | sed 's/^[ \t]*//;s/[ \t]*$//')
-                [ -z "$POLICY" ] && POLICY="<>"
+                    local PEER=${POLICY%% *}
+                    local PEER=${PEER#??}
 
-                sqlite3 $SQL_DATABASE "INSERT INTO policy values('wg$PEER','$POLICY');"
-                echo -e $cBGRE"\t[✔] Peer RPDB rule ${cBMAG}rp$PEER,'$POLICY'${cBGRE} migrate success"$cRESET 2>&1
-            done < /tmp/wireguard.txt
+                    POLICY=$(echo "$POLICY" | awk '{$1=""; print $0'})
+                    POLICY=$(printf "%s" "$POLICY" | sed 's/^[ \t]*//;s/[ \t]*$//')
+                    [ -z "$POLICY" ] && POLICY="<>"
 
-            rm /tmp/wireguard.txt
+                    sqlite3 $SQL_DATABASE "INSERT INTO policy values('wg$PEER','$POLICY');"
+                    echo -e $cBGRE"\t[✔] Peer RPDB rule ${cBMAG}rp$PEER,'$POLICY'${cBGRE} migrate success"$cRESET 2>&1
+                done < /tmp/wireguard.txt
 
-            Manage_Peer
+                rm /tmp/wireguard.txt
 
+                [ $(grep -E "^wg[1-2]" ${INSTALL_DIR}WireguardVPN.conf | wc -l) -gt 0 ] && mv ${INSTALL_DIR}WireGuardVPN.conf ${INSTALL_DIR}WireGuardVPN.conf_migrated
+
+                Create_Sample_Config
+
+                Manage_Peer
+
+            fi
         fi
     fi
 }
