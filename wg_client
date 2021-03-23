@@ -1,16 +1,16 @@
 #!/bin/sh
-VERSION="v1.07"
-#============================================================================================ © 2021 Martineau v1.07
+VERSION="v1.08"
+#============================================================================================ © 2021 Martineau v1.08
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 13-Mar-2021
+# Last Updated Date: 22-Mar-2021
 #
 # Description:
 #
 # Acknowledgement:
 #
-# Contributors: odkrys
+# Contributors: odkrys,@ZebMcKayhan
 
 CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v1.05 @elorimer
 INSTALL_DIR="/jffs/addons/wireguard/"
@@ -100,7 +100,7 @@ create_client_list(){
             ip rule add $SRCC $SRCA $DSTC $DSTA table $TARGET_LOOKUP priority $RULE_PRIO
             echo -en $cBCYA"\t"
             [ "$DSTC" == "to" ] && DSTC=" to "
-            logger -st "wireguard-${MODE}${VPN_NUM}" "Adding Wireguard 'client' Peer route for ${VPN_IP}${DSTC}$DST_IP through $TARGET_NAME"
+            logger -t "wireguard-${MODE}${VPN_NUM}" "Adding Wireguard 'client' Peer route for ${VPN_IP}${DSTC}$DST_IP through $TARGET_NAME"
             echo -en $cRESET
         fi
     done
@@ -143,7 +143,7 @@ WG_INTERFACE=$VPN_ID
 
 # Is this a standard 'client' Peer interface 'wg11-wg15'                    # v1.03
 if [ -z "$(echo "$VPN_ID" |  grep -oE "^wg[2][1-2]|^wg[1][1-5]*$")" ];then      # v1.03
-    # Non-stand so identfy if it's a 'client' or 'server' Peer
+    # Non-standard so identfy if it's a 'client' or 'server' Peer
     VPN_NUM="0"                 # i.e. 'client' Peer prio '990x' where the RPDB rules for 'client' Peers 'wg11'-wg15' are '991x-995x'
     if [ -f ${CONFIG_DIR}${VPN_ID}.conf ];then                                  # v1.03
         if [ -n "$(grep -E "^Endpoint" ${CONFIG_DIR}${VPN_ID}.conf)" ];then     # v1.03
@@ -241,6 +241,9 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
 
         Firewall_delete
 
+        # User Exit @ZebMcKayhan
+        [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh ] && { logger -t "wireguard-${MODE}${VPN_NUM}" "Executing Event:${VPN_ID}-up.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh; }
+
         iptables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'"
         iptables -t mangle -I FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'"
         iptables -t mangle -I FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'"
@@ -296,6 +299,9 @@ else
     ip rule del prio 992$VPN_NUM    2>/dev/null
 
     purge_client_list
+
+    # User Exit @ZebMcKayhan
+    [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh ] && { logger -t "wireguard-${MODE}${VPN_NUM}" "Executing Event:${VPN_ID}-down.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh; }
 
 #############################################################################EIC Hack 5 of 7################
         #ipset -F $Nipset 2>/dev/null
