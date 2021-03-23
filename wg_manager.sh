@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.01b7"
-#============================================================================================ © 2021 Martineau v4.01b7
+VERSION="v4.01b8"
+#============================================================================================ © 2021 Martineau v4.01b8
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -698,6 +698,8 @@ Manage_Peer() {
 
     [ "$WG_INTERFACE" == "new" ] && { CMD="new"; WG_INTERFACE=; }
 
+    [ "$WG_INTERFACE" == "help" ] && { CMD="help"; WG_INTERFACE=; }
+
     [ -z "$CMD" ] && CMD="list"
 
         case $CMD in
@@ -712,6 +714,23 @@ Manage_Peer() {
                 fi
             ;;
             *)
+
+                if [ "$CMD" == "help" ];then
+                    echo -e "\n\tpeer help\t\t\t\t- This text"
+                    echo -e "\tpeer\t\t\t\t\t- Show ALL Peers in database"
+                    echo -e "\tpeer peer_name\t\t\t\t- Show Peer in database"
+                    echo -e "\tpeer peer_name {cmd {options} }\t\t- Action the command against the Peer"
+                    echo -e "\tpeer peer_name del\t\t\t- Delete the Peer from the database and all of its files *.conf, *.key"
+                    echo -e "\tpeer category\t\t\t\t- Show Peer categories in database"
+                    echo -e "\tpeer [peer_name ipset [{add | del} {ipset[...]}] options]]\t\t- Manage IPSet Selective Routing e.g. wg13 add Netflix Hulu"
+                    echo -e "\t\te.g. peer category GroupA add wg17 wg99 wg11\t- Create a new category with 3 Peers"
+
+                    echo -e "\tpeer new [peer_name [options]]\t\t- Create new server Peer e.g. peer new wg27 ip=10.50.99.1/24 port=12345"
+
+
+
+                    return
+                fi
 
                 local FN=${INSTALL_DIR}WireguardVPN.confXXX
 
@@ -811,7 +830,7 @@ Manage_Peer() {
                                 sqlite3 $SQL_DATABASE "UPDATE policy SET rules='$RPDB' WHERE peer='$WG_INTERFACE';"
                                 echo -e $cBGRE"\n\t[✔] Updated RPDB Selective Routing rules for $WG_INTERFACE \n"$cRESET
                             ;;
-                            ip*)
+                            ip=*)
                                 shift
                                 local Mode=$(Server_or_Client "$WG_INTERFACE")
                                 local IP_SUBNET="$(echo "$CMD" | sed -n "s/^.*ip=//p" | awk '{print $1}')"
@@ -850,6 +869,17 @@ Manage_Peer() {
                                     echo -e $cBGRE"\n\t[✔] Updated DNS\n"$cRESET
                                 else
                                      echo -e $cBRED"\a\n\t***ERROR 'server' Peer '$WG_INTERFACE' cannot set DNS\n"$cRESET
+                                fi
+                            ;;
+                            add*|ipset*)                            # peer wg13 [add|del] ipset Netflix[.....]
+                                shift 2
+                                local SUBCMD=$1
+                                [ "$SUBCMD" == "ipset" ] && shift
+
+                                if [ "$CMD" == "add" ] || [ "$CMD" == "del" ];then
+                                    Manage_IPSET "$CMD" "$WG_INTERFACE" "$@"
+                                else
+                                    echo -e $cBRED"\a\n\t***ERROR Invalid command '$SUBCMD' e.g. [add | del]\n"$cRESET
                                 fi
                             ;;
                             *)
@@ -1208,6 +1238,26 @@ Manage_alias() {
         ;;
     esac
 }
+Manage_Event_Scripts() {
+
+    local ACTION=$2
+
+    if [ "$ACTION" != "backup" ];then
+        if [ ! -d ${INSTALL_DIR}Scripts ];then                              # v4.01
+            # Restore from backup if one exists
+            if [ -d ${CONFIG_DIR}Scripts ];then
+                mv ${CONFIG_DIR}Scripts ${INSTALL_DIR}
+            else
+                mkdir ${INSTALL_DIR}Scripts
+            fi
+        fi
+        echo -e $cBYEL"\n\tEvent scripts\n"$cBWHT
+        ls -1 ${INSTALL_DIR}Scripts
+    else
+        # Backup...perhaps user has elected to uninstall WireGuard Session Manager but wants to preserve the data directory ${CONFIG_DIR}
+        cp ${INSTALL_DIR}Scripts ${CONFIG_DIR}
+    fi
+}
 Initialise_SQL() {
 
     local ACTION=$2
@@ -1217,9 +1267,9 @@ Initialise_SQL() {
 
     local TS=$(date +"%Y%m%d-%H%M%S")    # current date and time 'yyyymmdd-hhmmss'
 
-    [ -f $SQL_DATABASE ] && cp $SQL_DATABASE ${SQL_DATABASE}.$TS
-
-    mv $SQL_DATABASE ${SQL_DATABASE}.$TS 2>/dev/null
+    if [ -f $SQL_DATABASE ] && [ "$ACTION" != "keep" ];then
+        mv $SQL_DATABASE ${SQL_DATABASE}.$TS 2>/dev/null
+    fi
 
     cat > /tmp/sql_cmds.txt << EOF
 CREATE TABLE servers (peer varchar(5) NOT NULL, auto varchar(1) NOT NULL, subnet varchar(19) NOT NULL, port integer(5), pubkey varchar(55), prikey varchar(55) NOT NULL, tag varchar(40));
@@ -1227,6 +1277,8 @@ CREATE TABLE clients (peer varchar(5) NOT NULL, auto varchar(1) NOT NULL, subnet
 CREATE TABLE devices (name varchar(15)  NOT NULL, auto varchar(1) NOT NULL, ip varchar(19)  NOT NULL, dns varchar(15)  NOT NULL, allowedip varchar(100), pubkey varchar(55)  NOT NULL, prikey varchar(55), tag varchar(40), conntrack UNSIGNED BIG INT );
 
 CREATE TABLE policy (peer NOT NULL, rules varchar(100));
+
+CREATE TABLE ipset (ipset NOT NULL, use varchar(1), peer varchar(5),fwmark varchar(10) NOT NULL, dstsrc varchar (11) NOT NULL);
 
 CREATE TABLE traffic (peer NOT NULL,timestamp UNSIGNED BIG INT NOT NULL,rx UNSIGNED BIG INT NOT NULL,tx UNSIGNED BIG INT NOT NULL);
 
@@ -1237,6 +1289,7 @@ CREATE UNIQUE INDEX peerclientx on clients(peer);
 #CREATE UNIQUE INDEX peerx on session(peer);
 CREATE UNIQUE INDEX namex on devices(name);
 CREATE UNIQUE INDEX peerpolicyx on policy(peer);
+
 
 EOF
     echo -en $cBRED
@@ -1883,6 +1936,8 @@ EOF
 
     Manage_alias
 
+    Manage_Event_Scripts                                # v4.01 @ZebMcKayhan
+
     # Auto start ALL defined WireGuard Peers @BOOT
     # Use post-mount
     echo -e $cBCYA"\tAdding Peer Auto-start @BOOT"$cRESET
@@ -1918,8 +1973,6 @@ Uninstall_WireGuard() {
         # legacy tidy-up!
         [ -f ${CONFIG_DIR}WireguardVPN_map ] && rm ${CONFIG_DIR}WireguardVPN_map
 
-    rm -rf ${INSTALL_DIR}
-
     # Only remove WireGuard Entware packages if user DELETES '/opt/etc/wireguard'
     echo -e "\n\tPress$cBRED Y$cRESET to$cBRED delete ALL WireGuard DATA files (Peer *.config etc.) $cRESET('${CONFIG_DIR}') or press$cBGRE [Enter] to keep custom WireGuard DATA files."
     read -r "ANS"
@@ -1930,7 +1983,12 @@ Uninstall_WireGuard() {
        echo -e $cBCYA"\tUninstalling Wireguard Kernel module and Userspace Tool for $HARDWARE_MODEL (v$BUILDNO)"$cBGRA
        opkg remove wireguard-kernel wireguard-tools
        rm -rf /opt/etc/wireguard/
+    else
+        Manage_Event_Scripts "backup"                           # v4.01
+        mv ${INSTALL_DIR}WireguardVPN.conf ${CONFIG_DIR}
     fi
+
+    rm -rf ${INSTALL_DIR}
 
     echo -e $cBCYA"\tDeleted Peer Auto-start @BOOT\n"$cRESET
     [ -n "$(grep -i "WireGuard" /jffs/scripts/post-mount)" ] && sed -i '/WireGuard/d' /jffs/scripts/post-mount  # v2.01
@@ -2159,7 +2217,7 @@ Show_Peer_Config_Entry() {
 
     local WG_INTERFACE=$1
 
-    echo -e $cBWHT"\n\tPeers (Auto=P - Policy, Auto=X - External i.e. Cell/Mobile)\n"$cBCYA
+    echo -e $cBWHT"\n\tPeers (Auto=P - Policy, Auto=X - External i.e. Cell/Mobile)"$cBCYA
 
     case ${WG_INTERFACE:0:3} in
 
@@ -2186,9 +2244,13 @@ Show_Peer_Config_Entry() {
 
             echo -e
             sqlite3 $SQL_DATABASE "SELECT * from $TABLE WHERE peer='$WG_INTERFACE';" | column -t  -s '|' --table-columns "$COLUMN_TXT"
-
+            echo -e
             if [ "$(sqlite3 $SQL_DATABASE "SELECT rules FROM policy WHERE peer='$WG_INTERFACE';")" ] ;then
                 sqlite3 $SQL_DATABASE "SELECT * FROM policy WHERE peer='$WG_INTERFACE';" | column -t  -s '|' --table-columns Peer,'RPDB Selective Routing rules'
+            fi
+            echo -e
+            if [ "$(sqlite3 $SQL_DATABASE "SELECT * FROM ipset WHERE peer='$WG_INTERFACE';")" ] ;then
+                sqlite3 $SQL_DATABASE "SELECT * FROM ipset WHERE peer='$WG_INTERFACE';" | column -t  -s '|' --table-columns IPSet,Enabled,Peer,FWMark,DST/SRC
             fi
         ;;
         *)
@@ -2317,6 +2379,11 @@ Diag_Dump() {
                         TABLE="devices"
                         echo -e $cBYEL"\tTable:$TABLE"$cBCYA 2>&1
                         sqlite3 $SQL_DATABASE "SELECT * FROM $TABLE;" | column -t  -s '|' --table-columns Device,Auto,IPADDR,DNS,'Allowed',Public,Private,tag,Conntrack
+                    ;;
+                    ips*)
+                        TABLE="ipset"
+                        echo -e $cBYEL"\tTable:$TABLE"$cBCYA 2>&1
+                        sqlite3 $SQL_DATABASE "SELECT * FROM $TABLE WHERE peer='$WG_INTERFACE';" | column -t  -s '|' --table-columns IPSet,Use,Peer,FWMark,DST/SRC
                     ;;
                     *)
                         echo -e $cBYEL"\tTable:$TABLE"$cBCYA 2>&1
@@ -2507,6 +2574,104 @@ EOF
     fi
 
 }
+Manage_IPSET() {
+#add wg13 Netflix Hulu
+    local ACTION=$1
+
+    case $ACTION in
+        fwmark|dstsrc|enable|add|del|new*)
+            shift
+        ;;
+        *)
+            echo -e $cBRED"\a\n\t***ERROR IPSet cmd '$ACTION' e.g. [new | add | del | enable | fwmark | dstsrc]\n"$cRESET
+            return 1
+        ;;
+    esac
+
+    if [ "$ACTION" == "add" ] || [ "$ACTION" == "del" ];then
+        local WG_INTERFACE=$1
+        if [ -n "$(echo "$WG_INTERFACE" | grep -e "^wg[0-2]")" ];then
+            shift
+            [ "$ACTION" == "add" ] && local SQL_ACTION="INSERT" || { SQL_ACTION="DELETE"; ACTION="delete"; }
+            for IPSET in $@
+                do
+                    if  [ -z "$(sqlite3 $SQL_DATABASE "SELECT * FROM ipset WHERE peer='$WG_INTERFACE' AND ipset='$IPSET';")" ];then
+                        local USE="Y"
+                        local FWMARK="0x1000"
+                        local DSTSRC="dst"
+                        if [ "$ACTION" == "add" ];then
+                            sqlite3 $SQL_DATABASE "INSERT into ipset values('$IPSET','$USE','$WG_INTERFACE','$FWMARK','$DSTSRC');"
+                        else
+                            sqlite3 $SQL_DATABASE "DELETE FROM ipset WHERE ipset='$IPSET' AND peer='$WG_INTERFACE';"
+                        fi
+
+                        echo -e $cBGRE"\n\t[✔] Ipset '$IPSET' Selective Routing ${ACTION}ed ${cBMAG}$WG_INTERFACE"$cRESET
+                    fi
+                done
+        fi
+        return 0
+    fi
+
+    if [ "$ACTION" == "new" ];then
+        if  [ -z "$(sqlite3 $SQL_DATABASE "SELECT * FROM ipset WHERE ip='$WG_INTERFACE'";)" ];then
+            local USE="Y"
+            local FWMARK="0x1000"
+            local DSTSRC="dst"
+            sqlite3 $SQL_DATABASE "INSERT into ipset values('$IPSET','$USE','$WG_INTERFACE','$FWMARK','$DSTSRC');"
+        fi
+    fi
+
+    if [ -z "$(sqlite3 $SQL_DATABASE "SELECT * FROM ipset WHERE ipset='$IPSET'";)" ];then
+        echo -e $cBRED"\a\n\t***ERROR IPSet '$IPSET' does not exist!\n"$cRESET
+        return 1
+    fi
+    case $ACTION in
+        fwmark)
+            shift
+            local FWMARK=$1
+            sqlite3 $SQL_DATABASE "UPDATE ipset SET fwmark='$FWMARK' WHERE peer='$WG_INTERFACE';"
+            echo -e $cBGRE"\n\t[✔] Updated IPSet Selective Routing for $WG_INTERFACE \n"$cRESET
+        ;;
+        dstsrc)
+            shift
+            local IPSET=$1
+            shift
+            local DSTSRC=$@
+            DSTSRC=$(printf "%s" "$DSTSRC" | sed 's/^[ \t]*//;s/[ \t]*$//')
+            local DSTSRC=$(echo "$DSTSRC" | tr 'A-Z' 'a-z')
+            local VALID="Y"
+            case $DSTSRC in
+                dst|src);;
+                dst","src);;
+                src","dst);;
+                dst","dst);;
+                *)
+                    VALID="N"
+                ;;
+            esac
+            if [ "$VALID" == "Y" ];then
+                sqlite3 $SQL_DATABASE "UPDATE ipset SET fwmark='$FWMARK' WHERE peer='$WG_INTERFACE';"
+                echo -e $cBGRE"\n\t[✔] Updated IPSet DST/SRC for $WG_INTERFACE \n"$cRESET
+            fi
+        ;;
+        enable)
+            shift
+            local IPSET=$1
+            shift
+            local USE=$1
+            if [ -n $(echo "$USE" | grep -iE "Y|N") ];then
+                local USE=$(echo "$USE" | tr 'a-z' 'A-Z')
+                sqlite3 $SQL_DATABASE "UPDATE ipset SET use='$USE' WHERE peer='$WG_INTERFACE';"
+                echo -e $cBGRE"\n\t[✔] Updated IPSet Enabled for $WG_INTERFACE \n"$cRESET
+            fi
+        ;;
+        *)
+            local IPSET="$@"
+            sqlite3 $SQL_DATABASE "UPDATE ipset SET ipset='$IPSET' WHERE peer='$WG_INTERFACE';"
+            echo -e $cBGRE"\n\t[✔] Updated IPSet Selective Routing for $WG_INTERFACE \n"$cRESET
+        ;;
+    esac
+}
 Build_Menu() {
     if [ -z "$SUPPRESSMENU" ];then
 
@@ -2587,11 +2752,12 @@ Validate_User_Choice() {
             alias*) ;;
             diag*) ;;
             debug) ;;
-            initdb*|migrate*);;            # 4.01
+            initdb*|migrate*);;            # v4.01
             stats*);;
             wg*) ;;
-            import*) ;;                     # 4.01
-            udpmon*) ;;                     # 4.01
+            scripts*) ;;                    # v4.01
+            import*) ;;                     # v4.01
+            udpmon*) ;;                     # v4.01
             killsw*) ;;             # v2.03
             killinter*) ip link del dev $(echo "$menu1" | awk '{print $2}'); menu1=;;
             "") ;;
@@ -2874,6 +3040,10 @@ Process_User_Choice() {
 
                 Import_Peer $menu1                                              # v4.01
                 Manage_Peer
+            ;;
+            scripts*)
+
+                Manage_Event_Scripts $menu1                                     # v4.01
             ;;
             *)
                 echo -e $cBWHT"\n\t$VERSION WireGuard Session Manager\n\n\t${cBRED}***ERROR $menu1\n"$cRESET    # v3.04 v1.09
