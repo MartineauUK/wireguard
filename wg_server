@@ -114,6 +114,9 @@ if [ "$2" != "disable" ];then
     iptables -I OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
     iptables -t nat -I PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'"
 
+    # User Exit @ZebMcKayhan
+    [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh ] && { logger -t "wireguard-server${VPN_ID:3:1}" "Executing ${VPN_ID}-up.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh; }
+
     ###############################################################EIC Hack 5 of 5##############################
     #logger -st "($(basename $0))" "Configuring Wireguard to VPN Client (pass-thru)"
     #[ -n "$(wg show interfaces | grep -E "wg[0-1]")" ] && iptables -I POSTROUTING -t nat -s $Subnet -o wg1+ -j MASQUERADE -m comment --comment "WireGuard 'server'"
@@ -128,6 +131,9 @@ else
     sqlite3 $SQL_DATABASE "INSERT into session values('$WG_INTERFACE','End','$TIMESTAMP');" # v1.13
 
     Firewall_delete
+
+    # User Exit @ZebMcKayhan
+    [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh ] && { logger -t "wireguard-server${VPN_ID:3:1}" "Executing ${VPN_ID}-down.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh; }
 
     logger -t "wireguard-server${VPN_ID:3:1}" "Wireguard VPN 'server' Peer ($VPN_ID) on" $SOCKET "Terminated"
 
