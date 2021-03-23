@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.01b8"
-#============================================================================================ © 2021 Martineau v4.01b8
+VERSION="v4.01b9"
+#============================================================================================ © 2021 Martineau v4.01b9
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -2383,7 +2383,7 @@ Diag_Dump() {
                     ips*)
                         TABLE="ipset"
                         echo -e $cBYEL"\tTable:$TABLE"$cBCYA 2>&1
-                        sqlite3 $SQL_DATABASE "SELECT * FROM $TABLE WHERE peer='$WG_INTERFACE';" | column -t  -s '|' --table-columns IPSet,Use,Peer,FWMark,DST/SRC
+                        sqlite3 $SQL_DATABASE "SELECT * FROM $TABLE;" | column -t  -s '|' --table-columns IPSet,Use,Peer,FWMark,DST/SRC
                     ;;
                     *)
                         echo -e $cBYEL"\tTable:$TABLE"$cBCYA 2>&1
@@ -2575,11 +2575,11 @@ EOF
 
 }
 Manage_IPSET() {
-#add wg13 Netflix Hulu
+
     local ACTION=$1
 
     case $ACTION in
-        fwmark|dstsrc|enable|add|del|new*)
+        fwmark|dstsrc|enable|add|del|new|""|list|ipset)
             shift
         ;;
         *)
@@ -2587,6 +2587,11 @@ Manage_IPSET() {
             return 1
         ;;
     esac
+
+    if [ "$ACTION" == "ipset" ] && [ -z "$2" ];then
+        local ACTION="summary"
+        local IPSET="*"
+    fi
 
     if [ "$ACTION" == "add" ] || [ "$ACTION" == "del" ];then
         local WG_INTERFACE=$1
@@ -2612,20 +2617,36 @@ Manage_IPSET() {
         return 0
     fi
 
-    if [ "$ACTION" == "new" ];then
-        if  [ -z "$(sqlite3 $SQL_DATABASE "SELECT * FROM ipset WHERE ip='$WG_INTERFACE'";)" ];then
-            local USE="Y"
-            local FWMARK="0x1000"
-            local DSTSRC="dst"
-            sqlite3 $SQL_DATABASE "INSERT into ipset values('$IPSET','$USE','$WG_INTERFACE','$FWMARK','$DSTSRC');"
+    if [ "$ACTION" != "summary" ];then
+        local IPSET=$1
+        shift
+        local ACTION=$1
+    fi
+
+    [ -z "$ACTION" ] && local ACTION="list"
+
+    if [ "$ACTION" != "summary" ];then
+        if [ "$ACTION" == "new" ];then
+            if  [ -z "$(sqlite3 $SQL_DATABASE "SELECT * FROM ipset WHERE ip='$WG_INTERFACE'";)" ];then
+                local USE="Y"
+                local FWMARK="0x1000"
+                local DSTSRC="dst"
+                sqlite3 $SQL_DATABASE "INSERT into ipset values('$IPSET','$USE','$WG_INTERFACE','$FWMARK','$DSTSRC');"
+            fi
+
+        else
+            if [ -z "$(sqlite3 $SQL_DATABASE "SELECT * FROM ipset WHERE ipset='$IPSET';")" ];then
+                echo -e $cBRED"\a\n\t***ERROR IPSet '$IPSET' does not exist!\n"$cRESET
+                return 1
+            fi
         fi
     fi
 
-    if [ -z "$(sqlite3 $SQL_DATABASE "SELECT * FROM ipset WHERE ipset='$IPSET'";)" ];then
-        echo -e $cBRED"\a\n\t***ERROR IPSet '$IPSET' does not exist!\n"$cRESET
-        return 1
-    fi
     case $ACTION in
+        list)
+            echo -e $cBYEL"\tTable:ipset"$cBCYA 2>&1
+            sqlite3 $SQL_DATABASE "SELECT * FROM ipset;" | column -t  -s '|' --table-columns IPSet,Enabled,Peer,FWMark,DST/SRC
+        ;;
         fwmark)
             shift
             local FWMARK=$1
@@ -2665,10 +2686,15 @@ Manage_IPSET() {
                 echo -e $cBGRE"\n\t[✔] Updated IPSet Enabled for $WG_INTERFACE \n"$cRESET
             fi
         ;;
+        summary)
+            echo -e $cBYEL"\tTable:Summary"$cBCYA 2>&1
+            sqlite3 $SQL_DATABASE "SELECT COUNT(ipset),ipset FROM ipset;" | column -t  -s '|' --table-columns Total,IPSet
+            sqlite3 $SQL_DATABASE "SELECT COUNT(ipset),peer FROM ipset GROUP BY peer;" | column -t  -s '|' --table-columns Total,IPSet,Peer
+        ;;
         *)
-            local IPSET="$@"
-            sqlite3 $SQL_DATABASE "UPDATE ipset SET ipset='$IPSET' WHERE peer='$WG_INTERFACE';"
-            echo -e $cBGRE"\n\t[✔] Updated IPSet Selective Routing for $WG_INTERFACE \n"$cRESET
+            #sqlite3 $SQL_DATABASE "UPDATE ipset SET ipset='$IPSET' WHERE peer='$WG_INTERFACE';"
+            #echo -e $cBGRE"\n\t[✔] Updated IPSet Selective Routing for $WG_INTERFACE \n"$cRESET
+            :
         ;;
     esac
 }
@@ -2756,7 +2782,8 @@ Validate_User_Choice() {
             stats*);;
             wg*) ;;
             scripts*) ;;                    # v4.01
-            import*) ;;                     # v4.01
+            import*) ;;
+            ipset*) ;;                       # v4.01
             udpmon*) ;;                     # v4.01
             killsw*) ;;             # v2.03
             killinter*) ip link del dev $(echo "$menu1" | awk '{print $2}'); menu1=;;
@@ -3044,6 +3071,11 @@ Process_User_Choice() {
             scripts*)
 
                 Manage_Event_Scripts $menu1                                     # v4.01
+            ;;
+            ipset*)
+
+                Manage_IPSET $menu1
+
             ;;
             *)
                 echo -e $cBWHT"\n\t$VERSION WireGuard Session Manager\n\n\t${cBRED}***ERROR $menu1\n"$cRESET    # v3.04 v1.09
@@ -3431,7 +3463,13 @@ if [ "$1" != "install" ];then   # v2.01
             start|init)
                 if [ "$1" == "init" ];then
 
-                    sleep 2
+                    if [ "$(nvram get ntp_ready)" = "0" ];then              # v4.01 Ensure event 'restart_diskmon' triggers the actual start of WireGuard Session Manager
+                        FN="/jffs/scripts/service-event-end"
+                        [ ! -f $FN ] && { echo "#!/bin/sh" > $FN; chmod +x $FN; }
+                        [ -z "$(grep -i "WireGuard" $FN)" ] && echo -e "if [ "\$2" = "diskmon" ]; then { sh /jffs/addons/wireguard/wg_manager.sh init & } ; fi # WireGuard_Manager" >> $FN   # v4.01
+                        SayT "WIreGuard Session Manager delayed for NTP synch event trigger 'restart_diskmon'"  # v4.01
+                        exit 99
+                    fi
 
                     UDP_MONITOR=$(Manage_UDP_Monitor "INIT" "disable")
 
