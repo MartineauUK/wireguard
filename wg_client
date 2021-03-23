@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v1.08"
-#============================================================================================ © 2021 Martineau v1.08
+VERSION="v1.09"
+#============================================================================================ © 2021 Martineau v1.09
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 22-Mar-2021
+# Last Updated Date: 23-Mar-2021
 #
 # Description:
 #
@@ -219,9 +219,27 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
             ip route add 128/1 dev $VPN_ID 2>/dev/null
         else
             #ip rule add from $(nvram get lan_ipaddr | cut -d"." -f1-3).0/24 table 12$VPN_NUM prio 99$VPN_NUM"9"
-            VPN_IP_LIST=$(awk -v pattern="${VPN_NUM}" 'match($0,"^rp1"pattern) {print $0}' ${INSTALL_DIR}WireguardVPN.conf | grep -oE "<.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
+            VPN_IP_LIST=$(sqlite3 $SQL_DATABASE "SELECT rules FROM policy WHERE peer='$WG_INTERFACE';")
 
             create_client_list
+
+            # Ipsets
+            if [ -n "$(sqlite3 $SQL_DATABASE "SELECT ipset FROM ipset WHERE peer='${WG_INTERFACE}';")" ];then
+
+                IPSETS=$(sqlite3 $SQL_DATABASE "SELECT ipset FROM ipset WHERE peer='${WG_INTERFACE}';" | tr '\n' ' ')
+                for IPSET in $IPSETS
+                    do
+                        ipset list $IPSET >/dev/null 2>&1;if [ $? -eq 0 ]; then
+                            DSTSRC=$(sqlite3 $SQL_DATABASE "SELECT dstsrc FROM ipset WHERE ipset='$IPSET' AND peer='${WG_INTERFACE}';")
+                            FWMARK=$(sqlite3 $SQL_DATABASE "SELECT fwmark FROM ipset WHERE ipset='$IPSET' AND peer='${WG_INTERFACE}';")
+                            iptables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} 2>/dev/null
+                            iptables -t mangle -A PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK}
+                            logger -t "wireguard-${MODE}${VPN_NUM}" "Adding IPSet '$IPSET' route through VPN 'client' Peer" $WG_INTERFACE
+                        else
+                            logger -t "wireguard-${MODE}${VPN_NUM}" "***ERROR IPSet '$IPSET' does NOT EXIST! for routing through VPN 'client' Peer "$WG_INTERFACE
+                        fi
+                    done
+            fi
 
         fi
 
@@ -299,6 +317,15 @@ else
     ip rule del prio 992$VPN_NUM    2>/dev/null
 
     purge_client_list
+
+    IPSETS=$(sqlite3 $SQL_DATABASE "SELECT ipset FROM ipset WHERE peer='${WG_INTERFACE}';" | tr '\n' ' ')
+    for IPSET in $IPSETS
+        do
+            DSTSRC=$(sqlite3 $SQL_DATABASE "SELECT dstsrc FROM ipset WHERE ipset='$IPSET' AND peer='${WG_INTERFACE}';")
+            FWMARK=$(sqlite3 $SQL_DATABASE "SELECT fwmark FROM ipset WHERE ipset='$IPSET' AND peer='${WG_INTERFACE}';")
+            iptables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} 2>/dev/null
+            logger -t "wireguard-${MODE}${VPN_NUM}" "Removing IPSet '$IPSET' routing through VPN 'client' Peer" $WG_INTERFACE
+        done
 
     # User Exit @ZebMcKayhan
     [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh ] && { logger -t "wireguard-${MODE}${VPN_NUM}" "Executing Event:${VPN_ID}-down.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh; }
