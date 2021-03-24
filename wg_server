@@ -69,8 +69,9 @@ SOCKET=$(nvram get wan_gateway)":"$wgport
 
 WG_INTERFACE=$1
 
+DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM servers where peer='$WG_INTERFACE';")
+DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')
 [ -z "$DESC" ] && DESC="# Unidentified"
-
 
 if [ "$2" != "disable" ];then
     wgport=$(awk '/Listen/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)
@@ -81,8 +82,7 @@ if [ "$2" != "disable" ];then
         Subnet=$SUBNET_PREFIX".0/24"
     fi
 
-    DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM servers where peer='$WG_INTERFACE';")
-    [ -z "$DESC" ] && DESC="# Unidentified"
+
 
     logger -t "wireguard-server${VPN_ID:3:1}" "Initialising Wireguard VPN 'Server' Peer (${cBMAG}$VPN_ID$cBGRE) on $SOCKET"
     echo -e $cBCYA"\twireguard-server${VPN_ID:3:1}: Initialising Wireguard VPN 'Server' Peer (${cBMAG}$VPN_ID$cBCYA) on $SOCKET (${cBMAG}$DESC${cBCYA})"$cRESET
