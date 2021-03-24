@@ -127,12 +127,10 @@ ANSIColours
 
 FIRMWARE=$(echo $(nvram get buildno) | awk 'BEGIN { FS = "." } {printf("%03d%02d",$1,$2)}')
 
-
-
 modprobe xt_set
 modprobe xt_comment
 insmod /opt/lib/modules/wireguard 2> /dev/null
-#############################################################################EIC Hack 1 of 1################
+
 #insmod /opt/lib/modules/wireguard
 VPN_ID=$1
 [ -z "$1" ] && VPN_ID="wg0"
@@ -158,31 +156,28 @@ if [ -z "$(echo "$VPN_ID" |  grep -oE "^wg[2][1-2]|^wg[1][1-5]*$")" ];then      
     fi
 fi
 
-############################################################################################################
-
 [ -n "$(echo "$@" | grep "policy")" ] && POLICY_MODE="in Policy Mode " || POLICY_MODE=
 
-# Read the Peer config to set the Annotation Description and LOCAL peer endpoint etc.
-if [ -f ${INSTALL_DIR}WireguardVPN.conf ];then
-    if [ "$MODE" == "client" ];then                         # v1.03
-        if [ -z "$LOCALIP" ];then
-           LOCALIP=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM clients where peer='$WG_INTERFACE';")
-           export LocalIP=$LOCALIP
-        fi
-        [ -z "$SOCKET" ] && SOCKET=$(sqlite3 $SQL_DATABASE "SELECT socket FROM clients where peer='$WG_INTERFACE';")
-        START_PRIO=99${VPN_NUM}0
-        END_PRIO=99${VPN_NUM}9
-        WAN_PRIO=99${VPN_NUM}0
-        VPN_PRIO=99${VPN_NUM}1
-        VPN_TBL=12$VPN_NUM
-        VPN_UNIT=$VPN_ID
-    else
-        SOCKET=$(nvram get wan_gateway)":"$(awk '/Listen/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)      # v1.03
+# Read the database to set the Annotation Description and LOCAL peer endpoint etc.
+if [ "$MODE" == "client" ];then                         # v1.03
+    if [ -z "$LOCALIP" ];then
+       LOCALIP=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM clients where peer='$WG_INTERFACE';")
+       export LocalIP=$LOCALIP
     fi
-    DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM clients where peer='$WG_INTERFACE';")
-    DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')
-    [ -z "$DESC" ] && DESC="# Unidentified"
+    [ -z "$SOCKET" ] && SOCKET=$(sqlite3 $SQL_DATABASE "SELECT socket FROM clients where peer='$WG_INTERFACE';")
+    START_PRIO=99${VPN_NUM}0
+    END_PRIO=99${VPN_NUM}9
+    WAN_PRIO=99${VPN_NUM}0
+    VPN_PRIO=99${VPN_NUM}1
+    VPN_TBL=12$VPN_NUM
+    VPN_UNIT=$VPN_ID
+else
+    SOCKET=$(nvram get wan_gateway)":"$(awk '/Listen/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)      # v1.03
 fi
+
+DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM clients where peer='$WG_INTERFACE';")
+DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')
+[ -z "$DESC" ] && DESC="# Unidentified"
 
 if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
 
