@@ -2650,7 +2650,7 @@ Manage_IPSET() {
             for IPSET in $@
                 do
                         local USE="Y"
-                        local FWMARK="0x1000"
+                        local FWMARK=$(sqlite3 $SQL_DATABASE "SELECT fwmark FROM fwmark WHERE peer='$WG_INTERFACE';")
                         local DSTSRC="dst"
                         if [ "$ACTION" == "add" ];then
                             if [ -z "$(sqlite3 $SQL_DATABASE "SELECT * FROM ipset WHERE peer='$WG_INTERFACE' AND ipset='$IPSET';")" ];then
@@ -2669,6 +2669,7 @@ Manage_IPSET() {
                         fi
                 done
         fi
+        Manage_Peer "list" "$WG_INTERFACE"
         return 0
     fi
 
@@ -2685,11 +2686,10 @@ Manage_IPSET() {
             if [ "$ACTION" == "new" ];then
                 if  [ -z "$(sqlite3 $SQL_DATABASE "SELECT * FROM ipset WHERE ip='$WG_INTERFACE'";)" ];then
                     local USE="Y"
-                    local FWMARK="0x1000"
+                    local FWMARK=$(sqlite3 $SQL_DATABASE "SELECT fwmark FROM fwmark WHERE peer='$WG_INTERFACE';")
                     local DSTSRC="dst"
                     sqlite3 $SQL_DATABASE "INSERT into ipset values('$IPSET','$USE','$WG_INTERFACE','$FWMARK','$DSTSRC');"
                 fi
-
             else
                 if [ -z "$(sqlite3 $SQL_DATABASE "SELECT * FROM ipset WHERE ipset='$IPSET';")" ];then
                     echo -e $cBRED"\a\n\t***ERROR IPSet '$IPSET' does not exist!\n"$cRESET
@@ -2747,11 +2747,18 @@ Manage_IPSET() {
             sqlite3 $SQL_DATABASE "SELECT COUNT(ipset),ipset FROM ipset GROUP BY ipset;" | column -t  -s '|' --table-columns Total,IPSet
             echo -e
             sqlite3 $SQL_DATABASE "SELECT COUNT(ipset),ipset,peer FROM ipset GROUP BY ipset,peer;" | column -t  -s '|' --table-columns Total,IPSet,Peer
+            echo -e
+            sqlite3 $SQL_DATABASE "SELECT * FROM fwmark;" | column -t  -s '|' --table-columns FWMark,Interface
         ;;
         *)
-            #sqlite3 $SQL_DATABASE "UPDATE ipset SET ipset='$IPSET' WHERE peer='$WG_INTERFACE';"
+
             #echo -e $cBGRE"\n\t[✔] Updated IPSet Selective Routing for $WG_INTERFACE \n"$cRESET
-            :
+            #Request to update FWMark table for Peer??
+            if [ "$IPSET" == "fwmark" ];then
+                sqlite3 $SQL_DATABASE "UPDATE fwmark SET fwmark='$ACTION' WHERE peer='$WG_INTERFACE';"
+                echo -e $cBGRE"\n\t[✔] Updated FWMARK for ${cBMAG}$WG_INTERFACE \n"$cBCYA
+                sqlite3 $SQL_DATABASE "SELECT * FROM fwmark;" | column -t  -s '|' --table-columns FWMark,Interface
+            fi
         ;;
     esac
 }
