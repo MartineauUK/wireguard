@@ -139,6 +139,8 @@ VPN_NUM=${VPN_ID#"${VPN_ID%?}"}
 
 WG_INTERFACE=$VPN_ID
 
+[ -n "$(echo "$@" | grep "force")" ] && local FORCE="force"
+
 # Is this a standard 'client' Peer interface 'wg11-wg15'                    # v1.03
 if [ -z "$(echo "$VPN_ID" |  grep -oE "^wg[2][1-2]|^wg[1][1-5]*$")" ];then      # v1.03
     # Non-standard so identfy if it's a 'client' or 'server' Peer
@@ -198,6 +200,9 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         sqlite3 $SQL_DATABASE "INSERT into session values('$WG_INTERFACE','Start','$TIMESTAMP');"   # v1.08
         sqlite3 $SQL_DATABASE "INSERT into traffic values('$WG_INTERFACE','$TIMESTAMP','0','0');"
 
+        # User Exit @Torson
+        [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-route-up.sh ] && { logger -t "wireguard-${MODE}${VPN_NUM}" "Executing Event:${VPN_ID}-route-up.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-route-up.sh; }
+
         host="$(wg show $VPN_ID endpoints | sed -n 's/.*\t\(.*\):.*/\1/p')"
         ip route add $(ip route get $host | sed '/ via [0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}/{s/^\(.* via [0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\).*/\1/}' | head -n 1) 2>/dev/null
 
@@ -237,6 +242,8 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
             fi
 
         fi
+
+
 
         ip route add 0/1 dev $VPN_ID table 12$VPN_NUM 2>/dev/null
         ip route add 128/1 dev $VPN_ID table 12$VPN_NUM 2>/dev/null
@@ -289,6 +296,9 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
 
 
 else
+
+    # User Exit @Torson
+    [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-route-down.sh ] && { logger -t "wireguard-${MODE}${VPN_NUM}" "Executing Event:${VPN_ID}-route-down.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-route-down.sh; }
 
     ip route del 0.0.0.0/1   dev $VPN_ID   2>/dev/null
     ip route del 128.0.0.0/1 dev $VPN_ID   2>/dev/null
