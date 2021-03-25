@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v1.13"
-#============================================================================================ © 2021 Martineau v1.13
+VERSION="v4.01"
+#============================================================================================ © 2021 Martineau v4.01
 #
 
 # Maintainer: Martineau
@@ -10,11 +10,11 @@ VERSION="v1.13"
 #
 # Acknowledgement:
 #
-# Contributors: odkrys
+# Contributors: odkrys,ZebMcKayhan,Torson
 
 CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v1.08 @elorimer
 INSTALL_DIR="/jffs/addons/wireguard/"
-
+SQL_DATABASE="/opt/etc/wireguard.d/WireGuard.db"        # v1.13
 
 # shellcheck disable=SC2034
 ANSIColours() {
@@ -68,21 +68,21 @@ wgport=$(awk '/Listen/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)
 SOCKET=$(nvram get wan_gateway)":"$wgport
 
 WG_INTERFACE=$1
-DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' ${INSTALL_DIR}WireguardVPN.conf | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
-[ -z "$DESC" ] && DESC="# Unidentified"
 
+DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM servers where peer='$WG_INTERFACE';")
+DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')
+[ -z "$DESC" ] && DESC="# Unidentified"
 
 if [ "$2" != "disable" ];then
     wgport=$(awk '/Listen/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)
-    Subnet=$(grep -E "^$WG_INTERFACE" ${INSTALL_DIR}WireguardVPN.conf | awk '{print $3}') # v1.09 @here1310
+    Subnet=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers where peer='$WG_INTERFACE';") # v1.09 @here1310
     # CIDR ?
     if [ -z "$(echo "$Subnet" | Is_IPv4_CIDR)" ];then
         SUBNET_PREFIX=${Subnet%.*}
         Subnet=$SUBNET_PREFIX".0/24"
     fi
 
-    DESC=$(awk -v pattern="$WG_INTERFACE" 'match($0,"^"pattern) {print $0}' ${INSTALL_DIR}WireguardVPN.conf | grep -oE "#.*$" | sed 's/^[ \t]*//;s/[ \t]*$//')
-    [ -z "$DESC" ] && DESC="# Unidentified"
+
 
     logger -t "wireguard-server${VPN_ID:3:1}" "Initialising Wireguard VPN 'Server' Peer (${cBMAG}$VPN_ID$cBGRE) on $SOCKET"
     echo -e $cBCYA"\twireguard-server${VPN_ID:3:1}: Initialising Wireguard VPN 'Server' Peer (${cBMAG}$VPN_ID$cBCYA) on $SOCKET (${cBMAG}$DESC${cBCYA})"$cRESET
@@ -94,6 +94,9 @@ if [ "$2" != "disable" ];then
     ip link set up dev $VPN_ID
     #ifconfig $VPN_ID mtu 1380
     ifconfig $VPN_ID mtu 1420                       # v1.02
+
+    TIMESTAMP=$(date +%s)
+    sqlite3 $SQL_DATABASE "INSERT into session values('$WG_INTERFACE','Start','$TIMESTAMP');"   # v1.13
 
     ifconfig $VPN_ID txqueuelen 1000
 
@@ -111,20 +114,30 @@ if [ "$2" != "disable" ];then
     iptables -I OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
     iptables -t nat -I PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'"
 
+    # User Exit @ZebMcKayhan
+    [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh ] && { logger -t "wireguard-server${VPN_ID:3:1}" "Executing ${VPN_ID}-up.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh; }
+
     ###############################################################EIC Hack 5 of 5##############################
     #logger -st "($(basename $0))" "Configuring Wireguard to VPN Client (pass-thru)"
-    [ -n "$(wg show interfaces | grep -E "wg[0-1]")" ] && iptables -I POSTROUTING -t nat -s $Subnet -o wg1+ -j MASQUERADE -m comment --comment "WireGuard 'server'"
+    #[ -n "$(wg show interfaces | grep -E "wg[0-1]")" ] && iptables -I POSTROUTING -t nat -s $Subnet -o wg1+ -j MASQUERADE -m comment --comment "WireGuard 'server'"
     echo -en $cBGRE"\t"
     logger -st "wireguard-server${VPN_ID:3:1}" "Initialisation complete."
     echo -e $cRESET
     ############################################################################################################
 else
     ip link del dev $VPN_ID 2>/dev/null
+
+    TIMESTAMP=$(date +%s)
+    sqlite3 $SQL_DATABASE "INSERT into session values('$WG_INTERFACE','End','$TIMESTAMP');" # v1.13
+
     Firewall_delete
+
+    # User Exit @ZebMcKayhan
+    [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh ] && { logger -t "wireguard-server${VPN_ID:3:1}" "Executing ${VPN_ID}-down.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh; }
 
     logger -t "wireguard-server${VPN_ID:3:1}" "Wireguard VPN 'server' Peer ($VPN_ID) on" $SOCKET "Terminated"
 
-    echo -en $cBGRE"\twireguard-server${VPN_ID:3:1}: Wireguard VPN '$MODE' Peer (${cBMAG}$VPN_ID$cBGRE) on $SOCKET (${cBMAG}$DESC${cBGRE}) ${cBRED}${aREVERSE}Terminated\n"$cRESET
+    echo -en $cBGRE"\twireguard-server${VPN_ID:3:1}: Wireguard VPN '$MODE' Peer (${cBMAG}$VPN_ID$cBGRE) on $SOCKET (${cBMAG}$DESC${cBGRE}) ${cBRED}Terminated\n"$cRESET
 
     echo -e $cRESET
 fi
