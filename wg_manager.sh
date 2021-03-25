@@ -24,7 +24,7 @@ VERSION="v4.01bB"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 24-Mar-2021
+# Last Updated Date: 25-Mar-2021
 #
 # Description:
 #
@@ -535,11 +535,8 @@ Delete_Peer() {
                     if [ "$ANS" == "y" ];then
 
                         [ -n "$(wg show $WG_INTERFACE 2>/dev/null)" ] && Manage_Wireguard_Sessions "stop" "$WG_INTERFACE"
-                        if [ "$Mode" != "?" ];then
-                            sqlite3 $SQL_DATABASE "DELETE FROM $TABLE WHERE $SQL_COL='$WG_INTERFACE';"
-                        else
-                            sqlite3 $SQL_DATABASE "DELETE FROM clients WHERE $SQL_COL='$WG_INTERFACE';"
-                        fi
+                        sqlite3 $SQL_DATABASE "DELETE FROM $TABLE WHERE $SQL_COL='$WG_INTERFACE';"
+                        [ -n "$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE name='$WG_INTERFACE';")" ] && sqlite3 $SQL_DATABASE "DELETE FROM devices WHERE name='$WG_INTERFACE';"
 
                         # ... and delete associated RPDB Selective Routing rule
                         sqlite3 $SQL_DATABASE "DELETE FROM policy WHERE peer='$WG_INTERFACE';"
