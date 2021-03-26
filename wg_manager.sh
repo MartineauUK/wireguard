@@ -931,7 +931,7 @@ Manage_Peer() {
                                 fi
                                 if [ -n "$(echo "$IP_SUBNET" | Is_IPv4_CIDR)" ];then    # v4.02
                                     local CHECK_IP=$(echo "$IP_SUBNET" | sed s'~/.*$~~')
-                                    local SQL_MATCH="subnet"; local ID="peer"
+                                    local SQL_MATCH="subnet"; local ID="peer"; IPADDR="subnet"
                                     case $Mode in
                                         server) local TABLE="servers";;
                                         client) local TABLE="clients";;
@@ -1381,7 +1381,7 @@ Initialise_SQL() {
     [ -f ${INSTALL_DIR}WireguardVPN.conf ] && local CCNT=$(grep -E "^wg[1-2]" ${INSTALL_DIR}WireguardVPN.conf | wc -l) || local CCNT=0
 
     if [ $CCNT -eq 0 ];then
-        echo -e $cBGRE"\a\n\tNo Peer entries to auto-migrate ${cBCYA}from '${cBWHT}${INSTALL_DIR}WireguardVPN.conf${cBCYA}', but you will need to manually import the 'device' Peer '*.conf' files:\n\n"$cRESET
+        echo -e $cBRED"\a\n\tNo Peer entries to auto-migrate ${cBCYA}from '${cBWHT}${INSTALL_DIR}WireguardVPN.conf${cBCYA}', but you will need to manually import the 'device' Peer '*.conf' files:\n\n"$cRESET
 
         ls -1 ${CONFIG_DIR}*.conf 2>/dev/null | awk -F '/' '{print $5}' | grep -v "wg[1-2]" | sed 's/\.conf$//' | sort
         [ "$ACTION" == "migrate" ] && return 0
@@ -2463,8 +2463,8 @@ Diag_Dump() {
             done
 
     fi
-	echo -e
-	netstat -rn | grep -E "wg.|Kernel|irtt"
+    echo -e
+    netstat -rn | grep -E "wg.|Kernel|irtt"
 
     if [ -z "$TYPE" ] || [ "$TYPE" == "udp" ] || [ "$TYPE" == "sockets" ];then
         echo -e $cBYEL"\n\tDEBUG: UDP sockets.\n"$cBCYA 2>&1
@@ -3468,7 +3468,7 @@ Create_RoadWarrior_Device() {
                             done
 
                             [ "$USE_IPV6" == "Y" ] && IPV6=", fc00:23:5::${IP}/128, 2001:db8:23:5::/64"     # v1.07
-                            local VPN_POOL_IP=$VPN_POOL_SUBNET"."$IP"/32"                                  
+                            local VPN_POOL_IP=$VPN_POOL_SUBNET"."$IP"/32"
                     else
                         echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) subnet NOT defined 'device' Peers?"
                         return 1
