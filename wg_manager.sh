@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.01bC"
-#============================================================================================ © 2021 Martineau v4.01bC
+VERSION="v4.02"
+#============================================================================================ © 2021 Martineau v4.02
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.01bC"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 25-Mar-2021
+# Last Updated Date: 26-Mar-2021
 #
 # Description:
 #
@@ -129,13 +129,13 @@ Convert_1024KMG() {
 
     case "$UNIT" in
         M|MB|MIB)
-            NUM=$(echo $NUM | awk '{printf "%.0f", val*1024*1024}')
+            NUM=$(echo $NUM | awk '{printf "%.0f", $1*1024*1024}')      # v4.02 Hotfix
             ;;
         G|GB|GIB)
-            NUM=$(echo $NUM | awk '{printf "%.0f", val*1024*1024*1024}')
+            NUM=$(echo $NUM | awk '{printf "%.0f", $1*1024*1024*1024}') # v4.02 Hotfix
             ;;
         K|KB|KIB)
-            NUM=$(echo $NUM | awk '{printf "%.0f", $1*1024}')
+            NUM=$(echo $NUM | awk '{printf "%.0f", $1*1024}')           # v4.02 Hotfix
             ;;
         B)
             ;;
@@ -187,6 +187,35 @@ EpochTime(){
     fi
 
     echo $RESULT
+}
+Size_Human() {
+
+    local SIZE=$1
+    if [ -z "$SIZE" ];then
+        echo "N/A"
+        return 1
+    fi
+    #echo $(echo $SIZE | awk '{ suffix=" KMGT"; for(i=1; $1>1024 && i < length(suffix); i++) $1/=1024; print int($1) substr(suffix, i, 1), $3; }')
+
+    # if [ $SIZE -gt $((1024*1024*1024*1024)) ];then                                    # 1,099,511,627,776
+        # printf "%2.2f TB\n" $(echo $SIZE | awk '{$1=$1/(1024^4); print $1;}')
+    # else
+        if [ $SIZE -gt $((1024*1024*1024)) ];then                                       # 1,073,741,824
+            printf "%2.2f GiB\n" $(echo $SIZE | awk '{$1=$1/(1024^3); print $1;}')
+        else
+            if [ $SIZE -gt $((1024*1024)) ];then                                        # 1,048,576
+                printf "%2.2f MiB\n" $(echo $SIZE | awk '{$1=$1/(1024^2);   print $1;}')
+            else
+                if [ $SIZE -gt $((1024)) ];then
+                    printf "%2.2f KiB\n" $(echo $SIZE | awk '{$1=$1/(1024);   print $1;}')
+                else
+                    printf "%d Bytes\n" $SIZE
+                fi
+            fi
+        fi
+    # fi
+
+    return 0
 }
 Check_Lock() {
         if [ -f "/tmp/wg.lock" ] && [ -d "/proc/$(sed -n '2p' /tmp/wg.lock)" ] && [ "$(sed -n '2p' /tmp/wg.lock)" != "$$" ]; then
@@ -546,7 +575,7 @@ Delete_Peer() {
                         #   DDNS martineau.homeip.net
                         #   Endpoint = martineau.homeip.net:51820
                         if [ -n "$FORCE" ] || [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
-                            if [ -n "$FORCE" ] || [ "$(awk '/^Endpoint/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)" == "$(nvram get ddns_hostname_x)" ];then
+                            if [ -n "$FORCE" ] || [ "$(awk -F '[ :]' '/^Endpoint/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)" == "$(nvram get ddns_hostname_x)" ];then      # v4.02
 
                                 # Remove the 'client' from any 'server' Peers
                                 #   # SGS8
@@ -558,7 +587,7 @@ Delete_Peer() {
 
                                     for SERVER_PEER in $SERVER_PEER
                                         do
-                                            echo -e $cBGRE"\t'client' Peer ${cBMAG}${WG_INTERFACE}${cBGRE}removed from 'server' Peer (${cBMAG}${SERVER_PEER}${cBGRE})"
+                                            echo -e $cBGRE"\t'device' Peer ${cBMAG}${WG_INTERFACE}${cBGRE} removed from 'server' Peer (${cBMAG}${SERVER_PEER}${cBGRE})"     # 4.02
                                             sed -i "/^# $WG_INTERFACE$/,/^# $WG_INTERFACE End$/d" ${CONFIG_DIR}${SERVER_PEER}.conf
                                             local RESTART_SERVERS=$RESTART_SERVERS" "$SERVER_PEER
                                         done
@@ -876,9 +905,10 @@ Manage_Peer() {
                                     echo -e
                                 fi
 
-                                [ ${WG_INTERFACE:0:2} == "wg" ] && local HDR="Peer" || local HDR="Device"
+                                [ "$Mode" == "device" ] && { local HDR="Device"; local ID="name"; }  || { local HDR="Peer"; local ID="peer"; } # v4.02 Hotfix
+
                                 echo -e $cBMAG
-                                sqlite3 $SQL_DATABASE "SELECT peer,tag FROM $TABLE WHERE peer='$WG_INTERFACE';" | column -t  -s '|' --table-columns $HDR,'Annotation'
+                                sqlite3 $SQL_DATABASE "SELECT $ID,tag FROM $TABLE WHERE $ID='$WG_INTERFACE';" | column -t  -s '|' --table-columns $HDR,'Annotation' # v4.02 Hotfix
 
                                 echo -e $cBCYA"\nConnected Session duration: $cBGRE"$(Session_Duration "$WG_INTERFACE")$cRESET
 
@@ -896,22 +926,39 @@ Manage_Peer() {
                                 shift
                                 local Mode=$(Server_or_Client "$WG_INTERFACE")
                                 local IP_SUBNET="$(echo "$CMD" | sed -n "s/^.*ip=//p" | awk '{print $1}')"
-                                local IPADDR="subnet"
-                                local ID="peer"
-                                case $Mode in
-                                    server) local TABLE="servers";;
-                                    client) local TABLE="clients";;
-                                    device)local TABLE="devices"; local ID="name"; local IPADDR="ip";;
-                                esac
+                                if [ "${IP_SUBNET#${IP_SUBNET%???}}" != "/32" ] && [ "${IP_SUBNET#${IP_SUBNET%???}}" != "/24" ];then    # v4.02
+                                    local IP_SUBNET=$IP_SUBNET"/32"                     # v4.02
+                                fi
+                                if [ -n "$(echo "$IP_SUBNET" | Is_IPv4_CIDR)" ];then    # v4.02
+                                    local CHECK_IP=$(echo "$IP_SUBNET" | sed s'~/.*$~~')
+                                    local SQL_MATCH="subnet"; local ID="peer"
+                                    case $Mode in
+                                        server) local TABLE="servers";;
+                                        client) local TABLE="clients";;
+                                        device) local TABLE="devices"; local ID="name"; local IPADDR="ip"; local SQL_MATCH="ip";;
+                                    esac
+                                    # Can't be the server IP or already assigned                    # v4.02
+                                    if [ "${CHECK_IP##*.}" != "1" ];then
+                                            local DUPLICATE=$(sqlite3 $SQL_DATABASE "SELECT $ID FROM $TABLE WHERE $SQL_MATCH LIKE '$CHECK_IP%';")   # v4.02
+                                            if [ -z "$DUPLICATE" ] ;then
 
-                                #[ "${WG_INTERFACE:0:2}" != "wg" ] && local TABLE="devices"; local ID="name"; local IPADDR="ip"
+                                                #[ "${WG_INTERFACE:0:2}" != "wg" ] && local TABLE="devices"; local ID="name"; local IPADDR="ip"
 
-                                # If it a 'server' Peer then all of its 'device' Peers are now invalid?
-                                # It may be that a 'device' Peer needs a static IP in its 'server' Peer Subnet?
-                                sqlite3 $SQL_DATABASE "UPDATE $TABLE SET $IPADDR='$IP_SUBNET' WHERE $ID='$WG_INTERFACE';"
-                                sed -i "/^Address/ s~[^ ]*[^ ]~$IP_SUBNET~3" ${CONFIG_DIR}${WG_INTERFACE}.conf
+                                                # If it a 'server' Peer then all of its 'device' Peers are now invalid?
+                                                # It may be that a 'device' Peer needs a static IP in its 'server' Peer Subnet?
+                                                sqlite3 $SQL_DATABASE "UPDATE $TABLE SET $IPADDR='$IP_SUBNET' WHERE $ID='$WG_INTERFACE';"
+                                                sed -i "/^Address/ s~[^ ]*[^ ]~$IP_SUBNET~3" ${CONFIG_DIR}${WG_INTERFACE}.conf
 
-                                echo -e $cBGRE"\n\t[✔] Updated IP/Subnet\n"$cRESET
+                                                echo -e $cBGRE"\n\t[✔] Updated IP/Subnet\n"$cRESET
+                                            else
+                                                echo -e $cBRED"\n\a\t***ERROR: '$IP_SUBNET' already assigned to Peer ${cBMAG}$DUPLICATE"$RESET
+                                            fi
+                                    else
+                                        echo -e $cBRED"\n\a\t***ERROR: '$IP_SUBNET' is not valid cannot be .1 "$RESET   # v4.02
+                                    fi
+                                else
+                                    echo -e $cBRED"\n\a\t***ERROR: '$IP_SUBNET' is not a valid IPv4 CIDR"$RESET # v4.02
+                                fi
                             ;;
                             dns*)
                                 shift
@@ -1337,7 +1384,7 @@ Initialise_SQL() {
         echo -e $cBRED"\a\n\tNo Peer entries to auto-migrate ${cBCYA}from '${cBWHT}${INSTALL_DIR}WireguardVPN.conf${cBCYA}', but you will need to manually import the 'device' Peer '*.conf' files:\n\n"$cRESET
 
         ls -1 ${CONFIG_DIR}*.conf 2>/dev/null | awk -F '/' '{print $5}' | grep -v "wg[1-2]" | sed 's/\.conf$//' | sort
-        return 0
+        [ "$ACTION" == "migrate" ] && return 0
     fi
 
     if [ -f $SQL_DATABASE ] && [ "$ACTION" != "keep" ];then
@@ -1698,7 +1745,6 @@ Manage_Stats() {
 }
 Get_scripts() {
     local BRANCH="$1"
-    local BRANCH="dev"      #********** NOT FOR STABLE BRANCH **********
 
     echo -e $cBCYA"\tDownloading scripts"$cRESET 2>&1
 
@@ -2253,7 +2299,7 @@ Show_Peer_Status() {
                                 RX=$(Convert_1024KMG "$RX" "$RXU")
                                 TX=$(Convert_1024KMG "$TX" "$TXU")
 
-                                # Need to get the last logged RX/TX values for the device, and only add to SQL if total > 0
+                                # Need to get the last logged RX/TX values for the Peer, and only add to SQL if total > 0
                                 Parse "$(sqlite3 $SQL_DATABASE "select rx,tx from traffic WHERE peer='$WG_INTERFACE' order by timestamp desc limit 1;")" "|" RX_OLD TX_OLD
                                 if [ -n "$RX_OLD" ] && [ -n "$TX_OLD" ];then
                                     local RX_DELTA=$((RX-RX_OLD))
@@ -2293,7 +2339,10 @@ Show_Peer_Status() {
 
                     if [ -z "$DETAIL" ];then
                         if [ "$STATS" == "Y" ];then
-                            [ -n "$(echo "$LINE" | grep -E "transfer:")" ] && Say ${WG_INTERFACE}":"$LINE
+                            if [ -n "$(echo "$LINE" | grep -E "transfer:")" ];then
+                                Say ${WG_INTERFACE}":"${LINE}$cRESET
+                                Say ${WG_INTERFACE}": period : $(Size_Human $RX_DELTA) received, $(Size_Human $TX_DELTA) sent (Rx=$RX_DELTA;Tx=$TX_DELTA)"
+                            fi
                         else
                             [ -n "$(echo "$LINE" | grep -E "interface:|peer:|transfer:|latest handshake:")" ] && echo -e ${TAB}${COLOR}$LINE
                         fi
@@ -2414,6 +2463,8 @@ Diag_Dump() {
             done
 
     fi
+	echo -e
+	netstat -rn | grep -E "wg.|Kernel|irtt"
 
     if [ -z "$TYPE" ] || [ "$TYPE" == "udp" ] || [ "$TYPE" == "sockets" ];then
         echo -e $cBYEL"\n\tDEBUG: UDP sockets.\n"$cBCYA 2>&1
@@ -2426,17 +2477,19 @@ Diag_Dump() {
         echo -e $cBYEL"\n\tDEBUG: -t filter \n"$cBCYA 2>&1
         iptables --line -nvL FORWARD | grep -iE "WireGuard|Chain|pkts"
         echo -e
-        iptables --line -nvL wireguard | grep -iE "WireGuard|Chain|pkts"
-        echo -e
+        #iptables --line -nvL wireguard | grep -iE "WireGuard|Chain|pkts"
+        #echo -e
         iptables --line -nvL INPUT | grep -iE "WireGuard|Chain|pkts"
         echo -e
         iptables --line -nvL OUTPUT | grep -iE "WireGuard|Chain|pkts"
 
 
         echo -e $cBYEL"\n\tDEBUG: -t nat \n"$cBCYA 2>&1
-        iptables --line -t nat -nvL POSTROUTING | grep -iE "WireGuard|Chain|pkts"
+        iptables --line -t nat -nvL PREROUTING | grep -iE "WireGuard|Chain|pkts"
         echo -e $cBYEL"\n\tDEBUG: -t mangle \n"$cBCYA 2>&1
-        iptables --line -t mangle -nvL POSTROUTING | grep -iE "WireGuard|Chain|pkts"
+        iptables --line -t mangle -nvL FORWARD | grep -iE "WireGuard|Chain|pkts"
+        echo -e
+        iptables --line -t mangle -nvL PREROUTING | grep -iE "WireGuard|Chain|pkts"
 
         [ "$(nvram get ipv6_service)" != "disabled" ] && ip -6 rule show
     fi
@@ -2923,6 +2976,7 @@ Validate_User_Choice() {
             scripts*) ;;                    # v4.01
             import*) ;;
             udpmon*) ;;                     # v4.01
+            generatestats) ;;
             killsw*) ;;             # v2.03
             killinter*) ip link del dev $(echo "$menu1" | awk '{print $2}'); menu1=;;
             "") ;;
@@ -3215,6 +3269,9 @@ Process_User_Choice() {
                 Manage_IPSET $menu1
 
             ;;
+            generatestats*)
+                Show_Peer_Status "generatestats"
+            ;;
             *)
                 echo -e $cBWHT"\n\t$VERSION WireGuard Session Manager\n\n\t${cBRED}***ERROR $menu1\n"$cRESET    # v3.04 v1.09
             ;;
@@ -3394,18 +3451,24 @@ Create_RoadWarrior_Device() {
                     if [ -n "$VPN_POOL" ];then
                         local VPN_POOL_SUBNET=${VPN_POOL%.*}
                         #local VPN_POOL_IP=$(grep -F "$VPN_POOL_SUBNET." ${INSTALL_DIR}WireguardVPN.conf | grep -Ev "^#" | grep -v "$SERVER_PEER" | awk '{print $2}' | sed 's~/32.*$~~g' | sort -n -t . -k 1,1 -k 2,2 -k 3,3 -k 4,4 | tail -n 1)
-                        local IP=$(sqlite3 $SQL_DATABASE "SELECT COUNT(ip) FROM devices WHERE ip LIKE '$VPN_POOL_PREFIX%';")
+                        local IP=$(sqlite3 $SQL_DATABASE "SELECT COUNT(ip) FROM devices WHERE ip LIKE '${VPN_POOL_SUBNET}.%';") # v4.01 Hotfix
                         #local IP=${VPN_POOL_IP##*.}        # 4th octet
-                        local IP=$((IP+1))
+                        local IP=$((IP+2))
+                        #[ $IP -eq 1 ] && local IP=2                # .1 is the the 'server' Peer!                  # v4.02
 
-                        if [ $IP -le 254 ];then
+                        while true
+                            do
+                                local DUPLICATE=$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE ip LIKE '$VPN_POOL_PREFIX.%';") # v4.02
+                                [ -z "$DUPLICATE" ] && break || local IP=$((IP+1))
+
+                                if [ $IP -ge 255 ];then
+                                    echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) subnet MAX 254 reached '${INSTALL_DIR}WireguardVPN.conf'"
+                                    exit 92
+                                fi
+                            done
+
                             [ "$USE_IPV6" == "Y" ] && IPV6=", fc00:23:5::${IP}/128, 2001:db8:23:5::/64"     # v1.07
-                            local VPN_POOL_IP=$VPN_POOL_SUBNET"."$IP"/32"
-                        else
-                            echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) subnet MAX 254 reached '${INSTALL_DIR}WireguardVPN.conf'"
-                            exit 92
-                        fi
-
+                            local VPN_POOL_IP=$VPN_POOL_SUBNET"."$IP"/32"                                  
                     else
                         echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) subnet NOT defined 'device' Peers?"
                         return 1
