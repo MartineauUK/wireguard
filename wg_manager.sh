@@ -1384,7 +1384,7 @@ Initialise_SQL() {
         echo -e $cBRED"\a\n\tNo Peer entries to auto-migrate ${cBCYA}from '${cBWHT}${INSTALL_DIR}WireguardVPN.conf${cBCYA}', but you will need to manually import the 'device' Peer '*.conf' files:\n\n"$cRESET
 
         ls -1 ${CONFIG_DIR}*.conf 2>/dev/null | awk -F '/' '{print $5}' | grep -v "wg[1-2]" | sed 's/\.conf$//' | sort
-        return 0
+        [ "$ACTION" == "migrate" ] && return 0
     fi
 
     if [ -f $SQL_DATABASE ] && [ "$ACTION" != "keep" ];then
@@ -1745,7 +1745,7 @@ Manage_Stats() {
 }
 Get_scripts() {
     local BRANCH="$1"
-    local BRANCH="dev" 
+    local BRANCH="dev"
     echo -e $cBCYA"\tDownloading scripts"$cRESET 2>&1
 
     # Allow use of custom script for debugging
