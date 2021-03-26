@@ -2463,6 +2463,8 @@ Diag_Dump() {
             done
 
     fi
+	echo -e
+	netstat -rn | grep -E "wg.|Kernel|irtt"
 
     if [ -z "$TYPE" ] || [ "$TYPE" == "udp" ] || [ "$TYPE" == "sockets" ];then
         echo -e $cBYEL"\n\tDEBUG: UDP sockets.\n"$cBCYA 2>&1
@@ -3466,7 +3468,7 @@ Create_RoadWarrior_Device() {
                             done
 
                             [ "$USE_IPV6" == "Y" ] && IPV6=", fc00:23:5::${IP}/128, 2001:db8:23:5::/64"     # v1.07
-                            local VPN_POOL_IP=$VPN_POOL_SUBNET"."$IP"/24"                                   # v4.02
+                            local VPN_POOL_IP=$VPN_POOL_SUBNET"."$IP"/32"                                  
                     else
                         echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) subnet NOT defined 'device' Peers?"
                         return 1
