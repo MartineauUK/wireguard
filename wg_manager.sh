@@ -728,7 +728,7 @@ Import_Peer() {
                         # Strip IPV6
                         if [ "$(nvram get ipv6_service)" == "disabled" ];then
                             local SUBNET=$(echo "$SUBNET" | tr ',' ' ' | awk '{print $1}')
-                            [ -z "$(echo "$SUBNET" | Is_IPv4_CIDR)" ] && $SUBNET=$SUBNET"/32"
+                            [ -z "$(echo "$SUBNET" | Is_IPv4_CIDR)" ] && SUBNET=$SUBNET"/32"
                         fi
                         if [ "$MODE" = "client" ];then
                             if [ "$RENAME" != "Y" ];then
@@ -1758,6 +1758,7 @@ Manage_Stats() {
 Get_scripts() {
     local BRANCH="$1"
     local BRANCH="dev"
+
     echo -e $cBCYA"\tDownloading scripts"$cRESET 2>&1
 
     # Allow use of custom script for debugging
@@ -2134,7 +2135,7 @@ Uninstall_WireGuard() {
        rm -rf /opt/etc/wireguard/
     else
         Manage_Event_Scripts "backup"                           # v4.01
-        mv ${INSTALL_DIR}WireguardVPN.conf ${CONFIG_DIR}
+        [ -f ${INSTALL_DIR}WireguardVPN.conf ] && mv ${INSTALL_DIR}WireguardVPN.conf ${CONFIG_DIR}
     fi
 
     rm -rf ${INSTALL_DIR}
