@@ -702,8 +702,6 @@ Import_Peer() {
                                     local ALLOWIP=$(echo "$LINE" | awk '{print $3}')
                                 ;;
                                 Endpoint) local SOCKET=${LINE##* };;
-                                "#"DNS) ;;
-                                "#"Address) ;;
                                 DNS) local DNS=${LINE##* }
                                     # This must be commented out!
                                     [ "$MODE" == "client" ] && COMMENT_OUT="Y"
@@ -712,6 +710,8 @@ Import_Peer() {
                                     # This must be commented out!
                                     [ "$MODE" == "client" ] && COMMENT_OUT="Y"
                                 ;;
+                                "#"DNS) local DNS=${LINE##* };;
+                                "#"Address) local SUBNET=${LINE##* };;
                             esac
                         done < ${IMPORT_DIR}${WG_INTERFACE}.conf
 
