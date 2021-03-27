@@ -2134,7 +2134,7 @@ Uninstall_WireGuard() {
        rm -rf /opt/etc/wireguard/
     else
         Manage_Event_Scripts "backup"                           # v4.01
-        mv ${INSTALL_DIR}WireguardVPN.conf ${CONFIG_DIR}
+        [ -f ${INSTALL_DIR}WireguardVPN.conf ] && mv ${INSTALL_DIR}WireguardVPN.conf ${CONFIG_DIR}
     fi
 
     rm -rf ${INSTALL_DIR}
