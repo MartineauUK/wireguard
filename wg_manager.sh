@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.02"
-#============================================================================================ © 2021 Martineau v4.02
+VERSION="v4.03"
+#============================================================================================ © 2021 Martineau v4.03
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -671,6 +671,10 @@ Import_Peer() {
                 [ -z "$ANNOTATE" ] && local ANNOTATE="$(echo "$@" | sed -n "s/^.*comment//p" | awk '{print $0}')"
                 break
             fi
+            if [ -n "$(echo "$1" | grep -F "type=")" ];then
+                local FORCE_TYPE="$(echo "$1" | sed -n "s/^.*type=//p" | awk '{print $0}')"     # v4.03
+            fi
+
             shift
     done
 
@@ -679,13 +683,14 @@ Import_Peer() {
             [ "$WG_INTERFACE" = "comment" ] && break
             if [ -f ${IMPORT_DIR}${WG_INTERFACE}.conf ];then
                 local MODE=$(Server_or_Client "$WG_INTERFACE")
+                [ -n "$FORCE_TYPE" ] && { MODE=$FORCE_TYPE; local FORCE_TYPE_TXT="(${cBRED}FORCED as 'client'${cRESET}) ${cBGRE}"; }                # v4.03
                 if [ "$MODE" != "server" ];then
                     [ "$MODE" == "client" ] && { local TABLE="clients"; local AUTO="Y"; local KEY="peer"; } || { TABLE="devices"; local AUTO="X"; local KEY="name"; }
                     if [ -z "$(sqlite3 $SQL_DATABASE "SELECT $KEY FROM $TABLE WHERE $KEY='$WG_INTERFACE';")" ];then
                         if [ -z "$ANNOTATE" ];then
-                            # Use first comment line
-                            local ANNOTATE=$(grep -Em 1 "^#" ${IMPORT_DIR}${WG_INTERFACE}.conf)
-                            [ -z "$ANNOTATE" ] && local ANNOTATE="# N/A"
+                            # Use comment line preceding the '[Interface]' directive
+                            local ANNOTATE=$(grep -FB1 "[Interface]" ${IMPORT_DIR}${WG_INTERFACE}.conf | grep -vF "[Interface]")
+                            [ -z "$ANNOTATE" ] && local ANNOTATE="# N/A" || local INSERT_COMMENT="N"    # v4.03
                         fi
 
                         local ANNOTATE=$(echo "$ANNOTATE" | sed "s/'/''/g")
@@ -702,8 +707,8 @@ Import_Peer() {
                                     local ALLOWIP=$(echo "$LINE" | awk '{print $3}')
                                 ;;
                                 Endpoint) local SOCKET=${LINE##* };;
-                                "#"DNS) local DNS=${LINE##* };;
-                                "#"Address) local SUBNET=${LINE##* };;
+                                "#"DNS) local COMMENT_DNS=${LINE##* } ;;
+                                "#"Address) local COMMENT_SUBNET=${LINE##* } ;;
                                 DNS) local DNS=${LINE##* }
                                     # This must be commented out!
                                     [ "$MODE" == "client" ] && COMMENT_OUT="Y"
@@ -716,6 +721,9 @@ Import_Peer() {
                         done < ${IMPORT_DIR}${WG_INTERFACE}.conf
 
                         [ -f ${IMPORT_DIR}${WG_INTERFACE}_public.key ] && local PUB_KEY=$(awk 'NR=1{print $0}' ${IMPORT_DIR}${WG_INTERFACE}_public.key)
+
+                        [ -z "$DNS" ] && local DNS=$COMMENT_DNS             # v4.03
+                        [ -z "$SUBNET" ] && local DNS=$COMMENT_SUBNET       # v4.03
 
                         # Strip IPV6
                         if [ "$(nvram get ipv6_service)" == "disabled" ];then
@@ -733,13 +741,17 @@ Import_Peer() {
                             sqlite3 $SQL_DATABASE "INSERT INTO $TABLE values('$WG_INTERFACE','$AUTO','$SUBNET','$DNS','$ALLOWIP','$PUB_KEY','$PRI_KEY','$ANNOTATE','');"
                         fi
 
+                        cp ${IMPORT_DIR}${WG_INTERFACE}.conf ${CONFIG_DIR}${WG_INTERFACE}.conf_imported
+
                         if [ "$COMMENT_OUT" == "Y" ];then
                             sed -i 's/^DNS/#DNS/' ${IMPORT_DIR}${WG_INTERFACE}.conf
                             sed -i 's/^Address/#Address/' ${IMPORT_DIR}${WG_INTERFACE}.conf
                             # Insert the tag
                             if [ "$ANNOTATE" != "# N/A" ];then
-                                local POS=$(awk '/^\[Interface\]/ {print NR}' ${IMPORT_DIR}${WG_INTERFACE}.conf)
-                                sed -i "$POS i $ANNOTATE" ${IMPORT_DIR}${WG_INTERFACE}.conf
+                                if [ "$INSERT_COMMENT" != "N" ];then                    # v4.03
+                                    local POS=$(awk '/^\[Interface\]/ {print NR}' ${IMPORT_DIR}${WG_INTERFACE}.conf)
+                                    sed -i "$POS i $ANNOTATE" ${IMPORT_DIR}${WG_INTERFACE}.conf
+                                fi
                             fi
                         fi
 
@@ -756,7 +768,7 @@ Import_Peer() {
 
                         [ "$RENAME" == "Y" ] && { mv ${CONFIG_DIR}${WG_INTERFACE}.conf ${CONFIG_DIR}${NEW_NAME}.conf; local AS_TXT="as ${cBMAG}$NEW_NAME "$cRESET; }
 
-                        echo -e $cBGRE"\n\t[✔] Peer ${cBMAG}${WG_INTERFACE}${cBGRE} import ${AS_TXT}success"$cRESET 2>&1
+                        echo -e $cBGRE"\n\t[✔] Config ${cBMAG}${WG_INTERFACE}${cBGRE} import ${AS_TXT}${FORCE_TYPE_TXT}success"$cRESET 2>&1
 
                         local COMMENTOUT=; local RENAME=; local AS_TXT=
                     else
@@ -931,7 +943,7 @@ Manage_Peer() {
                                 fi
                                 if [ -n "$(echo "$IP_SUBNET" | Is_IPv4_CIDR)" ];then    # v4.02
                                     local CHECK_IP=$(echo "$IP_SUBNET" | sed s'~/.*$~~')
-                                    local SQL_MATCH="subnet"; local ID="peer"
+                                    local SQL_MATCH="subnet"; local ID="peer"; IPADDR="subnet"
                                     case $Mode in
                                         server) local TABLE="servers";;
                                         client) local TABLE="clients";;
@@ -1745,7 +1757,7 @@ Manage_Stats() {
 }
 Get_scripts() {
     local BRANCH="$1"
-    local BRANCH="dev"
+
     echo -e $cBCYA"\tDownloading scripts"$cRESET 2>&1
 
     # Allow use of custom script for debugging
@@ -2463,8 +2475,8 @@ Diag_Dump() {
             done
 
     fi
-	echo -e
-	netstat -rn | grep -E "wg.|Kernel|irtt"
+    echo -e
+    netstat -rn | grep -E "wg.|Kernel|irtt"
 
     if [ -z "$TYPE" ] || [ "$TYPE" == "udp" ] || [ "$TYPE" == "sockets" ];then
         echo -e $cBYEL"\n\tDEBUG: UDP sockets.\n"$cBCYA 2>&1
@@ -3216,7 +3228,7 @@ Process_User_Choice() {
                     DEBUGMODE=
                 fi
             ;;
-            wg*)
+            wg" ")
                 # Expose the WireGuard Userspace Tool
                 echo -e $cBWHT"\n\tWireGuard Userspace Tool:\n"
                 $menu1
@@ -3273,7 +3285,7 @@ Process_User_Choice() {
                 Show_Peer_Status "generatestats"
             ;;
             *)
-                echo -e $cBWHT"\n\t$VERSION WireGuard Session Manager\n\n\t${cBRED}***ERROR $menu1\n"$cRESET    # v3.04 v1.09
+                printf '\n\a\t%bInvalid Option%b "%s"%b Please enter a valid option\n' "$cBRED" "$cRESET" "$menu1" "$cBRED"    # v4.03 v3.04 v1.09
             ;;
         esac
 }
@@ -3468,7 +3480,7 @@ Create_RoadWarrior_Device() {
                             done
 
                             [ "$USE_IPV6" == "Y" ] && IPV6=", fc00:23:5::${IP}/128, 2001:db8:23:5::/64"     # v1.07
-                            local VPN_POOL_IP=$VPN_POOL_SUBNET"."$IP"/32"                                  
+                            local VPN_POOL_IP=$VPN_POOL_SUBNET"."$IP"/32"
                     else
                         echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) subnet NOT defined 'device' Peers?"
                         return 1
