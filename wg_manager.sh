@@ -723,12 +723,12 @@ Import_Peer() {
                         [ -f ${IMPORT_DIR}${WG_INTERFACE}_public.key ] && local PUB_KEY=$(awk 'NR=1{print $0}' ${IMPORT_DIR}${WG_INTERFACE}_public.key)
 
                         [ -z "$DNS" ] && local DNS=$COMMENT_DNS             # v4.03
-                        [ -z "$SUBNET" ] && local DNS=$COMMENT_SUBNET       # v4.03
+                        [ -z "$SUBNET" ] && local SUBNET=$COMMENT_SUBNET       # v4.03
 
                         # Strip IPV6
                         if [ "$(nvram get ipv6_service)" == "disabled" ];then
                             local SUBNET=$(echo "$SUBNET" | tr ',' ' ' | awk '{print $1}')
-                            [ -z "$(echo "$SUBNET" | Is_IPv4_CIDR)" ] && SUBNET=$SUBNET"/32"
+                            [ -z "$(echo "$SUBNET" | Is_IPv4_CIDR)" ] && local SUBNET=$SUBNET"/32"
                         fi
                         if [ "$MODE" = "client" ];then
                             if [ "$RENAME" != "Y" ];then
