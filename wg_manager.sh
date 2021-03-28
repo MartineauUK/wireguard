@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.04"
-#============================================================================================ © 2021 Martineau v4.04
+VERSION="v4.05"
+#============================================================================================ © 2021 Martineau v4.05
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -1655,19 +1655,20 @@ EOF
 Server_or_Client() {
 
     local WG_INTERFACE=$1
-    local PEER_TYPE=
+    local PEER_TYPE="**ERROR**"                                                         # v4.05
 
-    # Is this a standard 'client' Peer interface 'wg11-wg15' or 'server' 'wg21-wg22'    # v1.09
-    #if [ -z "$(echo "$WG_INTERFACE" | grep -oE "^wg[2][1-2]|^wg[1][1-5]*$")" ];then     # v1.09
-        # Always identfy if it's a 'client' or 'server' Peer from its config file
+        # Always identify if it's a 'client','server' or 'device' Peer from its config file
         if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then                                # v1.03
             if [ -n "$(grep -iE "^Endpoint" ${CONFIG_DIR}${WG_INTERFACE}.conf)" ];then  # v1.03
-                [ -z "$(grep -iF "$(nvram get ddns_hostname_x)" ${CONFIG_DIR}${WG_INTERFACE}.conf)" ] && local PEER_TYPE="client" || PEER_TYPE="device"
+                local PEER_TYPE="client"
+                if [ -n "$(nvram get ddns_hostname_x)" ];then                           # v4.05
+                    [ -n "$(grep -iF "$(nvram get ddns_hostname_x)" ${CONFIG_DIR}${WG_INTERFACE}.conf)" ] && PEER_TYPE="device"
+                fi
             else
                 local PEER_TYPE="server"
             fi
         fi
-    #fi
+
     echo "$PEER_TYPE"
 }
 WG_show() {
