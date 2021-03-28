@@ -1,16 +1,16 @@
 #!/bin/sh
-VERSION="v1.09"
-#============================================================================================ © 2021 Martineau v1.09
+VERSION="v4.03"
+#============================================================================================ © 2021 Martineau v4.03
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 23-Mar-2021
+# Last Updated Date: 29-Mar-2021
 #
 # Description:
 #
 # Acknowledgement:
 #
-# Contributors: odkrys,@ZebMcKayhan
+# Contributors: odkrys,@ZebMcKayhan,Torson
 
 CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v1.05 @elorimer
 INSTALL_DIR="/jffs/addons/wireguard/"
@@ -135,16 +135,15 @@ insmod /opt/lib/modules/wireguard 2> /dev/null
 VPN_ID=$1
 [ -z "$1" ] && VPN_ID="wg0"
 [ "${VPN_ID:0:3}" == "wg1" ] && { MODE="client"; TXT="to"; } || { MODE="server"; TXT="Hosted at"; }
-VPN_NUM=${VPN_ID#"${VPN_ID%?}"}
+VPN_NUM=${VPN_ID#"${VPN_ID%?}"}     # i.e. 'client' Peer prio '99x[0|1]' where the RPDB rules for 'client' Peers 'wg11'-wg15' are '991x-995x'
 
 WG_INTERFACE=$VPN_ID
 
 [ -n "$(echo "$@" | grep "force")" ] && local FORCE="force"
 
 # Is this a standard 'client' Peer interface 'wg11-wg15'                    # v1.03
-if [ -z "$(echo "$VPN_ID" |  grep -oE "^wg[2][1-2]|^wg[1][1-5]*$")" ];then      # v1.03
+if [ -z "$(echo "$VPN_ID" |  grep -oE "^wg[0-2]")" ];then      # v4.02 v1.03
     # Non-standard so identfy if it's a 'client' or 'server' Peer
-    VPN_NUM="0"                 # i.e. 'client' Peer prio '990x' where the RPDB rules for 'client' Peers 'wg11'-wg15' are '991x-995x'
     if [ -f ${CONFIG_DIR}${VPN_ID}.conf ];then                                  # v1.03
         if [ -n "$(grep -E "^Endpoint" ${CONFIG_DIR}${VPN_ID}.conf)" ];then     # v1.03
             MODE="client"
@@ -190,7 +189,8 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         ip link del dev $VPN_ID 2>/dev/null
         ip link add dev $VPN_ID type wireguard
         wg setconf $VPN_ID ${CONFIG_DIR}$VPN_ID.conf
-        ip address add dev $VPN_ID $LOCALIP
+        #  Suppress the message if a domain is supplied i.e.'Error: any valid prefix is expected rather than "'xxx.com"
+        ip address add dev $VPN_ID $LOCALIP 2>/dev/null     # v4.02
         ip link set up dev $VPN_ID
         #ifconfig $VPN_ID mtu 1380
         ifconfig $VPN_ID mtu 1420                           # v1.02
@@ -215,6 +215,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
                         ip route del 128/1 dev $THIS  2>/dev/null
                     done
             fi
+            # 0.0.0.0/0 Default
             ip route add 0/1 dev $VPN_ID 2>/dev/null
             ip route add 128/1 dev $VPN_ID 2>/dev/null
         else
@@ -244,9 +245,9 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         fi
 
 
-
         ip route add 0/1 dev $VPN_ID table 12$VPN_NUM 2>/dev/null
         ip route add 128/1 dev $VPN_ID table 12$VPN_NUM 2>/dev/null
+        #ip route add default dev $VPN_ID table 12$VPN_NUM 2>/dev/null      # v4.03
 
         ip route add $(echo $LOCALIP | cut -d"." -f1-3).0/24 dev $VPN_ID  proto kernel  scope link  src $LOCALIP 2>/dev/null
         ip route show table main dev $(nvram get lan_ifname) | while read ROUTE
@@ -320,6 +321,7 @@ else
 
     ip route flush table 12$VPN_NUM 2>/dev/null
     ip rule del prio 992$VPN_NUM    2>/dev/null
+    ip route flush cache
 
     purge_client_list
 
