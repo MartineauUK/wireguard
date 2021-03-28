@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.03"
-#============================================================================================ © 2021 Martineau v4.03
+VERSION="v4.04"
+#============================================================================================ © 2021 Martineau v4.04
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.03"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 26-Mar-2021
+# Last Updated Date: 28-Mar-2021
 #
 # Description:
 #
@@ -1290,6 +1290,8 @@ Manage_Wireguard_Sessions() {
                                 [ "$(wg show interfaces | grep "wg2[1-9]" | wc -w)" -eq 0 ] && local UDP_MONITOR=$(Manage_UDP_Monitor "server" "disable")
 
                             else
+                                # Dump the stats
+                                Show_Peer_Status "generatestats" "$WG_INTERFACE"                # v4.04
                                 if [ "$Mode" == "client" ] && [ "$Route" != "policy" ] ; then
                                     /opt/bin/wg show $WG_INTERFACE >/dev/null 2>&1 && sh ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" "$FORCE" || Say "WireGuard $Mode service ('$WG_INTERFACE') NOT running."
                                 else
@@ -1758,7 +1760,6 @@ Manage_Stats() {
 Get_scripts() {
     local BRANCH="$1"
     local BRANCH="dev"
-
     echo -e $cBCYA"\tDownloading scripts"$cRESET 2>&1
 
     # Allow use of custom script for debugging
@@ -2353,8 +2354,8 @@ Show_Peer_Status() {
                     if [ -z "$DETAIL" ];then
                         if [ "$STATS" == "Y" ];then
                             if [ -n "$(echo "$LINE" | grep -E "transfer:")" ];then
-                                Say ${WG_INTERFACE}":"${LINE}$cRESET
-                                Say ${WG_INTERFACE}": period : $(Size_Human $RX_DELTA) received, $(Size_Human $TX_DELTA) sent (Rx=$RX_DELTA;Tx=$TX_DELTA)"
+                                SayT ${WG_INTERFACE}":"${LINE}$cRESET
+                                SayT ${WG_INTERFACE}": period : $(Size_Human $RX_DELTA) received, $(Size_Human $TX_DELTA) sent (Rx=$RX_DELTA;Tx=$TX_DELTA)"
                             fi
                         else
                             [ -n "$(echo "$LINE" | grep -E "interface:|peer:|transfer:|latest handshake:")" ] && echo -e ${TAB}${COLOR}$LINE
@@ -2398,7 +2399,7 @@ Show_Peer_Config_Entry() {
                 COLUMN_TXT="Server,Auto,Subnet,Port,Public,Private,Annotate"
             else
                 TABLE="clients"
-                COLUMN_TXT="Client,Auto,IP,Endpoint,DNS,Public,Annotate"
+                COLUMN_TXT="Client,Auto,IP,Endpoint,DNS,Public,Private,Annotate"    # v4.04
             fi
 
             echo -e
@@ -2985,7 +2986,7 @@ Validate_User_Choice() {
             debug) ;;
             initdb*|migrate*);;            # v4.01
             stats*);;
-            wg*) ;;
+            wg|wg" "*) ;;
             scripts*) ;;                    # v4.01
             import*) ;;
             udpmon*) ;;                     # v4.01
@@ -3229,7 +3230,7 @@ Process_User_Choice() {
                     DEBUGMODE=
                 fi
             ;;
-            wg" ")
+            wg|wg" "*)                                              # v4.04
                 # Expose the WireGuard Userspace Tool
                 echo -e $cBWHT"\n\tWireGuard Userspace Tool:\n"
                 $menu1
