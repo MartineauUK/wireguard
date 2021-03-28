@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.01"
-#============================================================================================ © 2021 Martineau v4.01
+VERSION="v4.03"
+#============================================================================================ © 2021 Martineau v4.03
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 21-Mar-2021
+# Last Updated Date: 29-Mar-2021
 #
 # Description:
 #
@@ -54,16 +54,16 @@ ANSIColours
 CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v1.08 @elorimer
 INSTALL_DIR="/jffs/addons/wireguard/"
 
-############################################################################################################
 modprobe xt_set
 modprobe xt_comment                                                                 # v1.13 Hotfix
-#############################################################################EIC Hack 2 of 3################
-#insmod /opt/lib/modules/wireguard
+insmod /opt/lib/modules/wireguard 2> /dev/null
+
 VPN_ID=$1
 [ -z "$1" ] && VPN_ID="wg21"
 #logger -st "wireguard-server${VPN_ID:2:1}" "Configuring Wireguard VPN Server ($VPN_ID) on Port:"$wgport
-insmod /opt/lib/modules/wireguard 2> /dev/null
-############################################################################################################
+
+VPN_NUM=${VPN_ID#"${VPN_ID%?}"}                     # v4.02
+
 wgport=$(awk '/Listen/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)
 SOCKET=$(nvram get wan_gateway)":"$wgport
 
@@ -82,13 +82,12 @@ if [ "$2" != "disable" ];then
         Subnet=$SUBNET_PREFIX".0/24"
     fi
 
-
-
     logger -t "wireguard-server${VPN_ID:3:1}" "Initialising Wireguard VPN 'Server' Peer (${cBMAG}$VPN_ID$cBGRE) on $SOCKET"
     echo -e $cBCYA"\twireguard-server${VPN_ID:3:1}: Initialising Wireguard VPN 'Server' Peer (${cBMAG}$VPN_ID$cBCYA) on $SOCKET (${cBMAG}$DESC${cBCYA})"$cRESET
 
     ip link del dev $VPN_ID 2>/dev/null
     ip link add dev $VPN_ID type wireguard
+    wg set $VPN_ID fwmark $wgport
     wg setconf $VPN_ID ${CONFIG_DIR}$VPN_ID.conf
     ip address add dev $VPN_ID $Subnet
     ip link set up dev $VPN_ID
@@ -101,6 +100,9 @@ if [ "$2" != "disable" ];then
     ifconfig $VPN_ID txqueuelen 1000
 
     Firewall_delete
+
+    ip route add default dev $VPN_ID table 2${VPN_NUM}"0"       # v4.03
+    ip rule add fwmark $(printf "%#07x\n" "2${VPN_NUM}0") table 2${VPN_NUM}"0" prio 98${VPN_NUM}0   # v4.03
 
     iptables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'server'"
     iptables -t mangle -I FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'server'"
@@ -131,6 +133,10 @@ else
     sqlite3 $SQL_DATABASE "INSERT into session values('$WG_INTERFACE','End','$TIMESTAMP');" # v1.13
 
     Firewall_delete
+
+    ip route flush table 2${VPN_NUM}"0" 2>/dev/null     # v4.03
+    ip rule del prio 98${VPN_NUM}0      2>/dev/null     # v4.03
+    ip route flush cache                                # v4.03
 
     # User Exit @ZebMcKayhan
     [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh ] && { logger -t "wireguard-server${VPN_ID:3:1}" "Executing ${VPN_ID}-down.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh; }
