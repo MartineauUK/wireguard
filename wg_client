@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.05"
-#============================================================================================ © 2021 Martineau v4.05
+VERSION="v4.07"
+#============================================================================================ © 2021 Martineau v4.07
 #
 
 # Maintainer: Martineau
@@ -331,14 +331,25 @@ else
     # User Exit @Torson
     [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-route-down.sh ] && { logger -t "wireguard-${MODE}${VPN_NUM}" "Executing Event:${VPN_ID}-route-down.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-route-down.sh; }
 
-    ip route del 0.0.0.0/1   dev $VPN_ID   2>/dev/null
-    ip route del 128.0.0.0/1 dev $VPN_ID   2>/dev/null
-    # Set the default to the last ACTIVE WireGuard interface
-    for WG_IFACE in $(wg show interfaces | grep -E "wg1|wg0" | sort -gr)
-            do
-                ip route add 0/1    dev $WG_IFACE  2>/dev/null
-                ip route add 128/1  dev $WG_IFACE  2>/dev/null
-            done
+    # If Policy mode, then there was no default route
+    if [ -z "$POLICY_MODE" ];then                                   # v4.06
+        ip route del 0.0.0.0/1   dev $VPN_ID   2>/dev/null
+        ip route del 128.0.0.0/1 dev $VPN_ID   2>/dev/null
+
+        # Set the default to the last ACTIVE WireGuard interface where the default route is required.
+        # 'wg show interfaces' returns  list of Peers orfered oldest -> latest, so reverse the list so we travers latest -> oldest
+        for WG_IFACE in $(wg show interfaces | grep -E "wg1|wg0" | awk '{do printf "%s"(NF>1?FS:RS),$NF;while(--NF)}')      # v4.07
+                do
+                    [ "$WG_IFACE" == "$WG_INTERFACE" ] && continue
+                    if [ -n "$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${WG_IFACE}.conf | grep -oE "0.0.0.0/0|::0/0")" ];then   # v4.07
+                        if [ "$(sqlite3 $SQL_DATABASE "SELECT auto FROM clients where peer='$WG_IFACE';")" != "P" ];then
+                            ip route add 0/1    dev $WG_IFACE  2>/dev/nul
+                            ip route add 128/1  dev $WG_IFACE  2>/dev/null
+                            break
+                        fi
+                    fi
+                done
+    fi
 
     ip link del dev $VPN_ID 2>/dev/null
 
