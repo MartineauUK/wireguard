@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.06"
-#============================================================================================ © 2021 Martineau v4.06
+VERSION="v4.07"
+#============================================================================================ © 2021 Martineau v4.07
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -2339,6 +2339,10 @@ Show_Peer_Status() {
                                 local TABLE="devices"
                             fi
 
+                            # Tag it on screen if this is the default route
+                            local DEFAULT_ROUTE=$(ip route | grep -Em 1 "^0.0.|128.0" | awk '{print $3}')       # v4.07
+                            [ "$DEFAULT_ROUTE" == "$WG_INTERFACE" ] && DEF="$aUNDER" || DEF=
+
                             local LOCALIP=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM $TABLE WHERE peer='$WG_INTERFACE';")
                             [ "$(nvram get ipv6_service)" == "disabled"  ] && local LOCALIP=$(echo "$LOCALIP" | awk -F ',' '{print $1}')
                             #local SOCKET=$(sqlite3 $SQL_DATABASE "SELECT socket FROM $TABLE WHERE peer='$WG_INTERFACE';")
@@ -2350,7 +2354,7 @@ Show_Peer_Status() {
 
                         fi
 
-                        local LINE=${COLOR}$LINE" ${cBMAG}\t${cBWHT}$VPN_IP_TXT\t${cBMAG}${DESC}"  # v3.05 v3.01
+                        local LINE=${DEF}${COLOR}${LINE}${cRESET}" ${cBMAG}\t${cBWHT}$VPN_IP_TXT\t${cBMAG}${DESC}"$cRESET  # v3.05 v3.01
                     else
                         local TAB="\t\t"
                         if [ -n "$(echo "$LINE" | grep -E "transfer:")" ];then
@@ -2506,10 +2510,23 @@ Diag_Dump() {
     local TABLE=$2;shift 2
     local REST=$@
 
-    if [ -z "$TYPE" ] || [ "$TYPE" == "route" ];then
-        echo -e $cBYEL"\n\tDEBUG: Routing Table main\n"$cBCYA 2>&1
+    if [ -z "$TYPE" ] || [ "$TYPE" == "route" ] || [ "$TYPE" == "rpdb" ];then
 
-        ip route | grep "wg."
+        echo -e $cBYEL"\n\tDEBUG: Routing info MTU etc.\n"$cBCYA 2>&1          # v1.07
+        for WG_INTERFACE in $(wg show interfaces)
+            do
+                ip a l $WG_INTERFACE                                # v1.07
+                [ "$(nvram get ipv6_service)" != "disabled" ] && ip -6 a l $WG_INTERFACE
+            done
+
+        echo -e
+        netstat -rn | grep -E "wg.|Kernel|irtt"
+
+        [ "$(nvram get ipv6_service)" != "disabled" ] && { echo -e $cBYEL"\n\tDEBUG: RPDB IPv6 rules\n"$cBCYA 2>&1 ; ip -6 rule show; }
+
+        echo -e $cBYEL"\n\tDEBUG: RPDB rules\n"$cBCYA 2>&1
+        ip rule
+
         for WG_INTERFACE in $(wg show interfaces)
             do
                 local I=${WG_INTERFACE:3:1}
@@ -2522,21 +2539,9 @@ Diag_Dump() {
                 fi
             done
 
+        echo -e $cBYEL"\n\tDEBUG: Routing Table main\n"$cBCYA 2>&1
+        ip route | grep "wg."
 
-        echo -e $cBYEL"\n\tDEBUG: RPDB rules\n"$cBCYA 2>&1
-        #ip rule | grep -E "lookup 12[1-5]"
-        ip rule
-        [ "$(nvram get ipv6_service)" != "disabled" ] && { echo -e $cBYEL"\n\tDEBUG: RPDB IPv6 rules\n"$cBCYA 2>&1 ; ip -6 rule show; }
-
-        echo -e $cBYEL"\n\tDEBUG: Routing info MTU etc.\n"$cBCYA 2>&1          # v1.07
-        for WG_INTERFACE in $(wg show interfaces)
-            do
-                ip a l $WG_INTERFACE                                # v1.07
-                [ "$(nvram get ipv6_service)" != "disabled" ] && ip -6 a l $WG_INTERFACE
-            done
-
-        echo -e
-        netstat -rn | grep -E "wg.|Kernel|irtt"
     fi
 
     if [ -z "$TYPE" ] || [ "$TYPE" == "udp" ] || [ "$TYPE" == "sockets" ];then
@@ -2553,12 +2558,6 @@ Diag_Dump() {
         iptables --line -nvL INPUT | grep -iE "WireGuard|Chain|pkts"
         echo -e
         iptables --line -nvL OUTPUT | grep -iE "WireGuard|Chain|pkts"
-
-
-        echo -e $cBYEL"\n\tDEBUG: -t nat \n"$cBCYA 2>&1
-        iptables --line -t nat -nvL PREROUTING | grep -iE "WireGuard|Chain|pkts"
-        echo -e
-        iptables --line -t nat -nvL POSTROUTING | grep -iE "WireGuard|Chain|pkts"
 
         if [ "$(nvram get ipv6_service)" != "disabled" ];then
             echo -e $cBYEL"\n\tDEBUG: Firewall IPv6 rules\n"$cBCYA 2>&1
@@ -2601,7 +2600,15 @@ Diag_Dump() {
         [ "$(nvram get ipv6_service)" != "disabled" ] && ip -6 rule show
     fi
 
-    echo -e $cBWHT"\n\nUse command 'diag sql [ table_name ]' to see the SQL data (might be many lines!)\n\n       e.g. ${cBGRE}diag sql traffic${cBWHT} will show the traffic stats SQL table"$cRESET
+    if [ "$TYPE" != "sql" ];then
+        echo -e $cBWHT"\n\nUse command 'diag sql [ table_name ]' to see the SQL data (might be many lines!)\n"
+        echo -en $cBWHT"       Valid SQL Database tables: "$cBCYA 2>&1
+        echo -e ".tables" > /tmp/sql_cmds.txt
+        sqlite3 $SQL_DATABASE < /tmp/sql_cmds.txt
+        echo -e $cRESET
+        echo -e "             e.g. ${cBGRE}diag sql traffic${cBWHT} will show the traffic stats SQL table"$cRESET
+    fi
+
     if [ "$TYPE" == "sql" ] || [ "$TYPE" == "cmd" ];then
 
         if [ "$TABLE" != "cmd" ];then
@@ -2650,8 +2657,11 @@ Diag_Dump() {
                         sqlite3 $SQL_DATABASE "SELECT * FROM $TABLE;" | column -t  -s '|' --table-columns FWMark,Peer
                     ;;
                     *)
-                        echo -e $cBYEL"\tTable:$TABLE"$cBCYA 2>&1
-                        sqlite3 $SQL_DATABASE "SELECT * FROM $TABLE;"
+                        [ "$TABLE" != "?" ] && echo -en $cBRED"\a\tInvalid SQL table ${cBWHT}'$TABLE'\n\n"
+                        echo -en $cBWHT"\tValid tables:\t"$cBCYA 2>&1
+                        echo -e ".tables" > /tmp/sql_cmds.txt
+                        sqlite3 $SQL_DATABASE < /tmp/sql_cmds.txt
+                        echo -e $cRESET
                     ;;
                 esac
             fi
@@ -3084,6 +3094,7 @@ Validate_User_Choice() {
             scripts*) ;;                    # v4.01
             import*) ;;
             udpmon*) ;;                     # v4.01
+            jump*|geo*) ;;                  # v4.07
             generatestats) ;;
             killsw*) ;;             # v2.03
             killinter*) ip link del dev $(echo "$menu1" | awk '{print $2}'); menu1=;;
@@ -3125,11 +3136,9 @@ Process_User_Choice() {
 
                 if [ -n "$(which wg)" ];then
 
-                    echo -e $cBYEL"\n\t\t WireGuard VPN Peer Status"$cRESET
-
                     if [ "$ACTION" == "diag" ];then
                         #[ -z "$ARG" ] && Show_Peer_Status "full"             # v3.04 Hotfix
-                        [ -z "$ARG" ] && wg show all
+                        [ -z "$ARG" ] && { echo -e $cBYEL"\n\t\t WireGuard VPN Peer Status"$cRESET; wg show all; }
                         Diag_Dump ${menu1#* }
                     else
                         Show_Peer_Status                    # v3.04 Hotfix
@@ -3379,6 +3388,34 @@ Process_User_Choice() {
             ;;
             generatestats*)
                 Show_Peer_Status "generatestats"
+            ;;
+            jump*|geo*)                                                         # jump {France | wg14} {LAN device}     # v4.07
+                shift
+                WG_INTERFACE=$1
+                shift
+                local IP=$1
+
+                [ -z "$IP" ] && { echo -en $cRED"\a\n\t***ERROR: Host name or IP address required'\n"$cRESET ; return 1; }
+
+                # Scan the Policy Peers for a description match?
+                [ ! -f ${CONFIG_DIR}${WG_INTERFACE}.conf ] && local WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM clients WHERE tag LIKE '%$WG_INTERFACE%';")   # v4.02
+
+                if [ -n "$WG_INTERFACE" ];then
+                    if [ "$(sqlite3 $SQL_DATABASE "SELECT auto FROM clients WHERE peer='$WG_INTERFACE';")" == "P" ];then
+                        local I=$(echo "$WG_INTERFACE" | grep -oE "[1-9]*$")
+                        [ ${#I} -gt 2 ] && local I=${I#"${I%??}"} || local I=${I#"${I%?}"}
+                        [ -z "$(echo "$IP" | Is_Private_IPv4)" ] && local IP=$(grep -i "$IP" /etc/hosts.dnsmasq  | awk '{print $1}')
+                        local DNS=$(sqlite3 $SQL_DATABASE "SELECT dns FROM clients WHERE peer='$WG_INTERFACE';")
+                        local PRIO=$(ip rule | awk -v pattern="$IP" 'match($0, pattern) {print $1}')
+                        ip rule del from $IP prio $PRIO 2>/dev/null
+                        ip rule add from $IP table 12${I}
+                        iptables -t nat -A WGDNS${I} -s $IP -j DNAT --to-destination $DNS -m comment --comment "WireGuard 'client${I} DNS'"
+                    else
+                        echo -en $cRED"\a\n\t***ERROR: ${cBMAG}${WG_INTERFACE} not is Policy mode\n"$cRESET
+                    fi
+                else
+                    echo -en $cRED"\a\n\t***ERROR: No match for destination '$1'\n"$cRESET
+                fi
             ;;
             *)
                 printf '\n\a\t%bInvalid Option%b "%s"%b Please enter a valid option\n' "$cBRED" "$cRESET" "$menu1" "$cBRED"    # v4.03 v3.04 v1.09
