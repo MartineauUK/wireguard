@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.08"
-#============================================================================================ © 2021 Martineau v4.08
+VERSION="v4.09"
+#============================================================================================ © 2021 Martineau v4.09
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 29-Mar-2021
+# Last Updated Date: 31-Mar-2021
 #
 # Description:
 #
@@ -83,15 +83,15 @@ Firewall_delete() {
     fi
 
 }
-# Taken/Adapted from 'vpnrouting.sh' by RMerlin
+# Adapted from RMerlin's 'vpnrouting.sh'
 create_client_list(){
-    local OLDIFS=$IFS
-    local IFS="<"
 
-    for ENTRY in $VPN_IP_LIST
+    # v4.09 Use new 'policy' table layout
+    [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$WG_INTERFACE';") -eq 0 ] && { logger -t "wireguard-${MODE}${VPN_NUM}" "Warning: No Selective Routing rules found";return 1; }
+    sqlite3 $SQL_DATABASE "SELECT iface,srcip,dstip FROM policy WHERE peer='$WG_INTERFACE' ORDER BY iface DESC;" | while read RULE
     do
-        [ -z "$ENTRY" ] && continue
-        local TARGET_ROUTE=$(echo $ENTRY | cut -d ">" -f 4)
+        [ -z "$RULE" ] && continue
+        local TARGET_ROUTE=$(echo $RULE | awk -F '|' '{print $1}')
         if [ "$TARGET_ROUTE" = "WAN" ]
         then
             local TARGET_LOOKUP="main"
@@ -104,8 +104,8 @@ create_client_list(){
             local RULE_PRIO=$VPN_PRIO
             local TARGET_NAME="VPN 'client' Peer $VPN_UNIT"
         fi
-        local VPN_IP=$(echo $ENTRY | cut -d ">" -f 2)
-        if [ "$VPN_IP" != "0.0.0.0" ] && [ -n "$VPN_IP" ]
+        local VPN_IP=$(echo $RULE | awk -F '|' '{print $2}')
+        if [ "$VPN_IP" != "Any" ] && [ -n "$VPN_IP" ]           # v4.09
         then
             local SRCC="from"
             local SRCA="$VPN_IP"
@@ -113,8 +113,8 @@ create_client_list(){
             local SRCC=""
             local SRCA=""
         fi
-        local DST_IP=$(echo $ENTRY | cut -d ">" -f 3)
-        if [ "$DST_IP" != "0.0.0.0" ] && [ -n "$DST_IP" ]
+        local DST_IP=$(echo $RULE | awk -F '|' '{print $3}')
+        if [ "$DST_IP" != "Any" ] && [ -n "$DST_IP" ]           # v4.09
         then
             local DSTC="to"
             local DSTA="$DST_IP"
@@ -122,12 +122,18 @@ create_client_list(){
             local DSTC=""
             local DSTA=""
         fi
+
         if [ -n "$SRCC" ] || [ -n "$DSTC" ]
         then
-            ip rule add $SRCC $SRCA $DSTC $DSTA table $TARGET_LOOKUP priority $RULE_PRIO
+            if [ "$USE_IPV6" != "Y" ];then                      # v4.08
+                ip rule add $SRCC $SRCA $DSTC $DSTA table $TARGET_LOOKUP priority $RULE_PRIO
+            else
+                ip -6 rule add $SRCC $SRCA $DSTC $DSTA table $TARGET_LOOKUP priority $RULE_PRIO
+            fi
+
             echo -en $cBCYA"\t"
-            [ "$DSTC" == "to" ] && DSTC=" to "
-            logger -t "wireguard-${MODE}${VPN_NUM}" "Adding Wireguard 'client' Peer route for ${VPN_IP}${DSTC}$DST_IP through $TARGET_NAME"
+            [ "$DSTC" == "to" ] && DSTC="to "
+            logger -t "wireguard-${MODE}${VPN_NUM}" "Adding Wireguard 'client' Peer route ${SRCA}${DSTC}$DSTA through $TARGET_NAME"
             echo -en $cRESET
 
             if [ -n "$PEER_DNS" ] && [ "$TARGET_LOOKUP" != "main" ];then
@@ -135,7 +141,6 @@ create_client_list(){
             fi
         fi
     done
-    local IFS=$OLDIFS
 }
 purge_client_list(){
     IP_LIST=$(ip rule show | cut -d ":" -f 1)
@@ -278,6 +283,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
             fi
             # 0.0.0.0/0 Default
             if [ "$USE_IPV6" != "Y" ];then                  # v4.08
+                # Should really check if '0.0.0.0/0, ::0/' is in the AllowedIps list?!!!!!
                 ip route add 0/1 dev $VPN_ID 2>/dev/null
                 ip route add 128/1 dev $VPN_ID 2>/dev/null
             else
@@ -292,8 +298,6 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
                 fi
             fi
         else
-            #ip rule add from $(nvram get lan_ipaddr | cut -d"." -f1-3).0/24 table 12$VPN_NUM prio 99$VPN_NUM"9"
-            VPN_IP_LIST=$(sqlite3 $SQL_DATABASE "SELECT rules FROM policy WHERE peer='$WG_INTERFACE';")
 
             create_client_list
 
