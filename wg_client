@@ -401,9 +401,12 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
                     }
             fi
 
+        ip route flush cache
+
         echo -en $cBGRE"\t"
         logger -st "wireguard-${MODE}${VPN_NUM}" "Initialisation complete."
         echo -e $cRESET
+
     else
         echo -e "\a\n\t";logger -st "wireguard-{$MODE}${VPN_NUM}" "Local Peer I/P endpoint ('${INSTALL_DIR}WireguardVPN.conf') not VALID. ABORTing Initialisation."
         echo -e
@@ -493,6 +496,8 @@ else
         ip6tables -t nat -F WGDNS$VPN_NUM 2>/dev/null               # v4.05
         ip6tables -t nat -X WGDNS$VPN_NUM 2>/dev/null               # v4.05
     fi
+
+    ip route flush cache
 
     logger -t "wireguard-${MODE}${VPN_NUM}" "Wireguard VPN '$MODE' Peer ($VPN_ID) $TXT $SOCKET ($DESC) Terminated"
     echo -e $cBGRE"\twireguard-${MODE}${VPN_NUM}: Wireguard VPN '$MODE' Peer (${cBMAG}$VPN_ID${cBGRE}) $TXT $SOCKET (${cBMAG}$DESC${cBGRE}) ${cBRED}Terminated"$cRESET
