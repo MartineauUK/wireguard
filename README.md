@@ -130,8 +130,8 @@ WireGuard Manager v2.0 now uses a menu (amtm compatible)
     v  = View ('/jffs/addons/wireguard/WireguardVPN.conf')		
 
     e  = Exit Script [?]
-
-
+    
+e.g
 
     E:Option ==> 3
 
