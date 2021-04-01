@@ -131,7 +131,7 @@ create_client_list(){
                 ip -6 rule add $SRCC $SRCA $DSTC $DSTA table $TARGET_LOOKUP priority $RULE_PRIO
             fi
 
-            echo -en $cBCYA"\t"
+            echo -en $cBCYA
             [ "$DSTC" == "to" ] && DSTC="to "
             logger -t "wireguard-${MODE}${VPN_NUM}" "Adding Wireguard 'client' Peer route ${SRCA}${DSTC}$DSTA through $TARGET_NAME"
             echo -en $cRESET
@@ -149,8 +149,8 @@ purge_client_list(){
         if [ "$PRIO" -ge "$START_PRIO" ] && [ "$PRIO" -le "$END_PRIO" ]
         then
             ip rule del prio $PRIO
-            echo -en $cBCYA"\t"
-            logger -st "wireguard-${MODE}${VPN_NUM}" "Removing Wireguard 'client' Peer rule $PRIO from routing policy"
+            echo -en $cBCYA
+            logger -t "wireguard-${MODE}${VPN_NUM}" "Removing Wireguard 'client' Peer rule $PRIO from routing policy"
             echo -en $cRESET
         fi
     done
