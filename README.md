@@ -18,7 +18,7 @@ Example successful install.....
     +======================================================================+
     |  Welcome to the WireGuard Manager/Installer script (Asuswrt-Merlin)  |
     |                                                                      |
-    |                      Version v3.05 by Martineau                      |
+    |                      Version v4.08 by Martineau                      |
     |                                                                      |
     | Requirements: USB drive with Entware installed                       |
     |                                                                      |
@@ -31,15 +31,13 @@ Example successful install.....
 
 	    WireGuard ACTIVE Peer Status: Clients 0, Servers 0
 
-	    v2.02 - No WireGuard Manager updates available - you have the latest version
-
     1  = Begin WireGuard Installation Process						
 
     e  = Exit Script [?]
 
     E:Option ==> 1
 
-	Installing WireGuard Manager - Router RT-AC86U (v386.1)
+	Installing WireGuard Manager - Router RT-AC86U (v386.1) arch=aarch64
 	Downloading scripts
 	wg_client downloaded successfully 
 	wg_server downloaded successfully 
@@ -129,7 +127,7 @@ WireGuard Manager v2.0 now uses a menu (amtm compatible)
     +======================================================================+
     |  Welcome to the WireGuard Manager/Installer script (Asuswrt-Merlin)  |
     |                                                                      |
-    |                      Version v2.01b9 by Martineau                    |
+    |                      Version v4.09 by Martineau                      |
     |                                                                      |
     +======================================================================+
 	       WireGuard ACTIVE Peer Status: Clients 3, Servers 2
@@ -191,53 +189,38 @@ WireGuard Manager v2.0 now uses a menu (amtm compatible)
 
 
 
-In lieu of the NVRAM variables that can retain OpenVPN Client/Server configurations across reboots, this script uses 
+In lieu of the NVRAM variables that can retain OpenVPN Client/Server configurations across reboots, this script uses SQL database
 
-'/jffs/addons/wireguard/WireguardVPN.conf' for the WireGuard directives.
+'/opt/etc/wireguard.d/Wireguard.db' for the WireGuard configuration directives.
 
-As this is a beta, the layout of the file includes placeholders, but currently, the first andsecond column are significant and are used as a primary lookup key e.g the 'Auto' and 'Annotation Comment' fields are extracted/used to determine the actions taken by the script.
 
-e.g.
-
-    wg13    P      xxx.xxx.xxx.xxx/32    103.231.88.18:51820    193.138.218.74    # Mullvad Oz, Melbourne
-
-is used to auto-start WireGuard VPN 'client' Peer 3 ('wg13')' in Policy mode, where the associated Policy rules are defined as
-
-    rp13    <Dummy VPN 3>172.16.1.3>>VPN<Plex>172.16.1.123>1.1.1.1>VPN<Router>172.16.1.1>>WAN<All LAN>172.16.1.0/24>>VPN
-
-which happens to be in the same format as the Policy rules created by the GUI for OpenVPN clients i.e.
-
-Use the GUI to generate the rules using a spare VPN Client and simply copy'n'paste the resulting NVRAM variable
-
-    vpn_client?_clientlist etc.
-    
-The contents of the WireGuard configuration file will be used when 'wg13.conf' is activated - assuming that you have used say the appropriate WireGuard Web configurator such as Mullvads' to create the Local IP address and Public/Private key-pair for the remote Peer.
+The contents of the WireGuard configuration database will be used when 'wg13.conf' is activated - assuming that you have used say the appropriate WireGuard Web configurator such as Mullvad's to create the Local IP address and Public/Private key-pair for the remote Peer.
  e.g
  
-    S50wireguard start client 3
+    start wg13
     
  The script supports several commands:
     
-    S50wireguard   {start|stop|restart|check|install} [ [client [policy] |server]} [wg_instance] ]
-    S50wireguard   start 0
+    wgm   {start|stop|restart|check|install} [ [client [policy] |server]} [wg_instance] ]
+    wgm   start 0
                    Initialises remote peer 'client' 'wg0' solely to remain backwards compatibilty with original
-    S50wireguard   start client 0
+    wgm   start client 0
                    Initialises remote peer 'client' 'wg0'
-    S50wireguard   start 1
+    wgm   start 1
                    Initialises local peer 'server' 'wg1' solely to remain backwards compatibilty with original
-    S50wireguard   start server 1
+    wgm   start server 1
                    Initialises local peer 'server' 'wg21' uses interface naming convention as per OpenVPN e.g. tun21
-    S50wireguard   start client 1
+    wgm   start client 1
                    Initialises remote peer 'client' 'wg11' uses interface naming convention as per OpenVPN e.g. tun11
-    S50wireguard   start client 1 policy
+    wgm   start client 1 policy
                    Initialises remote peer 'client' 'wg11' in 'policy' Selective Routing mode
-    S50wireguard   stop client 3
+    wgm   stop client 3
                    Terminates remote peer 'client' 'wg13'
-    S50wireguard   stop 1
+    wgm   stop 1
                    Terminates local peer 'server' 'wg21'
-    S50wireguard   stop
+    wgm   stop
                    Terminates ALL ACTIVE peers (wg1* and wg2* etc.)
-    S50wireguard   start
+    wgm   start
                    Initialises ALL peers (wg1* and wg2* etc.) defined in the configuration file where Auto=Y or Auto=P
                  
 and if the install is successful, there should now be a couple of simple aliases
@@ -256,12 +239,10 @@ e.g.
 
 An example of the enhanced WireGuard Peer Status report showing the names of the Peers rather than just their cryptic Public Keys
 
-    wgshow
-
-    (S50wireguard): 15024 v1.01b4 WireGuard VPN Peer Status check.....
+    wgm show
 
 	interface: wg21 	(# Martineau Host Peer 1)
-		 public key: j+aNKC0yA7+hFyH7cA9gISJ9+Ms05G3q4kYG/JkBwAU=
+		 public key: j+aNKC0yA7+hFyH7cA9gIJ9+Ms05G3q4kYG/JkBwAU=
 		 private key: (hidden)
 		 listening port: 1151
 		
@@ -300,22 +281,10 @@ and the next avaiable IP with DHCP pool prefix '10.50.1' e.g. .125 is chosen as 
     AllowedIPs = 10.50.1.125/32
     # Nokia6310i End
   
-and the cosmetic Annotation identification for the device '# Device Nokia6310i' is appended to the WireGuard configuration 'WireguardVPN_map'  
+and the cosmetic Annotation identification for the device '# Device Nokia6310i' is appended to the WireGuard Peer configuration  
 
-    # Optionally define the 'server' Peer 'clients' so they can be identified by name in the enhanced WireGuard Peer status report
-    # Public Key                                      DHCP IP             Annotation Comment
-    <snip>
-    xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=      10.50.1.124         # A Cell phone
-    snip>
-    
-    uAMVeM6DNsj9rEsz9rjDJ7WZEiJjEp98CDfDhSFL0W0=      10.50.1.125         # Device Nokia6310i
 
 To import the device Nokia6310i into the WireGuard App on the mobile device or tablet, rather than manually enter the details, or import the text file using a secure means of transfer, it is easier to simply display the QR Code containing the configuration and point the phone's/tablet's camera at the QR Code! ;-)
 
-     wgr qrcode Nokia6310i
+     wgm qrcode Nokia6310i
 
-
-
-    
-    
-     
