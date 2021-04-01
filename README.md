@@ -15,40 +15,104 @@ Enable SSH on router, then use your preferred SSH Client e.g. Xshell6,MobaXterm,
     
 Example successful install.....
 
-	Retrieving scripts 'wg_manager.sh/wg_server'
+	Downloading scripts
+	wg_client downloaded successfully 
+	wg_server downloaded successfully 
+	UDP_Updater.sh downloaded successfully 
 
-    <snip> 100.0%
-    <snip> 100.0%
+    Package column (2.36.1-2) installed in root is up to date.
+    Package coreutils-mkfifo (8.32-6) installed in root is up to date.
+	Downloading Wireguard Kernel module for RT-AC86U (v386.2)
 
-	Retrieving Wireguard Kernel module for RT-AC86U (v386.2)
-    
-    % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                 Dload  Upload   Total   Spent    Left  Speed
-    100   190  100   190    0     0    822      0 --:--:-- --:--:-- --:--:--   833
-    100 57251  100 57251    0     0   166k      0 --:--:-- --:--:-- --:--:--  166k
+	Downloading WireGuard Kernel module 'wireguard-kernel_1.0.20210219-k27_aarch64-3.10.ipk' for RT-AC86U (v386.2)...
 
-	Retrieving WireGuard User space Tools for RT-AC86U (v386.2)
-    
-    % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                 Dload  Upload   Total   Spent    Left  Speed                            
-    100   187  100   187    0     0    820      0 --:--:-- --:--:-- --:--:--   834
-    100 46503  100 46503    0     0  98315      0 --:--:-- --:--:-- --:--:-- 98315
+      ##################################################################################################################################################################################### 100.0%##################################################################################################################################################################################### 100.0%
 
-	Loading WireGuard Kernel module and Userspace Tools for RT-AC86U (v386.2)
+	Downloading WireGuard User space Tool 'wireguard-tools_1.0.20210223-1_aarch64-3.10.ipk' for RT-AC86U (v386.2)
 
-    Installing wireguard-kernel (1.0.20210219-k27) to root...
-    Configuring wireguard-kernel.
+    ##################################################################################################################################################################################### 100.0%##################################################################################################################################################################################### 100.0%
 
-    Installing wireguard-tools (1.0.20210223-1) to root...
-    Configuring wireguard-tools.
+	Loading WireGuard Kernel module and Userspace Tool for RT-AC86U (v386.2)
+    Package wireguard-kernel (1.0.20210219-k27) installed in root is up to date.
+    Package wireguard-tools (1.0.20210223-1) installed in root is up to date.
+	wireguard: WireGuard 1.0.20210219 loaded. See www.wireguard.com for information.
+	wireguard: Copyright (C) 2015-2019 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
 
-    wireguard: WireGuard 1.0.20210219 loaded. See www.wireguard.com for information.
 
-	Creating WireGuard configuration file '/jffs/configs/WireguardVPN_map'
+	Creating WireGuard configuration file '/jffs/addons/wireguard/WireguardVPN.conf'
 
-	Creating WireGuard 'Client' and 'Server' Peer templates 'wg11.conf' and wg21.conf'
+	No Peer entries to auto-migrate from '/jffs/addons/wireguard/WireguardVPN.conf', but you will need to manually import the 'device' Peer '*.conf' files:
 
-	WireGuard install COMPLETED.
+
+
+	[✔] WireGuard Peer SQL Database initialised OK
+
+	Creating WireGuard 'Server' Peer (wg21)'
+	Creating WireGuard Private/Public key-pairs for RT-AC86U (v386.2)
+	Initialising WireGuard VPN 'server' Peer
+
+	Requesting WireGuard VPN Peer start (wg21)
+
+	wireguard-server1: Initialising Wireguard VPN 'Server' Peer (wg21) on 10.88.8.1:51820 (# RT-AC86U Server #1)
+	wireguard-server1: Initialisation complete.
+
+	[✔] Statistics gathering is ENABLED
+
+	nat-start updated to protect WireGuard firewall rules
+	Restarting DNSmasq to add 'wg*' interfaces
+
+    Done.
+
+	Creating 'wg_manager' alias for 'wg_manager.sh'
+
+	Event scripts
+
+	Adding Peer Auto-start @BOOT
+	Installing QR rendering module
+    Package qrencode (4.1.1-1) installed in root is up to date.
+	Do you want to create a 'device' Peer for 'server' Peer (wg21) ?
+	Press y to create 'device' Peer or press [Enter] to skip
+    y
+    Enter the device name e.g. iPhone
+    iPhone
+
+	Creating Wireguard Private/Public key pair for device 'iPhone'
+	Device 'iPhone' Public key=zHI1BIxOsF9nKwfsPGoGPFa9ffMt83jRWz+ipPexWjM=
+
+	Using Public key for 'server' Peer 'wg21'
+
+
+	WireGuard config for Peer device 'iPhone' created (Allowed IP's 0.0.0.0/0 # ALL Traffic)
+
+	Press y to Display QR Code for Scanning into WireGuard App on device 'iPhone' or press [Enter] to SKIP.
+    y
+	Press y to ADD device 'iPhone' to 'server' Peer (wg21) or press [Enter] to SKIP.
+    y
+
+	Adding device Peer 'iPhone' 10.50.1.2/32 to RT-AC86U 'server' (wg21) and WireGuard config
+
+
+	WireGuard 'server' Peer needs to be restarted to listen for 'client' Peer iPhone "Device"
+	Press y to restart 'server' Peer (wg21) or press [Enter] to SKIP.
+    y
+
+	Requesting WireGuard VPN Peer restart (wg21)
+
+	Restarting Wireguard 'server' Peer (wg21)
+	wireguard-server1: Wireguard VPN '' Peer (wg21) on 10.88.8.1:51820 (# RT-AC86U Server #1) Terminated
+
+	wireguard-server1: Initialising Wireguard VPN 'Server' Peer (wg21) on 10.88.8.1:51820 (# RT-AC86U Server #1)
+	wireguard-server1: Initialisation complete.
+
+
+	interface: wg21 	Port:51820	10.50.1.1/24 		VPN Tunnel Network	# RT-AC86U Server #1
+		peer: zHI1BIxOsF9nKwfsPGoGPFa9ffMt83jRWz+ipPexWjM= 	10.50.1.2/32		# iPhone "Device"	
+
+	v4.08 WireGuard Session Manager install COMPLETED.
+
+
+ 	WireGuard ACTIVE Peer Status: Clients 0, Servers 1
+
 
 In lieu of the NVRAM variables that can retain OpenVPN Client/Server configurations across reboots, this script uses 
 
