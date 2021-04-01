@@ -131,7 +131,7 @@ WireGuard Manager v2.0 now uses a menu (amtm compatible)
 
     e  = Exit Script [?]
     
-e.g
+e.g.
 
     E:Option ==> 3
 
