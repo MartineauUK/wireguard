@@ -4,7 +4,7 @@ VERSION="v4.09"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 31-Mar-2021
+# Last Updated Date: 01-Apr-2021
 #
 # Description:
 #
@@ -228,7 +228,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
 
     if [ -n "$LOCALIP" ] || [ "$MODE" == "client" ];then                                # v1.03
         logger -t "wireguard-${MODE}${VPN_NUM}" "Initialising Wireguard VPN $MODE Peer ($VPN_ID) ${POLICY_MODE}${TXT} $SOCKET ($DESC)"
-        echo -e $cBCYA"\twireguard-${MODE}${VPN_NUM}: Initialising Wireguard VPN '$MODE' Peer (${cBMAG}$VPN_ID${cBCYA}) ${POLICY_MODE}${TXT} $SOCKET (${cBMAG}$DESC${cBCYA}) ${cBWHT}DNS=$PEER_DNS"$cRESET
+        echo -e $cBCYA"\twireguard-${MODE}${VPN_NUM}: Initialising Wireguard VPN '$MODE' Peer (${cBMAG}${VPN_ID}${cBCYA}) ${cBYEL}${POLICY_MODE}${cBCYA}${TXT}${cBWHT} ${SOCKET}${cBCYA} (${cBMAG}$DESC${cBCYA}) ${cBWHT}DNS=$PEER_DNS"$cRESET
 
         if [ -n "$PEER_DNS" ];then            # v4.05
             iptables -t nat -N WGDNS${VPN_NUM}                                          # v4.05
@@ -498,8 +498,8 @@ else
         ip6tables -t nat -X WGDNS$VPN_NUM 2>/dev/null               # v4.05
     fi
 
-    logger -t "wireguard-${MODE}${VPN_NUM}" "Wireguard VPN '$MODE' Peer ($VPN_ID) $TXT $SOCKET ($DESC) Terminated"
-    echo -e $cBGRE"\twireguard-${MODE}${VPN_NUM}: Wireguard VPN '$MODE' Peer (${cBMAG}$VPN_ID${cBGRE}) $TXT $SOCKET (${cBMAG}$DESC${cBGRE}) ${cBRED}Terminated"$cRESET
+    logger -t "wireguard-${MODE}${VPN_NUM}" "Wireguard VPN '$MODE' Peer ($VPN_ID) ${POLICY_MODE}$TXT $SOCKET ($DESC) Terminated"
+    echo -e $cBGRE"\twireguard-${MODE}${VPN_NUM}: Wireguard VPN '$MODE' Peer (${cBMAG}$VPN_ID${cBGRE}) ${cBYEL}${POLICY_MODE}${cBGRE}$TXT ${cBWHT}${SOCKET}${cBGRE} (${cBMAG}$DESC${cBGRE}) ${cBRED}Terminated"$cRESET
     echo -e $cRESET
 fi
 
