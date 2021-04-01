@@ -69,18 +69,8 @@ Example successful install.....
 
     (wg_manager.sh): 26628 v2.01b8 Requesting WireGuard VPN Peer auto-start (wg11 wg21 )
 
-
-	wireguard-client1: Initialising Wireguard VPN 'client' Peer (wg11) to 86.106.143.93:51820 (# ****THIS IS NOT A REAL PEER** Edit 'wg11.conf' with real DATA!)
-	wireguard-client1: Initialisation complete.
-
 	wireguard-server1: Initialising Wireguard VPN 'Server' Peer (wg21) on 0.0.0.0:51820 (# RT-AC86U Local Host Peer 1)
 	wireguard-server1: Initialisation complete.
-
-
-
-	WireGuard Peer Status
-	interface: wg11 	('client' # ****THIS IS NOT A REAL PEER** Edit 'wg11.conf' with real DATA!)
-		 listening port: 34465
 		
 	interface: wg21 	('server' # RT-AC86U Local Host Peer 1)
 		 public key: RPLF0ksVHyLvffhzNG7agfvaAbN3L3QIl08qkZ3pH0U=
@@ -89,16 +79,10 @@ Example successful install.....
 
 
 	Terminating ACTIVE WireGuard Peers ...
-	Requesting termination of Active WireGuard VPN Peers (wg11 wg21)
-
-
-    (wg_manager.sh): 27073 v2.01b8 Requesting termination of WireGuard VPN 'client' Peer ('wg11')
-	wireguard-client1: Wireguard VPN 'client' Peer (wg11) to 86.106.143.93:51820 (# ****THIS IS NOT A REAL PEER** Edit 'wg11.conf' with real DATA!) DELETED
+	Requesting termination of Active WireGuard VPN Peers (wg21)
 
     (wg_manager.sh): 27073 v2.01b8 Requesting termination of WireGuard VPN 'server' Peer ('wg21')
 	wireguard-server1: Wireguard VPN '' Peer (wg21) on 0.0.0.0:51820 (# RT-AC86U Local Host Peer 1) DELETED
-
-
 
 	nat-start updated to protect WireGuard firewall rules
 	Added 'wg*' interfaces to DNSMasq
@@ -134,18 +118,19 @@ WireGuard Manager v2.0 now uses a menu (amtm compatible)
 
     =============================================================================================================================================================
 
-    1  = Update Wireguard modules						7  = Display QR code for a Peer {device} e.g. iPhone
-    2  = Remove WireGuard/wg_manager					8  = Peer management [ {Peer} [ add | del | {auto [y|n|p]}] ] ]
-  	    								        9  = Create Key-pair for Peer {Device} e.g. Nokia6310i (creates Nokia6310i.conf etc.)
-    3  = List ACTIVE WireGuard Peers [3x - lists ALL details]									
-    4  = Start   WireGuard Peer [Peer]									
-    5  = Stop    WireGuard Peer [Peer]									
-    6  = Restart WireGuard Peer [Peer]									
+    1  = Update Wireguard modules					7  = Display QR code for a Peer {device} e.g. iPhone
+    2  = Remove WireGuard/wg_manager					8  = Peer management [ "list" | "category" | "new" ] | [ {Peer | category} [ del | show | add [{"auto="[y|n|p]}] ]
+									9  = Create Key-pair for Peer {Device} e.g. Nokia6310i (creates Nokia6310i.conf etc.)
+    3  = List ACTIVE Peers Summary [Peer...] [full]			10 = IPSet management [ "list" ] | [ "upd" { ipset [ "fwmark" {fwmark} ] | [ "enable" {"y"|"n"}] | [ "dstsrc"] ] } ] 
+    4  = Start   [ [Peer [nopolicy]...] | category ] e.g. start clients 									
+    5  = Stop    [ [Peer... ] | category ] e.g. stop clients									
+    6  = Restart [ [Peer... ] | category ] e.g. restart servers									
 
     ?  = About Configuration					
     v  = View ('/jffs/addons/wireguard/WireguardVPN.conf')		
 
     e  = Exit Script [?]
+
 
 
     E:Option ==> 3
