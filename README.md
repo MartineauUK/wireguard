@@ -119,7 +119,7 @@ WireGuard Manager v2.0 now uses a menu (amtm compatible)
     =============================================================================================================================================================
 
     1  = Update Wireguard modules					7  = Display QR code for a Peer {device} e.g. iPhone
-    2  = Remove WireGuard/wg_manager					8  = Peer management [ "list" | "category" | "new" ] | [ {Peer | category} [ del | show | add [{"auto="[y|n|p]}] ]
+    2  = Remove WireGuard/wg_manager				8  = Peer management [ "list" | "category" | "new" ] | [ {Peer | category} [ del | show | add [{"auto="[y|n|p]}] ]
 									9  = Create Key-pair for Peer {Device} e.g. Nokia6310i (creates Nokia6310i.conf etc.)
     3  = List ACTIVE Peers Summary [Peer...] [full]			10 = IPSet management [ "list" ] | [ "upd" { ipset [ "fwmark" {fwmark} ] | [ "enable" {"y"|"n"}] | [ "dstsrc"] ] } ] 
     4  = Start   [ [Peer [nopolicy]...] | category ] e.g. start clients 									
