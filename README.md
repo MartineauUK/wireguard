@@ -179,7 +179,7 @@ In lieu of the NVRAM variables that can retain OpenVPN Client/Server configurati
 '/opt/etc/wireguard.d/Wireguard.db' for the WireGuard configuration directives.
 
 
-The contents of the WireGuard configuration database will be used when 'wg13.conf' is activated - assuming that you have used say the appropriate WireGuard Web configurator such as Mullvad's to create the Local IP address and Public/Private key-pair for the remote Peer.
+The contents of the WireGuard configuration database will be used when say 'wg13.conf' is activated - assuming that you have used say the appropriate WireGuard Web configurator such as Mullvad's to create the Local IP address and Public/Private key-pair for the remote Peer.
  e.g
  
     start wg13
@@ -240,7 +240,7 @@ An example of the enhanced WireGuard Peer Status report showing the names of the
 NOTE: Currently, if you start say three WireGuard remote Peers concurrently and none of which are designated as Policy Peers, ALL traffic will be forced via the most recent connection, so if you then terminate that Peer, then the least oldest of the previous Peers will then have ALL traffic directed through it.
 Very crude fall-over configuration but may be useful. 
 
-For hosting a 'server' Peer (wg21) you can use the following command to generate a Private/Public key-pair and auto add it to the 'wg21.conf' and to the WireGuard config '/jffs/addons/wireguard/WireGuardVPN,conf'
+For hosting a 'server' Peer (wg21) you can use the following command to generate a Road-Warrior Private/Public key-pair and auto add it to the 'wg21.conf' 
 
     wgm create Nokia6310i
 
@@ -254,9 +254,12 @@ For hosting a 'server' Peer (wg21) you can use the following command to generate
 
 and the resulting entry in the WireGuard 'server' Peer config 'wg21.conf' - where 10.50.1.125 is derived from the DHCP pool for the 'server' Peer
 
-e.g. WireGuard configuration 'WireguardVPN_map' contains
+e.g. 
 
-    wg21    Y      10.50.1.1/24                                                 # Martineau Host Peer 1
+    	Peers (Auto=P - Policy, Auto=X - External i.e. Cell/Mobile)
+    Server  Auto  Subnet        Port   Annotate
+    wg21    Y     10.50.1.1/24  11501  # RT-AC86U Server 1
+
 
 and the next avaiable IP with DHCP pool prefix '10.50.1' e.g. .125 is chosen as .124 is already assigned when the Peer is appended to 'wg21.conf'
 
