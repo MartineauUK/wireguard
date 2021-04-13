@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.08"
-#============================================================================================ © 2021 Martineau v4.08
+VERSION="v4.09"
+#============================================================================================ © 2021 Martineau v4.09
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.08"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 31-Mar-2021
+# Last Updated Date: 13-Apr-2021
 #
 # Description:
 #
@@ -737,7 +737,7 @@ Import_Peer() {
                 local MODE=$(Server_or_Client "$WG_INTERFACE")
                 [ -n "$FORCE_TYPE" ] && { MODE=$FORCE_TYPE; local FORCE_TYPE_TXT="(${cBRED}FORCED as 'client'${cRESET}) ${cBGRE}"; }                # v4.03
                 if [ "$MODE" != "server" ];then
-                    [ "$MODE" == "client" ] && { local TABLE="clients"; local AUTO="Y"; local KEY="peer"; } || { TABLE="devices"; local AUTO="X"; local KEY="name"; }
+                    [ "$MODE" == "client" ] && { local TABLE="clients"; local AUTO="N"; local KEY="peer"; } || { TABLE="devices"; local AUTO="X"; local KEY="name"; }   # v4.09
                     if [ -z "$(sqlite3 $SQL_DATABASE "SELECT $KEY FROM $TABLE WHERE $KEY='$WG_INTERFACE';")" ];then
                         if [ -z "$ANNOTATE" ];then
                             # Use comment line preceding the '[Interface]' directive
@@ -759,8 +759,13 @@ Import_Peer() {
                                     local ALLOWIP=$(echo "$LINE" | awk '{print $3}')
                                 ;;
                                 Endpoint) local SOCKET=${LINE##* };;
+                                "#"MTU) local MTU=${LINE##* };;                 # v4.09
                                 "#"DNS) local COMMENT_DNS=${LINE##* } ;;
                                 "#"Address) local COMMENT_SUBNET=${LINE##* } ;;
+                                MTU) local MTU=${LINE##* }                      # v4.09
+                                    # This must be commented out!
+                                    [ "$MODE" == "client" ] && COMMENT_OUT="Y"
+                                ;;
                                 DNS) local DNS=${LINE##* }
                                     # This must be commented out!
                                     [ "$MODE" == "client" ] && COMMENT_OUT="Y"
@@ -784,9 +789,9 @@ Import_Peer() {
                         fi
                         if [ "$MODE" = "client" ];then
                             if [ "$RENAME" != "Y" ];then
-                                sqlite3 $SQL_DATABASE "INSERT INTO $TABLE values('$WG_INTERFACE','$AUTO','$SUBNET','$SOCKET','$DNS','$PUB_KEY','$PRI_KEY','$ANNOTATE');"
+                                sqlite3 $SQL_DATABASE "INSERT INTO $TABLE values('$WG_INTERFACE','$AUTO','$SUBNET','$SOCKET','$DNS','$MTU','$PUB_KEY','$PRI_KEY','$ANNOTATE');"     # v4.09
                             else
-                                sqlite3 $SQL_DATABASE "INSERT INTO $TABLE values('$NEW_NAME','$AUTO','$SUBNET','$SOCKET','$DNS','$PUB_KEY','$PRI_KEY','$ANNOTATE');"
+                                sqlite3 $SQL_DATABASE "INSERT INTO $TABLE values('$NEW_NAME','$AUTO','$SUBNET','$SOCKET','$DNS','$MTU','$PUB_KEY','$PRI_KEY','$ANNOTATE');"         # v4.09
                             fi
                             #sqlite3 $SQL_DATABASE "INSERT INTO policy values('$WG_INTERFACE','<>');"
                         else
@@ -798,6 +803,7 @@ Import_Peer() {
                         if [ "$COMMENT_OUT" == "Y" ];then
                             sed -i 's/^DNS/#DNS/' ${IMPORT_DIR}${WG_INTERFACE}.conf
                             sed -i 's/^Address/#Address/' ${IMPORT_DIR}${WG_INTERFACE}.conf
+                            sed -i 's/^MTU/#MTU/' ${IMPORT_DIR}${WG_INTERFACE}.conf # v4.09
                             # Insert the tag
                             if [ "$ANNOTATE" != "# N/A" ];then
                                 if [ "$INSERT_COMMENT" != "N" ];then                    # v4.03
@@ -1035,6 +1041,29 @@ Manage_Peer() {
                                     echo -e $cBGRE"\n\t[✔] Updated DNS\n"$cRESET
                                 else
                                      echo -e $cBRED"\a\n\t***ERROR 'server' Peer '$WG_INTERFACE' cannot set DNS\n"$cRESET
+                                fi
+                            ;;
+                            mtu*)                                                   # v4.09
+                                shift
+                                local Mode=$(Server_or_Client "$WG_INTERFACE")
+                                local MTU=$(echo "$CMD" | sed -n "s/^.*mtu=//p" | awk '{print $1}')
+                                local ID="peer"
+                                case $Mode in
+                                    client) local TABLE="clients";;
+                                    device) local TABLE="devices"; local ID="name";;
+                                esac
+
+                                if [ "$Mode" != "server" ];then
+                                    if [ "$MTU" -ge "1280" ] && [ "$MTU" -le "1420" ];then
+                                        sqlite3 $SQL_DATABASE "UPDATE $TABLE SET mtu='$MTU' WHERE $ID='$WG_INTERFACE';"
+                                        sed -i "/^MTU/ s~[^ ]*[^ ]~$MTU~3" ${CONFIG_DIR}${WG_INTERFACE}.conf
+
+                                        echo -e $cBGRE"\n\t[✔] Updated MTU\n"$cRESET
+                                    else
+                                        echo -e $cBRED"\a\n\t***ERROR 'client' Peer'$WG_INTERFACE' MTU '$MTU' invalid; range 1280-1420 Only\n"$cRESET
+                                    fi
+                                else
+                                     echo -e $cBRED"\a\n\t***ERROR 'server' Peer '$WG_INTERFACE' cannot set MTU\n"$cRESET
                                 fi
                             ;;
                             add*|ipset*)                            # peer wg13 [add|del|edit] ipset Netflix[.....]
@@ -1423,7 +1452,7 @@ Manage_Event_Scripts() {
         ls -1 ${INSTALL_DIR}Scripts
     else
         # Backup...perhaps user has elected to uninstall WireGuard Session Manager but wants to preserve the data directory ${CONFIG_DIR}
-        cp ${INSTALL_DIR}Scripts ${CONFIG_DIR}
+        mv ${INSTALL_DIR}Scripts ${CONFIG_DIR}                              # v4.09
     fi
 }
 Manage_RPDB_rules() {
@@ -1547,14 +1576,14 @@ Initialise_SQL() {
 
     # v4.09 Modify policy
     cat > /tmp/sql_cmds.txt << EOF
-CREATE TABLE servers (peer varchar(5) PRIMARY KEY, auto varchar(1) NOT NULL, subnet varchar(19) NOT NULL, port integer(5), pubkey varchar(55), prikey varchar(55) NOT NULL, tag varchar(40));
-CREATE TABLE clients (peer varchar(5) PRIMARY KEY, auto varchar(1) NOT NULL, subnet varchar(19) NOT NULL, socket varchar(25), dns varchar(19), pubkey varchar(55), prikey varchar(55), tag varchar(40));
-CREATE TABLE devices (name varchar(15) PRIMARY KEY, auto varchar(1) NOT NULL, ip varchar(19)  NOT NULL, dns varchar(15)  NOT NULL, allowedip varchar(100), pubkey varchar(55)  NOT NULL, prikey varchar(55), tag varchar(40), conntrack UNSIGNED BIG INT );
-CREATE TABLE policy  (peer varchar(5), iface varchar(4), srcip varchar(19), dstip varchar(19), tag varchar(30), PRIMARY KEY(peer,iface,srcip,dstip));
-CREATE TABLE fwmark  (fwmark varchar(10), peer varchar(15) NOT NULL, PRIMARY KEY(fwmark,peer));
-CREATE TABLE ipset   (ipset PRIMARY KEY, use varchar(1), peer varchar(5),fwmark varchar(10) NOT NULL, dstsrc varchar (11) NOT NULL);
-CREATE TABLE traffic (peer NOT NULL,timestamp UNSIGNED BIG INT NOT NULL,rx UNSIGNED BIG INT NOT NULL,tx UNSIGNED BIG INT NOT NULL);
-CREATE TABLE session (peer NOT NULL,state varchar(1), timestamp UNSIGNED BIG INT NOT NULL);
+CREATE TABLE IF NOT EXISTS servers (peer varchar(5) PRIMARY KEY, auto varchar(1) NOT NULL, subnet varchar(19) NOT NULL, port integer(5), pubkey varchar(55), prikey varchar(55) NOT NULL, tag varchar(40));
+CREATE TABLE IF NOT EXISTS clients (peer varchar(5) PRIMARY KEY, auto varchar(1) NOT NULL, subnet varchar(19) NOT NULL, socket varchar(25), dns varchar(19), mtu integer(4),pubkey varchar(55), prikey varchar(55), tag varchar(40));
+CREATE TABLE IF NOT EXISTS devices (name varchar(15) PRIMARY KEY, auto varchar(1) NOT NULL, ip varchar(19)  NOT NULL, dns varchar(15)  NOT NULL, allowedip varchar(100), pubkey varchar(55)  NOT NULL, prikey varchar(55), tag varchar(40), conntrack UNSIGNED BIG INT );
+CREATE TABLE IF NOT EXISTS policy  (peer varchar(5), iface varchar(4), srcip varchar(19), dstip varchar(19), tag varchar(30), PRIMARY KEY(peer,iface,srcip,dstip));
+CREATE TABLE IF NOT EXISTS fwmark  (fwmark varchar(10), peer varchar(15) NOT NULL, PRIMARY KEY(fwmark,peer));
+CREATE TABLE IF NOT EXISTS ipset   (ipset PRIMARY KEY, use varchar(1), peer varchar(5),fwmark varchar(10) NOT NULL, dstsrc varchar (11) NOT NULL);
+CREATE TABLE IF NOT EXISTS traffic (peer NOT NULL,timestamp UNSIGNED BIG INT NOT NULL,rx UNSIGNED BIG INT NOT NULL,tx UNSIGNED BIG INT NOT NULL);
+CREATE TABLE IF NOT EXISTS session (peer NOT NULL,state varchar(1), timestamp UNSIGNED BIG INT NOT NULL);
 EOF
     echo -en $cBRED
     sqlite3 $SQL_DATABASE < /tmp/sql_cmds.txt
@@ -2501,41 +2530,45 @@ Show_Peer_Config_Entry() {
             COLUMN_TXT="Server,Auto,Subnet,Port,Annotate"
             sqlite3 $SQL_DATABASE "SELECT peer,auto,subnet,port,tag from servers;" | column -t  -s '|' --table-columns "$COLUMN_TXT"
             echo -e
-            COLUMN_TXT="Client,Auto,IP,Endpoint,DNS,Annotate"
-            sqlite3 $SQL_DATABASE "SELECT peer,auto,subnet,socket,dns,tag from clients;" | column -t  -s '|' --table-columns "$COLUMN_TXT"
+            COLUMN_TXT="Client,Auto,IP,Endpoint,DNS,MTU,Annotate"           # v4.09
+            sqlite3 $SQL_DATABASE "SELECT peer,auto,subnet,socket,dns,mtu,tag from clients;" | column -t  -s '|' --table-columns "$COLUMN_TXT"
             echo -e
-            COLUMN_TXT="Device,Auto,IP,DNS,Allowed IP,Annotate"
+            COLUMN_TXT="Device,Auto,IP,DNS,Allowed IPs,Annotate"                    # v4.09
             sqlite3 $SQL_DATABASE "SELECT name,auto,ip,dns,allowedip,tag from devices;" | column -t  -s '|' --table-columns "$COLUMN_TXT"
         ;;
-        wg1|wg2)
-
-            local Mode=$(Server_or_Client "$WG_INTERFACE")
-            if [ "$Mode" == "server" ];then
-                TABLE="servers"
-                COLUMN_TXT="Server,Auto,Subnet,Port,Public,Private,Annotate"
-            else
-                TABLE="clients"
-                COLUMN_TXT="Client,Auto,IP,Endpoint,DNS,Public,Private,Annotate"    # v4.04
-            fi
-
-            echo -e
-            sqlite3 $SQL_DATABASE "SELECT * from $TABLE WHERE peer='$WG_INTERFACE';" | column -t  -s '|' --table-columns "$COLUMN_TXT"
-            if [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$WG_INTERFACE';") -gt 0 ];then
-                echo -e $cBCYA"\n\tSelective Routing RPDB rules"
-                sqlite3 $SQL_DATABASE "SELECT rowid,peer,iface,srcip,dstip,tag FROM policy WHERE peer='$WG_INTERFACE' ORDER BY iface DESC;" |column -t  -s '|' --table-columns ID,Peer,Interface,Source,Destination,Description # v4.08
-            else
-                echo -e $cRED"\n\tNo RPDB Selective Routing rules for $WG_INTERFACE\n"$cRESET
-            fi
-            echo -e
-            if [ "$(sqlite3 $SQL_DATABASE "SELECT * FROM ipset WHERE peer='$WG_INTERFACE';")" ] ;then
-                sqlite3 $SQL_DATABASE "SELECT * FROM ipset WHERE peer='$WG_INTERFACE';" | column -t  -s '|' --table-columns IPSet,Enable,Peer,FWMark,DST/SRC
-            fi
-        ;;
         *)
-            echo -e
-            COLUMN_TXT="Device,Auto,IP,DNS,Allowed IP,Public,Private,Annotate,Conntrack"
-            sqlite3 $SQL_DATABASE "SELECT * from devices WHERE name='$WG_INTERFACE';" | column -t  -s '|' --table-columns "$COLUMN_TXT"
+            local Mode=$(Server_or_Client "$WG_INTERFACE")
+            case "$Mode" in
+                server)
+                    local TABLE="servers"; local SQL_COL="peer"
+                    local COLUMN_TXT="Server,Auto,Subnet,Port,Public,Private,Annotate"
+                    ;;
+                client)
+                    local TABLE="clients"; local SQL_COL="peer"
+                    local COLUMN_TXT="Client,Auto,IP,Endpoint,DNS,MTU,Public,Private,Annotate"    # v4.09 v4.04
+                    ;;
+                *)
+                    local TABLE="devices"; local SQL_COL="name"
+                    local COLUMN_TXT="Device,Auto,IP,DNS,Allowed IPs,Public,Private,Annotate,Conntrack" # v4.09
+                    ;;
+            esac
 
+            echo -e
+            sqlite3 $SQL_DATABASE "SELECT * from $TABLE WHERE $SQL_COL='$WG_INTERFACE';" | column -t  -s '|' --table-columns "$COLUMN_TXT"
+
+            if [ "$SQL_COL" == "peer" ];then                                                        # v4.09
+                if [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$WG_INTERFACE';") -gt 0 ];then
+                    echo -e $cBCYA"\n\tSelective Routing RPDB rules"
+                    sqlite3 $SQL_DATABASE "SELECT rowid,peer,iface,srcip,dstip,tag FROM policy WHERE peer='$WG_INTERFACE' ORDER BY iface DESC;" |column -t  -s '|' --table-columns ID,Peer,Interface,Source,Destination,Description # v4.08
+                else
+                    echo -e $cRED"\n\tNo RPDB Selective Routing rules for $WG_INTERFACE\n"$cRESET
+                fi
+
+                echo -e
+                if [ "$(sqlite3 $SQL_DATABASE "SELECT * FROM ipset WHERE peer='$WG_INTERFACE';")" ] ;then
+                    sqlite3 $SQL_DATABASE "SELECT * FROM ipset WHERE peer='$WG_INTERFACE';" | column -t  -s '|' --table-columns IPSet,Enable,Peer,FWMark,DST/SRC
+                fi
+            fi
         ;;
     esac
 
