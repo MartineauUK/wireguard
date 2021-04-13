@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.09"
-#============================================================================================ © 2021 Martineau v4.09
+VERSION="v4.10"
+#============================================================================================ © 2021 Martineau v4.10
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -924,7 +924,7 @@ Manage_Peer() {
                                         fi
                                     fi
 
-                                    [ $(Server_or_Client "WG_INTERFACE") == "server" ] && local TABLE="servers" || TABLE="clients"
+                                    [ $(Server_or_Client "$WG_INTERFACE") == "server" ] && local TABLE="servers" || TABLE="clients" # v4.10
                                     sqlite3 $SQL_DATABASE "UPDATE $TABLE SET auto='$FLAG' WHERE peer='$WG_INTERFACE';"
                                     echo -e $cBGRE"\n\t[✔] Updated '$WG_INTERFACE' AUTO=$FLAG\n"$cRESET
                                 else
