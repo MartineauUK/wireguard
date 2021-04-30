@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.10"
-#============================================================================================ © 2021 Martineau v4.10
+VERSION="v4.11"
+#============================================================================================ © 2021 Martineau v4.11
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.10"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 13-Apr-2021
+# Last Updated Date: 30-Apr-2021
 #
 # Description:
 #
@@ -125,6 +125,27 @@ Chain_exists() {
         echo "Y"
         return 0
     fi
+}
+Get_WAN_IF_Name () {
+
+    # echo $([ -n "$(nvram get wan0_pppoe_ifname)" ] && echo $(nvram get wan0_pppoe_ifname) || echo $(nvram get wan0_ifname))
+    #   nvram get wan0_gw_ifname
+    #   nvram get wan0_proto
+
+    local IF_NAME=$(ip route | awk '/^default/{print $NF}')     # Should ALWAYS be 100% reliable ?
+
+    local IF_NAME=$(nvram get wan0_ifname)                      # ...but use the NVRAM e.g. DHCP/Static ?
+
+    # Usually this is probably valid for both eth0/ppp0e ?
+    if [ "$(nvram get wan0_gw_ifname)" != "$IF_NAME" ];then
+        local IF_NAME=$(nvram get wan0_gw_ifname)
+    fi
+
+    if [ ! -z "$(nvram get wan0_pppoe_ifname)" ];then
+        local IF_NAME="$(nvram get wan0_pppoe_ifname)"          # PPPoE
+    fi
+
+    echo $IF_NAME
 }
 Repeat() {
     # Print 25 '=' use HDRLINE=$(Repeat 25 "=")
@@ -635,7 +656,7 @@ Delete_Peer() {
                                 #   # SGS8 End
 
                                     # Scan for 'server' Peer that accepts this 'client' connection
-                                    SERVER_PEER=$(grep -E "^#.*$WG_INTERFACE$" /opt/etc/wireguard.d/wg2*.conf | awk -F '[\/:\._]' '{print $6}')
+                                    SERVER_PEER=$(grep -HE "^#.*$WG_INTERFACE$" /opt/etc/wireguard.d/wg2*.conf | awk -F '[\/:\._]' '{print $6}')    # v4.11
 
                                     for SERVER_PEER in $SERVER_PEER
                                         do
@@ -960,7 +981,11 @@ Manage_Peer() {
                                     grep -ivE "example" ${CONFIG_DIR}${WG_INTERFACE}.conf | awk '( $1=="PrivateKey" || $1=="ListenPort" || $3=="End") {print $0}' | sed 's/End//g; s/^#/Client Peer:/g'
                                 else
                                     echo -e $cBWHT"\n\t'$Mode' Peer ${cBMAG}${WG_INTERFACE}${cBWHT} Configuration Detail\n"$cBYEL
-                                    [ "$Mode" == "client" ] && local TABLE="clients" || TABLE="devices"
+                                    case $Mode in                           # v4.11
+                                        server) local TABLE="servers";;
+                                        clients) local TABLE="clients";;
+                                        *) local TABLE="devices";;
+                                    esac
                                     cat ${CONFIG_DIR}${WG_INTERFACE}.conf
 
                                     if [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$WG_INTERFACE';") -gt 0 ];then
@@ -2111,6 +2136,11 @@ Install_WireGuard_Manager() {
     if [ "$(Is_AX)" == "N" ] && [ "$(Is_HND)" == "N" ];then
         echo -e $cBRED"\a\n\tERROR: Router$cRESET $HARDWARE_MODEL (v$BUILDNO)$cBRED is not currently compatible with WireGuard!\n"
         exit 96
+    else
+        if [ "$(grep -oE "^arch" $ENTWARE_INFO)" != "aarch64" ];then                                # v4.11
+            echo -e $cBRED"\a\n\tERROR: Entware version not compatible with WireGuard!\n"       # v4.11
+            exit 97
+        fi
     fi
 
     echo -en $cBRED
@@ -3189,6 +3219,7 @@ Validate_User_Choice() {
             generatestats) ;;
             killsw*) ;;             # v2.03
             killinter*) ip link del dev $(echo "$menu1" | awk '{print $2}'); menu1=;;
+            rpfilter*|rp_filter*);;         # v4.11
             "") ;;
             e*) ;;
             *) printf '\n\a\t%bInvalid Option%b "%s"%b Please enter a valid option\n' "$cBRED" "$cRESET" "$menu1" "$cBRED"
@@ -3349,6 +3380,11 @@ Process_User_Choice() {
                         else
                             echo -e $cRED"\t[✖]${cBWHT} UDP ${cBGRE}monitor is ${cBRED}DISABLED$cRESET"
                         fi
+
+                        local WAN_IF=$(Get_WAN_IF_Name)                                             # v4.11
+                        local VAL=$(cat /proc/sys/net/ipv4/conf/$WAN_IF/rp_filter)                  # v4.11
+                        [ "$VAL" == "1" ] && STATE="ENABLED" || STATE="${cBRED}DISABLED${cBGRE}"    # v4.11
+                        echo -e $cBGRE"\n\t[ℹ ] Reverse Path Filtering $STATE\n"$cRESET         # v4.11
 
                         Manage_Stats
 
@@ -3523,6 +3559,35 @@ Process_User_Choice() {
                         done
                     echo -e $cBGRE"\n\t[✔] Welcome home Sir!!!\n"$cRESET
                 fi
+            ;;
+            rpfilter*|rp_filter*)                                               # v4.11 as per OpenVPN allow source to reply over different interface if route defined
+                local ARG=
+                local ACTION=
+                if [ "$(echo "$menu1" | wc -w)" -ge 2 ];then
+                    local ACTION="$(printf "%s" "$menu1" | cut -d' ' -f2)"
+                fi
+                case $ACTION in
+                    1|2|disable|enable|""|"?")
+                        local WAN_IF=$(Get_WAN_IF_Name)
+                        if [ "$ACTION" != "?" ];then
+                            [ "$ACTION" == "disable" ] && { local VAL=2; local TXT="DISABLED"; }
+                            [ "$ACTION" == "enable" ]  && { local VAL=1; local TXT="ENABLED";  }
+                            [ -z "$ACTION" ] && local VAL=1             # default is to re-enable the router's Reverse Path Filtering feature
+
+                            local TXT=$TXT" ($VAL)"
+                            echo $VAL> /proc/sys/net/ipv4/conf/$WAN_IF/rp_filter
+                            echo -e $cBGRE"\n\t [✔] Reverse Path Filtering $TXT\n"$cRESET
+                        else
+                            local VAL=$(cat /proc/sys/net/ipv4/conf/$WAN_IF/rp_filter)
+                            [ "$VAL" == "1" ] && STATE="ENABLED" || STATE="DISABLED"
+                            local TXT="value is "$VAL
+                            echo -e $cBGRE"\n\t [ℹ ] Reverse Path Filtering $TXT\n"$cRESET
+                        fi
+                    ;;
+                    *)
+                        echo -en $cRED"\a\n\t***ERROR: Invalid Reverse Path Filter request $cBWHT'"$ARG"'$cBRED - use 'disable|enable'\n"$cRESET
+                    ;;
+                esac
             ;;
             *)
                 printf '\n\a\t%bInvalid Option%b "%s"%b Please enter a valid option\n' "$cBRED" "$cRESET" "$menu1" "$cBRED"    # v4.03 v3.04 v1.09
@@ -3817,7 +3882,7 @@ EOF
 # $DEVICE_NAME
 [Peer]
 PublicKey = $PUB_KEY
-AllowedIPs = $ALLOWED_IPS
+AllowedIPs = $VPN_POOL_IP
 # $DEVICE_NAME End
 EOF
 
