@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.10"
-#============================================================================================ © 2021 Martineau v4.10
+VERSION="v4.11"
+#============================================================================================ © 2021 Martineau v4.11
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 13-Apr-2021
+# Last Updated Date: 04-May-2021
 #
 # Description:
 #
@@ -42,6 +42,10 @@ Is_AX() {
 }
 Is_IPv4 () {
         grep -oE '^([0-9]{1,3}\.){3}[0-9]{1,3}$'                    # IPv4 format
+}
+Is_IPv6() {
+    # Note this matches compression anywhere in the address, though it won't match the loopback address ::1
+    grep -oE '([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4}'       # IPv6 format -very crude
 }
 Firewall_delete() {
 
@@ -246,10 +250,18 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
 
         if [ -n "$PEER_DNS" ];then            # v4.05
             if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.09
-                iptables -t nat -N WGDNS${VPN_NUM}                          # v4.05
+                if [ "$USE_IPV6" != "Y" ];then                              # v4.11
+                    iptables -t nat -N WGDNS${VPN_NUM}                      # v4.05
+                else
+                    ip6tables -t nat -N WGDNS${VPN_NUM}                     # v4.11
+                fi
                 [ $? -gt 0 ] && { echo -e $cBRED"\a\n\t"; logger -st "wireguard-${MODE}${VPN_NAME}" "***ERROR Failed to create -t nat WGDNS${VPN_NUM}."; echo -e $cRESET; exit 99; }
             else
-                iptables -t nat -N WGDNS${WG_INTERFACE}                     # v4.09
+                if [ "$USE_IPV6" != "Y" ];then                              # v4.11
+                    iptables -t nat -N WGDNS${WG_INTERFACE}                 # v4.09
+                else
+                    ip6tables -t nat -N WGDNS${WG_INTERFACE}                # v4.11
+                fi
                 [ $? -gt 0 ] && { echo -e $cBRED"\a\n\t"; logger -st "wireguard-${MODE}${WG_INTERFACE}" "***ERROR Failed to create -t nat WGDNS${WG_INTERFACE}."; echo -e $cRESET; exit 99; }
             fi
         fi
@@ -266,11 +278,18 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         #  Suppress the message if a domain is supplied i.e.'Error: any valid prefix is expected rather than "'xxx.com"
 
         if [ "$USE_IPV6" != "Y" ];then                      # v4.08
-            ip address add dev $VPN_ID $LOCALIP 2>/dev/null     # v4.02
+            ip address add dev $VPN_ID $LOCALIP 2>/dev/null # v4.02
             ip link set up dev $VPN_ID
         else
-            ip -6 address add dev $VPN_ID $LOCALIP 2>/dev/null     # v4.02
-            ip -6 link set up dev $VPN_ID
+                local $LOCALIPS=$(echo "$LOCALIP" | tr ',' ' ')     # v4.11
+                for LOCALIP in $LOCALIPS
+                    do
+                        if [ -n "$(echo "$LOCALIP" | Is_IPv6)" ];then
+                            ip -6 address add dev $VPN_ID $LOCALIP 2>/dev/null     # v4.02
+                            ip -6 link set up dev $VPN_ID
+                            break
+                        fi
+                    done
         fi
         #ifconfig $VPN_ID mtu 1380
         ifconfig $VPN_ID mtu $MTU                           # v4.09 v1.02
@@ -383,7 +402,8 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
 
                 done
         else
-            ip -6 route add $(echo $LOCALIP | cut -d"::" -f1)::0/64 dev $VPN_ID  proto kernel  scope link  src $LOCALIP 2>/dev/null
+
+            ip -6 route add $(echo $LOCALIP | sed 's/::/|/' | cut -d"|" -f1)::0/64 dev $VPN_ID  proto kernel  scope link  src $LOCALIP 2>/dev/null      # v4.11
             ip -6 route show table main dev $(nvram get lan_ifname) | while read ROUTE
                 do
                     if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.10
@@ -519,7 +539,7 @@ else
 
     else
         if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.10
-            ip -6 rule del from $(nvram get lan_ipaddr | cut -d"::" -f1)::0/24 table 12$VPN_NUM prio 992$VPN_NUM   2>/dev/null
+            ip -6 rule del from $(nvram get lan_ipaddr | sed 's/::/|/' | cut -d"|" -f1)::0/24 table 12$VPN_NUM prio 992$VPN_NUM   2>/dev/null # v4.11
 
             ip -6 route flush table 12$VPN_NUM 2>/dev/null
             ip -6 rule del prio 992$VPN_NUM    2>/dev/null
@@ -553,14 +573,14 @@ else
             iptables -t nat -F WGDNS$WG_INTERFACE 2>/dev/null           # v4.09
             iptables -t nat -X WGDNS$WG_INTERFACE 2>/dev/null           # v4.09
         fi
-    else
-        if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.10
-            ip6tables -t nat -F WGDNS$VPN_NUM 2>/dev/null               # v4.05
-            ip6tables -t nat -X WGDNS$VPN_NUM 2>/dev/null               # v4.05
-        else
-            ip6tables -t nat -F WGDNS$WG_INTERFACE 2>/dev/null          # v4.10
-            ip6tables -t nat -X WGDNS$WG_INTERFACE 2>/dev/null          # v4.0
-        fi
+    # else
+        # if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.10
+            # ip6tables -t nat -F WGDNS$VPN_NUM 2>/dev/null               # v4.05
+            # ip6tables -t nat -X WGDNS$VPN_NUM 2>/dev/null               # v4.05
+        # else
+            # ip6tables -t nat -F WGDNS$WG_INTERFACE 2>/dev/null          # v4.10
+            # ip6tables -t nat -X WGDNS$WG_INTERFACE 2>/dev/null          # v4.0
+        # fi
     fi
 
     logger -t "wireguard-${MODE}${VPN_NAME}" "Wireguard VPN '$MODE' Peer ($VPN_ID) $TXT $SOCKET ($DESC) Terminated"
