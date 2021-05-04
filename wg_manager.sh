@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.11b2"
-#============================================================================================ © 2021 Martineau v4.11b2
+VERSION="v4.11b3"
+#============================================================================================ © 2021 Martineau v4.11b3
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -2227,7 +2227,7 @@ Install_WireGuard_Manager() {
         echo -e $cBRED"\a\n\tERROR: Router$cRESET $HARDWARE_MODEL (v$BUILDNO)$cBRED is not currently compatible with WireGuard!\n"
         exit 96
     else
-        if [ "$(grep -oE "^arch" $ENTWARE_INFO)" != "aarch64" ];then                                # v4.11
+        if [ "$(grep  "^arch" $ENTWARE_INFO | awk -F'=' '{print $2}' )" != "aarch64" ];then     # v4.11 Hotfix
             echo -e $cBRED"\a\n\tERROR: Entware version not compatible with WireGuard!\n"       # v4.11
             exit 97
         fi
