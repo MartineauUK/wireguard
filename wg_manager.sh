@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.11"
-#============================================================================================ © 2021 Martineau v4.11
+VERSION="v4.11b2"
+#============================================================================================ © 2021 Martineau v4.11b2
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,13 +24,13 @@ VERSION="v4.11"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 30-Apr-2021
+# Last Updated Date: 04-May-2021
 #
 # Description:
 #
 # Acknowledgement:
 #
-# Contributors: odkrys,Torson,ZebMcKayhan,jobhax,elorimer,Sh0cker54
+# Contributors: odkrys,Torson,ZebMcKayhan,jobhax,elorimer,Sh0cker54,here1310
 
 GIT_REPO="wireguard"
 GITHUB_MARTINEAU="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/main"
@@ -151,10 +151,17 @@ Repeat() {
     # Print 25 '=' use HDRLINE=$(Repeat 25 "=")
     printf "%${1}s\n" | tr " " "$2"
 }
-Is_IPv4_CIDR () {
+Is_IPv4() {
+    grep -oE '^([0-9]{1,3}\.){3}[0-9]{1,3}$'                    # IPv4 format
+}
+Is_IPv6() {
+    # Note this matches compression anywhere in the address, though it won't match the loopback address ::1
+    grep -oE '([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4}'       # IPv6 format -very crude
+}
+Is_IPv4_CIDR() {
         grep -oE '^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$'         # IPv4 CIDR range notation
 }
-Is_Private_IPv4 () {
+Is_Private_IPv4() {
     # 127.  0.0.0 – 127.255.255.255     127.0.0.0 /8
     # 10.   0.0.0 –  10.255.255.255      10.0.0.0 /8
     # 172. 16.0.0 – 172. 31.255.255    172.16.0.0 /12
@@ -162,7 +169,7 @@ Is_Private_IPv4 () {
     #grep -oE "(^192\.168\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])$)|(^172\.([1][6-9]|[2][0-9]|[3][0-1])\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])$)|(^10\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])$)"
     grep -oE "(^127\.)|(^(0)?10\.)|(^172\.(0)?1[6-9]\.)|(^172\.(0)?2[0-9]\.)|(^172\.(0)?3[0-1]\.)|(^169\.254\.)|(^192\.168\.)"
 }
-Is_Private_IPv6 () {
+Is_Private_IPv6() {
     grep -oE "(::1$)|([fF][cCdD])"
 }
 Convert_1024KMG() {
@@ -655,15 +662,15 @@ Delete_Peer() {
                                 #   ..........
                                 #   # SGS8 End
 
-                                    # Scan for 'server' Peer that accepts this 'client' connection
-                                    SERVER_PEER=$(grep -HE "^#.*$WG_INTERFACE$" /opt/etc/wireguard.d/wg2*.conf | awk -F '[\/:\._]' '{print $6}')    # v4.11
+                                # Scan for 'server' Peer that accepts this 'client' connection
+                                SERVER_PEER=$(grep -HE "^#.*$WG_INTERFACE$" /opt/etc/wireguard.d/wg2*.conf | awk -F '[\/:\._]' '{print $6}')    # v4.11
 
-                                    for SERVER_PEER in $SERVER_PEER
-                                        do
-                                            echo -e $cBGRE"\t'device' Peer ${cBMAG}${WG_INTERFACE}${cBGRE} removed from 'server' Peer (${cBMAG}${SERVER_PEER}${cBGRE})"     # 4.02
-                                            sed -i "/^# $WG_INTERFACE$/,/^# $WG_INTERFACE End$/d" ${CONFIG_DIR}${SERVER_PEER}.conf
-                                            local RESTART_SERVERS=$RESTART_SERVERS" "$SERVER_PEER
-                                        done
+                                for SERVER_PEER in $SERVER_PEER
+                                    do
+                                        echo -e $cBGRE"\t'device' Peer ${cBMAG}${WG_INTERFACE}${cBGRE} removed from 'server' Peer (${cBMAG}${SERVER_PEER}${cBGRE})"     # 4.02
+                                        sed -i "/^# $WG_INTERFACE$/,/^# $WG_INTERFACE End$/d" ${CONFIG_DIR}${SERVER_PEER}.conf
+                                        local RESTART_SERVERS=$RESTART_SERVERS" "$SERVER_PEER
+                                    done
                             fi
                         fi
                         #echo -e $cBCYA"\tDeleting '${CONFIG_DIR}${WG_INTERFACE}*.*'"$cBRED
@@ -754,6 +761,7 @@ Import_Peer() {
     for WG_INTERFACE in $WG_INTERFACE $@
         do
             [ "$WG_INTERFACE" = "comment" ] && break
+            WG_INTERFACE=$(echo "$WG_INTERFACE" | sed 's~.conf$~~')     # v4.11
             if [ -f ${IMPORT_DIR}${WG_INTERFACE}.conf ];then
                 local MODE=$(Server_or_Client "$WG_INTERFACE")
                 [ -n "$FORCE_TYPE" ] && { MODE=$FORCE_TYPE; local FORCE_TYPE_TXT="(${cBRED}FORCED as 'client'${cRESET}) ${cBGRE}"; }                # v4.03
@@ -902,6 +910,7 @@ Manage_Peer() {
                     echo -e "\tpeer peer_name\t\t\t\t\t\t\t\t- Show Peer in database or for details e.g peer wg21 config"
                     echo -e "\tpeer peer_name {cmd {options} }\t\t\t\t\t\t- Action the command against the Peer"
                     echo -e "\tpeer peer_name del\t\t\t\t\t\t\t- Delete the Peer from the database and all of its files *.conf, *.key"
+                    echo -e "\tpeer peer_name ip=xxx.xxx.xxx.xxx\t\t\t\t\t- Change the Peer VPN Pool IP"
                     echo -e "\tpeer category\t\t\t\t\t\t\t\t- Show Peer categories in database"
                     echo -e "\tpeer peer_name category [category_name {del | add peer_name[...]} ]\t- Create a new category with 3 Peers e.g. peer category GroupA add wg17 wg99 wg11"
 
@@ -1011,14 +1020,57 @@ Manage_Peer() {
                                 Manage_RPDB_rules $menu1
                                 [ $? -eq 1 ] && Show_Peer_Config_Entry "$WG_INTERFACE"
                             ;;
+                            allowedips=*)
+                                shift
+                                local Mode=$(Server_or_Client "$WG_INTERFACE")
+                                local ALLOWEDIPSCMD="$(echo "$CMD" | sed -n "s/^.*allowedips=//p" | awk '{print $1}' | tr ',' ' ')" # v4.11
+                                local ALLOWEDIPS=
+                                for IP in $ALLOWEDIPSCMD
+                                    do
+                                        if [ -n "$(echo "$IP" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$IP" | Is_IPv4)" ] || [ -n "$(echo "$IP" | Is_IPv6)" ];then       # v4.11
+                                            [ -n "$ALLOWEDIPS" ] && local ALLOWEDIPS=$ALLOWEDIPS","
+                                            ALLOWEDIPS=$ALLOWEDIPS""$IP
+                                        else
+                                            echo -e $cBRED"\n\a\t***ERROR: Invalid IP '${cBWHT}${IP}${cBRED}'"$RESET
+                                            return
+                                        fi
+                                    done
+
+                                local SQL_MATCH="subnet"; local ID="peer"; IPADDR="subnet"
+                                case $Mode in
+                                    server) local TABLE="servers";;
+                                    client) local TABLE="clients";;
+                                    device) local TABLE="devices"; local ID="name"; local IPADDR="allowedip"; local SQL_MATCH="ip";;
+                                esac
+
+                                sqlite3 $SQL_DATABASE "UPDATE $TABLE SET $IPADDR='$ALLOWEDIPS' WHERE $ID='$WG_INTERFACE';"
+
+                                [ "$Mode" == "device" ] && { DEVICE_NAME=$WG_INTERFACE; Display_QRCode "${CONFIG_DIR}${DEVICE_NAME}.conf"; }    # v4.11
+
+                                # If 'client' Peer is up, then restart it
+                                if [ "$Mode" == "client" ];then
+                                    if [ -n "$(wg show interfaces | grep -ow "$WG_INTERFACE")" ];then
+                                        CMD="restart"
+                                        local TAG=$cBWHT"("${cBMAG}$(sqlite3 $SQL_DATABASE "select tag FROM $TABLE WHERE $ID='$WG_INTERFACE';")${cBWHT}")"
+                                        echo -e $cBWHT"\a\n\tWireGuard 'client' Peer ${cBMAG}${WG_INTERFACE} ${TAG}$cBWHT needs to be ${CMD}ed"
+                                        echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'client' Peer ($WG_INTERFACE) or press$cBGRE [Enter] to SKIP."
+                                        read -r "ANS"
+                                        [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$WG_INTERFACE"; Show_Peer_Status "show"; }
+                                    fi
+                                fi
+
+                                echo -e $cBGRE"\n\t[✔] Updated Allowed IPs\n"$cRESET
+                            ;;
                             ip=*)
                                 shift
                                 local Mode=$(Server_or_Client "$WG_INTERFACE")
                                 local IP_SUBNET="$(echo "$CMD" | sed -n "s/^.*ip=//p" | awk '{print $1}')"
-                                if [ "${IP_SUBNET#${IP_SUBNET%???}}" != "/32" ] && [ "${IP_SUBNET#${IP_SUBNET%???}}" != "/24" ];then    # v4.02
-                                    local IP_SUBNET=$IP_SUBNET"/32"                     # v4.02
-                                fi
-                                if [ -n "$(echo "$IP_SUBNET" | Is_IPv4_CIDR)" ];then    # v4.02
+
+                                # v4.11 Whilst convenient, the following isn't appropriate for Site-to-Site where '/24' is the norm, nor for IPv6 addresses
+                                #if [ "${IP_SUBNET#${IP_SUBNET%???}}" != "/32" ] && [ "${IP_SUBNET#${IP_SUBNET%???}}" != "/24" ];then    # v4.02
+                                    #local IP_SUBNET=$IP_SUBNET"/32"                     # v4.02
+                                #fi
+                                if [ -n "$(echo "$IP_SUBNET" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$IP_SUBNET" | Is_IPv6)"  ];then    # v4.11 v4.02
                                     local CHECK_IP=$(echo "$IP_SUBNET" | sed s'~/.*$~~')
                                     local SQL_MATCH="subnet"; local ID="peer"; IPADDR="subnet"
                                     case $Mode in
@@ -1026,6 +1078,17 @@ Manage_Peer() {
                                         client) local TABLE="clients";;
                                         device) local TABLE="devices"; local ID="name"; local IPADDR="ip"; local SQL_MATCH="ip";;
                                     esac
+
+                                    # If it's a 'server' Peer, then all of its current 'device' Peers would be invalidated
+                                    if [ "$Mode" == "server" ];then             # v4.11
+                                        # Check how many 'client' Peers exist
+                                        local CNT=$(grep -cE "^AllowedIPs" ${CONFIG_DIR}${WG_INTERFACE}.conf )
+                                        if [ $CNT -gt 0 ];then
+                                            echo -e $cBRED"\n\a\t***ERROR: This will invalidate ${cBWHT}${CNT}$cBRED Road-Warrior 'device' Peers...request ABORTED"$RESET   # v4.11
+                                            return
+                                        fi
+                                    fi
+
                                     # Can't be the server IP or already assigned                    # v4.02
                                     if [ "${CHECK_IP##*.}" != "1" ];then
                                             local DUPLICATE=$(sqlite3 $SQL_DATABASE "SELECT $ID FROM $TABLE WHERE $SQL_MATCH LIKE '$CHECK_IP%';")   # v4.02
@@ -1033,12 +1096,39 @@ Manage_Peer() {
 
                                                 #[ "${WG_INTERFACE:0:2}" != "wg" ] && local TABLE="devices"; local ID="name"; local IPADDR="ip"
 
-                                                # If it a 'server' Peer then all of its 'device' Peers are now invalid?
+                                                [ "$Mode" == "device" ] && local OLD_IP=$(sqlite3 $SQL_DATABASE "select $IPADDR FROM devices WHERE $ID='$WG_INTERFACE';")
+
                                                 # It may be that a 'device' Peer needs a static IP in its 'server' Peer Subnet?
                                                 sqlite3 $SQL_DATABASE "UPDATE $TABLE SET $IPADDR='$IP_SUBNET' WHERE $ID='$WG_INTERFACE';"
                                                 sed -i "/^Address/ s~[^ ]*[^ ]~$IP_SUBNET~3" ${CONFIG_DIR}${WG_INTERFACE}.conf
 
                                                 echo -e $cBGRE"\n\t[✔] Updated IP/Subnet\n"$cRESET
+
+                                                # v4.11 If it's a 'device' Peer, then its 'server' Peer needs to be updated, and the new QRCODE scanned into device @here1310
+                                                if [ "$Mode" == "device" ];then
+                                                    DEVICE_NAME=$WG_INTERFACE
+                                                    # Find the 'server' Peer listening for the Road-Warrior 'device' Peer
+                                                    local RESTART_SERVERS=$(grep -HE "^#.*$DEVICE_NAME$" ${CONFIG_DIR}wg2*.conf | awk -F '[\/:\._]' '{print $6}')
+                                                    # Update the old VPN POOL IP with the new in the 'server' Peer config                   # v4.11
+                                                    sed -i "/^# $DEVICE_NAME$/,/^# $DEVICE_NAME End$/ s~$OLD_IP~$IP_SUBNET~" ${CONFIG_DIR}${RESTART_SERVERS}.conf   # v4.11
+
+                                                    Display_QRCode "${CONFIG_DIR}${DEVICE_NAME}.conf"                       # v4.11
+
+                                                    # Do we need to restart any 'server' Peers?
+                                                    local RESTART_SERVERS=$(echo "$RESTART_SERVERS" | xargs -n1 | sort -u | xargs)  # Remove duplicates from the restart list
+                                                    for SERVER_PEER in $RESTART_SERVERS
+                                                        do
+                                                            # Need to Restart the 'server' Peer if it is UP
+                                                            if [ -n "$(wg show interfaces | grep "$SERVER_PEER")" ];then
+                                                                CMD="restart"
+                                                                local TAG=$cBWHT"("${cBMAG}$(sqlite3 $SQL_DATABASE "select tag FROM devices WHERE $ID='$DEVICE_NAME';")${cBWHT}")"
+                                                                echo -e $cBWHT"\a\n\tWireGuard 'server' Peer needs to be ${CMD}ed to update 'client' Peer ${cBMAG}${DEVICE_NAME} $TAG"
+                                                                echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer ($SERVER_PEER) or press$cBGRE [Enter] to SKIP."
+                                                                read -r "ANS"
+                                                                [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$SERVER_PEER"; Show_Peer_Status "show"; }  # v3.03
+                                                            fi
+                                                        done
+                                                fi
                                             else
                                                 echo -e $cBRED"\n\a\t***ERROR: '$IP_SUBNET' already assigned to Peer ${cBMAG}$DUPLICATE"$RESET
                                             fi
@@ -1046,7 +1136,7 @@ Manage_Peer() {
                                         echo -e $cBRED"\n\a\t***ERROR: '$IP_SUBNET' is not valid cannot be .1 "$RESET   # v4.02
                                     fi
                                 else
-                                    echo -e $cBRED"\n\a\t***ERROR: '$IP_SUBNET' is not a valid IPv4 CIDR"$RESET # v4.02
+                                    echo -e $cBRED"\n\a\t***ERROR: '$IP_SUBNET' is not a valid IPv4 CIDR or IPv6 address"$RESET # v4.11 v4.02
                                 fi
                             ;;
                             dns*)
@@ -2917,8 +3007,8 @@ Manage_UDP_Monitor() {
             killall "$(pidof conntrack)" 2>/dev/null
             killall "$(pidof UDP_Monitor.sh)"  2>/dev/null
             killall "$(pidof UDP_Updater.sh)" 2>/dev/null
-            rm UDP_Updater.pid  2>/dev/null
-            rm UDP_Monitor.pid  2>/dev/null
+            rm /tmp/UDP_Updater.pid  2>/dev/null
+            rm /tmp/UDP_Monitor.pid  2>/dev/null
             rm /tmp/WireGuard_UDP.log 2>/dev/null
             rm ${INSTALL_DIR}UDP_Monitor.sh 2>/dev/null
         else
@@ -2931,7 +3021,7 @@ VERSION="$TS"
 #============================================================================================ © 2021 Martineau v1.01
 
 SayT() {
-   echo -e \$\$ $@ | logger -t "(\$(basename \$0))"
+   echo -e \$\$ \$@ | logger -t "(\$(basename \$0))"
 }
 LOCKFILE="/tmp/\${0##*/}.pid"
 
@@ -2953,10 +3043,14 @@ EOF
 
             fi
 
-            [ -z "$(pidof UDP_Monitor.sh)" ] && ( ${INSTALL_DIR}UDP_Monitor.sh & )
+            if [ -z "$(pidof UDP_Monitor.sh)" ];then
+                {INSTALL_DIR}UDP_Monitor.sh &
+            fi
 
 
-            [ -z "$(pidof UDP_Updater.sh)" ] && ( ${INSTALL_DIR}UDP_Updater.sh & )
+            if [ -z "$(pidof UDP_Updater.sh)" ];then
+                ${INSTALL_DIR}UDP_Updater.sh &
+            fi
 
         fi
 
@@ -3995,28 +4089,29 @@ if [ "$1" != "install" ];then   # v2.01
         fi
     fi
 
-    if [ "$(WireGuard_Installed)" == "Y" ];then             # v2.01
+    if [ "$(WireGuard_Installed)" == "Y" ];then # v2.01
 
         case "$1" in
 
             start|init)
+
                 if [ "$1" == "init" ];then
 
                     if [ "$(nvram get ntp_ready)" = "0" ];then              # v4.01 Ensure event 'restart_diskmon' triggers the actual start of WireGuard Session Manager
                         FN="/jffs/scripts/service-event-end"
                         [ ! -f $FN ] && { echo "#!/bin/sh" > $FN; chmod +x $FN; }
                         [ -z "$(grep -i "WireGuard" $FN)" ] && echo -e "if [ "\$2" = "diskmon" ]; then { sh /jffs/addons/wireguard/wg_manager.sh init & } ; fi # WireGuard_Manager" >> $FN   # v4.01
-                        SayT "WIreGuard Session Manager delayed for NTP synch event trigger 'restart_diskmon'"  # v4.01
+                        SayT "WireGuard Session Manager delayed for NTP synch event trigger 'restart_diskmon'"  # 4.11 v4.01
                         exit 99
                     fi
 
-                    UDP_MONITOR=$(Manage_UDP_Monitor "INIT" "disable")
+                    #[ $(sqlite3 $SQL_DATABASE "SELECT COUNT(auto) FROM servers WHERE auto='Y';") -gt 0 ] && UDP_MONITOR=$(Manage_UDP_Monitor "INIT" "enable")  # 4.11
 
                     Manage_Stats "INIT" "enable"
 
                 fi
 
-                Manage_Wireguard_Sessions "start" "$PEER" "$NOPOLICY"             # Post mount should start ALL defined sessions @BOOT
+                Manage_Wireguard_Sessions "start" "$PEER" "$NOPOLICY"
                 echo -e $cRESET
                 exit_message
             ;;
@@ -4066,9 +4161,11 @@ if [ "$1" != "install" ];then   # v2.01
         esac
 
     else
-        SayT "***ERROR WireGuard Manager/WireGuard Tool module 'wg' NOT installed"
-        echo -e $cBRED"\a\n\t***ERROR WireGuard Tool module 'wg' NOT installed\n"$cRESET
-        exit_message
+        if [ "$1" != "init" ];then              # v4.11
+            SayT "***ERROR WireGuard Manager/WireGuard Tool module 'wg' NOT installed"
+            echo -e $cBRED"\a\n\t***ERROR WireGuard Tool module 'wg' NOT installed\n"$cRESET
+            exit_message
+        fi
     fi
 fi
 
@@ -4083,8 +4180,6 @@ echo -e $cRESET
 rm -rf /tmp/wg.lock
 
 exit 0
-
-
 
 
 #) 2>&1 | logger -t $(basename $0)"[$$_***DEBUG]"
