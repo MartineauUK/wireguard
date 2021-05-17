@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.11b3"
-#============================================================================================ © 2021 Martineau v4.11b3
+VERSION="v4.11b4"
+#============================================================================================ © 2021 Martineau v4.11b4
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.11b3"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 04-May-2021
+# Last Updated Date: 13-May-2021
 #
 # Description:
 #
@@ -943,7 +943,11 @@ Manage_Peer() {
                             ;;
                             auto*)
                                 #shift 1
-                                local AUTO=$(echo "$CMD" | awk -F '=' '{print $2}')
+                                local Mode=$(Server_or_Client "$WG_INTERFACE")      # v4.11
+
+                                local AUTO=$(echo "$CMD" | sed -n "s/^.*auto=//p" | awk '{print $1}')   # v4.11
+
+                                [ "$Mode" == "device" ] && { echo -e $cBRED"\a\n\t***ERROR 'device' Peer '$WG_INTERFACE' does not support $cBWHT'auto=$AUTO'\n"$cRESET; return ; }  # v4.11
 
                                 if [ "$(echo "$AUTO" | grep "^[yYnNpPZ]$" )" ];then
                                     FLAG=$(echo "$AUTO" | tr 'a-z' 'A-Z')
@@ -954,7 +958,8 @@ Manage_Peer() {
                                         fi
                                     fi
 
-                                    [ $(Server_or_Client "$WG_INTERFACE") == "server" ] && local TABLE="servers" || TABLE="clients" # v4.10
+                                    [ "$Mode" == "server" ] && local TABLE="servers" || TABLE="clients" # v4.11 v4.10
+
                                     sqlite3 $SQL_DATABASE "UPDATE $TABLE SET auto='$FLAG' WHERE peer='$WG_INTERFACE';"
                                     echo -e $cBGRE"\n\t[✔] Updated '$WG_INTERFACE' AUTO=$FLAG\n"$cRESET
                                 else
@@ -990,18 +995,29 @@ Manage_Peer() {
                                     grep -ivE "example" ${CONFIG_DIR}${WG_INTERFACE}.conf | awk '( $1=="PrivateKey" || $1=="ListenPort" || $3=="End") {print $0}' | sed 's/End//g; s/^#/Client Peer:/g'
                                 else
                                     echo -e $cBWHT"\n\t'$Mode' Peer ${cBMAG}${WG_INTERFACE}${cBWHT} Configuration Detail\n"$cBYEL
-                                    case $Mode in                           # v4.11
+                                    local ID="peer"                                     # v4.11
+                                    case $Mode in                                       # v4.11
                                         server) local TABLE="servers";;
-                                        clients) local TABLE="clients";;
-                                        *) local TABLE="devices";;
+                                        client) local TABLE="clients";;                 # v4.11
+                                        *) local TABLE="devices";local ID="name";;      # v4.11
                                     esac
-                                    cat ${CONFIG_DIR}${WG_INTERFACE}.conf
+
+                                    cat ${CONFIG_DIR}${WG_INTERFACE}.conf | grep .      # v4.11
+
+                                    local AUTO="$(sqlite3 $SQL_DATABASE "SELECT auto FROM $TABLE WHERE $ID='$WG_INTERFACE';")"  # v4.11
 
                                     if [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$WG_INTERFACE';") -gt 0 ];then
-                                        echo -e $cBCYA"\n\tSelective Routing RPDB rules\n"
-                                        sqlite3 $SQL_DATABASE "SELECT rowid,peer,iface,srcip,dstip,tag FROM policy WHERE peer='$WG_INTERFACE' ORDER BY iface DESC;" |column -t  -s '|' --table-columns ID,Peer,Interface,Source,Destination,Description # v4.08
+                                        local COLOR=$cBCYA;local TXT=
+                                        if [ "$Mode" == "client" ] && [ "$AUTO" != "P" ];then
+                                            COLOR=$cRED;local TXT="DISABLED"
+                                        fi
+                                        echo -e $COLOR"\n\tSelective Routing RPDB rules $TXT\n"
+                                        sqlite3 $SQL_DATABASE "SELECT rowid,peer,iface,srcip,dstip,tag FROM policy WHERE $ID='$WG_INTERFACE' ORDER BY iface DESC;" |column -t  -s '|' --table-columns ID,Peer,Interface,Source,Destination,Description # v4.08
                                     else
-                                        echo -e $cRED"\n\tNo RPDB Selective Routing rules for $WG_INTERFACE\n"$cRESET
+                                        if [ "$Mode" == "client" ];then
+                                            [ "$AUTO" != "P" ] && local COLOR=$cGRA || local COLOR=$cRED                    # v4.11
+                                            echo -e $COLOR"\n\tNo RPDB Selective Routing rules for $WG_INTERFACE\n"$cRESET  # v4.11
+                                        fi
                                     fi
                                 fi
 
@@ -2660,28 +2676,33 @@ Show_Peer_Config_Entry() {
             local Mode=$(Server_or_Client "$WG_INTERFACE")
             case "$Mode" in
                 server)
-                    local TABLE="servers"; local SQL_COL="peer"
+                    local TABLE="servers"; local ID="peer"
                     local COLUMN_TXT="Server,Auto,Subnet,Port,Public,Private,Annotate"
                     ;;
                 client)
-                    local TABLE="clients"; local SQL_COL="peer"
+                    local TABLE="clients"; local ID="peer"
                     local COLUMN_TXT="Client,Auto,IP,Endpoint,DNS,MTU,Public,Private,Annotate"    # v4.09 v4.04
                     ;;
                 *)
-                    local TABLE="devices"; local SQL_COL="name"
+                    local TABLE="devices"; local ID="name"
                     local COLUMN_TXT="Device,Auto,IP,DNS,Allowed IPs,Public,Private,Annotate,Conntrack" # v4.09
                     ;;
             esac
 
-            echo -e
-            sqlite3 $SQL_DATABASE "SELECT * from $TABLE WHERE $SQL_COL='$WG_INTERFACE';" | column -t  -s '|' --table-columns "$COLUMN_TXT"
+            local AUTO="$(sqlite3 $SQL_DATABASE "SELECT auto FROM $TABLE WHERE $ID='$WG_INTERFACE';")"  # v4.11
 
-            if [ "$SQL_COL" == "peer" ];then                                                        # v4.09
+            echo -e
+            sqlite3 $SQL_DATABASE "SELECT * from $TABLE WHERE $ID='$WG_INTERFACE';" | column -t  -s '|' --table-columns "$COLUMN_TXT"
+
+            if [ "$ID" == "peer" ];then                                                        # v4.09
                 if [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$WG_INTERFACE';") -gt 0 ];then
                     echo -e $cBCYA"\n\tSelective Routing RPDB rules"
                     sqlite3 $SQL_DATABASE "SELECT rowid,peer,iface,srcip,dstip,tag FROM policy WHERE peer='$WG_INTERFACE' ORDER BY iface DESC;" |column -t  -s '|' --table-columns ID,Peer,Interface,Source,Destination,Description # v4.08
                 else
-                    echo -e $cRED"\n\tNo RPDB Selective Routing rules for $WG_INTERFACE\n"$cRESET
+                    if [ "$Mode" == "client" ];then
+                        [ "$AUTO" != "P" ] && local COLOR=$cGRA || local COLOR=$cRED                    # v4.11
+                        echo -e $COLOR"\n\tNo RPDB Selective Routing rules for $WG_INTERFACE\n"$cRESET  # v4.11
+                    fi
                 fi
 
                 echo -e
@@ -3616,7 +3637,7 @@ Process_User_Choice() {
                 shift
                 local IP=$1
 
-                [ -z "$IP" ] && { echo -en $cRED"\a\n\t***ERROR: Host name or IP address required'\n"$cRESET ; return 1; }
+                [ -z "$IP" ] && { echo -en $cRED"\a\n\t***ERROR: LAN Host name or LAN IP address required'\n"$cRESET ; return 1; }
 
                 [ -z "$(echo "$IP" | Is_Private_IPv4)" ] && local IP=$(grep -i "$IP" /etc/hosts.dnsmasq  | awk '{print $1}')
                 [ -z "$IP" ] && { echo -en $cRED"\a\n\t***ERROR: Invalid host IP address!'\n"$cRESET ; return 1; }
@@ -4058,6 +4079,11 @@ NOCHK=
 NOCHK="Martineau Disabled hack"
 [ -n "$(echo "$@" | grep -w "nochk")" ] & NOCHK="Y"
 
+# http://www.snbforums.com/threads/beta-wireguard-session-manager.70787/post-688282
+if [ "$HARDWARE_MODEL" == "RT-AX86U" ];then
+    [ -n "$(fc status | grep "Flow Learning Enabled")" ] && { fc disable; Say "Broadcom Packet Flow Cache learning via BLOG (Flow Cache) DISABLED"; }   # v4.11 @Torson
+fi
+
 # Retain commandline compatibility
 if [ "$1" != "install" ];then   # v2.01
 
@@ -4101,11 +4127,11 @@ if [ "$1" != "install" ];then   # v2.01
                         FN="/jffs/scripts/service-event-end"
                         [ ! -f $FN ] && { echo "#!/bin/sh" > $FN; chmod +x $FN; }
                         [ -z "$(grep -i "WireGuard" $FN)" ] && echo -e "if [ "\$2" = "diskmon" ]; then { sh /jffs/addons/wireguard/wg_manager.sh init & } ; fi # WireGuard_Manager" >> $FN   # v4.01
-                        SayT "WireGuard Session Manager delayed for NTP synch event trigger 'restart_diskmon'"  # 4.11 v4.01
+                        SayT "WireGuard Session Manager delayed for NTP synch event trigger 'restart_diskmon'"  # v4.11 v4.01
                         exit 99
                     fi
 
-                    #[ $(sqlite3 $SQL_DATABASE "SELECT COUNT(auto) FROM servers WHERE auto='Y';") -gt 0 ] && UDP_MONITOR=$(Manage_UDP_Monitor "INIT" "enable")  # 4.11
+                    #[ $(sqlite3 $SQL_DATABASE "SELECT COUNT(auto) FROM servers WHERE auto='Y';") -gt 0 ] && UDP_MONITOR=$(Manage_UDP_Monitor "INIT" "enable")  # v4.11
 
                     Manage_Stats "INIT" "enable"
 
