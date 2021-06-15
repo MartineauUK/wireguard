@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.11"
-#============================================================================================ © 2021 Martineau v4.11
+VERSION="v4.12"
+#============================================================================================ © 2021 Martineau v4.12
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 04-May-2021
+# Last Updated Date: 15-Jun-2021
 #
 # Description:
 #
@@ -189,6 +189,12 @@ LAN_SUBNET=${LAN_ADDR%.*}                                       # v4.05
 #[ -n "$(echo "$Subnet" | Is_Private_IPv6)" ] && { USE_IPV6="Y"; IPV6_TXT="(IPv6) "; }
 [ "$(nvram get ipv6_service)" != "disabled" ] && { USE_IPV6="Y"; IPV6_TXT="(IPv6) "; }          # 4.08
 
+# Override IPv6 ?
+if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -n "$(grep -E "^NOIPV6" /jffs/addons/wireguard/WireguardVPN.conf)" ];then    # v4.12
+    USE_IPV6="N"; IPV6_TXT=
+    SayT "'NOIPV6' directive found ('WireguardVPN.conf')- IPv6 configuration forced to IPv4"    # v4.12
+fi
+
 [ -n "$(echo "$@" | grep "force")" ] && local FORCE="force"
 
 # Is this a standard 'client' Peer interface 'wg11-wg15'                    # v1.03
@@ -357,11 +363,11 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
                             DSTSRC=$(sqlite3 $SQL_DATABASE "SELECT dstsrc FROM ipset WHERE ipset='$IPSET' AND peer='${WG_INTERFACE}';")
                             FWMARK=$(sqlite3 $SQL_DATABASE "SELECT fwmark FROM ipset WHERE ipset='$IPSET' AND peer='${WG_INTERFACE}';")
                             if [ "$USE_IPV6" != "Y" ];then                  # v4.08
-                                iptables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} 2>/dev/null
-                                iptables -t mangle -A PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK}
+                                iptables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'" 2>/dev/null # v4.12
+                                iptables -t mangle -A PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'"             # v4.12
                             else
-                                ip6tables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} 2>/dev/null
-                                ip6tables -t mangle -A PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK}
+                                ip6tables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'" 2>/dev/null    # v4.12
+                                ip6tables -t mangle -A PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'"                # v4.12
                             fi
                             logger -t "wireguard-${MODE}${VPN_NAME}" "Adding IPSet '$IPSET' route through VPN 'client' Peer" $WG_INTERFACE
                         else
@@ -522,6 +528,7 @@ else
 
     TIMESTAMP=$(date +%s)
     sqlite3 $SQL_DATABASE "INSERT into session values('$WG_INTERFACE','End','$TIMESTAMP');" # v1.08
+    sqlite3 $SQL_DATABASE "INSERT into traffic values('$WG_INTERFACE','$TIMESTAMP','0','0');"   # 4.12 @ZebMcKayhan
 
     Firewall_delete
 
@@ -553,9 +560,9 @@ else
             DSTSRC=$(sqlite3 $SQL_DATABASE "SELECT dstsrc FROM ipset WHERE ipset='$IPSET' AND peer='${WG_INTERFACE}';")
             FWMARK=$(sqlite3 $SQL_DATABASE "SELECT fwmark FROM ipset WHERE ipset='$IPSET' AND peer='${WG_INTERFACE}';")
             if [ "$USE_IPV6" != "Y" ];then                                      # v4.08
-                iptables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} 2>/dev/null
+                iptables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'" 2>/dev/null # v4.12
             else
-                ip6tables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} 2>/dev/null
+                ip6tables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'" 2>/dev/null    # v4.12
             fi
             logger -t "wireguard-${MODE}${VPN_NAME}" "Removing IPSet '$IPSET' routing through VPN 'client' Peer" $WG_INTERFACE
         done
