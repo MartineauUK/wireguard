@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.11b5"
-#============================================================================================ © 2021 Martineau v4.11b5
+VERSION="v4.11b6"
+#============================================================================================ © 2021 Martineau v4.11b6
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.11b5"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 05-Jun-2021
+# Last Updated Date: 15-Jun-2021
 #
 # Description:
 #
@@ -2583,6 +2583,8 @@ Show_Peer_Status() {
                             [ $MINS -gt 30 ] && COLOR=$cBGRA || COLOR=$cBWHT
 
                             if [ "$STATS" == "Y" ];then
+#set -x
+#(
                                 local RX=
                                 local RXU=
                                 local TX=
@@ -2594,19 +2596,26 @@ Show_Peer_Status() {
 
                                 # Need to get the last logged RX/TX values for the Peer, and only add to SQL if total > 0
                                 Parse "$(sqlite3 $SQL_DATABASE "select rx,tx from traffic WHERE peer='$WG_INTERFACE' order by timestamp desc limit 1;")" "|" RX_OLD TX_OLD
+
                                 if [ -n "$RX_OLD" ] && [ -n "$TX_OLD" ];then
-                                    local RX_DELTA=$((RX-RX_OLD))
-                                    local TX_DELTA=$((TX-TX_OLD))
+                                    #local RX_DELTA=$((RX-RX_OLD))
+                                    #local TX_DELTA=$((TX-TX_OLD))
+                                    # Old-skool - slower but doesn't create negative result
+                                    #   WTF!!! echo $((1191071409+2037987240))
+                                    local RX_DELTA=$(expr "$RX" - "$RX_OLD")    # v4.11 @ZebMcKayhan
+                                    local TX_DELTA=$(expr "$TX" - "$TX_OLD")    # v4.11 @ZebMcKayhan
                                 else
                                     local RX_DELTA=$RX
                                     local TX_DELTA=$TX
                                 fi
 
+
                                 if [ $((RX_DELTA+TX_DELTA)) -gt 0 ];then
                                     local TIMESTAMP=$(date +%s)
-
                                     sqlite3 $SQL_DATABASE "INSERT into traffic values('$WG_INTERFACE','$TIMESTAMP','$RX_DELTA','$TX_DELTA');"       # v3.05
                                 fi
+#set +x
+#) 2>&1 | logger -t $(basename $0)"[$$_***DEBUG]"
                             fi
                             local TABS="\t\t"
                             [ "${#LINE}" -lt 40 ] && local TABS="\t\t\t"
