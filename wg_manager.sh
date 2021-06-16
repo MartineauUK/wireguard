@@ -2610,7 +2610,8 @@ Show_Peer_Status() {
                                 fi
 
 
-                                if [ $((RX_DELTA+TX_DELTA)) -gt 0 ];then
+                                #if [ $((RX_DELTA+TX_DELTA)) -gt 0 ];then
+                                    if [ $(expr "$RX_DELTA" + "$TX_DELTA") -gt 0 ];then # v4.11 @ZebMcKayhan
                                     local TIMESTAMP=$(date +%s)
                                     sqlite3 $SQL_DATABASE "INSERT into traffic values('$WG_INTERFACE','$TIMESTAMP','$RX_DELTA','$TX_DELTA');"       # v3.05
                                 fi
