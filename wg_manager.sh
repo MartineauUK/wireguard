@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.11b6"
-#============================================================================================ © 2021 Martineau v4.11b6
+VERSION="v4.11b7"
+#============================================================================================ © 2021 Martineau v4.11b7
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.11b6"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 15-Jun-2021
+# Last Updated Date: 22-Jun-2021
 #
 # Description:
 #
@@ -1706,6 +1706,7 @@ Initialise_SQL() {
     fi
 
     # v4.09 Modify policy
+    # v4.11 Modify traffic
     cat > /tmp/sql_cmds.txt << EOF
 CREATE TABLE IF NOT EXISTS servers (peer varchar(5) PRIMARY KEY, auto varchar(1) NOT NULL, subnet varchar(19) NOT NULL, port integer(5), pubkey varchar(55), prikey varchar(55) NOT NULL, tag varchar(40));
 CREATE TABLE IF NOT EXISTS clients (peer varchar(5) PRIMARY KEY, auto varchar(1) NOT NULL, subnet varchar(19) NOT NULL, socket varchar(25), dns varchar(19), mtu integer(4),pubkey varchar(55), prikey varchar(55), tag varchar(40));
@@ -1713,7 +1714,7 @@ CREATE TABLE IF NOT EXISTS devices (name varchar(15) PRIMARY KEY, auto varchar(1
 CREATE TABLE IF NOT EXISTS policy  (peer varchar(5), iface varchar(4), srcip varchar(19), dstip varchar(19), tag varchar(30), PRIMARY KEY(peer,iface,srcip,dstip));
 CREATE TABLE IF NOT EXISTS fwmark  (fwmark varchar(10), peer varchar(15) NOT NULL, PRIMARY KEY(fwmark,peer));
 CREATE TABLE IF NOT EXISTS ipset   (ipset PRIMARY KEY, use varchar(1), peer varchar(5),fwmark varchar(10) NOT NULL, dstsrc varchar (11) NOT NULL);
-CREATE TABLE IF NOT EXISTS traffic (peer NOT NULL,timestamp UNSIGNED BIG INT NOT NULL,rx UNSIGNED BIG INT NOT NULL,tx UNSIGNED BIG INT NOT NULL);
+CREATE TABLE IF NOT EXISTS traffic (peer NOT NULL,timestamp UNSIGNED BIG INT NOT NULL,rx UNSIGNED BIG INT NOT NULL,tx UNSIGNED BIG INT NOT NULL,rxtotal UNSIGNED BIG INT NOT NULL,txtotal UNSIGNED BIG INT NOT NULL);
 CREATE TABLE IF NOT EXISTS session (peer NOT NULL,state varchar(1), timestamp UNSIGNED BIG INT NOT NULL);
 EOF
     echo -en $cBRED
@@ -2594,8 +2595,8 @@ Show_Peer_Status() {
                                 RX=$(Convert_1024KMG "$RX" "$RXU")
                                 TX=$(Convert_1024KMG "$TX" "$TXU")
 
-                                # Need to get the last logged RX/TX values for the Peer, and only add to SQL if total > 0
-                                Parse "$(sqlite3 $SQL_DATABASE "select rx,tx from traffic WHERE peer='$WG_INTERFACE' order by timestamp desc limit 1;")" "|" RX_OLD TX_OLD
+                                # Need to get the last logged RX/TX Total values for the Peer, and only add to SQL if total > 0
+                                Parse "$(sqlite3 $SQL_DATABASE "select rxtotal,txtotal from traffic WHERE peer='$WG_INTERFACE' order by timestamp desc limit 1;")" "|" RX_OLD TX_OLD    # v4.11
 
                                 if [ -n "$RX_OLD" ] && [ -n "$TX_OLD" ];then
                                     #local RX_DELTA=$((RX-RX_OLD))
@@ -2608,12 +2609,10 @@ Show_Peer_Status() {
                                     local RX_DELTA=$RX
                                     local TX_DELTA=$TX
                                 fi
-
-
                                 #if [ $((RX_DELTA+TX_DELTA)) -gt 0 ];then
                                     if [ $(expr "$RX_DELTA" + "$TX_DELTA") -gt 0 ];then # v4.11 @ZebMcKayhan
                                     local TIMESTAMP=$(date +%s)
-                                    sqlite3 $SQL_DATABASE "INSERT into traffic values('$WG_INTERFACE','$TIMESTAMP','$RX_DELTA','$TX_DELTA');"       # v3.05
+                                    sqlite3 $SQL_DATABASE "INSERT into traffic values('$WG_INTERFACE','$TIMESTAMP','$RX_DELTA','$TX_DELTA','$RX','$TX');"       # 4.11 v3.05
                                 fi
 #set +x
 #) 2>&1 | logger -t $(basename $0)"[$$_***DEBUG]"
@@ -2871,7 +2870,7 @@ Diag_Dump() {
                     tra*)
                         TABLE="traffic"
                         echo -e $cBYEL"\tTable:$TABLE"$cBCYA 2>&1
-                        sqlite3 $SQL_DATABASE "SELECT peer, datetime(timestamp, 'unixepoch', 'localtime') AS time, rx, tx FROM $TABLE;" | column -t  -s '|' --table-columns Peer,Timestamp,RX,TX
+                        sqlite3 $SQL_DATABASE "SELECT peer, datetime(timestamp, 'unixepoch', 'localtime') AS time, rx, tx, rxtotal, txtotal FROM $TABLE;" | column -t  -s '|' --table-columns Peer,Timestamp,RX,TX,"RX Total","TX Total"    # v4.11
                     ;;
                     sess*)
                         TABLE="session"
