@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.11b7"
-#============================================================================================ © 2021 Martineau v4.11b7
+VERSION="v4.11b8"
+#============================================================================================ © 2021 Martineau v4.11b8
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.11b7"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 22-Jun-2021
+# Last Updated Date: 25-Jun-2021
 #
 # Description:
 #
@@ -2584,14 +2584,11 @@ Show_Peer_Status() {
                             [ $MINS -gt 30 ] && COLOR=$cBGRA || COLOR=$cBWHT
 
                             if [ "$STATS" == "Y" ];then
-#set -x
-#(
                                 local RX=
                                 local RXU=
                                 local TX=
                                 local TXU=
                                 Parse "$LINE" " " junk RX RXU junk TX TXU junk
-
                                 RX=$(Convert_1024KMG "$RX" "$RXU")
                                 TX=$(Convert_1024KMG "$TX" "$TXU")
 
@@ -2614,8 +2611,6 @@ Show_Peer_Status() {
                                     local TIMESTAMP=$(date +%s)
                                     sqlite3 $SQL_DATABASE "INSERT into traffic values('$WG_INTERFACE','$TIMESTAMP','$RX_DELTA','$TX_DELTA','$RX','$TX');"       # 4.11 v3.05
                                 fi
-#set +x
-#) 2>&1 | logger -t $(basename $0)"[$$_***DEBUG]"
                             fi
                             local TABS="\t\t"
                             [ "${#LINE}" -lt 40 ] && local TABS="\t\t\t"
@@ -2640,13 +2635,18 @@ Show_Peer_Status() {
                     fi
 
                     if [ -z "$DETAIL" ];then
-                        if [ "$STATS" == "Y" ];then
-                            if [ -n "$(echo "$LINE" | grep -E "transfer:")" ];then
-                                SayT ${WG_INTERFACE}":"${LINE}$cRESET
-                                SayT ${WG_INTERFACE}": period : $(Size_Human $RX_DELTA) received, $(Size_Human $TX_DELTA) sent (Rx=$RX_DELTA;Tx=$TX_DELTA)"
+                        # For dormant (after 30 mins) Road-Warrior 'clients', don't display obvious redundant RX=0/TX=0 metrics
+                        if [ $MINS -lt 30 ];then        # v4.11
+                            if [ "$STATS" == "Y" ];then     # v4.11
+                                if [ -n "$(echo "$LINE" | grep -E "transfer:")" ];then
+                                    SayT ${WG_INTERFACE}":"${LINE}$cRESET
+                                    SayT ${WG_INTERFACE}": period : $(Size_Human $RX_DELTA) received, $(Size_Human $TX_DELTA) sent (Rx=$RX_DELTA;Tx=$TX_DELTA)"
+                                    echo -e "\t"${WG_INTERFACE}":"${LINE}$cRESET
+                                    echo -e "\t"${WG_INTERFACE}": period : $(Size_Human $RX_DELTA) received, $(Size_Human $TX_DELTA) sent (Rx=$RX_DELTA;Tx=$TX_DELTA)"
+                                fi
+                            else
+                                [ -n "$(echo "$LINE" | grep -E "interface:|peer:|transfer:|latest handshake:")" ] && echo -e ${TAB}${COLOR}$LINE
                             fi
-                        else
-                            [ -n "$(echo "$LINE" | grep -E "interface:|peer:|transfer:|latest handshake:")" ] && echo -e ${TAB}${COLOR}$LINE
                         fi
                     else
                         echo -e ${TAB}${COLOR}$LINE
