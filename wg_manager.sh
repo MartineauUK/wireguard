@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.11b8"
-#============================================================================================ © 2021 Martineau v4.11b8
+VERSION="v4.11b9"
+#============================================================================================ © 2021 Martineau v4.11b9
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.11b8"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 25-Jun-2021
+# Last Updated Date: 22-Jul-2021
 #
 # Description:
 #
@@ -2600,8 +2600,16 @@ Show_Peer_Status() {
                                     #local TX_DELTA=$((TX-TX_OLD))
                                     # Old-skool - slower but doesn't create negative result
                                     #   WTF!!! echo $((1191071409+2037987240))
-                                    local RX_DELTA=$(expr "$RX" - "$RX_OLD")    # v4.11 @ZebMcKayhan
-                                    local TX_DELTA=$(expr "$TX" - "$TX_OLD")    # v4.11 @ZebMcKayhan
+                                    if [ -n "$RX" ] && [ -n "$RX_OLD" ];then    # v4.11 @Torson
+                                        local RX_DELTA=$(expr "$RX" - "$RX_OLD")    # v4.11 @ZebMcKayhan
+                                    else
+                                        local RX_DELTA=0
+                                    fi
+                                    if [ -n "$TX" ] && [ -n "$RX_OLD" ];then    # v4.11 @Torson
+                                        local TX_DELTA=$(expr "$TX" - "$TX_OLD")    # v4.11 @ZebMcKayhan
+                                    else
+                                        local TX_DELTA=0
+                                    fi
                                 else
                                     local RX_DELTA=$RX
                                     local TX_DELTA=$TX
