@@ -342,7 +342,7 @@ Download_Modules() {
 
     #[ ! -d "${INSTALL_DIR}" ] && mkdir -p "${INSTALL_DIR}"
 
-    local WEBFILE_NAMES=$(curl -${SILENT}fL https://www.snbforums.com/threads/experimental-wireguard-for-hnd-platform-4-1-x-kernels.46164/ | grep "<a href=.*odkrys.*wireguard" | grep -oE "wireguard.*" | sed 's/\"//g' | tr '\n' ' ')
+    local WEBFILE_NAMES=$(curl -${SILENT}fL https://api.github.com/repos/odkrys/entware-makefile-for-merlin/git/trees/main | grep "\"path\": \"wireguard-.*\.ipk\"," | cut -d'"' -f 4 | tr '\r\n' ' ')
 
     # The file list MAY NOT ALWAYS be in the correct Router Model order for the following 'case' statement?
     case "$ROUTER" in
@@ -453,7 +453,7 @@ Check_Module_Versions() {
 
         # Check if Kernel and User Tools Update available
         echo -e $cBWHT"\tChecking for WireGuard Kernel and Userspace Tool updates..."
-        local FILES=$(curl -${SILENT}fL https://www.snbforums.com/threads/experimental-wireguard-for-hnd-platform-4-1-x-kernels.46164/ | grep "<a href=.*odkrys.*wireguard" | sed 's/"//g; s/\n/ /g' | grep -oE "wireguard.*")
+        local FILES=$(curl -${SILENT}fL https://api.github.com/repos/odkrys/entware-makefile-for-merlin/git/trees/main | grep "\"path\": \"wireguard-.*\.ipk\"," | cut -d'"' -f 4 | tr '\r\n' ' ')
 
         [ -z "$(echo "$FILES" | grep -F "$WGKERNEL")" ] && { echo -e $cBYEL"\t\tKernel UPDATE available" $FILE; local UPDATES="Y"; }
         [ -z "$(echo "$FILES" | grep -F "$WGTOOLS")" ] && { echo -e $cBYEL"\t\tUserspace Tool UPDATE available" $FILE; local UPDATES="Y"; }
