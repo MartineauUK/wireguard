@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.11b9"
-#============================================================================================ © 2021 Martineau v4.11b9
+VERSION="v4.11bA"
+#============================================================================================ © 2021 Martineau v4.11bA
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,13 +24,13 @@ VERSION="v4.11b9"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 22-Jul-2021
+# Last Updated Date: 15-Aug-2021
 #
 # Description:
 #
 # Acknowledgement:
 #
-# Contributors: odkrys,Torson,ZebMcKayhan,jobhax,elorimer,Sh0cker54,here1310
+# Contributors: odkrys,Torson,ZebMcKayhan,jobhax,elorimer,Sh0cker54,here1310,defung
 
 GIT_REPO="wireguard"
 GITHUB_MARTINEAU="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/main"
@@ -342,19 +342,20 @@ Download_Modules() {
 
     #[ ! -d "${INSTALL_DIR}" ] && mkdir -p "${INSTALL_DIR}"
 
-    local WEBFILE_NAMES=$(curl -${SILENT}fL https://www.snbforums.com/threads/experimental-wireguard-for-hnd-platform-4-1-x-kernels.46164/ | grep "<a href=.*odkrys.*wireguard" | grep -oE "wireguard.*" | sed 's/\"//g' | tr '\n' ' ')
+    #local WEBFILE_NAMES=$(curl -${SILENT}fL https://www.snbforums.com/threads/experimental-wireguard-for-hnd-platform-4-1-x-kernels.46164/ | grep "<a href=.*odkrys.*wireguard" | grep -oE "wireguard.*" | sed 's/\"//g' | tr '\n' ' ')
+    local WEBFILE_NAMES=$(curl -${SILENT}fL https://api.github.com/repos/odkrys/entware-makefile-for-merlin/git/trees/main | grep "\"path\": \"wireguard-.*\.ipk\"," | cut -d'"' -f 4 | tr '\r\n' ' ')  # v4.11 @defung pull request https://github.com/MartineauUK/wireguard/pull/3
 
     # The file list MAY NOT ALWAYS be in the correct Router Model order for the following 'case' statement?
     case "$ROUTER" in
 
-        RT-AC86U|GT-AC2900)     # RT-AC86U, GT-AC2900 - 4.1.27
-            _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $1}')"
+        RT-AC86U|GT-AC2900)     # RT-AC86U, GT-AC2900 - 4.1.27          e.g. wireguard-kernel_1.0.20210219-k27_1_aarch64-3.10.ipk
+            _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $1}')"     # k27_1
             ;;
-        RT-AX88U|GT-AX11000)    # RT-AX88U, GT-AX11000 - 4.1.51
-            _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $2}')"
+        RT-AX88U|GT-AX11000)    # RT-AX88U, GT-AX11000 - 4.1.51         e.g. wireguard-kernel_1.0.20210219-k52_1_aarch64-3.10.ipk
+            _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $2}')"     # k51_1
             ;;
-        RT-AX68U|RT-AX86U)      # RT-AX68U, RT-AX86U - 4.1.52
-            _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $3}')"
+        RT-AX68U|RT-AX86U)      # RT-AX68U, RT-AX86U - 4.1.52           e.g. wireguard-kernel_1.0.20210219-k52_1_aarch64-3.10.ipk
+            _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $3}')"     # k52_1
             ;;
         *)
             echo -e $cBRED"\a\n\t***ERROR: Unable to find WireGuard Kernel module for $ROUTER (v$BUILDNO)\n"$cRESET
@@ -453,8 +454,8 @@ Check_Module_Versions() {
 
         # Check if Kernel and User Tools Update available
         echo -e $cBWHT"\tChecking for WireGuard Kernel and Userspace Tool updates..."
-        local FILES=$(curl -${SILENT}fL https://www.snbforums.com/threads/experimental-wireguard-for-hnd-platform-4-1-x-kernels.46164/ | grep "<a href=.*odkrys.*wireguard" | sed 's/"//g; s/\n/ /g' | grep -oE "wireguard.*")
-
+        #local FILES=$(curl -${SILENT}fL https://www.snbforums.com/threads/experimental-wireguard-for-hnd-platform-4-1-x-kernels.46164/ | grep "<a href=.*odkrys.*wireguard" | sed 's/"//g; s/\n/ /g' | grep -oE "wireguard.*")
+        local FILES=$(curl -${SILENT}fL https://api.github.com/repos/odkrys/entware-makefile-for-merlin/git/trees/main | grep "\"path\": \"wireguard-.*\.ipk\"," | cut -d'"' -f 4 | tr '\r\n' ' ')  # v4.11 @defung pull request  https://github.com/MartineauUK/wireguard/pull/3
         [ -z "$(echo "$FILES" | grep -F "$WGKERNEL")" ] && { echo -e $cBYEL"\t\tKernel UPDATE available" $FILE; local UPDATES="Y"; }
         [ -z "$(echo "$FILES" | grep -F "$WGTOOLS")" ] && { echo -e $cBYEL"\t\tUserspace Tool UPDATE available" $FILE; local UPDATES="Y"; }
 
