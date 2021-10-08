@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.11bA"
-#============================================================================================ © 2021 Martineau v4.11bA
+VERSION="v4.11bB"
+#============================================================================================ © 2021 Martineau v4.11bB
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.11bA"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 15-Aug-2021
+# Last Updated Date: 08-Oct-2021
 #
 # Description:
 #
@@ -953,9 +953,12 @@ Manage_Peer() {
                                 if [ "$(echo "$AUTO" | grep "^[yYnNpPZ]$" )" ];then
                                     FLAG=$(echo "$AUTO" | tr 'a-z' 'A-Z')
                                     if [ -z "$(echo "$CMD" | grep "autoX")" ];then
-                                        # If Auto='P' then enforce existence of RPDB Selective Routing rules for the 'client' Peer
+                                        # If Auto='P' then enforce existence of RPDB Selective Routing rules or IPSET fwmark for the 'client' Peer
                                         if [ "$FLAG" == "P" ];then
-                                            [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$WG_INTERFACE';") -eq 0 ] && { echo -e $cBRED"\a\n\t***ERROR No Policy rules exist for ${cBMAG}$WG_INTERFACE ${cBRED}(${cBWHT}use 'peer $WG_INTERFACE rule add' command${cBRED} first)\n"$cRESET; return 1; }
+                                           if [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$WG_INTERFACE';") -eq 0 ] && [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM ipset WHERE peer='$WG_INTERFACE';") -eq 0 ];then    # v4.11 @ZebMcKayhan/@The Chief
+                                              echo -e $cBRED"\a\n\t***ERROR No Policy rules exist for ${cBMAG}$WG_INTERFACE ${cBRED}(${cBWHT}use 'peer $WG_INTERFACE rule add' command${cBRED} first)\n"$cRESET
+                                              return 1
+                                            fi
                                         fi
                                     fi
 
@@ -3288,6 +3291,7 @@ Build_Menu() {
             MENU_P="$(printf '%b8 %b = %bPeer management [ "list" | "category" | "new" ] | [ {Peer | category} [ 'del' | 'show' | 'add' [{"auto="[y|n|p]}] ]%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
             MENU_C="$(printf '%b9 %b = %bCreate Key-pair for Peer {Device} e.g. Nokia6310i (creates Nokia6310i.conf etc.)%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
             MENU_IPS="$(printf '%b10 %b= %bIPSet management [ "list" ] | [ "upd" { ipset [ "fwmark" {fwmark} ] | [ "enable" {"y"|"n"}] | [ "dstsrc"] ] } ] %b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
+            MENU_ISPIMP="$(printf '%b11 %b= %bImport Wireguard configuration { [ "?" | [ "dir" directory ] | [/path/]config_file [ rename_as ] ]} %b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
 
         fi
 
@@ -3300,8 +3304,9 @@ Build_Menu() {
         if [ "$(WireGuard_Installed)" == "Y" ];then
             printf "%s\t\t\t\t\t%s\n"                   "$MENU_Z" "$MENU_P"
             printf "\t\t\t\t\t\t\t\t\t%s\n"                       "$MENU_C"
-            printf "%s\t\t\t\t%s\n"                     "$MENU_L" "$MENU_IPS"
-            printf "%s\t\t\t\t\t\t\t\t\t%s\n"           "$MENU_S"
+            printf "%s\t\t\t\t%s"                       "$MENU_L" "$MENU_IPS"
+            printf "\t\t\t\t\t\t\t\t\t%s\n"                       "$MENU_ISPIMP"
+            printf "\n%s\t\t\t\t\t\t\t\t\t%s\n"         "$MENU_S"
             printf "%s\t\t\t\t\t\t\t\t\t%s\n"           "$MENU_T"
             printf "%s\t\t\t\t\t\t\t\t\t%s\n"           "$MENU_R"
             printf "\n%s\t\t\t\t\t\n"                   "$MENU__"
@@ -3330,6 +3335,7 @@ Validate_User_Choice() {
             8*|peer*) menu1=$(echo "$menu1" | awk '{$1="peer"}1') ;;
             9*) menu1=$(echo "$menu1" | awk '{$1="create"}1') ;;
             10*|ipset*) menu1=$(echo "$menu1" | awk '{$1="ipset"}1') ;;
+            11*|import*) menu1=$(echo "$menu1" | awk '{$1="import"}1') ;;
             u|uf|uf" "*) ;;                           # v3.14
             "?") ;;
             v|vx) ;;
@@ -3346,7 +3352,6 @@ Validate_User_Choice() {
             stats*);;
             wg|wg" "*) ;;
             scripts*) ;;                    # v4.01
-            import*) ;;
             udpmon*) ;;                     # v4.01
             jump*|geo*|livin*) ;;           # v4.08 v4.07
             generatestats) ;;
