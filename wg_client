@@ -1,16 +1,16 @@
 #!/bin/sh
-VERSION="v4.12b"
-#============================================================================================ © 2021 Martineau v4.12b
+VERSION="v4.13b"
+#============================================================================================ © 2021 Martineau v4.13b
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 22-Jun-2021
+# Last Updated Date: 10-Oct-2021
 #
 # Description:
 #
 # Acknowledgement:
 #
-# Contributors: odkrys,@ZebMcKayhan,Torson
+# Contributors: odkrys,@ZebMcKayhan,Torson,The Chief
 
 CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v1.05 @elorimer
 INSTALL_DIR="/jffs/addons/wireguard/"
@@ -93,7 +93,7 @@ Firewall_delete() {
 create_client_list(){
 
     # v4.09 Use new 'policy' table layout
-    [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$WG_INTERFACE';") -eq 0 ] && { logger -t "wireguard-${MODE}${VPN_NUM}" "Warning: No Selective Routing rules found";return 1; }
+    [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$WG_INTERFACE';") -eq 0 ] && { logger -t "wireguard-${MODE}${VPN_NAME}" "Warning: No Selective Routing rules found";return 1; }
     sqlite3 $SQL_DATABASE "SELECT iface,srcip,dstip FROM policy WHERE peer='$WG_INTERFACE' ORDER BY iface DESC;" | while read RULE
     do
         [ -z "$RULE" ] && continue
@@ -139,7 +139,7 @@ create_client_list(){
 
             echo -en $cBCYA
             [ "$DSTC" == "to" ] && DSTC="to "
-            logger -t "wireguard-${MODE}${VPN_NUM}" "Adding Wireguard 'client' Peer route ${SRCA}${DSTC}$DSTA through $TARGET_NAME"
+            logger -t "wireguard-${MODE}${VPN_NAME}" "Adding Wireguard 'client' Peer route ${SRCA}${DSTC}$DSTA through $TARGET_NAME"
             echo -en $cRESET
 
             if [ -n "$PEER_DNS" ] && [ "$TARGET_LOOKUP" != "main" ] && [ "$VPN_IP" != "Any" ];then
@@ -362,6 +362,12 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
                         ipset list $IPSET >/dev/null 2>&1;if [ $? -eq 0 ]; then
                             DSTSRC=$(sqlite3 $SQL_DATABASE "SELECT dstsrc FROM ipset WHERE ipset='$IPSET' AND peer='${WG_INTERFACE}';")
                             FWMARK=$(sqlite3 $SQL_DATABASE "SELECT fwmark FROM ipset WHERE ipset='$IPSET' AND peer='${WG_INTERFACE}';")
+
+                            TAG_MARK=$(sqlite3 /opt/etc/wireguard.d/WireGuard.db "select fwmark from fwmark where peer='${WG_INTERFACE}';") # v4.13                                                                                                             # v4.12
+                            ip rule del from 0/0 fwmark $TAG_MARK"/"$TAG_MARK table 12$VPN_NUM prio 999$VPN_NUM 2>/dev/null                 # v4.13
+                            ip rule add from 0/0 fwmark $TAG_MARK"/"$TAG_MARK table 12$VPN_NUM prio 999$VPN_NUM                             # v4.13
+                            echo 0 >/proc/sys/net/ipv4/conf/$WG_INTERFACE/rp_filter                                                         # v4.13
+
                             if [ "$USE_IPV6" != "Y" ];then                  # v4.08
                                 iptables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'" 2>/dev/null # v4.12
                                 iptables -t mangle -A PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'"             # v4.12
@@ -484,7 +490,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         logger -st "wireguard-${MODE}${VPN_NAME}" "Initialisation complete."
         echo -e $cRESET
     else
-        echo -e "\a\n\t";logger -st "wireguard-{$MODE}${VPN_NUM}" "Local Peer I/P endpoint ('${INSTALL_DIR}WireguardVPN.conf') not VALID. ABORTing Initialisation."
+        echo -e "\a\n\t";logger -st "wireguard-{$MODE}${VPN_NAME}" "Local Peer I/P endpoint ('${INSTALL_DIR}WireguardVPN.conf') not VALID. ABORTing Initialisation."
         echo -e
     fi
 else
@@ -559,6 +565,9 @@ else
         do
             DSTSRC=$(sqlite3 $SQL_DATABASE "SELECT dstsrc FROM ipset WHERE ipset='$IPSET' AND peer='${WG_INTERFACE}';")
             FWMARK=$(sqlite3 $SQL_DATABASE "SELECT fwmark FROM ipset WHERE ipset='$IPSET' AND peer='${WG_INTERFACE}';")
+            TAG_MARK=$(sqlite3 /opt/etc/wireguard.d/WireGuard.db "select fwmark from fwmark where peer='${WG_INTERFACE}';") # v4.13                                                                                                             # v4.12
+            ip rule del from 0/0 fwmark $TAG_MARK"/"$TAG_MARK table 12$VPN_NUM prio 999$VPN_NUM 2>/dev/null                 # v4.13
+
             if [ "$USE_IPV6" != "Y" ];then                                      # v4.08
                 iptables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'" 2>/dev/null # v4.12
             else
