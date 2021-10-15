@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.11bB"
-#============================================================================================ © 2021 Martineau v4.11bB
+VERSION="v4.12b"
+#============================================================================================ © 2021 Martineau v4.12b
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.11bB"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 09-Oct-2021
+# Last Updated Date: 15-Oct-2021
 #
 # Description:
 #
@@ -35,6 +35,7 @@ VERSION="v4.11bB"
 GIT_REPO="wireguard"
 GITHUB_MARTINEAU="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/main"
 GITHUB_MARTINEAU_DEV="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/dev"
+GITHUB_ZEBMCKAYHAN="https://raw.githubusercontent.com/ZebMcKayhan/Wireguard/master"
 GITHUB_DIR=$GITHUB_MARTINEAU                       # default for script
 CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v2.03 @elorimer
 IMPORT_DIR=$CONFIG_DIR                             # Allow custom Peer .config import directory v4.01
@@ -327,11 +328,16 @@ download_file() {
 _Get_File() {
 
     local WEBFILE=$1
+    local REPOSITORY_OWNER=$2
+    local REPOSITORY="https://github.com/odkrys/entware-makefile-for-merlin/raw/main/"      # v4.12
 
-    [ -z "$2" ] && echo -e $cBCYA"\n\tDownloading WireGuard Kernel module ${cBWHT}'$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO)..."$cRESET
+    [ "$REPOSITORY_OWNER" != "odkrys" ] && local REPOSITORY="https://github.com/ZebMcKayhan/Wireguard/raw/main/"                    # v4.12
+
+    [ -z "$(echo "$@" | grep "NOMSG")" ] && echo -e $cBCYA"\n\tDownloading WireGuard Kernel module ${cBWHT}'$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO) @$REPOSITORY_OWNER"$cRESET
+
     echo -e $cBGRA
 
-    curl -# -fL --retry 3 https://github.com/odkrys/entware-makefile-for-merlin/raw/main/${WEBFILE} -o ${INSTALL_DIR}${WEBFILE}
+    curl -# -fL --retry 3 ${REPOSITORY}${WEBFILE} -o ${INSTALL_DIR}${WEBFILE}           # v4.12
 
     return $?
 }
@@ -339,8 +345,11 @@ Download_Modules() {
 
 
     local ROUTER=$1
+    local REPOSITORY_OWNER="odkrys"                                                     # v4.12
 
     #[ ! -d "${INSTALL_DIR}" ] && mkdir -p "${INSTALL_DIR}"
+
+    rm ${INSTALL_DIR}/*.ipk
 
     #local WEBFILE_NAMES=$(curl -${SILENT}fL https://www.snbforums.com/threads/experimental-wireguard-for-hnd-platform-4-1-x-kernels.46164/ | grep "<a href=.*odkrys.*wireguard" | grep -oE "wireguard.*" | sed 's/\"//g' | tr '\n' ' ')
     local WEBFILE_NAMES=$(curl -${SILENT}fL https://api.github.com/repos/odkrys/entware-makefile-for-merlin/git/trees/main | grep "\"path\": \"wireguard-.*\.ipk\"," | cut -d'"' -f 4 | tr '\r\n' ' ')  # v4.11 @defung pull request https://github.com/MartineauUK/wireguard/pull/3
@@ -348,14 +357,16 @@ Download_Modules() {
     # The file list MAY NOT ALWAYS be in the correct Router Model order for the following 'case' statement?
     case "$ROUTER" in
 
-        RT-AC86U|GT-AC2900)     # RT-AC86U, GT-AC2900 - 4.1.27          e.g. wireguard-kernel_1.0.20210219-k27_1_aarch64-3.10.ipk
-            _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $1}')"     # k27_1
+        RT-AC86U|GT-AC2900)     # RT-AC86U, GT-AC2900 - 4.1.27          e.g. wireguard-kernel_1.0.20210606-k27_1_aarch64-3.10.ipk
+            local WEBFILE_NAMES=$(curl -${SILENT}fL https://api.github.com/repos/ZebMcKayhan/Wireguard/git/trees/main | grep "\"path\": \"wireguard-.*\.ipk\"," | cut -d'"' -f 4 | tr '\r\n' ' ')   # v4.12
+            local REPOSITORY_OWNER="ZebMcKayhan"
+            _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $1}')" "$REPOSITORY_OWNER"     # k27_1
             ;;
         RT-AX88U|GT-AX11000)    # RT-AX88U, GT-AX11000 - 4.1.51         e.g. wireguard-kernel_1.0.20210219-k52_1_aarch64-3.10.ipk
-            _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $2}')"     # k51_1
+            _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $2}')" "$REPOSITORY_OWNER"    # k51_1
             ;;
         RT-AX68U|RT-AX86U)      # RT-AX68U, RT-AX86U - 4.1.52           e.g. wireguard-kernel_1.0.20210219-k52_1_aarch64-3.10.ipk
-            _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $3}')"     # k52_1
+            _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $3}')" "$REPOSITORY_OWNER"    # k52_1
             ;;
         *)
             echo -e $cBRED"\a\n\t***ERROR: Unable to find WireGuard Kernel module for $ROUTER (v$BUILDNO)\n"$cRESET
@@ -367,16 +378,16 @@ Download_Modules() {
             #        * opkg_install_cmd: Cannot install package wireguard-kernel.
             #
             #
-            _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $1}')"
+            _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $1}')" "$REPOSITORY_OWNER"
 
             ROUTER_COMPATIBLE="N"
             ;;
     esac
 
     # User Space Tools
-    WEBFILE=$(echo "$WEBFILE_NAMES" | awk '{print $4}')
-    echo -e $cBCYA"\n\tDownloading WireGuard User space Tool$cBWHT '$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO)"$cRESET
-    _Get_File  "$WEBFILE" "NOMSG"
+    WEBFILE=$(echo "$WEBFILE_NAMES" | awk '{print $NF}')
+    echo -e $cBCYA"\n\tDownloading WireGuard User space Tool$cBWHT '$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO) @$REPOSITORY_OWNER"$cRESET  # v4.12
+    _Get_File  "$WEBFILE" "$REPOSITORY_OWNER" "NOMSG"           # v4.12
 
 }
 Load_UserspaceTool() {
@@ -1873,17 +1884,18 @@ Display_QRCode() {
         [ "$ANS" == "y" ] && { clear; qrencode -t ANSIUTF8 < $FN; }             # v1.05
     fi
 }
-Edit_nat_start() {
+# v4.12 'nat'-start references changed to 'firewall'-start
+Edit_firewall_start() {
 
     if [ "$1" != "del" ];then
 
-        [ ! -f /jffs/scripts/nat-start ] && { echo -e "#!/bin/sh\n\n"    > /jffs/scripts/nat-start; chmod +x /jffs/scripts/nat-start; }
-        if [ -z "$(grep "WireGuard" /jffs/scripts/nat-start)" ];then
-            echo -e "/jffs/addons/wireguard/wg_firewall            # WireGuard" >> /jffs/scripts/nat-start
+        [ ! -f /jffs/scripts/firewall-start ] && { echo -e "#!/bin/sh\n\n"    > /jffs/scripts/firewall-start; chmod +x /jffs/scripts/firewall-start; }
+        if [ -z "$(grep "WireGuard" /jffs/scripts/firewall-start)" ];then
+            echo -e "/jffs/addons/wireguard/wg_firewall            # WireGuard" >> /jffs/scripts/firewall-start
             cat > /jffs/addons/wireguard/wg_firewall << EOF                     # v2.04
 #!/bin/sh
 VERSION="$TS"
-# Reinstate WireGuard firewall rules by restarting WireGuard as nat-start has executed
+# Reinstate WireGuard firewall rules by restarting WireGuard as firewall-start has executed
 #
 Get_WAN_IF_Name() {
 
@@ -1901,10 +1913,12 @@ Get_WAN_IF_Name() {
     echo \$IF_NAME
 }
 
+WAN_IF=\$(Get_WAN_IF_Name)
+
 logger -st "(\$(basename "\$0"))" \$\$ "Checking if WireGuard VPN Peer KILL-Switch is required....."
 if [ -n "\$(grep -E "^KILLSWITCH" /jffs/addons/wireguard/WireguardVPN.conf)" ];then
-    iptables -D FORWARD -i br0 -o \$(nvram get wan0_ifname) -j REJECT -m comment --comment "WireGuard KILL-Switch" 2>/dev/null
-    iptables -I FORWARD -i br0 -o \$(nvram get wan0_ifname) -j REJECT -m comment --comment "WireGuard KILL-Switch" 2>/dev/null
+    iptables -D FORWARD -i br0 -o \$WAN_IF -j REJECT -m comment --comment "WireGuard KILL-Switch" 2>/dev/null
+    iptables -I FORWARD -i br0 -o \$WAN_IF -j REJECT -m comment --comment "WireGuard KILL-Switch" 2>/dev/null
     logger -st "(\$(basename "\$0"))" \$\$ "WireGuard VPN Peer KILL-Switch ENABLED"
 fi
 
@@ -1918,12 +1932,12 @@ EOF
 
             chmod +x /jffs/addons/wireguard/wg_firewall
         fi
-        echo -e $cBCYA"\n\tnat-start updated to protect WireGuard firewall rules"$cRESET
-        SayT "nat-start updated to protect WireGuard firewall rules"
+        echo -e $cBCYA"\n\tfirewall-start updated to protect WireGuard firewall rules"$cRESET
+        SayT "firewall-start updated to protect WireGuard firewall rules"
     else
-        sed -i '/WireGuard/d' /jffs/scripts/nat-start
-        echo -e $cBCYA"\n\tnat-start updated - no longer protecting WireGuard firewall rules"$cRESET
-        SayT "nat-start updated - no longer protecting WireGuard firewall rules"
+        sed -i '/WireGuard/d' /jffs/scripts/firewall-start          # v4.12
+        echo -e $cBCYA"\n\tfirewall-start updated - no longer protecting WireGuard firewall rules"$cRESET
+        SayT "firewall-start updated - no longer protecting WireGuard firewall rules"
     fi
 
 }
@@ -2362,7 +2376,7 @@ EOF
         echo -e $cBRED"\a\n\t***ERROR: WireGuard install FAILED!\n"$cRESETd
     fi
 
-    Edit_nat_start                                      # v1.07
+    Edit_firewall_start                                      # v1.07
 
     Edit_DNSMasq                                        # v1.12
 
@@ -2429,7 +2443,7 @@ Uninstall_WireGuard() {
 
     Manage_Stats "DISABLE" "disable"
 
-    Edit_nat_start "del"
+    Edit_firewall_start "del"
 
     Manage_alias "del"                  # v1.11
 
@@ -3020,7 +3034,7 @@ Display_SplashBox() {
         printf '|   1 = Install WireGuard                                              |\n'
     fi
     local YES_NO="   "                              # v2.07
-    [ "$EASYMENU" == "Y" ] && local YES_NO="${cBGRE}   ";   printf '|       o1. Enable nat-start protection for Firewall rules     %b    %b |\n' "$YES_NO" "$cRESET"
+    [ "$EASYMENU" == "Y" ] && local YES_NO="${cBGRE}   ";   printf '|       o1. Enable firewall-start protection for Firewall rules     %b    %b |\n' "$YES_NO" "$cRESET"
     [ "$EASYMENU" == "Y" ] && local YES_NO="${cBGRE}   ";   printf '|       o2. Enable DNS                                         %b    %b |\n' "$YES_NO" "$cRESET"
     printf '|                                                                      |\n'
 
@@ -3501,10 +3515,10 @@ Process_User_Choice() {
                         echo -e $cRESET
                         DNSmasq_Listening_WireGuard_Status
 
-                        if [ -z "$(grep -i "wireguard" /jffs/scripts/nat-start)" ];then     # v1.11
-                            echo -e $cBRED"\t[✖]${cBWHT} nat-start$${cBRED} is NOT monitoring WireGuard Firewall rules - ${cBWHT}use 'wgm natstart' to ENABLE\n"$cRESET
+                        if [ -z "$(grep -i "wireguard" /jffs/scripts/firewall-start)" ];then     # v1.11
+                            echo -e $cBRED"\t[✖]${cBWHT} firewall-start$${cBRED} is NOT monitoring WireGuard Firewall rules - ${cBWHT}use 'wgm natstart' to ENABLE\n"$cRESET
                         else
-                            echo -e $cBGRE"\t[✔]${cBWHT} nat-start ${cBGRE}is monitoring WireGuard Firewall rules\n"$cRESET
+                            echo -e $cBGRE"\t[✔]${cBWHT} firewall-start ${cBGRE}is monitoring WireGuard Firewall rules\n"$cRESET
                         fi
 
                         if [ "$(Manage_KILL_Switch)" == "Y" ];then
@@ -3564,7 +3578,7 @@ Process_User_Choice() {
                     local ARG="$(printf "%s" "$menu1" | cut -d' ' -f2)"
                 fi
 
-                Edit_nat_start "$ARG"
+                Edit_firewall_start "$ARG"
 
                 ;;
             "-h"|help)
