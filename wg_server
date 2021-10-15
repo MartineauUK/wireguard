@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.03"
-#============================================================================================ © 2021 Martineau v4.03
+VERSION="v4.04"
+#============================================================================================ © 2021 Martineau v4.04
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 29-Mar-2021
+# Last Updated Date: 15-May-2021
 #
 # Description:
 #
@@ -193,7 +193,7 @@ else
 
 
     # User Exit @ZebMcKayhan
-    [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh ] && { logger -t "wireguard-server${VPN_ID:3:1}" "Executing ${VPN_ID}-down.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh; }
+    [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh ] && { logger -t "wireguard-server${VPN_ID:3:1}" "Executing ${VPN_ID}-down.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh; }  #v4.04
 
     logger -t "wireguard-server${VPN_ID:3:1}" "Wireguard VPN 'server' Peer ($VPN_ID) on" $SOCKET "Terminated"
 
