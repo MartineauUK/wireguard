@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.12b"
-#============================================================================================ © 2021 Martineau v4.12b
+VERSION="v4.11"
+#============================================================================================ © 2021 Martineau v4.11
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.12b"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 15-Oct-2021
+# Last Updated Date: 16-Oct-2021
 #
 # Description:
 #
@@ -35,7 +35,7 @@ VERSION="v4.12b"
 GIT_REPO="wireguard"
 GITHUB_MARTINEAU="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/main"
 GITHUB_MARTINEAU_DEV="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/dev"
-GITHUB_ZEBMCKAYHAN="https://raw.githubusercontent.com/ZebMcKayhan/Wireguard/master"
+GITHUB_ZEBMCKAYHAN="https://raw.githubusercontent.com/ZebMcKayhan/Wireguard/master" # v4.11
 GITHUB_DIR=$GITHUB_MARTINEAU                       # default for script
 CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v2.03 @elorimer
 IMPORT_DIR=$CONFIG_DIR                             # Allow custom Peer .config import directory v4.01
@@ -329,15 +329,15 @@ _Get_File() {
 
     local WEBFILE=$1
     local REPOSITORY_OWNER=$2
-    local REPOSITORY="https://github.com/odkrys/entware-makefile-for-merlin/raw/main/"      # v4.12
+    local REPOSITORY="https://github.com/odkrys/entware-makefile-for-merlin/raw/main/"      # v4.11
 
-    [ "$REPOSITORY_OWNER" != "odkrys" ] && local REPOSITORY="https://github.com/ZebMcKayhan/Wireguard/raw/main/"                    # v4.12
+    [ "$REPOSITORY_OWNER" != "odkrys" ] && local REPOSITORY="https://github.com/ZebMcKayhan/Wireguard/raw/main/"    # v4.11
 
     [ -z "$(echo "$@" | grep "NOMSG")" ] && echo -e $cBCYA"\n\tDownloading WireGuard Kernel module ${cBWHT}'$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO) @$REPOSITORY_OWNER"$cRESET
 
     echo -e $cBGRA
 
-    curl -# -fL --retry 3 ${REPOSITORY}${WEBFILE} -o ${INSTALL_DIR}${WEBFILE}           # v4.12
+    curl -# -fL --retry 3 ${REPOSITORY}${WEBFILE} -o ${INSTALL_DIR}${WEBFILE}           # v4.11
 
     return $?
 }
@@ -345,7 +345,7 @@ Download_Modules() {
 
 
     local ROUTER=$1
-    local REPOSITORY_OWNER="odkrys"                                                     # v4.12
+    local REPOSITORY_OWNER="odkrys"                                                     # v4.11
 
     #[ ! -d "${INSTALL_DIR}" ] && mkdir -p "${INSTALL_DIR}"
 
@@ -358,7 +358,7 @@ Download_Modules() {
     case "$ROUTER" in
 
         RT-AC86U|GT-AC2900)     # RT-AC86U, GT-AC2900 - 4.1.27          e.g. wireguard-kernel_1.0.20210606-k27_1_aarch64-3.10.ipk
-            local WEBFILE_NAMES=$(curl -${SILENT}fL https://api.github.com/repos/ZebMcKayhan/Wireguard/git/trees/main | grep "\"path\": \"wireguard-.*\.ipk\"," | cut -d'"' -f 4 | tr '\r\n' ' ')   # v4.12
+            local WEBFILE_NAMES=$(curl -${SILENT}fL https://api.github.com/repos/ZebMcKayhan/Wireguard/git/trees/main | grep "\"path\": \"wireguard-.*\.ipk\"," | cut -d'"' -f 4 | tr '\r\n' ' ')   # v4.11
             local REPOSITORY_OWNER="ZebMcKayhan"
             _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $1}')" "$REPOSITORY_OWNER"     # k27_1
             ;;
@@ -386,8 +386,8 @@ Download_Modules() {
 
     # User Space Tools
     WEBFILE=$(echo "$WEBFILE_NAMES" | awk '{print $NF}')
-    echo -e $cBCYA"\n\tDownloading WireGuard User space Tool$cBWHT '$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO) @$REPOSITORY_OWNER"$cRESET  # v4.12
-    _Get_File  "$WEBFILE" "$REPOSITORY_OWNER" "NOMSG"           # v4.12
+    echo -e $cBCYA"\n\tDownloading WireGuard User space Tool$cBWHT '$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO) @$REPOSITORY_OWNER"$cRESET  # v4.11
+    _Get_File  "$WEBFILE" "$REPOSITORY_OWNER" "NOMSG"           # v4.11
 
 }
 Load_UserspaceTool() {
@@ -1884,7 +1884,7 @@ Display_QRCode() {
         [ "$ANS" == "y" ] && { clear; qrencode -t ANSIUTF8 < $FN; }             # v1.05
     fi
 }
-# v4.12 'nat'-start references changed to 'firewall'-start
+# v4.11 'nat'-start references changed to 'firewall'-start
 Edit_firewall_start() {
 
     if [ "$1" != "del" ];then
@@ -1935,7 +1935,7 @@ EOF
         echo -e $cBCYA"\n\tfirewall-start updated to protect WireGuard firewall rules"$cRESET
         SayT "firewall-start updated to protect WireGuard firewall rules"
     else
-        sed -i '/WireGuard/d' /jffs/scripts/firewall-start          # v4.12
+        sed -i '/WireGuard/d' /jffs/scripts/firewall-start          # v4.11
         echo -e $cBCYA"\n\tfirewall-start updated - no longer protecting WireGuard firewall rules"$cRESET
         SayT "firewall-start updated - no longer protecting WireGuard firewall rules"
     fi
@@ -2443,6 +2443,7 @@ Uninstall_WireGuard() {
 
     Manage_Stats "DISABLE" "disable"
 
+    [ -n "$(grep -o "WireGuard" /jffs/scripts/nat-start)" ] && sed -i '/WireGuard/d' /jffs/scripts/nat-start    # v4.11 Legacy use of nat-start
     Edit_firewall_start "del"
 
     Manage_alias "del"                  # v1.11
@@ -3358,7 +3359,7 @@ Validate_User_Choice() {
             getmod*) ;;
             loadmod*) ;;
             dns*) ;;                       # v2.01
-            natstart*) ;;
+            firewallstart*) ;;             # v4.11
             alias*) ;;
             diag*) ;;
             debug) ;;
@@ -3571,14 +3572,15 @@ Process_User_Choice() {
                         ;;
                 esac
                 ;;
-            natstart*)
+            firewallstart*)
 
                 local ARG=
                 if [ "$(echo "$menu1" | wc -w)" -ge 2 ];then
                     local ARG="$(printf "%s" "$menu1" | cut -d' ' -f2)"
                 fi
 
-                Edit_firewall_start "$ARG"
+                [ -n "$(grep -o "WireGuard" /jffs/scripts/nat-start)" ] && sed -i '/WireGuard/d' /jffs/scripts/nat-start    # v4.11 Legacy use of nat-start
+                Edit_firewall_start "$ARG"      # v4.11
 
                 ;;
             "-h"|help)
