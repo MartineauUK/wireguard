@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.12b"
-#============================================================================================ © 2021 Martineau v4.12b
+VERSION="v4.12b1"
+#============================================================================================ © 2021 Martineau v4.12b1
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -465,8 +465,16 @@ Check_Module_Versions() {
 
         # Check if Kernel and User Tools Update available
         echo -e $cBWHT"\tChecking for WireGuard Kernel and Userspace Tool updates..."
-        #local FILES=$(curl -${SILENT}fL https://www.snbforums.com/threads/experimental-wireguard-for-hnd-platform-4-1-x-kernels.46164/ | grep "<a href=.*odkrys.*wireguard" | sed 's/"//g; s/\n/ /g' | grep -oE "wireguard.*")
-        local FILES=$(curl -${SILENT}fL https://api.github.com/repos/odkrys/entware-makefile-for-merlin/git/trees/main | grep "\"path\": \"wireguard-.*\.ipk\"," | cut -d'"' -f 4 | tr '\r\n' ' ')  # v4.11 @defung pull request  https://github.com/MartineauUK/wireguard/pull/3
+        if [ "$HARDWARE_MODEL" != "RT-AC86U" ] && [ "$HARDWARE_MODEL" != "GT-AC2900" ];then                 # v4.12
+            local REPOSITORY_OWNER="odkrys"                                                                 # v4.12
+            local REPOSITORY_TITLE="entware-makefile-for-merlin"                                            # v4.12
+        else
+            local REPOSITORY_OWNER="ZebMcKayhan"                                                            # v4.12
+            local REPOSITORY_TITLE="Wireguard"                                                              # v4.12
+        fi
+
+        local FILES=$(curl -${SILENT}fL https://api.github.com/repos/$REPOSITORY_OWNER/$REPOSITORY_TITLE/git/trees/main | grep "\"path\": \"wireguard-.*\.ipk\"," | cut -d'"' -f 4 | tr '\r\n' ' ')  # v4.12 v4.11 @defung pull request  https://github.com/MartineauUK/wireguard/pull/3
+
         [ -z "$(echo "$FILES" | grep -F "$WGKERNEL")" ] && { echo -e $cBYEL"\t\tKernel UPDATE available" $FILE; local UPDATES="Y"; }
         [ -z "$(echo "$FILES" | grep -F "$WGTOOLS")" ] && { echo -e $cBYEL"\t\tUserspace Tool UPDATE available" $FILE; local UPDATES="Y"; }
 
