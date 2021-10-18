@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.11"
-#============================================================================================ © 2021 Martineau v4.11
+VERSION="v4.12b"
+#============================================================================================ © 2021 Martineau v4.12b
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.11"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 16-Oct-2021
+# Last Updated Date: 18-Oct-2021
 #
 # Description:
 #
@@ -1847,15 +1847,20 @@ Create_Sample_Config() {
     echo -e $cBCYA"\a\n\tCreating WireGuard configuration file '${INSTALL_DIR}WireguardVPN.conf'"
 
     cat > ${INSTALL_DIR}WireguardVPN.conf << EOF
-# WireGuard Session Manager v4.01
+# WireGuard Session Manager v4.12
 
-# Categories
+# Categories - Group several Wireguard peers for ease of starting/stopping
+#     NOTE: The default categories 'clients' and 'servers' represent ALL 'client' peers and 'server' peers respectively
+#     e.g. Create the category 'usa',  use command 'peer category usa wg12 wg13' then command 'start usa' will start both 'client' peers.
 None=
 
-# WAN KILL-Switch
-KILLSWITCH
+# WAN KILL-Switch - Prevents WAN access if there are no ACTIVE Wireguard 'client' peers.
+#     Use command 'vx' to edit this setting.
+#     (You can temporarily override this by using menu command 'killswitch off')
+#KILLSWITCH
 
 # Statistics Gathering
+#     Use command 'vx' to edit this setting.
 STATS
 
 
@@ -2004,15 +2009,19 @@ Manage_KILL_Switch() {
     local ACTION=$1
 
     local SILENT="N"
+    local TEMP_PERM="temporarily"
+
 
     if [ -n "$ACTION" ];then
         if [ "$ACTION" != "off" ];then
                 iptables -D FORWARD -i br0 -o $(nvram get wan0_ifname) -j REJECT -m comment --comment "WireGuard KILL-Switch" 2>/dev/null
                 iptables -I FORWARD -i br0 -o $(nvram get wan0_ifname) -j REJECT -m comment --comment "WireGuard KILL-Switch" 2>/dev/null
-                [ "$SILENT" == "N" ] && echo -e $cBGRE"\n\t[✔] WireGuard WAN KILL Switch ${cBRED}${aREVERSE}ENABLED"$cRESET 2>&1
+                [ -z "$(grep -oE "^#KILLSWITCH" ${INSTALL_DIR}WireguardVPN.conf)" ] && local TEMP_PERM=             # v4.12
+                [ "$SILENT" == "N" ] && echo -e $cBGRE"\n\t[✔] WireGuard WAN KILL-Switch "${cBRED}${aREVERSE}"$TEMP_PERM ENABLED"$cRESET" (use 'vx' command for info)" 2>&1         # v4.12
         else
                 iptables -D FORWARD -i br0 -o $(nvram get wan0_ifname) -j REJECT -m comment --comment "WireGuard KILL-Switch" 2>/dev/null
-                [ "$SILENT" == "N" ] && echo -e $cBRED"\n\t[✖] ${cBGRE}WireGuard WAN KILL Switch ${cBRED}${aREVERSE}DISABLED"$cRESET 2>&1
+                [ -z "$(grep -oE "^KILLSWITCH" ${INSTALL_DIR}WireguardVPN.conf)" ] && local TEMP_PERM=              # v4.12
+                [ "$SILENT" == "N" ] && echo -e $cBRED"\n\t[✖] ${cBGRE}WireGuard WAN KILL-Switch "${cBRED}${aREVERSE}"$TEMP_PERM DISABLED"$cRESET" (use 'vx' command for info)" 2>&1    # v4.12
         fi
     fi
 
@@ -3302,11 +3311,11 @@ Build_Menu() {
                 MENU_T="$(printf '%b5 %b = %bStop%b    [ [Peer... ] | category ] e.g. stop clients\n' "${cBYEL}" "${cRESET}" "${cGRA}" "${cBGRA}")"
             fi
             MENU_R="$(printf '%b6 %b = %bRestart%b [ [Peer... ] | category ]%b e.g. restart servers\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
-            MENU_Q="$(printf '%b7 %b = %bDisplay QR code for a Peer {device} e.g. iPhone%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
-            MENU_P="$(printf '%b8 %b = %bPeer management [ "list" | "category" | "new" ] | [ {Peer | category} [ 'del' | 'show' | 'add' [{"auto="[y|n|p]}] ]%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
-            MENU_C="$(printf '%b9 %b = %bCreate Key-pair for Peer {Device} e.g. Nokia6310i (creates Nokia6310i.conf etc.)%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
-            MENU_IPS="$(printf '%b10 %b= %bIPSet management [ "list" ] | [ "upd" { ipset [ "fwmark" {fwmark} ] | [ "enable" {"y"|"n"}] | [ "dstsrc"] ] } ] %b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
-            MENU_ISPIMP="$(printf '%b11 %b= %bImport Wireguard configuration { [ "?" | [ "dir" directory ] | [/path/]config_file [ rename_as ] ]} %b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
+            MENU_Q="$(printf '%b7 %b = %bQRcode%b for a Peer {device} e.g. iPhone%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"   # v4.12
+            MENU_P="$(printf '%b8 %b = %bPeer%b management [ "list" | "category" | "new" ] | [ {Peer | category} [ 'del' | 'show' | 'add' [{"auto="[y|n|p]}] ]%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
+            MENU_C="$(printf '%b9 %b = %bCreate%b Key-pair for Peer {Device} e.g. Nokia6310i (creates Nokia6310i.conf etc.)%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
+            MENU_IPS="$(printf '%b10 %b= %bIPSet%b management [ "list" ] | [ "upd" { ipset [ "fwmark" {fwmark} ] | [ "enable" {"y"|"n"}] | [ "dstsrc"] ] } ] %b' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
+            MENU_ISPIMP="$(printf '%b11 %b= %bImport%b Wireguard configuration { [ "?" | [ "dir" directory ] | [/path/]config_file [ rename_as ] ]} %b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
 
         fi
 
@@ -3319,9 +3328,8 @@ Build_Menu() {
         if [ "$(WireGuard_Installed)" == "Y" ];then
             printf "%s\t\t\t\t\t%s\n"                   "$MENU_Z" "$MENU_P"
             printf "\t\t\t\t\t\t\t\t\t%s\n"                       "$MENU_C"
-            printf "%s\t\t\t\t%s"                       "$MENU_L" "$MENU_IPS"
-            printf "\t\t\t\t\t\t\t\t\t%s\n"                       "$MENU_ISPIMP"
-            printf "\n%s\t\t\t\t\t\t\t\t\t%s\n"         "$MENU_S"
+            printf "%s\t\t\t\t%s\n"                     "$MENU_L" "$MENU_IPS"       # v4.12
+            printf "%s\t%s\n"                           "$MENU_S" "$MENU_ISPIMP"    # v4.12
             printf "%s\t\t\t\t\t\t\t\t\t%s\n"           "$MENU_T"
             printf "%s\t\t\t\t\t\t\t\t\t%s\n"           "$MENU_R"
             printf "\n%s\t\t\t\t\t\n"                   "$MENU__"
@@ -3523,9 +3531,13 @@ Process_User_Choice() {
                         fi
 
                         if [ "$(Manage_KILL_Switch)" == "Y" ];then
-                            echo -e $cBGRE"\t[✔]$cBWHT WAN ${cBGRE}KILL-Switch is ENABLED$cRESET"
+                            local TEMP_PERM="temporarily "                                      # v4.12
+                            [ -z "$(grep -oE "^#KILLSWITCH" ${INSTALL_DIR}WireguardVPN.conf)" ] && local TEMP_PERM=             # v4.12
+                            echo -e $cBGRE"\t[✔]$cBWHT WAN ${cBGRE}KILL-Switch is ${TEMP_PERM}ENABLED"$cRESET" (use 'vx' command for info)" # v4.12
                         else
-                            echo -e $cRED"\t[✖]$cBWHT WAN ${cBGRE}KILL-Switch is ${cBRED}${aREVERSE}DISABLED$cRESET"
+                            local TEMP_PERM="temporarily "                                      # v4.12
+                            [ -z "$(grep -oE "^KILLSWITCH" ${INSTALL_DIR}WireguardVPN.conf)" ] && local TEMP_PERM=              # v4.12
+                            echo -e $cRED"\t[✖]$cBWHT WAN ${cBGRE}KILL-Switch is "${cBRED}${aREVERSE}"${TEMP_PERM}DISABLED"$cRESET" (use 'vx' command for info)"    # v4.12
                         fi
 
                         if [ "$(Manage_UDP_Monitor)" == "Y" ];then                          # v4.01
@@ -3777,7 +3789,7 @@ Show_Main_Menu() {
             fi
 
             local STATUS_LINE="WireGuard ACTIVE Peer Status: "$(Peer_Status_Summary)                  # v3.04 v2.01
-            [ "$(Manage_KILL_Switch)" == "Y" ] && local KILL_STATUS="${cBGRE}${aREVERSE}ENABLED$cRESET" || local KILL_STATUS="        "
+            [ "$(Manage_KILL_Switch)" == "Y" ] && local KILL_STATUS="${cBGRE}${aREVERSE}KILL-Switch ACTIVE$cRESET" || local KILL_STATUS="                 " # v4.12
             echo -e $cRESET"\n"${KILL_STATUS}"\t"${cRESET}${cBMAG}${STATUS_LINE}$cRESET
 
             if [ -z "$NOCHK" ];then
