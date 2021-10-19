@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.12b1"
-#============================================================================================ © 2021 Martineau v4.12b1
+VERSION="v4.12b2"
+#============================================================================================ © 2021 Martineau v4.12b2
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.12b1"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 18-Oct-2021
+# Last Updated Date: 19-Oct-2021
 #
 # Description:
 #
@@ -475,12 +475,21 @@ Check_Module_Versions() {
 
         local FILES=$(curl -${SILENT}fL https://api.github.com/repos/$REPOSITORY_OWNER/$REPOSITORY_TITLE/git/trees/main | grep "\"path\": \"wireguard-.*\.ipk\"," | cut -d'"' -f 4 | tr '\r\n' ' ')  # v4.12 v4.11 @defung pull request  https://github.com/MartineauUK/wireguard/pull/3
 
-        [ -z "$(echo "$FILES" | grep -F "$WGKERNEL")" ] && { echo -e $cBYEL"\t\tKernel UPDATE available" $FILE; local UPDATES="Y"; }
-        [ -z "$(echo "$FILES" | grep -F "$WGTOOLS")" ] && { echo -e $cBYEL"\t\tUserspace Tool UPDATE available" $FILE; local UPDATES="Y"; }
+        if [ "$ACTION" == "force" ];then                                            # v4.12
+            local UPDATES="Y"                                                       # v4.12
+        else
+            [ -z "$(echo "$FILES" | grep -F "$WGKERNEL")" ] && { echo -e $cBYEL"\t\tKernel UPDATE available" $FILE; local UPDATES="Y"; }
+            [ -z "$(echo "$FILES" | grep -F "$WGTOOLS")" ] && { echo -e $cBYEL"\t\tUserspace Tool UPDATE available" $FILE; local UPDATES="Y"; }
+        fi
 
         if [ "$UPDATES" == "Y" ];then
-            echo -e $cRESET"\n\tPress$cBRED y$cRESET to$cBRED Update WireGuard Kernel and Userspace Tool${cRESET} or press$cBGRE [Enter] to SKIP."
-            read -r "ANS"
+            if [ "$ACTION" != "force" ];then            # v4.12
+                echo -e $cRESET"\n\tPress$cBRED y$cRESET to$cBRED Update WireGuard Kernel and Userspace Tool${cRESET} or press$cBGRE [Enter] to SKIP."
+                read -r "ANS"
+            else
+                local ANS="y"                           # v4.12
+            fi
+
             if [ "$ANS" == "y" ];then
                 Download_Modules $HARDWARE_MODEL
                 Load_UserspaceTool
@@ -764,6 +773,20 @@ Import_Peer() {
                         echo -e $cBRED"\a\n\t***ERROR: Peer (${cBWHT}$NEW_NAME${cBRED}) ALREADY exists!"$cRESET
                         return 1
                     fi
+                fi
+            else
+                # v4.12 By default if 'name=' not specified import .config into next free 'wg1x' slot
+                if [ -z "$(echo "$WG_INTERFACE" | grep -E "^wg[1-2]")" ];then           # v4.12
+
+                    # Pick the next 'client' Peer name
+                    for I in 11 12 13 14 15 16 17 18 19 111 112 113 114 115             # v4.12
+                        do
+                            [ -f ${CONFIG_DIR}wg${I}.conf ] && continue
+                            local NEW_NAME="wg"$I
+                            break
+                        done
+
+                    local RENAME="Y"
                 fi
             fi
             if [ "$1" == "tag=" ] || [ "$1" == "comment" ];then
@@ -3323,7 +3346,7 @@ Build_Menu() {
             MENU_P="$(printf '%b8 %b = %bPeer%b management [ "list" | "category" | "new" ] | [ {Peer | category} [ 'del' | 'show' | 'add' [{"auto="[y|n|p]}] ]%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
             MENU_C="$(printf '%b9 %b = %bCreate%b Key-pair for Peer {Device} e.g. Nokia6310i (creates Nokia6310i.conf etc.)%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
             MENU_IPS="$(printf '%b10 %b= %bIPSet%b management [ "list" ] | [ "upd" { ipset [ "fwmark" {fwmark} ] | [ "enable" {"y"|"n"}] | [ "dstsrc"] ] } ] %b' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
-            MENU_ISPIMP="$(printf '%b11 %b= %bImport%b Wireguard configuration { [ "?" | [ "dir" directory ] | [/path/]config_file [ rename_as ] ]} %b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
+            MENU_ISPIMP="$(printf '%b11 %b= %bImport%b Wireguard configuration { [ "?" | [ "dir" directory ] | [/path/]config_file [ "name="rename_as ] ]} %b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
 
         fi
 
@@ -3533,7 +3556,7 @@ Process_User_Choice() {
                         DNSmasq_Listening_WireGuard_Status
 
                         if [ -z "$(grep -i "wireguard" /jffs/scripts/firewall-start)" ];then     # v1.11
-                            echo -e $cBRED"\t[✖]${cBWHT} firewall-start$${cBRED} is NOT monitoring WireGuard Firewall rules - ${cBWHT}use 'wgm natstart' to ENABLE\n"$cRESET
+                            echo -e $cBRED"\t[✖]${cBWHT} firewall-start$${cBRED} is NOT monitoring WireGuard Firewall rules - ${cBWHT}use 'firewallstart' to ENABLE\n"$cRESET   # v4.12
                         else
                             echo -e $cBGRE"\t[✔]${cBWHT} firewall-start ${cBGRE}is monitoring WireGuard Firewall rules\n"$cRESET
                         fi
@@ -3571,7 +3594,11 @@ Process_User_Choice() {
                         DOWNLOAD="N"
 
                         echo -e
-                        Check_Module_Versions
+                        if [ -z "$(echo "$ACTION" | grep -E "^uf")" ];then          # v4.12
+                            Check_Module_Versions
+                        else
+                            Check_Module_Versions "force"                           # v4.12
+                        fi
 
                         if [ "$ACTION" == "uf" ];then
                             echo -e ${cRESET}$cWRED"\n\tForced Update"$cRESET"\n"
