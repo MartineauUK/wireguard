@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.12b2"
-#============================================================================================ © 2021 Martineau v4.12b2
+VERSION="v4.12b3"
+#============================================================================================ © 2021 Martineau v4.12b3
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.12b2"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 19-Oct-2021
+# Last Updated Date: 30-Oct-2021
 #
 # Description:
 #
@@ -827,10 +827,11 @@ Import_Peer() {
 
                                 PrivateKey) local PRI_KEY=${LINE##* };;
                                 PublicKey) local PUB_KEY=${LINE##* };;
-                                AllowedIPs)
-                                    local ALLOWIP=$(echo "$LINE" | awk '{print $3}')
+                                AllowedIPs) local ALLOWIP=$(echo "$LINE" | sed 's/^AllowedIPs.*=//' | awk '{$1=$1};1')  # v4.12 strip leading/trailing spaces/tabs
                                 ;;
-                                Endpoint) local SOCKET=${LINE##* };;
+                                Endpoint) local SOCKET=${LINE##* }
+                                    local SOCKET=$(echo "$SOCKET" | awk '{$1=$1};1')    # v4.12  strip leading/trailing spaces/tabs
+                                ;;
                                 "#"MTU) local MTU=${LINE##* };;                 # v4.09
                                 "#"DNS) local COMMENT_DNS=${LINE##* } ;;
                                 "#"Address) local COMMENT_SUBNET=${LINE##* } ;;
@@ -842,7 +843,20 @@ Import_Peer() {
                                     # This must be commented out!
                                     [ "$MODE" == "client" ] && COMMENT_OUT="Y"
                                 ;;
-                                Address) local SUBNET=${LINE##* }
+                                Address) local IP_LIST=$(echo "$LINE" | sed 's/^Address.*=//' | tr ',' ' ' | awk '{$1=$1};1')   # v4.12  strip leading/trailing spaces/tabs
+                                        for IP in $IP_LIST                                                      # v4.12
+                                            do
+                                                # Only use IPv4 or IPv6 address ?
+                                                if [ $(nvram get ipv6_service) == "disabled" ];then             # v4.12
+                                                    if [ -z "$(echo "$IP" | Is_IPv4_CIDR)" ];then               # v4.12
+                                                        continue                                                # v4.12 ignore IPv6
+                                                    else
+                                                        [ -z $(echo "$IP" | grep "/" ) ] && local SUBNET=$IP"/32" || local SUBNET=$IP   # v4.12 add "/32" as appropriate
+                                                    fi
+                                                else
+                                                    [ -n "$(echo "$IP" | Is_IPv4_CIDR)" ] && continue           # v4.12 ignore IPv4
+                                                fi
+                                            done
                                     # This must be commented out!
                                     [ "$MODE" == "client" ] && COMMENT_OUT="Y"
                                 ;;
@@ -854,11 +868,7 @@ Import_Peer() {
                         [ -z "$DNS" ] && local DNS=$COMMENT_DNS             # v4.03
                         [ -z "$SUBNET" ] && local SUBNET=$COMMENT_SUBNET       # v4.03
 
-                        # Strip IPV6
-                        if [ "$(nvram get ipv6_service)" == "disabled" ];then
-                            local SUBNET=$(echo "$SUBNET" | tr ',' ' ' | awk '{print $1}')
-                            [ -z "$(echo "$SUBNET" | Is_IPv4_CIDR)" ] && local SUBNET=$SUBNET"/32"
-                        fi
+
                         if [ "$MODE" = "client" ];then
                             if [ "$RENAME" != "Y" ];then
                                 sqlite3 $SQL_DATABASE "INSERT INTO $TABLE values('$WG_INTERFACE','$AUTO','$SUBNET','$SOCKET','$DNS','$MTU','$PUB_KEY','$PRI_KEY','$ANNOTATE');"     # v4.09
@@ -910,8 +920,8 @@ Import_Peer() {
                     echo -e $cBRED"\a\n\t***ERROR: WireGuard Peer (${cBWHT}$WG_INTERFACE${cBRED}) must be 'client'....skipping import Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
                 fi
             else
-                SayT "***ERROR: WireGuard VPN 'client' Peer ('${IMPORT_DIR}$WG_INTERFACE') config NOT found?....skipping import request"
-                echo -e $cBRED"\a\n\t***ERROR: WireGuard 'client' Peer (${cBWHT}${IMPORT_DIR}$WG_INTERFACE${cBRED}) config NOT found?....skipping import Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
+                SayT "***ERROR: WireGuard VPN 'client' Peer ('${IMPORT_DIR}$WG_INTERFACE.conf') configuration file NOT found?....skipping import request"   # v4.12
+                echo -e $cBRED"\a\n\t***ERROR: WireGuard 'client' Peer (${cBWHT}${IMPORT_DIR}$WG_INTERFACE.conf${cBRED}) configuration file NOT found?....skipping import Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1   # v4.12
             fi
         done
 
@@ -964,6 +974,11 @@ Manage_Peer() {
                     echo -e "\tpeer peer_name {rule [del {id_num} |add [wan] rule_def]}\t\t- Manage Policy rules e.g. peer wg13 rule add 172.16.1.0/24 comment All LAN"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg13 rule add wan 52.97.133.162 comment smtp.office365.com"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg13 rule add wan 172.16.1.100 9.9.9.9 comment Quad9 DNS"
+                    echo -e "\tpeer serv_peer_name {passthru client_peer {[add|del] [device|IP/CIDR]}} - Manage passthu' rules for inbound 'server' peer devices/IPs/CIDR outbound via 'client' peer tunnel"
+                    echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru add wg11 SGS8"
+                    echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru add wg15 all"
+                    echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru add wg12 10.100.100.0/27"
+
                     return
                 fi
 
@@ -995,10 +1010,12 @@ Manage_Peer() {
                                 if [ "$(echo "$AUTO" | grep "^[yYnNpPZ]$" )" ];then
                                     FLAG=$(echo "$AUTO" | tr 'a-z' 'A-Z')
                                     if [ -z "$(echo "$CMD" | grep "autoX")" ];then
-                                        # If Auto='P' then enforce existence of RPDB Selective Routing rules or IPSET fwmark for the 'client' Peer
+                                        # If Auto='P' then enforce existence of RPDB Selective Routing rules or IPSET fwmark for the 'client' Peer or Passthru gateway
                                         if [ "$FLAG" == "P" ];then
-                                           if [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$WG_INTERFACE';") -eq 0 ] && [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM ipset WHERE peer='$WG_INTERFACE';") -eq 0 ];then    # v4.11 @ZebMcKayhan/@The Chief
-                                              echo -e $cBRED"\a\n\t***ERROR No Policy rules exist for ${cBMAG}$WG_INTERFACE ${cBRED}(${cBWHT}use 'peer $WG_INTERFACE rule add' command${cBRED} first)\n"$cRESET
+                                           if [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$WG_INTERFACE';") -eq 0 ] && \
+                                              [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM ipset WHERE peer='$WG_INTERFACE';") -eq 0 ]  && \
+                                              [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(client) FROM passthru WHERE client='$WG_INTERFACE';") -eq 0 ];then    # v4.12 v4.11 @ZebMcKayhan/@The Chief
+                                              echo -e $cBRED"\a\n\t***ERROR No Policy (nor IPSET/Passthru) rules exist for ${cBMAG}$WG_INTERFACE ${cBRED}(${cBWHT} e.g. use 'peer $WG_INTERFACE rule add' command${cBRED} first)\n"$cRESET
                                               return 1
                                             fi
                                         fi
@@ -1080,6 +1097,10 @@ Manage_Peer() {
                             ;;
                             rule*)
                                 Manage_RPDB_rules $menu1
+                                [ $? -eq 1 ] && Show_Peer_Config_Entry "$WG_INTERFACE"
+                            ;;
+                            passthru*)
+                                Manage_PASSTHRU_rules $menu1            # v4.12
                                 [ $? -eq 1 ] && Show_Peer_Config_Entry "$WG_INTERFACE"
                             ;;
                             allowedips=*)
@@ -1393,6 +1414,9 @@ Manage_Wireguard_Sessions() {
 
     WG_INTERFACE=$(printf "%s" "$WG_INTERFACE" | sed 's/^[ \t]*//;s/[ \t]*$//')
 
+    # v4.12 Ensure 'server' peers are initialised before 'client' peers e.g. this order:  wg22 wg21 wg15 wg14 wg13 wg12 wg11
+    WG_INTERFACE=$(echo "$WG_INTERFACE" | tr " " "\n" | sort -r | tr "\n" " ")  # v4.12
+
     [ -n "$WG_INTERFACE" ] && echo -e $cBWHT"\n\tRequesting WireGuard VPN Peer ${ACTION}$CATEGORY (${cBMAG}$WG_INTERFACE"$cRESET")"
 
     case "$ACTION" in
@@ -1456,7 +1480,7 @@ Manage_Wireguard_Sessions() {
 
                                 local TS=$(date +%s)
                                 sh ${INSTALL_DIR}wg_server $WG_INTERFACE
-#[ "$(wg show interfaces | grep "wg2[1-9]" | wc -w)" -eq 1 ] && local UDP_MONITOR=$(Manage_UDP_Monitor "server" "enable")
+#[ "$(wg show interfaces | tr ' ' '\n' | grep "wg2[1-9]" | wc -w)" -eq 1 ] && local UDP_MONITOR=$(Manage_UDP_Monitor "server" "enable")
 
                                 # Reset all its 'client' Peers...well HACK until 'client' peer ACTUALLY connects...
                                 # Update the Start time for ALL 'client' device Peers hosted by the server
@@ -1537,7 +1561,7 @@ Manage_Wireguard_Sessions() {
 
                                 # If there are no 'server' Peers ACTIVE then terminate UDP monitoring
                                 # Will require REBOOT to reinstate! or 'wgm init'
-                                [ "$(wg show interfaces | grep "wg2[1-9]" | wc -w)" -eq 0 ] && local UDP_MONITOR=$(Manage_UDP_Monitor "server" "disable")
+                                [ "$(wg show interfaces | tr ' ' '\n' | grep "wg2[1-9]" | wc -w)" -eq 0 ] && local UDP_MONITOR=$(Manage_UDP_Monitor "server" "disable") # v4.12
 
                             else
                                 # Dump the stats
@@ -1728,6 +1752,77 @@ Manage_RPDB_rules() {
 
     return $REDISPLAY
 }
+Manage_PASSTHRU_rules() {
+    # v4.12
+    local REDISPLAY=1
+    local ACTION=$1
+    shift
+    local WG_INTERFACE=$1
+    shift 2
+    local CMD=$1
+    shift
+    local IFACE=$1
+    shift
+    local IP_SUBNET=$1
+
+    if [ ! -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
+        echo -e $cBRED"\a\n\t***ERROR: Peer (${cBWHT}$WG_INTERFACE${cBRED}) doesn't exist!"$cRESET
+        return 1
+    fi
+
+    local MODE=$(Server_or_Client "$WG_INTERFACE")
+
+    if [ "$MODE" != "server" ];then
+        echo -e $cBRED"\a\n\t***ERROR: Peer (${cBWHT}$WG_INTERFACE${cBRED}) must be 'server' peer e.g. 'wg21'"$cRESET
+        return 1
+    fi
+
+    if [ -n "$CMD" ] && [ "$CMD" != "list" ];then
+
+        case "$CMD" in
+            add)
+
+                if [ ! -f ${CONFIG_DIR}${IFACE}.conf ];then
+                    echo -e $cBRED"\a\n\t***ERROR: 'client' Peer (${cBWHT}$IFACE${cBRED}) doesn't exist!"$cRESET
+                    return 1
+                fi
+
+                local MODE=$(Server_or_Client "$IFACE")
+
+                if [ "$MODE" == "server" ];then
+                        echo -e $cBRED"\a\n\t***ERROR: Peer (${cBWHT}$IFACE${cBRED}) must be 'client' peer e.g. 'wg13'"$cRESET
+                        return 1
+                fi
+
+                sqlite3 $SQL_DATABASE "INSERT INTO passthru values('$WG_INTERFACE','$IFACE','$IP_SUBNET');"
+                echo -e $cBGRE"\n\t[✔] Updated Passthru Routing rule for $WG_INTERFACE \n"$cRESET  2>&1
+            ;;
+            del)
+                if [ "$IFACE" != "all" ];then
+                    sqlite3 $SQL_DATABASE "DELETE FROM passthru WHERE server='$WG_INTERFACE' AND client='$IFACE' AND ip_subnet='$IP_SUBNET';"
+                    echo -e $cBGRE"\n\t[✔] Deleted Passthru Routing rule for $WG_INTERFACE \n"$cRESET  2>&1
+                else
+                    echo -e $cBCYA"\a\n\tDo you want to DELETE ALL Passthru Routing rules for ${cBMAG}$WG_INTERFACE?"$cRESET
+                    echo -e "\tPress$cBRED y$cRESET to$cBRED CONFIRM${cRESET} or press$cBGRE [Enter] to SKIP."
+                    read -r "ANS"
+                    if [ "$ANS" == "y" ];then
+                        sqlite3 $SQL_DATABASE "DELETE FROM passthru WHERE server='$WG_INTERFACE';"
+                        echo -e $cBGRE"\n\t[✔] Deleted ALL Passthru Routing rules for $WG_INTERFACE \n"$cRESET  2>&1
+                    else
+                        REDISPLAY=0
+                    fi
+                fi
+            ;;
+            *)
+                echo -e $cBRED"\a\n\t***ERROR: command '$CMD' invalid - use 'add' or 'del' ONLY"$cRESET
+                return 1
+            ;;
+        esac
+
+    fi
+
+    return $REDISPLAY
+}
 Initialise_SQL() {
 
     local ACTION=$2
@@ -1762,6 +1857,7 @@ CREATE TABLE IF NOT EXISTS fwmark  (fwmark varchar(10), peer varchar(15) NOT NUL
 CREATE TABLE IF NOT EXISTS ipset   (ipset PRIMARY KEY, use varchar(1), peer varchar(5),fwmark varchar(10) NOT NULL, dstsrc varchar (11) NOT NULL);
 CREATE TABLE IF NOT EXISTS traffic (peer NOT NULL,timestamp UNSIGNED BIG INT NOT NULL,rx UNSIGNED BIG INT NOT NULL,tx UNSIGNED BIG INT NOT NULL,rxtotal UNSIGNED BIG INT NOT NULL,txtotal UNSIGNED BIG INT NOT NULL);
 CREATE TABLE IF NOT EXISTS session (peer NOT NULL,state varchar(1), timestamp UNSIGNED BIG INT NOT NULL);
+CREATE TABLE IF NOT EXISTS passthru (server varchar(5) NOT NULL, client varchar(5) NOT NULL, ip_subnet varchar(19) NOT NULL, PRIMARY KEY(server,client,ip_subnet));
 EOF
     echo -en $cBRED
     sqlite3 $SQL_DATABASE < /tmp/sql_cmds.txt
@@ -1894,6 +1990,12 @@ None=
 #     Use command 'vx' to edit this setting.
 STATS
 
+# Global IPv6 Override
+#     Use command 'vx' to edit this setting.
+#     If IPv6 is configured on the router (nvram get ipv6_service != "disabled") then
+#        a 'client' peer may be assigned an IPv6 IP address by the WireGuard ISP and may subsequently include "::/0" in its AllowedIPs list etc.
+#        This setting basically ignores any IPv6 settings for the WireGuard interfaces.
+#NOIPV6
 
 EOF
     return 0
@@ -1988,6 +2090,8 @@ Server_or_Client() {
                 local PEER_TYPE="client"
                 if [ -n "$(nvram get ddns_hostname_x)" ];then                           # v4.05
                     [ -n "$(grep -iF "$(nvram get ddns_hostname_x)" ${CONFIG_DIR}${WG_INTERFACE}.conf)" ] && PEER_TYPE="device"
+                else
+                    [ -n "$(grep -iF "$(nvram get wan0_realip_ip)" ${CONFIG_DIR}${WG_INTERFACE}.conf)" ] && PEER_TYPE="device"  # v4.12
                 fi
             else
                 local PEER_TYPE="server"
@@ -2745,18 +2849,20 @@ Show_Peer_Config_Entry() {
             COLUMN_TXT="Client,Auto,IP,Endpoint,DNS,MTU,Annotate"           # v4.09
             sqlite3 $SQL_DATABASE "SELECT peer,auto,subnet,socket,dns,mtu,tag from clients;" | column -t  -s '|' --table-columns "$COLUMN_TXT"
             echo -e
-            COLUMN_TXT="Device,Auto,IP,DNS,Allowed IPs,Annotate"                    # v4.09
+            COLUMN_TXT="Device,Auto,IP,DNS,Allowed IPs,Annotate"            # v4.09
             sqlite3 $SQL_DATABASE "SELECT name,auto,ip,dns,allowedip,tag from devices ORDER BY ip ASC;" | column -t  -s '|' --table-columns "$COLUMN_TXT"   # v4.11
+
+            [ -n "$(sqlite3 $SQL_DATABASE "SELECT * from passthru;" 2>/dev/null)" ] && { echo -e; sqlite3 $SQL_DATABASE "SELECT * from passthru;" | column -t  -s '|' --table-columns Server,Client,Passthru ; }    # v4.12
         ;;
         *)
             local Mode=$(Server_or_Client "$WG_INTERFACE")
             case "$Mode" in
                 server)
-                    local TABLE="servers"; local ID="peer"
+                    local TABLE="servers"; local ID="peer"; local SQL_COL="server"
                     local COLUMN_TXT="Server,Auto,Subnet,Port,Public,Private,Annotate"
                     ;;
                 client)
-                    local TABLE="clients"; local ID="peer"
+                    local TABLE="clients"; local ID="peer"; local SQL_COL="client"
                     local COLUMN_TXT="Client,Auto,IP,Endpoint,DNS,MTU,Public,Private,Annotate"    # v4.09 v4.04
                     ;;
                 *)
@@ -2786,6 +2892,16 @@ Show_Peer_Config_Entry() {
                     sqlite3 $SQL_DATABASE "SELECT * FROM ipset WHERE peer='$WG_INTERFACE';" | column -t  -s '|' --table-columns IPSet,Enable,Peer,FWMark,DST/SRC
                 fi
             fi
+
+            case "$Mode" in                                         # v4.12
+                server|client)
+                    [ -n "$(sqlite3 $SQL_DATABASE "SELECT * FROM passthru WHERE $SQL_COL='$WG_INTERFACE';" 2>/dev/null)" ] && { echo -e $cBCYA; sqlite3 $SQL_DATABASE "SELECT * from passthru WHERE $SQL_COL='$WG_INTERFACE';" | column -t  -s '|' --table-columns Server,Client,Passthru ; }   # v4.12
+                    ;;
+                *)
+                    [ -n "$(sqlite3 $SQL_DATABASE "SELECT * FROM passthru WHERE ip_subnet LIKE '$WG_INTERFACE';" 2>/dev/null)" ] && { echo -e $cBCYA; sqlite3 $SQL_DATABASE "SELECT * from passthru WHERE ip_subnet LIKE '$WG_INTERFACE';" | column -t  -s '|' --table-columns Server,Client,Passthru ; }   # v4.12
+                    ;;
+            esac
+
         ;;
     esac
 
@@ -2923,7 +3039,7 @@ Diag_Dump() {
             # Probably not a good idea for * - last couple of days maybe?
             if [ -z "$TABLE" ];then
                 echo -e $cBYEL"\n\tDEBUG: SQL '$SQL_DATABASE'\n"$cBCYA 2>&1
-                sqlite3 $SQL_DATABASE "SELECT * FROM servers;" |
+                sqlite3 $SQL_DATABASE "SELECT * FROM servers;"
                 sqlite3 $SQL_DATABASE "SELECT * FROM clients;"
                 sqlite3 $SQL_DATABASE "SELECT * FROM fwmark;"
                 sqlite3 $SQL_DATABASE "SELECT * FROM policy;"
@@ -2952,7 +3068,7 @@ Diag_Dump() {
                     dev*)
                         TABLE="devices"
                         echo -e $cBYEL"\tTable:$TABLE"$cBCYA 2>&1
-                        sqlite3 $SQL_DATABASE "SELECT * FROM $TABLE ORDER BY ip ASC;" | column -t  -s '|' --table-columns Device,Auto,IPADDR,DNS,'Allowed',Public,Private,tag,Conntrack # v4.11
+                        sqlite3 $SQL_DATABASE "SELECT * FROM $TABLE ORDER BY ip ASC;" | column -t  -s '|' --table-columns Device,Auto,IPADDR,DNS,'Allowed',Public,Private,Description,Conntrack # v4.12 v4.11
                     ;;
                     ips*)
                         TABLE="ipset"
@@ -2963,6 +3079,21 @@ Diag_Dump() {
                         TABLE="fwmark"
                         echo -e $cBYEL"\tTable:$TABLE"$cBCYA 2>&1
                         sqlite3 $SQL_DATABASE "SELECT * FROM $TABLE;" | column -t  -s '|' --table-columns FWMark,Peer
+                    ;;
+                    serv*)
+                        TABLE="servers"
+                        echo -e $cBYEL"\tTable:$TABLE"$cBCYA 2>&1
+                        sqlite3 $SQL_DATABASE "SELECT * FROM $TABLE;" | column -t  -s '|' --table-columns Peer,Auto,Subnet,Port,Public,Private,Description  # v4.12
+                    ;;
+                    client*)
+                        TABLE="clients"
+                        echo -e $cBYEL"\tTable:$TABLE"$cBCYA 2>&1
+                        sqlite3 $SQL_DATABASE "SELECT * FROM $TABLE;" | column -t  -s '|' --table-columns Peer,Auto,IP,Endpoint,DNS,MTU,Public,Private,Description  # v4.12
+                    ;;
+                    passthru*)                                      # v4.12
+                        TABLE="passthru"
+                        echo -e $cBYEL"\tTable:$TABLE"$cBCYA 2>&1
+                        sqlite3 $SQL_DATABASE "SELECT * FROM $TABLE;" | column -t  -s '|' --table-columns Server,Client,Passthru    # v4.12
                     ;;
                     *)
                         [ "$TABLE" != "?" ] && echo -en $cBRED"\a\tInvalid SQL table ${cBWHT}'$TABLE'\n\n"
@@ -3344,7 +3475,7 @@ Build_Menu() {
             MENU_R="$(printf '%b6 %b = %bRestart%b [ [Peer... ] | category ]%b e.g. restart servers\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
             MENU_Q="$(printf '%b7 %b = %bQRcode%b for a Peer {device} e.g. iPhone%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"   # v4.12
             MENU_P="$(printf '%b8 %b = %bPeer%b management [ "list" | "category" | "new" ] | [ {Peer | category} [ 'del' | 'show' | 'add' [{"auto="[y|n|p]}] ]%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
-            MENU_C="$(printf '%b9 %b = %bCreate%b Key-pair for Peer {Device} e.g. Nokia6310i (creates Nokia6310i.conf etc.)%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
+            MENU_C="$(printf '%b9 %b = %bCreate[split]%b Key-pair for Peer {Device} e.g. Nokia6310i (creates Nokia6310i.conf etc.)%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
             MENU_IPS="$(printf '%b10 %b= %bIPSet%b management [ "list" ] | [ "upd" { ipset [ "fwmark" {fwmark} ] | [ "enable" {"y"|"n"}] | [ "dstsrc"] ] } ] %b' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
             MENU_ISPIMP="$(printf '%b11 %b= %bImport%b Wireguard configuration { [ "?" | [ "dir" directory ] | [/path/]config_file [ "name="rename_as ] ]} %b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
 
