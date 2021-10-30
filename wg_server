@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.05b"
-#============================================================================================ © 2021 Martineau v4.05b
+VERSION="v4.05b2"
+#============================================================================================ © 2021 Martineau v4.05b2
 #
 
 # Maintainer: Martineau
@@ -53,7 +53,35 @@ Firewall_delete() {
         ip6tables -D OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
     fi
 }
+Manage_Passthru(){
 
+    local PASSTHRU_CLIENTS=$(sqlite3 /opt/etc/wireguard.d/WireGuard.db "SELECT client FROM passthru where server='$WG_INTERFACE';" | sort | uniq | tr '\n' ' ')
+
+    local ACTION="add"
+    [ -n "$1" ] && ACTION=$1        # "del" or "add"
+
+    if [ -n "$PASSTHRU_CLIENTS" ];then
+
+    local IP_ADDR=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers where peer='$WG_INTERFACE';")
+
+        for VPN_ID in $PASSTHRU_CLIENTS     # wg11 wg14
+            do
+                local VPN_NUM=${VPN_ID#"${VPN_ID%?}"}
+
+                if [ "$ACTION" == "add" ];then
+                    # Ensure target WireGuard 'client' peer routing policy table contains WireGuard 'server' peer IP/network in the passthru tunnel @chongnt
+
+                    while read ROUTE; do
+                        ip route $ACTION $ROUTE table 12$VPN_NUM 2>/dev/null && ROUTING_CHANGED=
+                    done << EOR
+$(ip route | grep "$WG_INTERFACE")
+EOR
+
+                    [ ${ROUTING_CHANGED+x} ] && ip route flush cache || logger -st "wireguard-${MODE}${VPN_NAME}" "Warning 'server' peer ($PASSTHRU_SERVER) route not found - is it UP?"
+                fi
+            done
+    fi
+}
 
 #For verbose debugging, uncomment the following two lines, and uncomment the last line of this script
 #set -x
@@ -129,6 +157,8 @@ if [ "$2" != "disable" ];then
 
     Firewall_delete
 
+    Manage_Passthru "add"
+
     if [ "$USE_IPV6" != "Y" ];then
         ip route add default dev $VPN_ID table 2${VPN_NUM}"0"       # v4.03
         ip rule add fwmark $(printf "%#07x\n" "2${VPN_NUM}0") table 2${VPN_NUM}"0" prio 98${VPN_NUM}0   # v4.03
@@ -180,6 +210,7 @@ else
 
     Firewall_delete
 
+    Manage_Passthru "del"
 
     ip route flush table 2${VPN_NUM}"0" 2>/dev/null     # v4.03
     ip rule del prio 98${VPN_NUM}0      2>/dev/null     # v4.03
