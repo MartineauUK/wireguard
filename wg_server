@@ -1,20 +1,16 @@
 #!/bin/sh
-VERSION="v4.04"
-#============================================================================================ © 2021 Martineau v4.04
+VERSION="v4.05b"
+#============================================================================================ © 2021 Martineau v4.05b
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 15-May-2021
+# Last Updated Date: 30-Oct-2021
 #
 # Description:
 #
 # Acknowledgement:
 #
 # Contributors: odkrys,ZebMcKayhan,Torson
-
-CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v1.08 @elorimer
-INSTALL_DIR="/jffs/addons/wireguard/"
-SQL_DATABASE="/opt/etc/wireguard.d/WireGuard.db"        # v1.13
 
 # shellcheck disable=SC2034
 ANSIColours() {
@@ -67,6 +63,7 @@ Main() { true; }            # Syntax that is Atom Shellchecker compatible!
 
 ANSIColours
 
+SQL_DATABASE="/opt/etc/wireguard.d/WireGuard.db"        # v1.13
 CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v1.08 @elorimer
 INSTALL_DIR="/jffs/addons/wireguard/"
 
@@ -82,6 +79,7 @@ VPN_NUM=${VPN_ID#"${VPN_ID%?}"}                     # v4.02
 
 wgport=$(awk '/Listen/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)
 SOCKET=$(nvram get wan_gateway)":"$wgport
+SOCKET=$(nvram get wan0_gateway)":"$wgport          # v4.04
 
 WG_INTERFACE=$1
 
@@ -193,7 +191,7 @@ else
 
 
     # User Exit @ZebMcKayhan
-    [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh ] && { logger -t "wireguard-server${VPN_ID:3:1}" "Executing ${VPN_ID}-down.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh; }  #v4.04
+    [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh ] && { logger -t "wireguard-server${VPN_ID:3:1}" "Executing ${VPN_ID}-down.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh; }
 
     logger -t "wireguard-server${VPN_ID:3:1}" "Wireguard VPN 'server' Peer ($VPN_ID) on" $SOCKET "Terminated"
 
