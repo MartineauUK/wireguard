@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.13b"
-#============================================================================================ © 2021 Martineau v4.13b
+VERSION="v4.13b2"
+#============================================================================================ © 2021 Martineau v4.13b2
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 10-Oct-2021
+# Last Updated Date: 30-Oct-2021
 #
 # Description:
 #
@@ -12,14 +12,27 @@ VERSION="v4.13b"
 #
 # Contributors: odkrys,@ZebMcKayhan,Torson,The Chief
 
-CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v1.05 @elorimer
-INSTALL_DIR="/jffs/addons/wireguard/"
-SQL_DATABASE="/opt/etc/wireguard.d/WireGuard.db"        # v1.08
-
 #For verbose debugging, uncomment the following two lines, and uncomment the last line of this script
 #set -x
 #(
 
+Parse() {
+    #
+    #   Parse       "Word1,Word2|Word3" ",|" VAR1 VAR2 REST
+    #               (Effectivley executes VAR1="Word1";VAR2="Word2";REST="Word3")
+
+    local TEXT IFS
+
+    TEXT="$1"
+    IFS="$2"
+    shift 2
+    read -r -- "$@" <<EOF
+$TEXT
+EOF
+}
+SayT() {
+   echo -e $$ $@ | logger -t "($(basename $0))"
+}
 # shellcheck disable=SC2034
 ANSIColours() {
 
@@ -42,6 +55,9 @@ Is_AX() {
 }
 Is_IPv4 () {
         grep -oE '^([0-9]{1,3}\.){3}[0-9]{1,3}$'                    # IPv4 format
+}
+Is_IPv4_CIDR () {
+        grep -oE '^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$'         # IPv4 CIDR range notation
 }
 Is_IPv6() {
     # Note this matches compression anywhere in the address, though it won't match the loopback address ::1
@@ -161,11 +177,64 @@ purge_client_list(){
         fi
     done
 }
+Manage_Passthru(){
+
+    local SERVER_DEVICEPEERS=$(sqlite3 /opt/etc/wireguard.d/WireGuard.db "SELECT server,ip_subnet FROM passthru where client='$WG_INTERFACE';" | tr '\n' ' ')
+
+    local PASSTHRU_SERVER
+    local PASSTHRU
+
+    local ACTION="add"
+    [ -n "$1" ] && ACTION=$1        # "del" or "add"
+
+    if [ -n "$SERVER_DEVICEPEERS" ];then
+
+        for ITEM in $SERVER_DEVICEPEERS     # wg21|all or wg22|SGS8 or wg21|10.0.0.0/27
+            do
+                Parse "$ITEM" "|" PASSTHRU_SERVER PASSTHRU
+
+                if [ "$PASSTHRU" == "all" ];then
+                    # Use 'server' peer clients subnet
+                    local IP_ADDR=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers where peer='$PASSTHRU_SERVER';")
+                    local TYPE="Subnet"
+                else
+                    local IP_ADDR=$(sqlite3 $SQL_DATABASE "SELECT ip FROM devices where name='$PASSTHRU';" 2> /dev/null)
+                    [ -z "$IP_ADDR" ] && local IP_ADDR=$PASSTHRU
+                    local TYPE="I/P"
+                fi
+
+                if [ -n "$IP_ADDR" ];then
+                    #Say "Psuedo command 'pass-thru' will be applied to "$TYPE $IP_ADDR "directly via VPN Client '"$WG_INTERFACE"' ("$DESC")"
+                    ip rule del from $IP_ADDR table 12$VPN_NUM prio 998$VPN_NUM 2> /dev/null
+                    [ "$ACTION" != "del" ] && ip rule $ACTION from $IP_ADDR table 12$VPN_NUM prio 998$VPN_NUM
+                    SayT "RPDB" $username "'pass-thru': 'ip rule $ACTION from $IP_ADDR  table 12$VPN_NUM'"
+                    iptables -t nat -D POSTROUTING -s  $IP_ADDR -o wg1$VPN_NUM -j MASQUERADE 2> /dev/null
+                    [ "$ACTION" != "del" ] && iptables -t nat -I POSTROUTING -s  $IP_ADDR -o wg1$VPN_NUM -j MASQUERADE
+
+                    # Ensure target WireGuard 'client' peer routing policy table contains WireGuard 'server' peer IP/network in the passthru tunnel @chongnt
+                    if [ -n "$(wg show interfaces | grep "$SERVERS")" ];then
+
+                        while read route; do
+                           ip route $ACTION $route table 12$VPN_NUM 2>/dev/null
+                        done << EOR
+$(ip route | grep "$PASSTHRU_SERVER")
+EOR
+
+                    fi
+                    ip route flush cache
+                fi
+            done
+    fi
+}
 #=============================================Main=============================================================
 # shellcheck disable=SC2068
 Main() { true; } # Syntax that is Atom Shellchecker compatible!
 
 ANSIColours
+
+CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v1.05 @elorimer
+INSTALL_DIR="/jffs/addons/wireguard/"
+SQL_DATABASE="/opt/etc/wireguard.d/WireGuard.db"        # v1.08
 
 FIRMWARE=$(echo $(nvram get buildno) | awk 'BEGIN { FS = "." } {printf("%03d%02d",$1,$2)}')
 
@@ -283,20 +352,21 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         wg setconf $VPN_ID ${CONFIG_DIR}$VPN_ID.conf
         #  Suppress the message if a domain is supplied i.e.'Error: any valid prefix is expected rather than "'xxx.com"
 
-        if [ "$USE_IPV6" != "Y" ];then                      # v4.08
-            ip address add dev $VPN_ID $LOCALIP 2>/dev/null # v4.02
-            ip link set up dev $VPN_ID
-        else
-                local $LOCALIPS=$(echo "$LOCALIP" | tr ',' ' ')     # v4.11
-                for LOCALIP in $LOCALIPS
-                    do
-                        if [ -n "$(echo "$LOCALIP" | Is_IPv6)" ];then
-                            ip -6 address add dev $VPN_ID $LOCALIP 2>/dev/null     # v4.02
-                            ip -6 link set up dev $VPN_ID
-                            break
-                        fi
-                    done
-        fi
+        # v4.12 Assign both IPv6 nd IPv6 IPs to interface as required
+        LOCALIPS=$(echo "$LOCALIP" | tr ',' ' ')     # v4.11
+        for LOCALIP in $LOCALIPS
+            do
+                if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$LOCALIP" | grep -F ":")" ];then     # v4.12
+                    ip -6 address add dev $VPN_ID $LOCALIP 2>/dev/null     # v4.02
+                    ip -6 link set up dev $VPN_ID
+                else
+                    if [ -n "$(echo "$LOCALIP" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$LOCALIP" | Is_IPv4)" ];then
+                        ip address add dev $VPN_ID $LOCALIP 2>/dev/null # v4.02
+                        ip link set up dev $VPN_ID
+                    fi
+                fi
+            done
+
         #ifconfig $VPN_ID mtu 1380
         ifconfig $VPN_ID mtu $MTU                           # v4.09 v1.02
         ifconfig $VPN_ID txqueuelen 1000
@@ -313,6 +383,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
             ip route add $(ip route get $host | sed '/ via [0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}/{s/^\(.* via [0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\).*/\1/}' | head -n 1) 2>/dev/null
         else
             :
+            # ip -6 route add
         fi
 
         # If there is ALREADY an ACTIVE WireGuard VPN Client, then tough! - make this one the default!!!!
@@ -320,17 +391,17 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
             if [ "$(wg show interfaces | grep -E "wg[0-1]" | wc -w)" -gt 1 ];then
                 for THIS in $(wg show interfaces | grep -E "wg[0-1]")
                     do
-                        ip route del 0/1 dev $THIS  2>/dev/null
+                        ip route del 0/1   dev $THIS  2>/dev/null
                         ip route del 128/1 dev $THIS  2>/dev/null
                     done
             fi
             # 0.0.0.0/0 Default
             if [ "$USE_IPV6" != "Y" ];then                  # v4.08
-                ip route add 0/1 dev $VPN_ID 2>/dev/null
+                ip route add 0/1   dev $VPN_ID 2>/dev/null
                 ip route add 128/1 dev $VPN_ID 2>/dev/null
             else
-                ip -6 route add 0/1 dev $VPN_ID 2>/dev/null
-                ip -6 route add 128/1 dev $VPN_ID 2>/dev/null
+                ip -6 route add ::/1     dev $VPN_ID 2>/dev/null    # v4.12
+                ip -6 route add 8000::/1 dev $VPN_ID 2>/dev/null    # v4.12
             fi
 
             # Could be anything really....  e.g. 0.0.0.0/0,::0/0
@@ -353,7 +424,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
                 echo -e
             fi
 
-            # Ipsets
+            # Ipsets ?
             if [ -n "$(sqlite3 $SQL_DATABASE "SELECT ipset FROM ipset WHERE peer='${WG_INTERFACE}';")" ];then
 
                 IPSETS=$(sqlite3 $SQL_DATABASE "SELECT ipset FROM ipset WHERE peer='${WG_INTERFACE}';" | tr '\n' ' ')
@@ -363,10 +434,10 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
                             DSTSRC=$(sqlite3 $SQL_DATABASE "SELECT dstsrc FROM ipset WHERE ipset='$IPSET' AND peer='${WG_INTERFACE}';")
                             FWMARK=$(sqlite3 $SQL_DATABASE "SELECT fwmark FROM ipset WHERE ipset='$IPSET' AND peer='${WG_INTERFACE}';")
 
-                            TAG_MARK=$(sqlite3 /opt/etc/wireguard.d/WireGuard.db "select fwmark from fwmark where peer='${WG_INTERFACE}';") # v4.13                                                                                                             # v4.12
-                            ip rule del from 0/0 fwmark $TAG_MARK"/"$TAG_MARK table 12$VPN_NUM prio 999$VPN_NUM 2>/dev/null                 # v4.13
-                            ip rule add from 0/0 fwmark $TAG_MARK"/"$TAG_MARK table 12$VPN_NUM prio 999$VPN_NUM                             # v4.13
-                            echo 0 >/proc/sys/net/ipv4/conf/$WG_INTERFACE/rp_filter                                                         # v4.13
+                            TAG_MARK=$(sqlite3 /opt/etc/wireguard.d/WireGuard.db "select fwmark from fwmark where peer='${WG_INTERFACE}';") # v4.12                                                                                                             # v4.12
+                            ip rule del from 0/0 fwmark $TAG_MARK"/"$TAG_MARK table 12$VPN_NUM prio 999$VPN_NUM 2>/dev/null                 # v4.12
+                            ip rule add from 0/0 fwmark $TAG_MARK"/"$TAG_MARK table 12$VPN_NUM prio 999$VPN_NUM                             # v4.12
+                            echo 0 >/proc/sys/net/ipv4/conf/$WG_INTERFACE/rp_filter                                                         # v4.12
 
                             if [ "$USE_IPV6" != "Y" ];then                  # v4.08
                                 iptables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'" 2>/dev/null # v4.12
@@ -382,14 +453,16 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
                     done
             fi
 
+
+
         fi
 
         if [ "$USE_IPV6" != "Y" ];then                                      # v4.08
-            ip route add 0/1 dev $VPN_ID table 12$VPN_NUM 2>/dev/null
+            ip route add 0/1   dev $VPN_ID table 12$VPN_NUM 2>/dev/null
             ip route add 128/1 dev $VPN_ID table 12$VPN_NUM 2>/dev/null
         else
-            ip -6 route add 0/1 dev $VPN_ID table 12$VPN_NUM 2>/dev/null
-            ip -6 route add 128/1 dev $VPN_ID table 12$VPN_NUM 2>/dev/null
+            ip -6 route add ::/1     dev $VPN_ID table 12$VPN_NUM 2>/dev/null   # v4.12
+            ip -6 route add 8000::/1 dev $VPN_ID table 12$VPN_NUM 2>/dev/null   # v4.12
         fi
         #ip route add default dev $VPN_ID table 12$VPN_NUM 2>/dev/null      # v4.03
 
@@ -436,6 +509,9 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         fi
 
         Firewall_delete
+
+        # PASSTHRU ?
+        Manage_Passthru
 
         # User Exit @ZebMcKayhan
         [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh ] && { logger -t "wireguard-${MODE}${VPN_NAME}" "Executing Event:${VPN_ID}-up.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh; }
@@ -500,11 +576,12 @@ else
 
     # If Policy mode, then there was no default route
     if [ -z "$POLICY_MODE" ];then                                   # v4.06
-        if [ "$USE_IPV6" != "Y" ];then                                      # v4.08
+        if [ "$USE_IPV6" != "Y" ];then                              # v4.08
             ip route del 0.0.0.0/1   dev $VPN_ID   2>/dev/null
             ip route del 128.0.0.0/1 dev $VPN_ID   2>/dev/null
         else
-            ip -6 route del ::/0   dev $VPN_ID   2>/dev/null
+            ip -6 route del ::/1     dev $VPN_ID   2>/dev/null      # v4.12
+            ip -6 route del 8000::/1 dev $VPN_ID   2>/dev/null      # v4.12
         fi
 
         # Set the default to the last ACTIVE WireGuard interface where the default route is required.
@@ -518,7 +595,9 @@ else
                                 ip route add 0/1    dev $WG_IFACE  2>/dev/nul
                                 ip route add 128/1  dev $WG_IFACE  2>/dev/null
                             else
-                                ip -6 route add ::/0   dev $WG_IFACE  2>/dev/nul
+                                ip -6 route add ::/1       dev $WG_IFACE  2>/dev/null   # v4.12
+                                ip -6 route add 8000::/1   dev $WG_IFACE  2>/dev/null   # v4.12
+
                             fi
                             break
                         fi
@@ -565,8 +644,8 @@ else
         do
             DSTSRC=$(sqlite3 $SQL_DATABASE "SELECT dstsrc FROM ipset WHERE ipset='$IPSET' AND peer='${WG_INTERFACE}';")
             FWMARK=$(sqlite3 $SQL_DATABASE "SELECT fwmark FROM ipset WHERE ipset='$IPSET' AND peer='${WG_INTERFACE}';")
-            TAG_MARK=$(sqlite3 /opt/etc/wireguard.d/WireGuard.db "select fwmark from fwmark where peer='${WG_INTERFACE}';") # v4.13                                                                                                             # v4.12
-            ip rule del from 0/0 fwmark $TAG_MARK"/"$TAG_MARK table 12$VPN_NUM prio 999$VPN_NUM 2>/dev/null                 # v4.13
+            TAG_MARK=$(sqlite3 /opt/etc/wireguard.d/WireGuard.db "select fwmark from fwmark where peer='${WG_INTERFACE}';") # v4.12                                                                                                             # v4.12
+            ip rule del from 0/0 fwmark $TAG_MARK"/"$TAG_MARK table 12$VPN_NUM prio 999$VPN_NUM 2>/dev/null                 # v4.12
 
             if [ "$USE_IPV6" != "Y" ];then                                      # v4.08
                 iptables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'" 2>/dev/null # v4.12
@@ -575,6 +654,9 @@ else
             fi
             logger -t "wireguard-${MODE}${VPN_NAME}" "Removing IPSet '$IPSET' routing through VPN 'client' Peer" $WG_INTERFACE
         done
+
+        # PASSTHRU ?
+        Manage_Passthru "del"
 
     # User Exit @ZebMcKayhan
     [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh ] && { logger -t "wireguard-${MODE}${VPN_NAME}" "Executing Event:${VPN_ID}-down.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh; }
