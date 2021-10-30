@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.13b2"
-#============================================================================================ © 2021 Martineau v4.13b2
+VERSION="v4.13b3"
+#============================================================================================ © 2021 Martineau v4.13b3
 #
 
 # Maintainer: Martineau
@@ -29,9 +29,6 @@ Parse() {
     read -r -- "$@" <<EOF
 $TEXT
 EOF
-}
-SayT() {
-   echo -e $$ $@ | logger -t "($(basename $0))"
 }
 # shellcheck disable=SC2034
 ANSIColours() {
@@ -204,24 +201,26 @@ Manage_Passthru(){
                 fi
 
                 if [ -n "$IP_ADDR" ];then
-                    #Say "Psuedo command 'pass-thru' will be applied to "$TYPE $IP_ADDR "directly via VPN Client '"$WG_INTERFACE"' ("$DESC")"
+                    #logger -t "wireguard-${MODE}${VPN_NAME}" "Psuedo command 'pass-thru' will be applied to "$TYPE $IP_ADDR "directly via VPN Client '"$WG_INTERFACE"' ("$DESC")"
                     ip rule del from $IP_ADDR table 12$VPN_NUM prio 998$VPN_NUM 2> /dev/null
                     [ "$ACTION" != "del" ] && ip rule $ACTION from $IP_ADDR table 12$VPN_NUM prio 998$VPN_NUM
-                    SayT "RPDB" $username "'pass-thru': 'ip rule $ACTION from $IP_ADDR  table 12$VPN_NUM'"
+                    logger -t "wireguard-${MODE}${VPN_NAME}" "'server' peer '$PASSTHRU_SERVER' RPDB" "'pass-thru': 'ip rule $ACTION from $IP_ADDR table 12$VPN_NUM'"
                     iptables -t nat -D POSTROUTING -s  $IP_ADDR -o wg1$VPN_NUM -j MASQUERADE 2> /dev/null
                     [ "$ACTION" != "del" ] && iptables -t nat -I POSTROUTING -s  $IP_ADDR -o wg1$VPN_NUM -j MASQUERADE
 
-                    # Ensure target WireGuard 'client' peer routing policy table contains WireGuard 'server' peer IP/network in the passthru tunnel @chongnt
-                    if [ -n "$(wg show interfaces | grep "$SERVERS")" ];then
+                    if [ "$ACTION" == "add" ];then
+                        # Ensure target WireGuard 'client' peer routing policy table contains WireGuard 'server' peer IP/network in the passthru tunnel @chongnt
+                        if [ -n "$(wg show interfaces | grep "$SERVERS")" ];then
 
-                        while read route; do
-                           ip route $ACTION $route table 12$VPN_NUM 2>/dev/null
-                        done << EOR
+                            while read ROUTE; do
+                               ip route $ACTION $ROUTE table 12$VPN_NUM 2>/dev/null && ROUTING_CHANGED=
+                            done << EOR
 $(ip route | grep "$PASSTHRU_SERVER")
 EOR
 
+                        fi
+                        [ ${ROUTING_CHANGED+x} ] && ip route flush cache || logger -st "wireguard-${MODE}${VPN_NAME}" "Warning 'server' peer ($PASSTHRU_SERVER) route not found - is it UP?"
                     fi
-                    ip route flush cache
                 fi
             done
     fi
@@ -261,7 +260,7 @@ LAN_SUBNET=${LAN_ADDR%.*}                                       # v4.05
 # Override IPv6 ?
 if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -n "$(grep -E "^NOIPV6" /jffs/addons/wireguard/WireguardVPN.conf)" ];then    # v4.12
     USE_IPV6="N"; IPV6_TXT=
-    SayT "'NOIPV6' directive found ('WireguardVPN.conf')- IPv6 configuration forced to IPv4"    # v4.12
+    logger -t "wireguard-${MODE}${VPN_NAME}" "'NOIPV6' directive found ('WireguardVPN.conf')- IPv6 configuration forced to IPv4"    # v4.12
 fi
 
 [ -n "$(echo "$@" | grep "force")" ] && local FORCE="force"
@@ -659,7 +658,7 @@ else
         Manage_Passthru "del"
 
     # User Exit @ZebMcKayhan
-    [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh ] && { logger -t "wireguard-${MODE}${VPN_NAME}" "Executing Event:${VPN_ID}-down.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh; }
+    [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh ] && { logger -t "wireguard-${MODE}${VPN_NAME}" "Executing Event:${VPN_ID}-down.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh; }
 
     #mv /tmp/resolv.dnsmasq_backup.$WG_INTERFACE /tmp/resolv.dnsmasq 2>/dev/null
     #service restart_dnsmasq 2>&1 1>/dev/null
