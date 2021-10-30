@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.12b3"
-#============================================================================================ © 2021 Martineau v4.12b3
+VERSION="v4.12b4"
+#============================================================================================ © 2021 Martineau v4.12b4
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -1069,17 +1069,20 @@ Manage_Peer() {
 
                                     local AUTO="$(sqlite3 $SQL_DATABASE "SELECT auto FROM $TABLE WHERE $ID='$WG_INTERFACE';")"  # v4.11
 
-                                    if [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$WG_INTERFACE';") -gt 0 ];then
-                                        local COLOR=$cBCYA;local TXT=
-                                        if [ "$Mode" == "client" ] && [ "$AUTO" != "P" ];then
-                                            COLOR=$cRED;local TXT="DISABLED"
+                                    if [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$WG_INTERFACE';") -gt 0 ] || \
+                                        [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(client) FROM passthru WHERE client='$WG_INTERFACE';")" -gt 0 ];then
+                                        if [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$WG_INTERFACE';") -gt 0 ];then
+                                            local COLOR=$cBCYA;local TXT=
+                                            if [ "$Mode" == "client" ] && [ "$AUTO" != "P" ];then
+                                                COLOR=$cRED;local TXT="DISABLED"
+                                            fi
+                                            echo -e $COLOR"\n\tSelective Routing RPDB rules $TXT\n"
+                                            sqlite3 $SQL_DATABASE "SELECT rowid,peer,iface,srcip,dstip,tag FROM policy WHERE $ID='$WG_INTERFACE' ORDER BY iface DESC;" |column -t  -s '|' --table-columns ID,Peer,Interface,Source,Destination,Description # v4.08
                                         fi
-                                        echo -e $COLOR"\n\tSelective Routing RPDB rules $TXT\n"
-                                        sqlite3 $SQL_DATABASE "SELECT rowid,peer,iface,srcip,dstip,tag FROM policy WHERE $ID='$WG_INTERFACE' ORDER BY iface DESC;" |column -t  -s '|' --table-columns ID,Peer,Interface,Source,Destination,Description # v4.08
                                     else
                                         if [ "$Mode" == "client" ];then
                                             [ "$AUTO" != "P" ] && local COLOR=$cGRA || local COLOR=$cRED                    # v4.11
-                                            echo -e $COLOR"\n\tNo RPDB Selective Routing rules for $WG_INTERFACE\n"$cRESET  # v4.11
+                                            echo -e $COLOR"\n\tNo RPDB Selective Routing/Passthru rules for $WG_INTERFACE\n"$cRESET  # v4.11
                                         fi
                                     fi
                                 fi
@@ -1448,11 +1451,13 @@ Manage_Wireguard_Sessions() {
                         if [ "$Mode" == "client" ];then
                             if [ "$(sqlite3 $SQL_DATABASE "SELECT auto FROM $TABLE WHERE peer='$WG_INTERFACE';")" == "P" ];then
 
-                                if [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$WG_INTERFACE';")" -gt 0 ] || [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM ipset WHERE peer='$WG_INTERFACE';") -gt 0 ];then # v4.11 @ZebMcKayhan/@The Chief
+                                if [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$WG_INTERFACE';")" -gt 0 ] || \
+                                   [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM ipset WHERE peer='$WG_INTERFACE';")" -gt 0 ] || \
+                                   [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(client) FROM passthru WHERE client='$WG_INTERFACE';")" -gt 0 ];then # v4.12 v4.11 @ZebMcKayhan/@The Chief
                                     Route="policy"
                                 else
-                                    SayT "Warning: WireGuard '$Mode' Peer ('$WG_INTERFACE') defined as Policy mode but no RPDB Selective Routing rules found?"
-                                    echo -e $cRED"\tWarning: WireGuard '$Mode' Peer (${cBWHT}$WG_INTERFACE${cBRED}) defined as Policy mode but no RPDB Selective Routing rules found?\n"$cRESET 2>&1
+                                    SayT "Warning: WireGuard '$Mode' Peer ('$WG_INTERFACE') defined as Policy mode but no RPDB Selective Routing/Passthru rules found?"
+                                    echo -e $cRED"\tWarning: WireGuard '$Mode' Peer (${cBWHT}$WG_INTERFACE${cBRED}) defined as Policy mode but no RPDB Selective Routing/Passthru rules found?\n"$cRESET 2>&1
                                 fi
                             else
                                 Route="default"
@@ -1743,7 +1748,7 @@ Manage_RPDB_rules() {
                 echo -e $cBCYA"\n"
                 sqlite3 $SQL_DATABASE "SELECT rowid,peer,iface,srcip,dstip,tag FROM policy WHERE peer='$WG_INTERFACE' ORDER BY iface DESC;" | column -t  -s '|' --table-columns ID,Peer,Interface,Source,Destination,Description
             else
-                echo -e $cRED"\n\tNo RPDB Selective Routing rules for $WG_INTERFACE\n"$cRESET
+                echo -e $cRED"\n\tNo RPDB Selective Routing/Passthru rules for $WG_INTERFACE\n"$cRESET
             fi
 
             REDISPLAY=0
@@ -2877,16 +2882,17 @@ Show_Peer_Config_Entry() {
             sqlite3 $SQL_DATABASE "SELECT * from $TABLE WHERE $ID='$WG_INTERFACE';" | column -t  -s '|' --table-columns "$COLUMN_TXT"
 
             if [ "$ID" == "peer" ];then                                                        # v4.09
-                if [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$WG_INTERFACE';") -gt 0 ];then
-                    echo -e $cBCYA"\n\tSelective Routing RPDB rules"
-                    sqlite3 $SQL_DATABASE "SELECT rowid,peer,iface,srcip,dstip,tag FROM policy WHERE peer='$WG_INTERFACE' ORDER BY iface DESC;" |column -t  -s '|' --table-columns ID,Peer,Interface,Source,Destination,Description # v4.08
+                if [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$WG_INTERFACE';")" -gt 0 ] || [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(client) FROM passthru WHERE client='$WG_INTERFACE';")" -gt 0 ];then
+                   if [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$WG_INTERFACE';")" -gt 0 ];then
+                        echo -e $cBCYA"\n\tSelective Routing RPDB rules"
+                        sqlite3 $SQL_DATABASE "SELECT rowid,peer,iface,srcip,dstip,tag FROM policy WHERE peer='$WG_INTERFACE' ORDER BY iface DESC;" |column -t  -s '|' --table-columns ID,Peer,Interface,Source,Destination,Description # v4.08
+                   fi
                 else
                     if [ "$Mode" == "client" ];then
                         [ "$AUTO" != "P" ] && local COLOR=$cGRA || local COLOR=$cRED                    # v4.11
-                        echo -e $COLOR"\n\tNo RPDB Selective Routing rules for $WG_INTERFACE\n"$cRESET  # v4.11
+                        echo -e $COLOR"\n\tNo RPDB Selective Routing/Passthru rules for $WG_INTERFACE\n"$cRESET  # v4.11
                     fi
                 fi
-
                 echo -e
                 if [ "$(sqlite3 $SQL_DATABASE "SELECT * FROM ipset WHERE peer='$WG_INTERFACE';")" ] ;then
                     sqlite3 $SQL_DATABASE "SELECT * FROM ipset WHERE peer='$WG_INTERFACE';" | column -t  -s '|' --table-columns IPSet,Enable,Peer,FWMark,DST/SRC
