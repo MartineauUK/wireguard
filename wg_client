@@ -200,7 +200,7 @@ Manage_Passthru(){
                     #logger -t "wireguard-${MODE}${VPN_NAME}" "Psuedo command 'pass-thru' will be applied to "$TYPE $IP_ADDR "directly via VPN Client '"$WG_INTERFACE"' ("$DESC")"
                     ip rule del from $IP_ADDR table 12$VPN_NUM prio 998$VPN_NUM 2> /dev/null
                     [ "$ACTION" != "del" ] && ip rule $ACTION from $IP_ADDR table 12$VPN_NUM prio 998$VPN_NUM
-                    logger -t "wireguard-${MODE}${VPN_NAME}" "'server' peer '$PASSTHRU_SERVER' RPDB" "'pass-thru': 'ip rule $ACTION from $IP_ADDR table 12$VPN_NUM'"
+                    logger -t "wireguard-${MODE}${VPN_NAME}" "'server' peer ($PASSTHRU_SERVER) RPDB" "'pass-thru': 'ip rule $ACTION from $IP_ADDR table 12$VPN_NUM'"
                     iptables -t nat -D POSTROUTING -s  $IP_ADDR -o wg1$VPN_NUM -j MASQUERADE 2> /dev/null
                     [ "$ACTION" != "del" ] && iptables -t nat -I POSTROUTING -s  $IP_ADDR -o wg1$VPN_NUM -j MASQUERADE
 
