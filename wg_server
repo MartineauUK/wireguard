@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.05b2"
-#============================================================================================ © 2021 Martineau v4.05b2
+VERSION="v4.05b3"
+#============================================================================================ © 2021 Martineau v4.05b3
 #
 
 # Maintainer: Martineau
@@ -70,14 +70,13 @@ Manage_Passthru(){
 
                 if [ "$ACTION" == "add" ];then
                     # Ensure target WireGuard 'client' peer routing policy table contains WireGuard 'server' peer IP/network in the passthru tunnel @chongnt
-
                     while read ROUTE; do
                         ip route $ACTION $ROUTE table 12$VPN_NUM 2>/dev/null && ROUTING_CHANGED=
                     done << EOR
 $(ip route | grep "$WG_INTERFACE")
 EOR
 
-                    [ ${ROUTING_CHANGED+x} ] && ip route flush cache || logger -st "wireguard-${MODE}${VPN_NAME}" "Warning 'server' peer ($PASSTHRU_SERVER) route not found - is it UP?"
+                    [ ${ROUTING_CHANGED+x} ] && ip route flush cache
                 fi
             done
     fi
@@ -157,8 +156,6 @@ if [ "$2" != "disable" ];then
 
     Firewall_delete
 
-    Manage_Passthru "add"
-
     if [ "$USE_IPV6" != "Y" ];then
         ip route add default dev $VPN_ID table 2${VPN_NUM}"0"       # v4.03
         ip rule add fwmark $(printf "%#07x\n" "2${VPN_NUM}0") table 2${VPN_NUM}"0" prio 98${VPN_NUM}0   # v4.03
@@ -166,6 +163,8 @@ if [ "$2" != "disable" ];then
         ip -6 route add default dev $VPN_ID table 2${VPN_NUM}"0"    # v4.03
         ip -6 rule add fwmark $(printf "%#07x\n" "2${VPN_NUM}0") table 2${VPN_NUM}"0" prio 98${VPN_NUM}0   # v4.03
     fi
+
+    Manage_Passthru "add"
 
     if [ "$USE_IPV6" != "Y" ];then
         iptables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'server'"
