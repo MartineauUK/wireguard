@@ -1,20 +1,16 @@
 #!/bin/sh
-VERSION="v4.13b3"
-#============================================================================================ © 2021 Martineau v4.13b3
+VERSION="v4.13b4"
+#============================================================================================ © 2021 Martineau v4.13b4
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 30-Oct-2021
+# Last Updated Date: 01-Nov-2021
 #
 # Description:
 #
 # Acknowledgement:
 #
 # Contributors: odkrys,@ZebMcKayhan,Torson,The Chief
-
-#For verbose debugging, uncomment the following two lines, and uncomment the last line of this script
-#set -x
-#(
 
 Parse() {
     #
@@ -210,22 +206,29 @@ Manage_Passthru(){
 
                     if [ "$ACTION" == "add" ];then
                         # Ensure target WireGuard 'client' peer routing policy table contains WireGuard 'server' peer IP/network in the passthru tunnel @chongnt
-                        if [ -n "$(wg show interfaces | grep "$SERVERS")" ];then
+                        if [ -n "$(wg show interfaces | grep "$PASSTHRU_SERVER")" ];then
 
                             while read ROUTE; do
-                               ip route $ACTION $ROUTE table 12$VPN_NUM 2>/dev/null && ROUTING_CHANGED=
+                               ip route $ACTION $ROUTE table 12$VPN_NUM 2>/dev/null
+                               local FLUSH="Y"
                             done << EOR
 $(ip route | grep "$PASSTHRU_SERVER")
 EOR
 
                         fi
-                        [ ${ROUTING_CHANGED+x} ] && ip route flush cache || logger -st "wireguard-${MODE}${VPN_NAME}" "Warning 'server' peer ($PASSTHRU_SERVER) route not found - is it UP?"
+                        [ "$FLUSH" == "Y" ] && ip route flush cache || logger -st "wireguard-${MODE}${VPN_NAME}" "Warning 'server' peer ($PASSTHRU_SERVER) route not found - is it UP? FLUSH="$FLUSH
+                        local FLUSH=
                     fi
                 fi
             done
     fi
 }
 #=============================================Main=============================================================
+
+#For verbose debugging, uncomment the following two lines, and uncomment the last line of this script
+#set -x
+#(
+
 # shellcheck disable=SC2068
 Main() { true; } # Syntax that is Atom Shellchecker compatible!
 
