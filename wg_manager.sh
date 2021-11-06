@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.12b5"
-#============================================================================================ © 2021 Martineau v4.12b5
+VERSION="v4.12b6"
+#============================================================================================ © 2021 Martineau v4.12b6
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -640,8 +640,9 @@ ListenPort = $LISTEN_PORT
 
 # Peer Example
 #[Peer]
-#PublicKey = This_should_be_replaced_with_the_Public_Key_of_YOUR_mobile_device
+#PublicKey = Replace_with_the_Public_Key_of_YOUR_mobile_device
 #AllowedIPs = PEER.ip.xxx.xxx/32
+#PresharedKey = Replace_with_the_Pre-shared_Key_of_YOUR_mobile_device
 # Peer Example End
 EOF
 
@@ -4316,7 +4317,7 @@ Create_RoadWarrior_Device() {
     done
 
     # If user did not specify 'server' Peers, use the oldest 'server' Peer found ACTIVE or the first defined in the config
-    [ -z "$SERVER_PEER" ] && SERVER_PEER=$(wg show interfaces | grep -vE "wg1")
+    [ -z "$SERVER_PEER" ] && SERVER_PEER=$(wg show interfaces | grep -vE "wg1" | grep -vE "wgs")    # v4.12
     [ -z "$SERVER_PEER" ] && SERVER_PEER=$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers order by peer;" | head -n 1)
     [ -z "$SERVER_PEER" ] && { echo -e $cBRED"\a\n\t***ERROR: no 'server' Peers specified or found (wg2*)"$cRESET; return 1; }
     for SERVER_PEER in $SERVER_PEER
@@ -4339,6 +4340,11 @@ Create_RoadWarrior_Device() {
                 echo -e $cBCYA"\n\tCreating Wireguard Private/Public key pair for device '${cBMAG}${DEVICE_NAME}${cBCYA}'"$cBYEL
                 wg genkey | tee ${CONFIG_DIR}${DEVICE_NAME}_private.key | wg pubkey > ${CONFIG_DIR}${DEVICE_NAME}_public.key
                 echo -e $cBYEL"\tDevice '"$DEVICE_NAME"' Public key="$(cat ${CONFIG_DIR}${DEVICE_NAME}_public.key)"\n"$cRESET
+                umask 077
+                wg genpsk > ${CONFIG_DIR}${DEVICE_NAME}_pre-shared.key                  # v4.12 or openssl rand -base64 32 > ${CONFIG_DIR}${SERVER_PEER}_pre-shared.key
+                echo -e $cBYEL"\tDevice '"$DEVICE_NAME"' Pre-shared key="$(cat ${CONFIG_DIR}${DEVICE_NAME}_public.key)"\n"$cRESET   # v4.12
+                local PRE_SHARED_KEY=$(cat ${CONFIG_DIR}${DEVICE_NAME}_pre-shared.key)  # v4.12
+                #local PRE_SHARED_KEY=$(Convert_Key "$PRE-SHARED_KEY")                  # v4.12
 
                 # Generate the Peer config to be imported into the device
                 local PUB_KEY=$(cat ${CONFIG_DIR}${DEVICE_NAME}_public.key)
@@ -4489,6 +4495,7 @@ PublicKey = $PUB_SERVER_KEY
 AllowedIPs = $ALLOWED_IPS     ${SPLIT_TXT}
 # DDNS $ROUTER_DDNS
 Endpoint = $ROUTER_DDNS:$LISTEN_PORT
+PresharedKey = $PRE_SHARED_KEY
 PersistentKeepalive = 25
 # $DEVICE_NAME End
 EOF
@@ -4518,6 +4525,7 @@ EOF
 [Peer]
 PublicKey = $PUB_KEY
 AllowedIPs = $VPN_POOL_IP
+PresharedKey = $PRE_SHARED_KEY
 # $DEVICE_NAME End
 EOF
 
