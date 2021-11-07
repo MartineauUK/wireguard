@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.12b6"
-#============================================================================================ © 2021 Martineau v4.12b6
+VERSION="v4.12b7"
+#============================================================================================ © 2021 Martineau v4.12b7
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.12b6"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 06-Nov-2021
+# Last Updated Date: 07-Nov-2021
 #
 # Description:
 #
@@ -3666,7 +3666,7 @@ Manage_IPSET() {
             esac
             if [ "$VALID" == "Y" ];then
                 [ "$IPSET" != "all" ] && local SQL_WHERE="ipset='$IPSET' AND" || SQL_WHERE=
-                sqlite3 $SQL_DATABASE "UPDATE ipset SET dstsrc='$DSTSRC' WHERE $SQL_WHERE AND peer='$WG_INTERFACE';"
+                sqlite3 $SQL_DATABASE "UPDATE ipset SET dstsrc='$DSTSRC' WHERE $SQL_WHERE peer='$WG_INTERFACE';"    # v4.12 @ZebMcKayhan
                 echo -e $cBGRE"\n\t[✔] Updated IPSet DST/SRC for ${cBMAG}$WG_INTERFACE \n"$cRESET
             fi
         ;;
@@ -3963,7 +3963,7 @@ Process_User_Choice() {
                             echo -e $cBRED"\t[✖]${cBWHT} firewall-start${cBRED} is NOT monitoring WireGuard Firewall rules - ${cBWHT}use 'firewallstart' to ENABLE\n"$cRESET
                         fi
 
-                        if [ -f ${INSTALL_DIR}/WireGuardVPN.conf ];then
+                        if [ -f ${INSTALL_DIR}WireguardVPN.conf ];then
                             if [ "$(Manage_KILL_Switch)" == "Y" ];then
                                 local TEMP_PERM="temporarily "                                      # v4.12
                                 [ -z "$(grep -oE "^#KILLSWITCH" ${INSTALL_DIR}WireguardVPN.conf)" ] && local TEMP_PERM=             # v4.12
@@ -3974,7 +3974,7 @@ Process_User_Choice() {
                                 echo -e $cRED"\t[✖]$cBWHT WAN ${cBGRE}KILL-Switch is "${cBRED}${aREVERSE}"${TEMP_PERM}DISABLED"$cRESET" (use 'vx' command for info)"    # v4.12
                             fi
                         else
-                            echo -e $cRED"\t[✖]$cBWHT WAN ${cBGRE}KILL-Switch ${cBRED}STATUS N/A (${cRESET}${INSTALL_DIR}/WireGuardVPN.conf${cBRED} not found?)"$cRESET
+                            echo -e $cRED"\t[✖]$cBWHT WAN ${cBGRE}KILL-Switch ${cBRED}STATUS N/A (${cRESET}${INSTALL_DIR}WireguardVPN.conf${cBRED} not found?)"$cRESET
                         fi
 
                         if [ "$(Manage_UDP_Monitor)" == "Y" ];then                          # v4.01
