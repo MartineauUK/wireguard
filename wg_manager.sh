@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.12b7"
-#============================================================================================ © 2021 Martineau v4.12b7
+VERSION="v4.12b8"
+#============================================================================================ © 2021 Martineau v4.12b8
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.12b7"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 07-Nov-2021
+# Last Updated Date: 12-Nov-2021
 #
 # Description:
 #
@@ -3947,7 +3947,9 @@ Process_User_Choice() {
                         if [ ! -f /usr/sbin/wg ];then               # v4.12
                             Check_Module_Versions "report"
                         else
-                            echo -e $cBGRE"\n\t[✔]$cBWHT Wireguard Kernel module/User Space Tools included in Firmware"$cRED" (Versions unidentified!)\n"$cRESET    # v4.12
+                            local FPATH=$(modprobe --show-depends wireguard | awk '{print $2}')
+                            local FVERSION=$(strings $FPATH | grep "^version" | cut -d'=' -f2)  # v4.12 @ZebMcKayhan
+                            echo -e $cBGRE"\n\t[✔]$cBWHT Wireguard Kernel module/User Space Tools included in Firmware"$cRED" ($FVERSION)\n"$cRESET    # v4.12
                         fi
 
                         echo -e $cRESET
@@ -4145,8 +4147,12 @@ Process_User_Choice() {
 
                 [ -z "$IP" ] && { echo -en $cRED"\a\n\t***ERROR: LAN Host name or LAN IP address required'\n"$cRESET ; return 1; }
 
-                [ -z "$(echo "$IP" | Is_Private_IPv4)" ] && local IP=$(grep -i "$IP" /etc/hosts.dnsmasq  | awk '{print $1}')
-                [ -z "$IP" ] && { echo -en $cRED"\a\n\t***ERROR: Invalid host IP address!'\n"$cRESET ; return 1; }
+                if [ -z "$(echo "$IP" | Is_IPv4)" ] && [ -z "$(echo "$IP" | Is_Private_IPv4)" ];then
+                    IP=
+                else
+                    [ -f /etc/hosts.dnsmasq ] && local IP=$(grep -i "$IP" /etc/hosts.dnsmasq  | awk '{print $1}') || IP=
+                fi
+                [ -z "$IP" ] && { echo -en $cRED"\a\n\t***ERROR: Invalid host IPv4 address!'\n"$cRESET ; return 1; }
 
                 if [ "$LOCATION" != "@home" ] && [ "$LOCATION" != "*" ];then
                     local WG_INTERFACE=$LOCATION
@@ -4155,18 +4161,31 @@ Process_User_Choice() {
 
                     if [ -n "$WG_INTERFACE" ];then
                         if [ "$(sqlite3 $SQL_DATABASE "SELECT auto FROM clients WHERE peer='$WG_INTERFACE';")" == "P" ];then
-                            local I=$(echo "$WG_INTERFACE" | grep -oE "[1-9]*$")
-                            [ ${#I} -gt 2 ] && local I=${I#"${I%??}"} || local I=${I#"${I%?}"}
-                            local DNS=$(sqlite3 $SQL_DATABASE "SELECT dns FROM clients WHERE peer='$WG_INTERFACE';")
-                            local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM clients WHERE peer='$WG_INTERFACE';")
-                            local PRIO=$(ip rule | awk -v pattern="$IP" 'match($0, pattern) {print $1}')
-                            ip rule del from $IP prio $PRIO 2>/dev/null
-                            # Live in......
-                            ip rule add from $IP table 12${I}
-                            iptables -t nat -A WGDNS${I} -s $IP -j DNAT --to-destination $DNS -m comment --comment "WireGuard 'client${I} DNS'"
-                            echo -e $cBGRE"\n\t[✔] Welcome Expat to '$DESC'\n"$cRESET
+                            if [ -n "$(wg show interfaces | grep -o "$WG_INTERFACE")" ];then    # v4.12
+                                # v4.12 Remove the DNS redirection if it exists .....
+                                local I=$(iptables-save -t nat | grep -m 1 -F "$IP" | grep -o "WGDNS[1-5]" | grep -o "[1-5]")
+                                local DNS=$(iptables-save -t nat | grep -F "$IP" | grep WGDNS | awk '{print $NF}')
+                                [ -n "$I" ] && iptables -t nat -D WGDNS${I} -s $IP -j DNAT --to-destination $DNS -m comment --comment "WireGuard 'client${I} DNS'"  # v4.12 @ZebMcKayhan
+                                # Remove 'livin' from Policy database
+                                sqlite3 $SQL_DATABASE "DELETE FROM policy WHERE srcip='$IP' AND tag LIKE '%Expat livin%' ;"
+
+                                local I=$(echo "$WG_INTERFACE" | grep -oE "[1-9]*$")
+                                [ ${#I} -gt 2 ] && local I=${I#"${I%??}"} || local I=${I#"${I%?}"}
+                                local DNS=$(sqlite3 $SQL_DATABASE "SELECT dns FROM clients WHERE peer='$WG_INTERFACE';")
+                                local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM clients WHERE peer='$WG_INTERFACE';")
+                                local PRIO=$(ip rule | awk -v pattern="$IP" 'match($0, pattern) {print $1}')
+                                ip rule del from $IP prio $PRIO 2>/dev/null
+                                # Live in......
+                                ip rule add from $IP table 12${I}
+                                # Add 'livin' to Policy database
+                                sqlite3 $SQL_DATABASE "INSERT INTO policy values('$WG_INTERFACE','VPN','$IP','Any','## Expat livin temporarily $DESC ##');"
+                                iptables -t nat -A WGDNS${I} -s $IP -j DNAT --to-destination $DNS -m comment --comment "WireGuard 'client${I} DNS'"
+                                echo -e $cBGRE"\n\t[✔] Welcome Expat to '$DESC'\n"$cRESET
+                            else
+                                echo -en $cRED"\a\n\t***ERROR: ${cBMAG}${WG_INTERFACE}${cRED} not ACTIVE\n"$cRESET
+                            fi
                         else
-                            echo -en $cRED"\a\n\t***ERROR: ${cBMAG}${WG_INTERFACE} not is Policy mode\n"$cRESET
+                            echo -en $cRED"\a\n\t***ERROR: ${cBMAG}${WG_INTERFACE} not in Policy mode\n"$cRESET
                         fi
                     else
                         echo -en $cRED"\a\n\t***ERROR: No match for destination '$LOCATION'\n"$cRESET
@@ -4178,6 +4197,13 @@ Process_User_Choice() {
                         do
                             ip rule del from $IP prio $PRIO 2>/dev/null
                         done
+
+                    # v4.12 Remove the DNS redirection.....
+                    # Remove 'livin' from Policy database
+                    sqlite3 $SQL_DATABASE "DELETE FROM policy WHERE srcip='$IP' AND tag LIKE '%Expat livin%' ;"
+                    local DNS=$(iptables-save -t nat | grep -F "$IP" | grep WGDNS | awk '{print $NF}')
+                    local I=$(iptables-save -t nat | grep -m 1 -F "$IP" | grep -o "WGDNS[1-5]" | grep -o "[1-5]")
+                    [ -n "$I" ] && iptables -t nat -D WGDNS${I} -s $IP -j DNAT --to-destination $DNS -m comment --comment "WireGuard 'client${I} DNS'"  # v4.12 @ZebMcKayhan
                     echo -e $cBGRE"\n\t[✔] Welcome home Sir!!!\n"$cRESET
                 fi
             ;;
@@ -4201,7 +4227,7 @@ Process_User_Choice() {
                         else
                             local VAL=$(cat /proc/sys/net/ipv4/conf/$WAN_IF/rp_filter)
                             [ "$VAL" == "1" ] && STATE="ENABLED" || STATE="DISABLED"
-                            local TXT="value is "$VAL
+                            local TXT="value is "$VAL" ("$STATE")"
                             echo -e $cBGRE"\n\t [ℹ ] Reverse Path Filtering $TXT\n"$cRESET
                         fi
                     ;;
