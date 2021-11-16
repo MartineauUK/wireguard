@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.05b3"
-#============================================================================================ © 2021 Martineau v4.05b3
+VERSION="v4.05b4"
+#============================================================================================ © 2021 Martineau v4.05b4
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 31-Oct-2021
+# Last Updated Date: 16-Nov-2021
 #
 # Description:
 #
@@ -96,7 +96,19 @@ INSTALL_DIR="/jffs/addons/wireguard/"
 
 modprobe xt_set
 modprobe xt_comment                                                                 # v1.13 Hotfix
-insmod /opt/lib/modules/wireguard 2> /dev/null
+if [ -f /opt/lib/modules/wireguard.ko ];then
+    insmod /opt/lib/modules/wireguard 2> /dev/null
+    logger -t "wireguard-server${VPN_ID:3:1}" "Initialising Wireguard Kernel module '/opt/lib/modules/wireguard.ko'"
+else
+    KERNEL_MODULE=$(find / -name wireguard.ko)                      # v4.05
+    if [ -n "$KERNEL_MODULE" ];then
+        insmod $KERNEL_MODULE 2> /dev/null  # v4.05
+        logger -t "wireguard-server${VPN_ID:3:1}" "Initialising Wireguard Kernel module '$KERNEL_MODULE'"
+    else
+        logger -t "wireguard-server${VPN_ID:3:1}" "***ERROR Failure to Initialise Wireguard Kernel module - ABORTing"
+        exit 99
+    fi
+fi
 
 VPN_ID=$1
 [ -z "$1" ] && VPN_ID="wg21"
