@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.12b8"
-#============================================================================================ © 2021 Martineau v4.12b8
+VERSION="v4.12b9"
+#============================================================================================ © 2021 Martineau v4.12b9
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.12b8"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 12-Nov-2021
+# Last Updated Date: 18-Nov-2021
 #
 # Description:
 #
@@ -350,66 +350,76 @@ Download_Modules() {
 
     local ROUTER=$1
     local REPOSITORY_OWNER="odkrys"                                         # v4.11
+    local USE_ENTWARE_KERNEL_MODULE="N"                                     # v4.12
+    [ -n "$(grep -oE "^USE_ENTWARE_KERNEL_MODULE" ${INSTALL_DIR}WireguardVPN.conf)" ] && local USE_ENTWARE_KERNEL_MODULE="Y"
 
     #[ ! -d "${INSTALL_DIR}" ] && mkdir -p "${INSTALL_DIR}"
 
-    [ ! -f /usr/sbin/wg ] && rm ${INSTALL_DIR}/*.ipk                        # v4.12
+    if [ ! -f /usr/sbin/wg ] && [ "$USE_ENTWARE_KERNEL_MODULE" == "N" ];then
+        rm ${INSTALL_DIR}*.ipk 2>/dev/null            # v4.12
+        [ -n "$(opkg list-installed | grep "wireguard-kernel")" ] && opkg remove wireguard-kernel 1>/dev/null
+        [ -n "$(opkg list-installed | grep "wireguard-tools")" ]  && opkg remove wireguard-tools  1>/dev/null
+    fi
 
     #local WEBFILE_NAMES=$(curl -${SILENT}fL https://www.snbforums.com/threads/experimental-wireguard-for-hnd-platform-4-1-x-kernels.46164/ | grep "<a href=.*odkrys.*wireguard" | grep -oE "wireguard.*" | sed 's/\"//g' | tr '\n' ' ')
     local WEBFILE_NAMES=$(curl -${SILENT}fL https://api.github.com/repos/odkrys/entware-makefile-for-merlin/git/trees/main | grep "\"path\": \"wireguard-.*\.ipk\"," | cut -d'"' -f 4 | tr '\r\n' ' ')  # v4.11 @defung pull request https://github.com/MartineauUK/wireguard/pull/3
 
-    # The file list MAY NOT ALWAYS be in the correct Router Model order for the following 'case' statement?
-    case "$ROUTER" in
+    # Allow use of Entware/3rd Party Kernel modules even if included in firmware
+    if [ ! -f /usr/sbin/wg ] || [ "$USE_ENTWARE_KERNEL_MODULE" == "Y" ];then
 
-        RT-AC86U|GT-AC2900)     # RT-AC86U, GT-AC2900 - 4.1.27          e.g. wireguard-kernel_1.0.20210606-k27_1_aarch64-3.10.ipk
-            local WEBFILE_NAMES=$(curl -${SILENT}fL https://api.github.com/repos/ZebMcKayhan/Wireguard/git/trees/main | grep "\"path\": \"wireguard-.*\.ipk\"," | cut -d'"' -f 4 | tr '\r\n' ' ')   # v4.11
-            local REPOSITORY_OWNER="ZebMcKayhan"
-            _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $1}')" "$REPOSITORY_OWNER"     # k27_1
-            ;;
-        RT-AX88U|GT-AX11000)    # RT-AX88U, GT-AX11000 - 4.1.51         e.g. wireguard-kernel_1.0.20210219-k52_1_aarch64-3.10.ipk
-            _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $2}')" "$REPOSITORY_OWNER"    # k51_1
-            ;;
-        RT-AX68U)               # RT-AX68U - 4.1.52                     e.g. wireguard-kernel_1.0.20210219-k52_1_aarch64-3.10.ipk
-            _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $3}')" "$REPOSITORY_OWNER"    # k52_1
-            ;;
-        RT-AX86U|GT-AC5700)         # v4.12 These models have wireguard in the firmware
-            if [ ! -f /usr/sbin/wg ];then
-                # RT-AX68U, RT-AX86U - 4.1.52           e.g. wireguard-kernel_1.0.20210219-k52_1_aarch64-3.10.ipk
+        # The file list MAY NOT ALWAYS be in the correct Router Model order for the following 'case' statement?
+        case "$ROUTER" in
+
+            RT-AC86U|GT-AC2900)     # RT-AC86U, GT-AC2900 - 4.1.27          e.g. wireguard-kernel_1.0.20210606-k27_1_aarch64-3.10.ipk
+                local WEBFILE_NAMES=$(curl -${SILENT}fL https://api.github.com/repos/ZebMcKayhan/Wireguard/git/trees/main | grep "\"path\": \"wireguard-.*\.ipk\"," | cut -d'"' -f 4 | tr '\r\n' ' ')   # v4.11
+                local REPOSITORY_OWNER="ZebMcKayhan"
+                _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $1}')" "$REPOSITORY_OWNER"     # k27_1
+                ;;
+            RT-AX88U|GT-AX11000)    # RT-AX88U, GT-AX11000 - 4.1.51         e.g. wireguard-kernel_1.0.20210219-k52_1_aarch64-3.10.ipk
+                _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $2}')" "$REPOSITORY_OWNER"    # k51_1
+                ;;
+            RT-AX68U)               # RT-AX68U - 4.1.52                     e.g. wireguard-kernel_1.0.20210219-k52_1_aarch64-3.10.ipk
                 _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $3}')" "$REPOSITORY_OWNER"    # k52_1
-            else
-                # Should the Github version be used?
-                echo -e $cBYEL"\a\n\t***ERROR: Wireguard exists in firmware for $ROUTER (v$BUILDNO)\n"$cRESET
-            fi
+                ;;
+            RT-AX86U|GT-AC5700)     # v4.12 These models have wireguard in the firmware
+                    # RT-AX68U, RT-AX86U - 4.1.52           e.g. wireguard-kernel_1.0.20210219-k52_1_aarch64-3.10.ipk
+                    _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $3}')" "$REPOSITORY_OWNER"    # k52_1
+                ;;
+            *)
+                echo -e $cBRED"\a\n\t***ERROR: Unable to find 3rd-Party WireGuard Kernel module for $ROUTER (v$BUILDNO)\n"$cRESET
+                # Deliberately Download an incompatible file simply so that an error message is produced by 'opkg install*.ipk'
+                #
+                #       Unknown package 'wireguard-kernel'.
+                #       Collected errors:
+                #        * pkg_hash_fetch_best_installation_candidate: Packages for wireguard-kernel found, but incompatible with the architectures configured
+                #        * opkg_install_cmd: Cannot install package wireguard-kernel.
+                #
+                #
+                _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $1}')" "$REPOSITORY_OWNER"
+                ROUTER_COMPATIBLE="N"
+                ;;
+        esac
+    else
+        echo -e $cBYEL"\a\n\t***ERROR: WireGuard exists in firmware for $ROUTER (v$BUILDNO) use 'vx' command to override\n"$cRESET
+        local FPATH=$(modprobe --show-depends wireguard | awk '{print $2}')
+        local FVERSION=$(strings $FPATH | grep "^version" | cut -d'=' -f2)  # v4.12 @ZebMcKayhan
+        echo -e $cBGRE"\n\t[✔]$cBWHT WireGuard Kernel module/User Space Tools included in Firmware $ROUTER (v$BUILDNO)"$cRED" ($FVERSION)\n"$cRESET    # v4.12
+    fi
 
-            ;;
-        *)
-            echo -e $cBRED"\a\n\t***ERROR: Unable to find WireGuard Kernel module for $ROUTER (v$BUILDNO)\n"$cRESET
-            # Deliberately Download an incompatible file simply so that an error message is produced by 'opkg install*.ipk'
-            #
-            #       Unknown package 'wireguard-kernel'.
-            #       Collected errors:
-            #        * pkg_hash_fetch_best_installation_candidate: Packages for wireguard-kernel found, but incompatible with the architectures configured
-            #        * opkg_install_cmd: Cannot install package wireguard-kernel.
-            #
-            #
-            _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $1}')" "$REPOSITORY_OWNER"
-
-            ROUTER_COMPATIBLE="N"
-            ;;
-    esac
-
-    # User Space Tools
-    if [ ! -f /usr/sbin/wg ];then           # v4.12 Is the User Space Tools included in the firmware?
+    # User Space Tools - Allow use of Entware/3rd Party modules even if Modules included in firmware
+    if [ ! -f /usr/sbin/wg ] || [ "$USE_ENTWARE_KERNEL_MODULE" == "Y" ];then    # v4.12 Is the User Space Tools included in the firmware?
         WEBFILE=$(echo "$WEBFILE_NAMES" | awk '{print $NF}')
         echo -e $cBCYA"\n\tDownloading WireGuard User space Tool$cBWHT '$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO) @$REPOSITORY_OWNER"$cRESET  # v4.11
         _Get_File  "$WEBFILE" "$REPOSITORY_OWNER" "NOMSG"           # v4.11
     else
-        # Should the Github version be used?
-        echo -e $cBYEL"\a\n\t***ERROR: User Space tool exists in firmware for $ROUTER (v$BUILDNO)\n"$cRESET
+        echo -e $cBYEL"\a\n\t***ERROR: User Space tool exists in firmware for $ROUTER (v$BUILDNO) use 'vx' command to override\n"$cRESET
     fi
 
 }
 Load_UserspaceTool() {
+
+    local USE_ENTWARE_KERNEL_MODULE="N"                                     # v4.12
+    [ -n "$(grep -oE "^USE_ENTWARE_KERNEL_MODULE" ${INSTALL_DIR}WireguardVPN.conf)" ] && local USE_ENTWARE_KERNEL_MODULE="Y"
 
     if [ ! -d "${INSTALL_DIR}" ];then
         echo -e $cRED"\a\n\tNo modules found - '/${INSTALL_DIR} doesn't exist'\n"
@@ -422,7 +432,7 @@ Load_UserspaceTool() {
     fi
 
     STATUS=0
-    if [ ! -f /usr/sbin/wg ];then           # v4.12 Is the User Space Tools included in the firmware?
+    if [ ! -f /usr/sbin/wg ] || [ "$USE_ENTWARE_KERNEL_MODULE" == "Y" ];then           # v4.12 Is the User Space Tools included in the firmware?
         echo -e $cBCYA"\n\tLoading WireGuard Kernel module and Userspace Tool for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
         for MODULE in $(ls /jffs/addons/wireguard/*.ipk)
             do
@@ -439,15 +449,35 @@ Load_UserspaceTool() {
         if [ "$STATUS" -eq 0 ];then
             insmod /opt/lib/modules/wireguard 2>/dev/null
 
-            echo -e $cBGRA"\t"$(dmesg | grep -a "WireGuard")
-            echo -e $cBGRA"\t"$(dmesg | grep -a "wireguard: Copyright")"\n"$cRESET
+            echo -e $cBGRA"\t"$(dmesg | grep -a "WireGuard" | tail -n 1)
+            echo -e $cBGRA"\t"$(dmesg | grep -a "wireguard: Copyright" | tail -n 1)"\n"$cRESET
             return 0
         else
             echo -e $cBRED"\a\n\t***ERROR: Unable to DOWNLOAD WireGuard Kernel and Userspace Tool modules\n"
             return 1
         fi
     else
-        echo -e $cBYEL"\a\n\t***ERROR: Wireguard exists in firmware for $ROUTER (v$BUILDNO)\n"$cRESET
+
+        local KERNEL_MODULE=$(find / -name wireguard.ko | tr '\n' ' ' | awk '{print $1}')       # v4.12
+
+        if [ -n "$KERNEL_MODULE" ];then
+            local FPATH=$(modprobe --show-depends wireguard | awk '{print $2}')
+            local FVERSION=$(strings $FPATH | grep "^version" | cut -d'=' -f2)  # v4.12 @ZebMcKayhan
+            echo -e $cBGRE"\n\t[✔]$cBWHT WireGuard Kernel module/User Space Tools included in Firmware"$cRED" ($FVERSION)\n"$cRESET
+            rmmod  $KERNEL_MODULE 2>/dev/null                   # v4.12
+            insmod $KERNEL_MODULE 2>/dev/null                   # v4.12
+            logger -t "wireguard-server${VPN_ID:3:1}" "Initialising WireGuard Kernel module '$KERNEL_MODULE'"
+            echo -e $cBGRA"\t"$(dmesg | grep -a "WireGuard" | tail -n 1)
+            echo -e $cBGRA"\t"$(dmesg | grep -a "wireguard: Copyright" | tail -n 1)"\n"$cRESET
+
+            rm ${INSTALL_DIR}*.ipk 2>/dev/null            # v4.12
+            [ -n "$(opkg list-installed | grep "wireguard-kernel")" ] && opkg remove wireguard-kernel 1>/dev/null
+            [ -n "$(opkg list-installed | grep "wireguard-tools")" ]  && opkg remove wireguard-tools  1>/dev/null
+
+        else
+            logger -t "wireguard-server${VPN_ID:3:1}" "***ERROR Failure to Initialise WireGuard Kernel module!"
+            return 1
+        fi
     fi
 }
 Show_MD5() {
@@ -457,11 +487,11 @@ Show_MD5() {
     if [ "$TYPE" == "script" ];then
         echo -e $cBCYA"\tMD5="$(awk '{print $0}' ${INSTALL_DIR}wg_manager.md5)
     else
-        if [ ! -f /usr/sbin/wg ];then           # v4.12
+        if [ ! -f /usr/sbin/wg ] || [ "$(which wg)" == "/opt/bin/wg" ];then           # v4.12
             echo -e $cBCYA"\tMD5="$(awk '{print $0}' ${INSTALL_DIR}wireguard-kernel.md5)
             echo -e $cBCYA"\tMD5="$(awk '{print $0}' ${INSTALL_DIR}wireguard-tools.md5)
         else
-            echo -e $cBYEL"\a\n\t***ERROR: MD5= ???? - Wireguard exists in firmware for $ROUTER (v$BUILDNO)\n"$cRESET
+            echo -e $cBYEL"\a\n\t***ERROR: MD5= ???? - WireGuard exists in firmware for $ROUTER (v$BUILDNO)\n"$cRESET
         fi
     fi
 }
@@ -471,19 +501,25 @@ Check_Module_Versions() {
 
     local UPDATES="N"
 
-    echo -e $cBGRA"\t"$(dmesg | grep -a "WireGuard")
-    echo -e $cBGRA"\t"$(dmesg | grep -a "wireguard: Copyright")"\n"$cRESET
+    echo -e $cBGRA"\t"$(dmesg | grep -a "WireGuard" | tail -n 1)    # v4.12
+    echo -e $cBGRA"\t"$(dmesg | grep -a "wireguard: Copyright" | tail -n 1)"\n"$cRESET  # v4.12
 
     [ -n "$(lsmod | grep -i wireguard)" ] && echo -e $cBGRE"\t[✔] WireGuard Module is LOADED\n"$cRESET || echo -e $cBRED"\t[✖] WireGuard Module is NOT LOADED\n"$cRESET
 
-    # Without a BOOT, there may be a mismatch
-    local BOOTLOADED=$(dmesg | grep -a WireGuard | awk '{print $3}')
+    # Without a BOOT or 'loadmodule' command was issued, there may be a mismatch
+    local BOOTLOADED=$(dmesg | grep -a WireGuard  | tail -n 1 | awk '{print $3}')
     local WGKERNEL=$(opkg list-installed | grep "wireguard-kernel" | awk '{print $3}' | sed 's/\-.*$//')
     local WGTOOLS=$(opkg list-installed | grep "wireguard-tools" | awk '{print $3}' | sed 's/\-.*$//')
 
-    if [ -n "$WGKERNEL" ];then                  # v1.04
-        [ "$WGKERNEL" != "$BOOTLOADED" ] && echo -e $cRED"\a\n\tWarning: Reboot required for (dmesg) WireGuard $WGKERNEL $BOOTLOADED\n"
+    local USE_ENTWARE_KERNEL_MODULE="N"                                     # v4.12
+    [ -n "$(grep -oE "^USE_ENTWARE_KERNEL_MODULE" ${INSTALL_DIR}WireguardVPN.conf)" ] && local USE_ENTWARE_KERNEL_MODULE="Y"
+
+    if [ -f /usr/sbin/wg ] && [ "$USE_ENTWARE_KERNEL_MODULE" == "N" ];then
+        local FPATH=$(modprobe --show-depends wireguard | awk '{print $2}')
+        local WGKERNEL=$(strings $FPATH | grep "^version" | cut -d'=' -f2)  # v4.12 @ZebMcKayhan
     fi
+
+    [ "$WGKERNEL" != "$BOOTLOADED" ] && echo -e $cRED"\a\n\tWarning: Reboot or 'loadmodule command' required for (dmesg) WireGuard $WGKERNEL $BOOTLOADED\n"
 
     Show_MD5
 
@@ -2173,6 +2209,10 @@ STATS
 #        This setting basically ignores any IPv6 settings for the WireGuard interfaces.
 #NOIPV6
 
+# For Routers that include WireGuard Kernel/User Space tools, allow overriding with supported 3rd-Party/Entware versions
+#     Use command 'vx' to edit this setting.
+#USE_ENTWARE_KERNEL_MODULE
+
 EOF
     return 0
 }
@@ -3704,7 +3744,7 @@ Build_Menu() {
 
         # Generate dynamically context aware menu
         if [ "$(WireGuard_Installed)" == "Y" ];then
-            MENU_I="$(printf '%b1 %b = %bUpdate%b Wireguard modules' "${cBYEL}" "${cRESET}" "${cBGRE}" "${cRESET}")"
+            MENU_I="$(printf '%b1 %b = %bUpdate%b WireGuard modules' "${cBYEL}" "${cRESET}" "${cBGRE}" "${cRESET}")"
             MENU_Z="$(printf '%b2 %b = %bRemove%b WireGuard/wg_manager\n' "${cBYEL}" "${cRESET}" "${cBRED}" "${cRESET}")"
         else
             MENU_I="$(printf '%b1 %b = %bBegin%b WireGuard Installation Process' "${cBYEL}" "${cRESET}" "${cBGRE}" "${cRESET}")"
@@ -3727,7 +3767,7 @@ Build_Menu() {
             MENU_P="$(printf '%b8 %b = %bPeer%b management [ "list" | "category" | "new" ] | [ {Peer | category} [ 'del' | 'show' | 'add' [{"auto="[y|n|p]}] ]%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
             MENU_C="$(printf '%b9 %b = %bCreate[split]%b Key-pair for Peer {Device} e.g. Nokia6310i (creates Nokia6310i.conf etc.)%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
             MENU_IPS="$(printf '%b10 %b= %bIPSet%b management [ "list" ] | [ "upd" { ipset [ "fwmark" {fwmark} ] | [ "enable" {"y"|"n"}] | [ "dstsrc"] ] } ] %b' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
-            MENU_ISPIMP="$(printf '%b11 %b= %bImport%b Wireguard configuration { [ "?" | [ "dir" directory ] | [/path/]config_file [ "name="rename_as ] ]} %b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
+            MENU_ISPIMP="$(printf '%b11 %b= %bImport%b WireGuard configuration { [ "?" | [ "dir" directory ] | [/path/]config_file [ "name="rename_as ] ]} %b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
 
         fi
 
@@ -3943,14 +3983,17 @@ Process_User_Choice() {
 
                 case "$ACTION" in
                     "?")
-
-                        if [ ! -f /usr/sbin/wg ];then               # v4.12
-                            Check_Module_Versions "report"
-                        else
+                        if [ -f /usr/sbin/wg ];then             # v4.12
                             local FPATH=$(modprobe --show-depends wireguard | awk '{print $2}')
                             local FVERSION=$(strings $FPATH | grep "^version" | cut -d'=' -f2)  # v4.12 @ZebMcKayhan
-                            echo -e $cBGRE"\n\t[✔]$cBWHT Wireguard Kernel module/User Space Tools included in Firmware"$cRED" ($FVERSION)\n"$cRESET    # v4.12
+                            if [ "$(which wg)" != "/opt/bin/wg" ];then
+                                echo -e $cBGRE"\n\t[✔]$cBWHT WireGuard Kernel module/User Space Tools included in Firmware"$cRED" ($FVERSION)\n"$cRESET    # v4.12
+                            else
+                                echo -e $cBGRE"\n\t[ℹ ]$cBGRA WireGuard Kernel module/User Space Tools included in Firmware"$cBWHT" ($FVERSION)${cBGRA} but 3rd-Party modules installed...\n"$cRESET    # v4.12
+                            fi
                         fi
+
+                        [ "$(which wg)" == "/opt/bin/wg" ] && Check_Module_Versions "report"
 
                         echo -e $cRESET
                         DNSmasq_Listening_WireGuard_Status
