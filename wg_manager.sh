@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.12b9"
-#============================================================================================ © 2021 Martineau v4.12b9
+VERSION="v4.12bA"
+#============================================================================================ © 2021 Martineau v4.12bA
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.12b9"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 18-Nov-2021
+# Last Updated Date: 19-Nov-2021
 #
 # Description:
 #
@@ -4638,7 +4638,8 @@ HARDWARE_MODEL=$(Get_Router_Model)
 # v384.13+ NVRAM variable 'lan_hostname' supersedes 'computer_name'
 [ -n "$(nvram get computer_name)" ] && MYROUTER=$(nvram get computer_name) || MYROUTER=$(nvram get lan_hostname)
 BUILDNO=$(nvram get buildno)
-[ "${#BUILDNO}" -eq 3 ] && BUILDNO=$(nvram get innerver)            # v4.12
+#[ "${#BUILDNO}" -eq 3 ] && BUILDNO=$(nvram get innerver)            # v4.12
+BUILDNO=$(nvram get innerver)            # v4.12
 SCRIPT_NAME="${0##*/}"
 ENTWARE_INFO="/opt/etc/entware_release"
 
@@ -4724,6 +4725,9 @@ if [ "$1" != "install" ];then   # v2.01
 
     if [ "$NOCHK" == "Y" ] || [ "$(WireGuard_Installed)" == "Y" ];then # v4.12 v2.01
 
+        # Ensure Kernel module is loaded
+        [ -z "$(lsmod | grep wireguard)" ] && Load_UserspaceTool    # v4.12
+
         case "$1" in
 
             start|init)
@@ -4746,7 +4750,13 @@ if [ "$1" != "install" ];then   # v2.01
 
                 # http://www.snbforums.com/threads/beta-wireguard-session-manager.70787/post-688282
                 if [ "$HARDWARE_MODEL" == "RT-AX86U" ];then
-                    [ -n "$(fc status | grep "Flow Learning Enabled")" ] && { fc disable; Say "Broadcom Packet Flow Cache learning via BLOG (Flow Cache) DISABLED"; }   # v4.11 @Torson
+                    if [ -n "$(fc status | grep "Flow Learning Enabled")" ];then
+                        fc disable
+                        fc flush
+                        Say "Broadcom Packet Flow Cache learning via BLOG (Flow Cache) DISABLED"   # v4.11 @Torson
+                        nvram set fc_disable=1      # v4.12
+                        nvram commit                # v4.12
+                    fi
                 fi
 
                 Manage_Wireguard_Sessions "start" "$PEER" "$NOPOLICY"
