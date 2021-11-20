@@ -4568,7 +4568,7 @@ Create_RoadWarrior_Device() {
                 # User specifed DNS ?
                 if [ -z "$DNS_RESOLVER" ];then                                                      # v3.04 Hotfix
                     local DNS_RESOLVER=$(nvram get wan0_dns | awk '{print $1}')                     # v3.04 Hotfix @Sh0cker54 #v3.04 Hotfix
-                    if [ -n "$DNS_RESOLVER" ];then                                                  # v4.12 @underdose
+                    if [ -z "$DNS_RESOLVER" ];then                                                  # v4.12 @underdose
                         echo -e $cRED"\a\tWarning: No DNS (${cBWHT}nvram get wan0_dns${cRED}) is configured! - will use ${cBWHT}${VPN_POOL_SUBNET}.1"   # v4.12 @underdose
                         local DNS_RESOLVER="${VPN_POOL_SUBNET}.1"                                   # v4.12 @underdose
                     fi
