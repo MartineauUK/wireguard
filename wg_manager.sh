@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.12bA"
-#============================================================================================ © 2021 Martineau v4.12bA
+VERSION="v4.12bB"
+#============================================================================================ © 2021 Martineau v4.12bB
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.12bA"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 19-Nov-2021
+# Last Updated Date: 20-Nov-2021
 #
 # Description:
 #
@@ -1977,7 +1977,7 @@ Manage_PASSTHRU_rules() {
     shift
     local IP_SUBNET=$1
 
-    if [ ! -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
+    if [ "$IFACE" != "wan" ] && [ ! -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
         echo -e $cBRED"\a\n\t***ERROR: Peer (${cBWHT}$WG_INTERFACE${cBRED}) doesn't exist!"$cRESET
         return 1
     fi
@@ -1994,25 +1994,48 @@ Manage_PASSTHRU_rules() {
         case "$CMD" in
             add)
 
-                if [ ! -f ${CONFIG_DIR}${IFACE}.conf ];then
+                if [ "$IFACE" != "wan" ] && [ ! -f ${CONFIG_DIR}${IFACE}.conf ];then
                     echo -e $cBRED"\a\n\t***ERROR: 'client' Peer (${cBWHT}$IFACE${cBRED}) doesn't exist!"$cRESET
                     return 1
                 fi
 
-                local MODE=$(Server_or_Client "$IFACE")
-
-                if [ "$MODE" == "server" ];then
+                if [ "$IFACE" == "wan" ];then
+                    :
+                else
+                    local MODE=$(Server_or_Client "$IFACE")
+                    if [ "$MODE" == "server" ];then
                         echo -e $cBRED"\a\n\t***ERROR: Peer (${cBWHT}$IFACE${cBRED}) must be 'client' peer e.g. 'wg13'"$cRESET
                         return 1
+                    fi
                 fi
 
                 sqlite3 $SQL_DATABASE "INSERT INTO passthru values('$WG_INTERFACE','$IFACE','$IP_SUBNET');"
                 echo -e $cBGRE"\n\t[✔] Updated Passthru Routing rule for $WG_INTERFACE \n"$cRESET  2>&1
+                if [ "$IFACE" == "wan" ];then
+                   # Need to Restart the 'server' Peer if it is UP
+                    if [ -n "$(wg show interfaces | grep "$WG_INTERFACE")" ];then
+                        CMD="restart"
+                        echo -e $cBWHT"\a\n\tWireGuard 'server' Peer needs to be ${CMD}ed to implement 'wan' passthru"
+                        echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer ($WG_INTERFACE) or press$cBGRE [Enter] to SKIP."
+                        read -r "ANS"
+                        [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$WG_INTERFACE"; Show_Peer_Status "show"; }  # v4.12
+                    fi
+                fi
             ;;
             del)
                 if [ "$IFACE" != "all" ];then
                     sqlite3 $SQL_DATABASE "DELETE FROM passthru WHERE server='$WG_INTERFACE' AND client='$IFACE' AND ip_subnet='$IP_SUBNET';"
                     echo -e $cBGRE"\n\t[✔] Deleted Passthru Routing rule for $WG_INTERFACE \n"$cRESET  2>&1
+                    if [ "$IFACE" == "wan" ];then
+                        # Need to Restart the 'server' Peer if it is UP
+                        if [ -n "$(wg show interfaces | grep "$WG_INTERFACE")" ];then
+                            CMD="restart"
+                            echo -e $cBWHT"\a\n\tWireGuard 'server' Peer needs to be ${CMD}ed to remove 'wan' passthru"
+                            echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer ($WG_INTERFACE) or press$cBGRE [Enter] to SKIP."
+                            read -r "ANS"
+                            [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$WG_INTERFACE"; Show_Peer_Status "show"; }  # v4.12
+                        fi
+                    fi
                 else
                     echo -e $cBCYA"\a\n\tDo you want to DELETE ALL Passthru Routing rules for ${cBMAG}$WG_INTERFACE?"$cRESET
                     echo -e "\tPress$cBRED y$cRESET to$cBRED CONFIRM${cRESET} or press$cBGRE [Enter] to SKIP."
@@ -4545,6 +4568,11 @@ Create_RoadWarrior_Device() {
                 # User specifed DNS ?
                 if [ -z "$DNS_RESOLVER" ];then                                                      # v3.04 Hotfix
                     local DNS_RESOLVER=$(nvram get wan0_dns | awk '{print $1}')                     # v3.04 Hotfix @Sh0cker54 #v3.04 Hotfix
+                    if [ -n "$DNS_RESOLVER" ];then                                                  # v4.12 @underdose
+                        echo -e $cRED"\a\tWarning: No DNS (${cBWHT}nvram get wan0_dns${cRED}) is configured! - will use ${cBWHT}${VPN_POOL_SUBNET}.1"   # v4.12 @underdose
+                        local DNS_RESOLVER="${VPN_POOL_SUBNET}.1"                                   # v4.12 @underdose
+                    fi
+
                     [ "$USE_IPV6" == "Y" ] && DNS_RESOLVER=$DNS_RESOLVER","$(nvram get ipv6_dns1)   # v3.04 Hotfix
                 fi
 
