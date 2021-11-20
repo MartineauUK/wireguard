@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.05b4"
-#============================================================================================ © 2021 Martineau v4.05b4
+VERSION="v4.05b5"
+#============================================================================================ © 2021 Martineau v4.05b5
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 16-Nov-2021
+# Last Updated Date: 18-Nov-2021
 #
 # Description:
 #
@@ -67,16 +67,22 @@ Manage_Passthru(){
         for VPN_ID in $PASSTHRU_CLIENTS     # wg11 wg14
             do
                 local VPN_NUM=${VPN_ID#"${VPN_ID%?}"}
+                local TABLE=12$VPN_NUM
+                [ "$VPN_ID" == "wan" ] && TABLE="main"
 
                 if [ "$ACTION" == "add" ];then
-                    # Ensure target WireGuard 'client' peer routing policy table contains WireGuard 'server' peer IP/network in the passthru tunnel @chongnt
-                    while read ROUTE; do
-                        ip route $ACTION $ROUTE table 12$VPN_NUM 2>/dev/null && ROUTING_CHANGED=
-                    done << EOR
+                    if [ "$VPN_ID" != "wan" ];then
+                        # Ensure target WireGuard 'client' peer routing policy table contains WireGuard 'server' peer IP/network in the passthru tunnel @chongnt
+                        while read ROUTE; do
+                            ip route $ACTION $ROUTE table $TABLE 2>/dev/null && ROUTING_CHANGED=
+                        done << EOR
 $(ip route | grep "$WG_INTERFACE")
 EOR
-
-                    [ ${ROUTING_CHANGED+x} ] && ip route flush cache
+                    else
+                        ip rule $ACTION from $IP_ADDR table $TABLE
+                    fi
+                else
+                    ip rule $ACTION from $IP_ADDR table $TABLE 2>/dev/null
                 fi
             done
     fi
