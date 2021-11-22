@@ -2352,7 +2352,9 @@ Server_or_Client() {
                         if [ -n "$(nvram get ddns_hostname_x)" ];then                           # v4.05
                             [ -n "$(grep -iF "$(nvram get ddns_hostname_x)" ${SOURCE_DIR}${WG_INTERFACE}.conf)" ] && PEER_TYPE="device" # v4.12
                         else
-                            [ -n "$(grep -iF "$(nvram get wan0_realip_ip)" ${SOURCE_DIR}${WG_INTERFACE}.conf)" ] && PEER_TYPE="device"  # v4.12
+                            if [ -n "$(nvram get wan0_realip_ip)" ];then
+                                [ -n "$(grep -iF "$(nvram get wan0_realip_ip)" ${SOURCE_DIR}${WG_INTERFACE}.conf)" ] && PEER_TYPE="device"  # v4.12
+                            fi
                         fi
                     else
                         local PEER_TYPE="server"
