@@ -434,17 +434,19 @@ Load_UserspaceTool() {
     STATUS=0
     if [ ! -f /usr/sbin/wg ] || [ "$USE_ENTWARE_KERNEL_MODULE" == "Y" ];then           # v4.12 Is the User Space Tools included in the firmware?
         echo -e $cBCYA"\n\tLoading WireGuard Kernel module and Userspace Tool for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
-        for MODULE in $(ls /jffs/addons/wireguard/*.ipk)
-            do
-                opkg install $MODULE
-                if [ $? -eq 0 ];then
-                    MODULE_NAME=$(echo "$(basename $MODULE)" | sed 's/_.*$//')
-                    md5sum $MODULE > ${INSTALL_DIR}$MODULE_NAME".md5"
-                    sed -i 's~/jffs/addons/wireguard/~~' ${INSTALL_DIR}$MODULE_NAME".md5"
-                else
-                    STATUS=0
-                fi
-            done
+        if [ -n "$(ls /jffs/addons/wireguard/*.ipk 2>/dev/null)" ];then
+            for MODULE in $(ls /jffs/addons/wireguard/*.ipk)
+                do
+                    opkg install $MODULE
+                    if [ $? -eq 0 ];then
+                        MODULE_NAME=$(echo "$(basename $MODULE)" | sed 's/_.*$//')
+                        md5sum $MODULE > ${INSTALL_DIR}$MODULE_NAME".md5"
+                        sed -i 's~/jffs/addons/wireguard/~~' ${INSTALL_DIR}$MODULE_NAME".md5"
+                    else
+                        STATUS=0
+                    fi
+                done
+        fi
 
         if [ "$STATUS" -eq 0 ];then
             insmod /opt/lib/modules/wireguard 2>/dev/null
@@ -505,7 +507,11 @@ Check_Module_Versions() {
     echo -e $cBGRA"\t"$(dmesg | grep -a "wireguard: Copyright" | tail -n 1)"\n"$cRESET  # v4.12
 
     if [ -n "$(lsmod | grep -i wireguard)" ];then
-        local LOADTIME=$(date -d "@"$(opkg status wireguard-kernel | awk '/^Installed/ {print $2}' ))
+        if [ -n "$(opkg status wireguard-kernel | awk '/^Installed/ {print $2}')" ];then
+            local LOADTIME=$(date -d @$(opkg status wireguard-kernel | awk '/^Installed/ {print $2}'))
+        else
+            local LOADTIME=
+        fi
         echo -e $cBGRE"\t[✔] WireGuard Module LOADED $LOADTIME\n"$cRESET
     else
         echo -e $cBRED"\t[✖] WireGuard Module is NOT LOADED\n"$cRESET
