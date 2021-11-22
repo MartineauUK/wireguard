@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.12bB"
-#============================================================================================ © 2021 Martineau v4.12bB
+VERSION="v4.12bC"
+#============================================================================================ © 2021 Martineau v4.12bC
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.12bB"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 20-Nov-2021
+# Last Updated Date: 22-Nov-2021
 #
 # Description:
 #
@@ -355,7 +355,7 @@ Download_Modules() {
 
     #[ ! -d "${INSTALL_DIR}" ] && mkdir -p "${INSTALL_DIR}"
 
-    if [ ! -f /usr/sbin/wg ] && [ "$USE_ENTWARE_KERNEL_MODULE" == "N" ];then
+    if [ -f /usr/sbin/wg ] && [ "$USE_ENTWARE_KERNEL_MODULE" == "N" ];then
         rm ${INSTALL_DIR}*.ipk 2>/dev/null            # v4.12
         [ -n "$(opkg list-installed | grep "wireguard-kernel")" ] && opkg remove wireguard-kernel 1>/dev/null
         [ -n "$(opkg list-installed | grep "wireguard-tools")" ]  && opkg remove wireguard-tools  1>/dev/null
@@ -400,10 +400,10 @@ Download_Modules() {
                 ;;
         esac
     else
-        echo -e $cBYEL"\a\n\t***ERROR: WireGuard exists in firmware for $ROUTER (v$BUILDNO) use 'vx' command to override\n"$cRESET
         local FPATH=$(modprobe --show-depends wireguard | awk '{print $2}')
         local FVERSION=$(strings $FPATH | grep "^version" | cut -d'=' -f2)  # v4.12 @ZebMcKayhan
         echo -e $cBGRE"\n\t[✔]$cBWHT WireGuard Kernel module/User Space Tools included in Firmware $ROUTER (v$BUILDNO)"$cRED" ($FVERSION)\n"$cRESET    # v4.12
+        echo -e $cBYEL"\a\t\tWireGuard exists in firmware       - use ${cRESET}'vx'${cBYEL} command to override with 3rd-Party/Entware (if available)"$cRESET
     fi
 
     # User Space Tools - Allow use of Entware/3rd Party modules even if Modules included in firmware
@@ -412,7 +412,7 @@ Download_Modules() {
         echo -e $cBCYA"\n\tDownloading WireGuard User space Tool$cBWHT '$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO) @$REPOSITORY_OWNER"$cRESET  # v4.11
         _Get_File  "$WEBFILE" "$REPOSITORY_OWNER" "NOMSG"           # v4.11
     else
-        echo -e $cBYEL"\a\n\t***ERROR: User Space tool exists in firmware for $ROUTER (v$BUILDNO) use 'vx' command to override\n"$cRESET
+        echo -e $cBYEL"\a\t\tUser Space tool exists in firmware - use ${cRESET}'vx'${cBYEL} command to override with 3rd-Party/Entware (if available)\n"$cRESET
     fi
 
 }
@@ -504,7 +504,12 @@ Check_Module_Versions() {
     echo -e $cBGRA"\t"$(dmesg | grep -a "WireGuard" | tail -n 1)    # v4.12
     echo -e $cBGRA"\t"$(dmesg | grep -a "wireguard: Copyright" | tail -n 1)"\n"$cRESET  # v4.12
 
-    [ -n "$(lsmod | grep -i wireguard)" ] && echo -e $cBGRE"\t[✔] WireGuard Module is LOADED\n"$cRESET || echo -e $cBRED"\t[✖] WireGuard Module is NOT LOADED\n"$cRESET
+    if [ -n "$(lsmod | grep -i wireguard)" ];then
+        local LOADTIME=$(date -d "@"$(opkg status wireguard-kernel | awk '/^Installed/ {print $2}' ))
+        echo -e $cBGRE"\t[✔] WireGuard Module LOADED $LOADTIME\n"$cRESET
+    else
+        echo -e $cBRED"\t[✖] WireGuard Module is NOT LOADED\n"$cRESET
+    fi
 
     # Without a BOOT or 'loadmodule' command was issued, there may be a mismatch
     local BOOTLOADED=$(dmesg | grep -a WireGuard  | tail -n 1 | awk '{print $3}')
@@ -519,7 +524,7 @@ Check_Module_Versions() {
         local WGKERNEL=$(strings $FPATH | grep "^version" | cut -d'=' -f2)  # v4.12 @ZebMcKayhan
     fi
 
-    [ "$WGKERNEL" != "$BOOTLOADED" ] && echo -e $cRED"\a\n\tWarning: Reboot or 'loadmodule command' required for (dmesg) WireGuard $WGKERNEL $BOOTLOADED\n"
+    #[ "$WGKERNEL" != "$BOOTLOADED" ] && echo -e $cRED"\a\n\tWarning: Reboot or 'loadmodule command' required for (dmesg) WireGuard $WGKERNEL $BOOTLOADED\n"
 
     Show_MD5
 
@@ -2707,12 +2712,12 @@ Install_WireGuard_Manager() {
     opkg install column                     # v2.02
     opkg install coreutils-mkfifo
 
-    # Kernel module
-    echo -e $cBCYA"\tDownloading Wireguard Kernel module for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
-
-    ROUTER_COMPATIBLE="Y"
-
     if [ "$(which wg)" != "/usr/sbin/wg" ];then # v4.12
+        # Kernel module
+        echo -e $cBCYA"\tDownloading Wireguard Kernel module for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
+
+        ROUTER_COMPATIBLE="Y"
+
         Download_Modules $HARDWARE_MODEL
 
         Load_UserspaceTool
@@ -2721,7 +2726,7 @@ Install_WireGuard_Manager() {
     # Create the Sample/template parameter file '${INSTALL_DIR}WireguardVPN.conf'
     Create_Sample_Config
 
-    Initialise_SQL                                      # v3.04
+    [ ! -f $SQL_DATABASE ] && Initialise_SQL || Initialise_SQL "keep"             # v4.12 v3.04
 
     # Create 'Server' Peer
     echo -e $cBCYA"\tCreating WireGuard 'Server' Peer ${cBMAG}(wg21)${cBCYA}'"$cRESET
@@ -3777,13 +3782,15 @@ Build_Menu() {
 
             MENU_VX="$(printf '%bv %b = View %b%s\n' "${cBYEL}" "${cRESET}" "$cBGRE" "('${INSTALL_DIR}WireguardVPN.conf')")"
             MENU_RS="$(printf '%brs%b = %bRestart%b (or %bStart%b) WireGuard Sessions(%b)\n' "${cBYEL}" "${cRESET}" "$cBGRE" "${cRESET}" "$cBGRE" "${cRESET}" )"
-            MENU_S="$(printf '%b4 %b = %bStart%b   [ [Peer [nopolicy]...] | category ] e.g. start clients \n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"        # v2.02
+
             if [ -n "$(wg show interfaces)" ];then
+                MENU_S="$(printf '%b4 %b = %bStart%b   [ [Peer [nopolicy]...] | category ] e.g. start clients \n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"        # v2.02
                 MENU_L="$(printf '%b3 %b = %bList%b ACTIVE Peers Summary [Peer...] [full]\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
                 MENU_T="$(printf '%b5 %b = %bStop%b    [ [Peer... ] | category ] e.g. stop clients\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
             else
-                MENU_L="$(printf '%b3 %b = %bList%b ACTIVE Peers Summary [Peer...] [full]\n' "${cBYEL}" "${cRESET}" "${cGRA}" "${cBGRA}")"   # v2.03
-                MENU_T="$(printf '%b5 %b = %bStop%b    [ [Peer... ] | category ] e.g. stop clients\n' "${cBYEL}" "${cRESET}" "${cGRA}" "${cBGRA}")"
+                MENU_S="$(printf '%b4 %b = %bStart%b   [ [Peer [nopolicy]...] | category ] e.g. start clients \n' "${cBYEL}" "${cRESET}" "${cBGRE}" "${cRESET}")"        # v2.02
+                MENU_L="$(printf '%b3 %b = %bList%b ACTIVE Peers Summary [Peer...] [full]\n' "${cBYEL}" "${cRESET}" "${cBGRA}" "${cBGRA}")"   # v2.03
+                MENU_T="$(printf '%b5 %b = %bStop%b    [ [Peer... ] | category ] e.g. stop clients\n' "${cBYEL}" "${cRESET}" "${cBGRA}" "${cBGRA}")"
             fi
             MENU_R="$(printf '%b6 %b = %bRestart%b [ [Peer... ] | category ]%b e.g. restart servers\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
             MENU_Q="$(printf '%b7 %b = %bQRcode%b for a Peer {device} e.g. iPhone%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"   # v4.12
