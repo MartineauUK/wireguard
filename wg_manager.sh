@@ -24,7 +24,7 @@ VERSION="v4.12bC"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 22-Nov-2021
+# Last Updated Date: 23-Nov-2021
 #
 # Description:
 #
@@ -3259,6 +3259,9 @@ Diag_Dump() {
 
     if [ -z "$TYPE" ] || [ "$TYPE" == "route" ] || [ "$TYPE" == "rpdb" ];then
 
+        echo -e $cBYEL"\n\tWireGuard VPN Peers"$cRESET
+        Show_Peer_Config_Entry
+
         echo -e $cBYEL"\n\tDEBUG: Routing info MTU etc.\n"$cBCYA 2>&1          # v1.07
         for WG_INTERFACE in $(wg show interfaces)
             do
@@ -3912,7 +3915,7 @@ Process_User_Choice() {
 
                     if [ "$ACTION" == "diag" ];then
                         #[ -z "$ARG" ] && Show_Peer_Status "full"             # v3.04 Hotfix
-                        [ -z "$ARG" ] && { echo -e $cBYEL"\n\t\t WireGuard VPN Peer Status"$cRESET; wg show all; }
+                        [ -z "$ARG" ] && { echo -e $cBYEL"\n\tWireGuard VPN Peer Status"$cRESET; wg show all; }
                         Diag_Dump ${menu1#* }
                     else
                         Show_Peer_Status                    # v3.04 Hotfix
