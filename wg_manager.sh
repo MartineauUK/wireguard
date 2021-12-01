@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.12bC"
-#============================================================================================ © 2021 Martineau v4.12bC
+VERSION="v4.12bD"
+#============================================================================================ © 2021 Martineau v4.12bD
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.12bC"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 23-Nov-2021
+# Last Updated Date: 01-Dec-2021
 #
 # Description:
 #
@@ -161,6 +161,10 @@ Is_IPv6() {
 }
 Is_IPv4_CIDR() {
         grep -oE '^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$'         # IPv4 CIDR range notation
+}
+Is_IPv6() {
+    # Note this matches compression anywhere in the address, though it won't match the loopback address ::1
+    grep -oE '([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4}'       # IPv6 format -very crude
 }
 Is_Private_IPv4() {
     # 127.  0.0.0 – 127.255.255.255     127.0.0.0 /8
@@ -460,7 +464,7 @@ Load_UserspaceTool() {
         fi
     else
 
-        local KERNEL_MODULE=$(find / -name wireguard.ko | tr '\n' ' ' | awk '{print $1}')       # v4.12
+        local KERNEL_MODULE=$(find / -name "wireguard.ko" | tr '\n' ' ' | awk '{print $1}')       # v4.12
 
         if [ -n "$KERNEL_MODULE" ];then
             local FPATH=$(modprobe --show-depends wireguard | awk '{print $2}')
@@ -998,7 +1002,7 @@ Import_Peer() {
                             fi
                         fi
 
-                        if [ "$ASUS_NVRAM" == "Y" ];then
+                        if [ "$ASUS_NVRAM" == "Y" ] && [ "$(uname -o)" != "ASUSWRT-Merlin" ];then       # v4.12
                             # ASUS supported firmware, so use NVRAM
                             if [ $(nvram get wgc_unit) -ne 1 ];then
                                 local INDEX=$(($(nvram get wgc_unit)-1))
@@ -1073,7 +1077,7 @@ Import_Peer() {
                             [ "$RENAME" == "Y" ] && { mv ${CONFIG_DIR}${WG_INTERFACE}.conf ${CONFIG_DIR}${NEW_NAME}.conf; local AS_TXT="as ${cBMAG}$NEW_NAME "$cRESET; }
                         fi
 
-                        if [ "$ASUS_NVRAM" == "Y" ];then
+                        if [ "$ASUS_NVRAM" == "Y" ] && [ "$(uname -o)" != "ASUSWRT-Merlin" ];then
                             [ -z "$AS_TXT" ] && local AS_TXT="as ${cBMAG}wgc${INDEX} "$cRESET || local AS_TXT="$AS_TXT, ${cBMAG}wgc${INDEX} "$cRESET
                         fi
 
@@ -1764,7 +1768,7 @@ Manage_Wireguard_Sessions() {
                         echo -en $cBCYA
                         SayT "$VERSION Requesting termination of WireGuard VPN '$Mode' Peer ('$WG_INTERFACE')"
 
-                        if [ -z "$(ifconfig | grep -E "^$WG_INTERFACE")" ];then
+                        if [ -z "$(wg show interfaces | grep -w "$WG_INTERFACE")" ] && [ -z "$(ifconfig | grep -E "^$WG_INTERFACE")" ];then     # v4.12
                             echo -e $cRED"\a\t";Say "WireGuard VPN '$Mode' Peer ('$WG_INTERFACE') NOT ACTIVE";echo -e
                         else
                             if [ "$Mode" == "server" ]; then
@@ -1882,6 +1886,10 @@ Manage_Event_Scripts() {
 Manage_RPDB_rules() {
     # v4.08
     local REDISPLAY=1
+    local SRC=
+    local DST=
+    local ALLOW_SRCDST_SWITCH="Y"
+    local SRCDST_SWITCHED=
     local ACTION=$1
     shift
     local WG_INTERFACE=$1
@@ -1925,21 +1933,135 @@ Manage_RPDB_rules() {
         shift
     done
 
-    if [ -z "$(echo "$SRC" | Is_IPv4_CIDR)" ] && [ -z "$(echo "$SRC" | Is_Private_IPv4)" ];then
-        local DST=$SRC
-        local SRC=
-    fi
+    case $SRC in
+        [aA][nN][yY]) local SRC="Any";;
+    esac
+    case $DST in
+        [aA][nN][yY]) local DST="Any";;
+    esac
 
-    [ -z "$IFACE" ] && IFACE="VPN"
-    [ -z "$SRC" ] && SRC="Any"
-    [ -z "$DST" ] && DST="Any"
+    # Don't perform validation if BOTH SRC and DST are EXPLICITLY supplied
+    if { [ -z "$SRC" ] && [ -z "$DST" ] ;} || { [ -n "$SRC" ] && [ -z "$DST" ] ;} ;then                                 # v4.12
+
+        # By default, any DST IP that is    deemed LOCAL, is switched to be the SRC, similarly
+        #             any SRC IP that ISN'T deemed LOCAL, is switched to be the DST
+
+        # Wait!, for WireGuard it is indeed perfectly acceptable to access LOCAL IPs over the tunnel?
+
+        if [ -n "$SRC" ];then
+                if [ "$SRC" != "Any" ];then
+                    if [ -z "$(echo "$SRC" | grep -F ":")" ];then               # v4.12
+                        if [ -z "$(echo "$SRC" | Is_IPv4_CIDR)" ] && [ -z "$(echo "$SRC" | Is_Private_IPv4)" ];then
+                            if [ "$ALLOW_SRCDST_SWITCH" == "Y" ];then
+                                if [ "$DST" != "Any" ];then
+                                    local SRCDST_SWITCHED="${cRESET}***Source $SRC switched to destination!"
+                                    local DST=$SRC
+                                    local SRC=
+                                fi
+                            fi
+                        fi
+                    else
+                        if [ -z "$(echo "${SRC%/*}" | Is_Private_IPv6)" ];then
+                            if [ "$ALLOW_SRCDST_SWITCH" == "Y" ];then
+                                local SRCDST_SWITCHED="${cRESET}***Source $SRC switched to destination!"
+                                local DST=$SRC
+                                local SRC=
+                            fi
+                        fi
+                    fi
+                fi
+        fi
+
+        if [ -n "$DST" ];then
+            if [ "$DST" != "Any" ];then
+                if [ -n "$(echo "$DST" | grep -F ":")" ];then
+                    if [ -n "$(echo "${DST%/*}" | Is_Private_IPv6)" ];then
+                        if [ "$ALLOW_SRCDST_SWITCH" == "Y" ];then
+                            if [ "$SRC" != "Any" ];then
+                                local SRCDST_SWITCHED="${cRESET}***Destination $DST switched to source!"
+                                local SRC=$DST
+                                local DST=
+                            fi
+                        fi
+                    fi
+                else
+                    if [ -n "$(echo "$DST" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$DST" | Is_Private_IPv4)" ];then
+                        if [ "$ALLOW_SRCDST_SWITCH" == "Y" ];then
+                            if [ "$SRC" != "Any" ];then
+                                local SRCDST_SWITCHED="${cRESET}***Destination $DST switched to source!"
+                                local SRC=$DST
+                                local DST=
+                            fi
+                        fi
+                    fi
+                fi
+            fi
+        fi
+
+        [ -z "$IFACE" ] && IFACE="VPN"
+        [ -z "$SRC" ] && SRC="Any"
+        [ -z "$DST" ] && DST="Any"
+    else
+        #Check if valid SRC/DST format
+        [ -z "$IFACE" ] && IFACE="VPN"
+        [ -z "$SRC" ] && SRC="Any"
+        [ -z "$DST" ] && DST="Any"
+
+        case $SRC in
+            Any)
+            ;;
+            *.*)
+                 if [ -z "$(echo "$SRC" | Is_IPv4_CIDR)" ] && [ -z "$(echo "$SRC" | Is_Private_IPv4)" ];then
+                    echo -e $cBRED"\a\n\t***ERROR: Source IP address (${cBWHT}$SRC${cBRED}) is NOT a valid IPv4/CIDR address!"$cRESET
+                    return 1
+                 fi
+            ;;
+            *:*)
+                 if [ -z "$(echo "${SRC%/*}" | Is_IPv6)" ];then
+                    echo -e $cBRED"\a\n\t***ERROR: Source IP address (${cBWHT}$SRC${cBRED}) is NOT a valid IPv6 address!"$cRESET
+                    return 1
+                 fi
+            ;;
+            *)
+                echo -e $cBRED"\a\n\t***ERROR: Source IP address (${cBWHT}$SRC${cBRED}) - must be valid IPv4/IPv6 address or 'Any'!"$cRESET
+                return 1
+            ;;
+        esac
+
+        case $DST in
+            Any)
+            ;;
+            *.*)
+                 if [ -z "$(echo "$DST" | Is_IPv4_CIDR)" ] && [ -z "$(echo "$DST" | Is_IPv4)" ];then
+                    echo -e $cBRED"\a\n\t***ERROR: Destination IP address (${cBWHT}$DST${cBRED}) is NOT a valid IPv4/CIDR address!"$cRESET
+                    return 1
+                 fi
+            ;;
+            *:*)
+                 if [ -z "$(echo "${DST%/*}" | Is_IPv6)" ];then
+                    echo -e $cBRED"\a\n\t***ERROR: Destination IP address (${cBWHT}$DST${cBRED}) is NOT a valid IPv6 address!"$cRESET
+                    return 1
+                 fi
+            ;;
+            *)
+                echo -e $cBRED"\a\n\t***ERROR: Destination IP address (${cBWHT}$DST${cBRED}) - must be valid IPv4/IPv6 address or 'Any'!"$cRESET
+                return 1
+            ;;
+        esac
+    fi
 
     local IFACE=$(echo "$IFACE" | tr 'a-z' 'A-Z')
 
     case "$CMD" in
         add)
-            sqlite3 $SQL_DATABASE "INSERT INTO policy values('$WG_INTERFACE','$IFACE','$SRC','$DST','$ANNOTATE');"
-            echo -e $cBGRE"\n\t[✔] Updated RPDB Selective Routing rule for $WG_INTERFACE \n"$cRESET  2>&1
+            if [ -z "$(sqlite3 $SQL_DATABASE "SELECT * FROM policy WHERE peer='$WG_INTERFACE' AND iface='$IFACE' AND srcip='$SRC' AND dstip='$DST';")" ];then
+                sqlite3 $SQL_DATABASE "INSERT INTO policy values('$WG_INTERFACE','$IFACE','$SRC','$DST','$ANNOTATE');"
+                echo -e $cBGRE"\n\t[✔] Updated RPDB Selective Routing rule for $WG_INTERFACE $SRCDST_SWITCHED\n"$cRESET  2>&1
+                SayT "Updated RPDB Selective Routing rule for $WG_INTERFACE $SRCDST_SWITCHED"
+            else
+                echo -e $cRED"\a\n\t***ERROR Peer ${cBCYA}${WG_INTERFACE} ${cRESET}$IFACE${cRED} rule already exists!\n"$cRESET
+                REDISPLAY=0
+            fi
         ;;
         del)
             if [ "$ROW" != "all" ];then
@@ -3100,7 +3222,11 @@ Show_Peer_Status() {
                                     local TX_DELTA=$TX
                                 fi
                                 #if [ $((RX_DELTA+TX_DELTA)) -gt 0 ];then
-                                    if [ $(expr "$RX_DELTA" + "$TX_DELTA") -gt 0 ];then # v4.11 @ZebMcKayhan
+                                [ -z "$RX_DELTA" ] && local RX_DELTA=0          # v4.12 @Dreaz
+                                [ -z "$TX_DELTA" ] && local TX_DELTA=0          # v4.12 @Dreaz
+
+
+                                if [ $(expr "$RX_DELTA" + "$TX_DELTA") -gt 0 ];then # v4.11 @ZebMcKayhan
                                     local TIMESTAMP=$(date +%s)
                                     sqlite3 $SQL_DATABASE "INSERT into traffic values('$WG_INTERFACE','$TIMESTAMP','$RX_DELTA','$TX_DELTA','$RX','$TX');"       # 4.11 v3.05
                                 fi
