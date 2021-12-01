@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.05b5"
-#============================================================================================ © 2021 Martineau v4.05b5
+VERSION="v4.05b6"
+#============================================================================================ © 2021 Martineau v4.05b6
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 18-Nov-2021
+# Last Updated Date: 01-Dec-2021
 #
 # Description:
 #
@@ -104,9 +104,9 @@ modprobe xt_set
 modprobe xt_comment                                                                 # v1.13 Hotfix
 if [ -f /opt/lib/modules/wireguard.ko ];then
     insmod /opt/lib/modules/wireguard 2> /dev/null
-    logger -t "wireguard-server${VPN_ID:3:1}" "Initialising Wireguard Kernel module '/opt/lib/modules/wireguard.ko'"
+    logger -t "wireguard-server${VPN_ID:3:1}" "Initialising Wireguard 3rd-Party/Entware Kernel module '/opt/lib/modules/wireguard.ko'"
 else
-    KERNEL_MODULE=$(find / -name wireguard.ko)                      # v4.05
+    KERNEL_MODULE=$(find / -name "wireguard.ko")                      # v4.05
     if [ -n "$KERNEL_MODULE" ];then
         insmod $KERNEL_MODULE 2> /dev/null  # v4.05
         logger -t "wireguard-server${VPN_ID:3:1}" "Initialising Wireguard Kernel module '$KERNEL_MODULE'"
@@ -135,7 +135,17 @@ DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')
 if [ "$2" != "disable" ];then
     wgport=$(awk '/Listen/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)
     Subnet=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers where peer='$WG_INTERFACE';") # v1.09 @here1310
-    [ -n "$(echo "$Subnet" | Is_Private_IPv6)" ] && { USE_IPV6="Y"; IPV6_TXT="(IPv6) "; }
+
+    if [ "$(nvram get ipv6_service)" != "disabled" ] || [ -n "$(echo "$Subnet" | Is_Private_IPv6)" ];then                                   # v4.05
+        # Override IPv6 ?
+        if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -n "$(grep -E "^NOIPV6" /jffs/addons/wireguard/WireguardVPN.conf)" ];then   # v4.05
+            USE_IPV6="N"; IPV6_TXT=
+            logger -t "wireguard-${MODE}${VPN_NAME}" "'NOIPV6' directive found ('WireguardVPN.conf')- IPv6 configuration forced to IPv4"    # v4..05
+        else
+            USE_IPV6="Y"
+            IPV6_TXT="(IPv6) "
+        fi
+    fi
 
     if [ "$USE_IPV6" != "Y" ];then
         # CIDR ?
@@ -148,22 +158,24 @@ if [ "$2" != "disable" ];then
     logger -t "wireguard-server${VPN_ID:3:1}" "Initialising Wireguard VPN ${IPV6_TXT}'Server' Peer (${cBMAG}$VPN_ID$cBGRE) on $SOCKET"
     echo -e $cBCYA"\twireguard-server${VPN_ID:3:1}: Initialising Wireguard VPN ${IPV6_TXT}'Server' Peer (${cBMAG}$VPN_ID$cBCYA) on $SOCKET (${cBMAG}$DESC${cBCYA})"$cRESET
 
-    if [ "$USE_IPV6" != "Y" ];then
-        ip link del dev $VPN_ID 2>/dev/null
-        ip link add dev $VPN_ID type wireguard
-    else
+    ip link del dev $VPN_ID 2>/dev/null
+    ip link add dev $VPN_ID type wireguard
+    if [ "$USE_IPV6" == "Y" ];then              # v4.05
         ip -6 link del dev $VPN_ID 2>/dev/null
         ip -6 link add dev $VPN_ID type wireguard
     fi
+
     wg set $VPN_ID fwmark $wgport
+
     wg setconf $VPN_ID ${CONFIG_DIR}$VPN_ID.conf
-    if [ "$USE_IPV6" != "Y" ];then
-        ip address add dev $VPN_ID $Subnet
-        ip link set up dev $VPN_ID
-    else
+
+    ip address add dev $VPN_ID $Subnet
+    ip link set up dev $VPN_ID
+    if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$Subnet" | grep ":")" ];then         # v4.05
         ip -6 address add dev $VPN_ID $Subnet
         ip -6 link set up dev $VPN_ID
     fi
+
     #ifconfig $VPN_ID mtu 1380
     ifconfig $VPN_ID mtu 1420                       # v1.02
 
@@ -174,29 +186,28 @@ if [ "$2" != "disable" ];then
 
     Firewall_delete
 
-    if [ "$USE_IPV6" != "Y" ];then
-        ip route add default dev $VPN_ID table 2${VPN_NUM}"0"       # v4.03
-        ip rule add fwmark $(printf "%#07x\n" "2${VPN_NUM}0") table 2${VPN_NUM}"0" prio 98${VPN_NUM}0   # v4.03
-    else
+    ip route add default dev $VPN_ID table 2${VPN_NUM}"0"       # v4.03
+    ip rule add fwmark $(printf "%#07x\n" "2${VPN_NUM}0") table 2${VPN_NUM}"0" prio 98${VPN_NUM}0   # v4.03
+    if [ "$USE_IPV6" == "Y" ];then                              # v4.05
         ip -6 route add default dev $VPN_ID table 2${VPN_NUM}"0"    # v4.03
         ip -6 rule add fwmark $(printf "%#07x\n" "2${VPN_NUM}0") table 2${VPN_NUM}"0" prio 98${VPN_NUM}0   # v4.03
     fi
 
     Manage_Passthru "add"
 
-    if [ "$USE_IPV6" != "Y" ];then
-        iptables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'server'"
-        iptables -t mangle -I FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'server'"
-        iptables -t mangle -I FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'server'"
-        iptables -t mangle -I PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'server'"
+    iptables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'server'"
+    iptables -t mangle -I FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'server'"
+    iptables -t mangle -I FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'server'"
+    iptables -t mangle -I PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'server'"
 
-        iptables -I INPUT -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'"
-        iptables -I INPUT -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
-        iptables -I FORWARD -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
-        iptables -I FORWARD -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
-        iptables -I OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
-        iptables -t nat -I PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'"
-    else
+    iptables -I INPUT -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'"
+    iptables -I INPUT -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
+    iptables -I FORWARD -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
+    iptables -I FORWARD -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
+    iptables -I OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
+    iptables -t nat -I PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'"
+
+    if [ "$USE_IPV6" == "Y" ];then                          # v4.05
         ip6tables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'server'"
         ip6tables -t mangle -I FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'server'"
         ip6tables -t mangle -I FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'server'"
