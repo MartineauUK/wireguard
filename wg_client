@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.13b6"
-#============================================================================================ © 2021 Martineau v4.13b6
+VERSION="v4.13b7"
+#============================================================================================ © 2021 Martineau v4.13b7
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 29-Nov-2021
+# Last Updated Date: 01-Dec-2021
 #
 # Description:
 #
@@ -269,7 +269,7 @@ if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -n "$(grep -E "^NOIPV6" 
     logger -t "wireguard-${MODE}${VPN_NAME}" "'NOIPV6' directive found ('WireguardVPN.conf')- IPv6 configuration forced to IPv4"    # v4.12
 fi
 
-[ -n "$(echo "$@" | grep "force")" ] && local FORCE="force"
+[ -n "$(echo "$@" | grep "force")" ] && FORCE="force"
 
 # Is this a standard 'client' Peer interface 'wg11-wg15'                    # v1.03
 if [ -z "$(echo "$VPN_ID" |  grep -oE "^wg[0-2]")" ];then      # v4.02 v1.03
@@ -440,6 +440,10 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
                             ip rule del from 0/0 fwmark $TAG_MARK"/"$TAG_MARK table 12$VPN_NUM prio 999$VPN_NUM 2>/dev/null                 # v4.12
                             ip rule add from 0/0 fwmark $TAG_MARK"/"$TAG_MARK table 12$VPN_NUM prio 999$VPN_NUM                             # v4.12
                             echo 0 >/proc/sys/net/ipv4/conf/$WG_INTERFACE/rp_filter                                                         # v4.12
+                            if [ "$USE_IPV6" == "Y" ];then
+                                ip -6 rule del from ::/0 fwmark $TAG_MARK"/"$TAG_MARK table 12$VPN_NUM prio 999$VPN_NUM 2>/dev/null          # v4.13
+                                ip -6 rule add from ::/0 fwmark $TAG_MARK"/"$TAG_MARK table 12$VPN_NUM prio 999$VPN_NUM                      # v4.13
+                            fi
 
                             iptables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'" 2>/dev/null # v4.12
                             iptables -t mangle -A PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'"             # v4.12
