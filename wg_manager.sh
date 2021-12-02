@@ -964,20 +964,23 @@ Import_Peer() {
                                     # This must be commented out!
                                     [ "$MODE" == "client" ] && COMMENT_OUT="Y"
                                 ;;
-                                Address) local IP_LIST=$(echo "$LINE" | sed 's/^Address.*=//' | tr ',' ' ' | awk '{$1=$1};1')   # v4.12  strip leading/trailing spaces/tabs
-                                        for IP in $IP_LIST                                                      # v4.12
-                                            do
-                                                # Only use IPv4 or IPv6 address ?
-                                                if [ $(nvram get ipv6_service) == "disabled" ];then             # v4.12
-                                                    if [ -z "$(echo "$IP" | Is_IPv4_CIDR)" ];then               # v4.12
-                                                        continue                                                # v4.12 ignore IPv6
-                                                    else
-                                                        [ -z $(echo "$IP" | grep "/" ) ] && local SUBNET=$IP"/32" || local SUBNET=$IP   # v4.12 add "/32" as appropriate
-                                                    fi
-                                                else
-                                                    [ -n "$(echo "$IP" | Is_IPv4_CIDR)" ] && continue           # v4.12 ignore IPv4
-                                                fi
-                                            done
+                                Address) local SUBNET=${LINE##* }
+								
+										# local IP_LIST=$(echo "$LINE" | sed 's/^Address.*=//' | tr ',' ' ' | awk '{$1=$1};1')   # v4.12  strip leading/trailing spaces/tabs
+                                        # for IP in $IP_LIST													# v4.12
+                                            # do
+                                                # # Only use IPv4 or IPv6 address ?
+                                                # if [ $(nvram get ipv6_service) == "disabled" ];then			# v4.12
+                                                    # if [ -z "$(echo "$IP" | Is_IPv4_CIDR)" ];then				# v4.12
+                                                        # local SUBNET=$IP
+														# break													# v4.12 ignore IPv6
+                                                    # else
+                                                        # [ -z $(echo "$IP" | grep ":" ) ] && local SUBNET=$IP"/32" || local SUBNET=$IP   # v4.12 add "/32" as appropriate
+                                                    # fi
+                                                # else
+                                                    # [ -n "$(echo "$IP" | Is_IPv6)" ] && { local SUBNET=$IP; break ; }	# v4.12 ignore IPv4
+                                                # fi
+                                            # done
                                     # This must be commented out!
                                     [ "$MODE" == "client" ] && COMMENT_OUT="Y"
                                 ;;
