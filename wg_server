@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.05b6"
-#============================================================================================ © 2021 Martineau v4.05b6
+VERSION="v4.05b7"
+#============================================================================================ © 2021 Martineau v4.05b7
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 01-Dec-2021
+# Last Updated Date: 08-Dec-2021
 #
 # Description:
 #
@@ -195,10 +195,18 @@ if [ "$2" != "disable" ];then
 
     Manage_Passthru "add"
 
-    iptables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'server'"
-    iptables -t mangle -I FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'server'"
-    iptables -t mangle -I FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'server'"
-    iptables -t mangle -I PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'server'"
+    if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -z "$(grep -E "^NOTCPMSS" /jffs/addons/wireguard/WireguardVPN.conf)" ];then    # v4.12
+        iptables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'server'"
+        iptables -t mangle -I FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'server'"
+    else
+        logger -t "wireguard-${MODE}${VPN_NAME}" "'NOTCPMSS' directive found ('WireguardVPN.conf') -t mangle FORWARD chain TCP '-j TCPMSS --clamp-mss-to-pmtu' NOT configured"    # v4.12
+    fi
+    if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -z "$(grep -E "^NOSETXMARK" /jffs/addons/wireguard/WireguardVPN.conf)" ];then    # v4.12
+        iptables -t mangle -I FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'server'"
+        iptables -t mangle -I PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'server'"
+    else
+        logger -t "wireguard-${MODE}${VPN_NAME}" "'NOSETXMARK' directive found ('WireguardVPN.conf') -t mangle FORWARD/PREROUTING chain'-j MARK --set-xmark 0x01/0x7' NOT configured"    # v4.12
+    fi
 
     iptables -I INPUT -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'"
     iptables -I INPUT -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
@@ -208,10 +216,18 @@ if [ "$2" != "disable" ];then
     iptables -t nat -I PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'"
 
     if [ "$USE_IPV6" == "Y" ];then                          # v4.05
-        ip6tables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'server'"
-        ip6tables -t mangle -I FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'server'"
-        ip6tables -t mangle -I FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'server'"
-        ip6tables -t mangle -I PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'server'"
+        if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -z "$(grep -E "^NOTCPMSS" /jffs/addons/wireguard/WireguardVPN.conf)" ];then    # v4.12
+            ip6tables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'server'"
+            ip6tables -t mangle -I FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'server'"
+        else
+            logger -t "wireguard-${MODE}${VPN_NAME}" "'NOTCPMSS' directive found ('WireguardVPN.conf') IPv6 -t mangle FORWARD chain TCP '-j TCPMSS --clamp-mss-to-pmtu' NOT configured"    # v4.12
+        fi
+        if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -z "$(grep -E "^NOSETXMARK" /jffs/addons/wireguard/WireguardVPN.conf)" ];then    # v4.12
+            ip6tables -t mangle -I FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'server'"
+            ip6tables -t mangle -I PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'server'"
+        else
+            logger -t "wireguard-${MODE}${VPN_NAME}" "'NOSETXMARK' directive found ('WireguardVPN.conf') IPv6 -t mangle FORWARD/PREROUTING chain'-j MARK --set-xmark 0x01/0x7' NOT configured"    # v4.12
+        fi
 
         ip6tables -I INPUT -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'"
         ip6tables -I INPUT -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
