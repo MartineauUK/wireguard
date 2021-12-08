@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.12bD"
-#============================================================================================ © 2021 Martineau v4.12bD
+VERSION="v4.12bE"
+#============================================================================================ © 2021 Martineau v4.12bE
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.12bD"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 01-Dec-2021
+# Last Updated Date: 08-Dec-2021
 #
 # Description:
 #
@@ -965,20 +965,19 @@ Import_Peer() {
                                     [ "$MODE" == "client" ] && COMMENT_OUT="Y"
                                 ;;
                                 Address) local SUBNET=${LINE##* }
-								
-										# local IP_LIST=$(echo "$LINE" | sed 's/^Address.*=//' | tr ',' ' ' | awk '{$1=$1};1')   # v4.12  strip leading/trailing spaces/tabs
-                                        # for IP in $IP_LIST													# v4.12
+                                        # local IP_LIST=$(echo "$LINE" | sed 's/^Address.*=//' | tr ',' ' ' | awk '{$1=$1};1')   # v4.12  strip leading/trailing spaces/tabs
+                                        # for IP in $IP_LIST                                                    # v4.12
                                             # do
-                                                # # Only use IPv4 or IPv6 address ?
-                                                # if [ $(nvram get ipv6_service) == "disabled" ];then			# v4.12
-                                                    # if [ -z "$(echo "$IP" | Is_IPv4_CIDR)" ];then				# v4.12
+                                                # # Only use IPv4 or IPv6 address or both? or leave the decision to 'wg_client' during initialisation
+                                                # if [ $(nvram get ipv6_service) == "disabled" ];then           # v4.12
+                                                    # if [ -z "$(echo "$IP" | Is_IPv4_CIDR)" ];then             # v4.12
                                                         # local SUBNET=$IP
-														# break													# v4.12 ignore IPv6
+                                                        # break                                                 # v4.12 ignore IPv6
                                                     # else
                                                         # [ -z $(echo "$IP" | grep ":" ) ] && local SUBNET=$IP"/32" || local SUBNET=$IP   # v4.12 add "/32" as appropriate
                                                     # fi
                                                 # else
-                                                    # [ -n "$(echo "$IP" | Is_IPv6)" ] && { local SUBNET=$IP; break ; }	# v4.12 ignore IPv4
+                                                    # [ -n "$(echo "$IP" | Is_IPv6)" ] && { local SUBNET=$IP; break ; } # v4.12 ignore IPv4
                                                 # fi
                                             # done
                                     # This must be commented out!
@@ -1298,7 +1297,7 @@ Manage_Peer() {
                                         fi
                                     else
                                         if [ "$Mode" == "client" ];then
-                                            [ "$AUTO" != "P" ] && local COLOR=$cGRA || local COLOR=$cRED                    # v4.11
+                                            [ "$AUTO" != "P" ] && local COLOR=$cBGRA || local COLOR=$cRED                    # v4.12 v4.11
                                             echo -e $COLOR"\n\tNo RPDB Selective Routing/Passthru rules for $WG_INTERFACE\n"$cRESET  # v4.11
                                         fi
                                     fi
@@ -1472,13 +1471,13 @@ Manage_Peer() {
                                 esac
 
                                 if [ "$Mode" != "server" ];then
-                                    if [ "$MTU" -ge "1280" ] && [ "$MTU" -le "1420" ];then
+                                    if [ "$MTU" -ge "1280" ] && [ "$MTU" -le "1500" ];then  # v4.12
                                         sqlite3 $SQL_DATABASE "UPDATE $TABLE SET mtu='$MTU' WHERE $ID='$WG_INTERFACE';"
                                         sed -i "/^MTU/ s~[^ ]*[^ ]~$MTU~3" ${CONFIG_DIR}${WG_INTERFACE}.conf
 
                                         echo -e $cBGRE"\n\t[✔] Updated MTU\n"$cRESET
                                     else
-                                        echo -e $cBRED"\a\n\t***ERROR 'client' Peer'$WG_INTERFACE' MTU '$MTU' invalid; range 1280-1420 Only\n"$cRESET
+                                        echo -e $cBRED"\a\n\t***ERROR 'client' Peer'$WG_INTERFACE' MTU '$MTU' invalid; ONLY range 1280-1500 (Recommended Default 1420)\n"$cRESET    # v4.12
                                     fi
                                 else
                                      echo -e $cBRED"\a\n\t***ERROR 'server' Peer '$WG_INTERFACE' cannot set MTU\n"$cRESET
@@ -2372,6 +2371,16 @@ STATS
 #     Use command 'vx' to edit this setting.
 #USE_ENTWARE_KERNEL_MODULE
 
+# Override setting of the TCP MSS clamping of -t mangle FORWARD chain '-p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu'
+#     Use command 'vx' to edit this setting.
+#     https://www.linuxtopia.org/Linux_Firewall_iptables/x4700.html
+#NOTCPMSS
+
+# Override setting of the -t mangle FORWARD/PREROUTING '-j MARK --set-xmark 0x01/0x7' fwmarks
+# (NOT the user Selective Routing fwmarks for Ports/IPSETs etc.)
+#     Use command 'vx' to edit this setting.
+#NOSETXMARK
+
 EOF
     return 0
 }
@@ -2729,7 +2738,14 @@ _GetKEY() {
 
 }
 WireGuard_Installed() {
-    if [ -f "${INSTALL_DIR}WireguardVPN.conf" ] && [ -n "$(which wg)" ];then   # v2.00
+
+    local KERNEL_LOADED="N"     # v4.12 Check the current Kernel module rather than inconclusive 'which wg' User Tools module
+
+    if [ -n "$(lsmod | grep -i wireguard)" ] || [ -n "$(opkg status wireguard-kernel 2>/dev/null | awk '/^Installed/ {print $2}')" ];then   # v4.12
+       local KERNEL_LOADED="Y"  # v4.12
+    fi
+
+    if [ -f "${INSTALL_DIR}WireguardVPN.conf" ] && [ "$KERNEL_LOADED" == "Y" ];then # v4.12 v2.02
         echo "Y"
         return 0
     else
@@ -3335,8 +3351,8 @@ Show_Peer_Config_Entry() {
                    fi
                 else
                     if [ "$Mode" == "client" ];then
-                        [ "$AUTO" != "P" ] && local COLOR=$cGRA || local COLOR=$cRED                    # v4.11
-                        echo -e $COLOR"\n\tNo RPDB Selective Routing/Passthru rules for $WG_INTERFACE\n"$cRESET  # v4.11
+                        [ "$AUTO" != "P" ] && local COLOR=$cBGRA || local COLOR=$cRED                    # v4.12 v4.11
+                        echo -e $COLOR"\n\tNo RPDB Selective Routing/Passthru rules for 'client' Peer ${cBMAG}${WG_INTERFACE}\n"$cRESET  # v4.11
                     fi
                 fi
                 echo -e
@@ -3381,6 +3397,9 @@ Show_VPN_Pool() {
 }
 Diag_Dump() {
 
+    local IPV6ONLY="N"
+    [ "$1" == "noipv4" ] && { local IPV6ONLY="Y"; shift; }
+
     local TYPE=$1
     [ "$TYPE" == "diag" ] && TYPE=
     local TABLE=$2;shift 2
@@ -3391,92 +3410,27 @@ Diag_Dump() {
         echo -e $cBYEL"\n\tWireGuard VPN Peers"$cRESET
         Show_Peer_Config_Entry
 
-        echo -e $cBYEL"\n\tDEBUG: Routing info MTU etc.\n"$cBCYA 2>&1          # v1.07
-        for WG_INTERFACE in $(wg show interfaces)
-            do
-                ip a l $WG_INTERFACE                                # v1.07
-                [ "$(nvram get ipv6_service)" != "disabled" ] && ip -6 a l $WG_INTERFACE
-            done
+        [ "$IPV6ONLY" == "N" ] && Diag_Routes "4"
+        [ "$(nvram get ipv6_service)" != "disabled" ] && Diag_Routes "6"
 
-        echo -e
+        [ "$IPV6ONLY" == "N" ] && Diag_Rules "4"
+        [ "$(nvram get ipv6_service)" != "disabled" ] && Diag_Rules "6"
+
+
+        echo -e $cBYEL"\n\tDEBUG: Netstat\n"$cRESET
         netstat -rn | grep -E "wg.|Kernel|irtt"
+        [ "$(nvram get ipv6_service)" != "disabled" ] && netstat -arn | grep -F ":"
 
-        [ "$(nvram get ipv6_service)" != "disabled" ] && { echo -e $cBYEL"\n\tDEBUG: RPDB IPv6 rules\n"$cBCYA 2>&1 ; ip -6 rule show; }
-
-        echo -e $cBYEL"\n\tDEBUG: RPDB rules\n"$cBCYA 2>&1
-        ip rule
-
-        for WG_INTERFACE in $(wg show interfaces)
-            do
-                local I=${WG_INTERFACE:3:1}
-                if [ "${WG_INTERFACE:0:3}" != "wg2" ];then
-                    local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM clients WHERE peer='$WG_INTERFACE';")
-                    local DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')
-                    echo -e $cBYEL"\n\tDEBUG: Routing Table 12$I (wg1$I) ${cBMAG}$DESC\n"$cBCYA 2>&1
-                    ip route show table 12$I
-                    [ "$(nvram get ipv6_service)" != "disabled" ] && ip -6 route show table 12$I
-                fi
-            done
-
-        echo -e $cBYEL"\n\tDEBUG: Routing Table main\n"$cBCYA 2>&1
-        ip route | grep "wg."
-
+        if [ -z "$TYPE" ] || [ "$TYPE" == "udp" ] || [ "$TYPE" == "sockets" ];then
+            echo -e $cBYEL"\n\tDEBUG: UDP sockets.\n"$cBCYA 2>&1
+            netstat -lnp | grep -e "^udp\s.*\s-$"
+        fi
     fi
 
-    if [ -z "$TYPE" ] || [ "$TYPE" == "udp" ] || [ "$TYPE" == "sockets" ];then
-        echo -e $cBYEL"\n\tDEBUG: UDP sockets.\n"$cBCYA 2>&1
-        netstat -l -n -p | grep -e "^udp\s.*\s-$"
-    fi
 
     if [ -z "$TYPE" ] || [ "$TYPE" == "firewall" ];then
-
-        echo -e $cBYEL"\n\tDEBUG: Firewall rules \n"$cBCYA 2>&1
-        echo -e $cBYEL"\n\tDEBUG: -t filter \n"$cBCYA 2>&1
-        iptables --line -nvL FORWARD | grep -iE "WireGuard|Chain|pkts"
-        echo -e
-        iptables --line -nvL INPUT | grep -iE "WireGuard|Chain|pkts"
-        echo -e
-        iptables --line -nvL OUTPUT | grep -iE "WireGuard|Chain|pkts"
-
-        if [ "$(nvram get ipv6_service)" != "disabled" ];then
-            echo -e $cBYEL"\n\tDEBUG: Firewall IPv6 rules\n"$cBCYA 2>&1
-            echo -e $cBYEL"\n\tDEBUG: -t filter \n"$cCYA 2>&1
-            ip6tables --line -nvL FORWARD | grep -iE "WireGuard|Chain|pkts"
-            echo -e
-            ip6tables --line -nvL INPUT | grep -iE "WireGuard|Chain|pkts"
-            echo -e
-            ip6tables --line -nvL OUTPUT | grep -iE "WireGuard|Chain|pkts"
-        fi
-
-        echo -e $cBYEL"\n\tDEBUG: -t nat \n"$cBCYA 2>&1
-        iptables --line -t nat -nvL PREROUTING | grep -iE "WireGuard|Chain|pkts"
-        echo -e
-        iptables --line -t nat -nvL POSTROUTING | grep -iE "WireGuard|Chain|pkts"
-
-        for WG_INTERFACE in $(wg show interfaces)
-            do
-                case $WG_INTERFACE in
-                    wg1*)
-
-                        local I=$(echo "$WG_INTERFACE" | grep -oE "[1-9]*$")
-                        [ ${#I} -gt 2 ] && local I=${I#"${I%??}"} || local I=${I#"${I%?}"}
-                        if [ "$(Chain_exists "WGDNS${I}" "nat")" == "Y" ];then
-                            echo -e
-                            iptables --line -t nat -nvL WGDNS${I} | grep -iE "WireGuard|Chain|pkts"
-                        fi
-                    ;;
-                    *)
-                    ;;
-                esac
-
-            done
-
-        echo -e $cBYEL"\n\tDEBUG: -t mangle \n"$cBCYA 2>&1
-        iptables --line -t mangle -nvL FORWARD | grep -iE "WireGuard|Chain|pkts"
-        echo -e
-        iptables --line -t mangle -nvL PREROUTING | grep -iE "WireGuard|Chain|pkts"
-
-        [ "$(nvram get ipv6_service)" != "disabled" ] && ip -6 rule show
+        [ "$IPV6ONLY" == "N" ] && Diag_IPTables "4"
+        [ "$(nvram get ipv6_service)" != "disabled" ] && Diag_IPTables "6"
     fi
 
     if [ "$TYPE" != "sql" ];then
@@ -3588,6 +3542,103 @@ Diag_Dump() {
     fi
 
     echo -e $cRESET 2>&1
+}
+Diag_IPTables() {
+
+    if [ "$1" == "4" ];then
+        local IPT="iptables"
+        local DASH6=
+        local IPVER=
+    else
+        local IPT="ip6tables"
+        local DASH6="-6"
+        local IPVER="IPv6"
+    fi
+
+    echo -e $cBYEL"\n\tDEBUG: $IPVER Firewall rules \n"$cBCYA 2>&1
+    echo -e $cBYEL"\n\tDEBUG: $IPVER -t filter \n"$cBCYA 2>&1
+    $IPT --line -nvL FORWARD | grep -iE "WireGuard|Chain|pkts"
+    echo -e
+    $IPT --line -nvL INPUT | grep -iE "WireGuard|Chain|pkts"
+    echo -e
+    $IPT --line -nvL OUTPUT | grep -iE "WireGuard|Chain|pkts"
+
+    echo -e $cBYEL"\n\tDEBUG: $IPVER -t nat \n"$cBCYA 2>&1
+    $IPT --line -t nat -nvL PREROUTING | grep -iE "WireGuard|Chain|pkts"
+    echo -e
+    $IPT --line -t nat -nvL POSTROUTING | grep -iE "WireGuard|Chain|pkts"
+
+    for WG_INTERFACE in $(wg show interfaces)
+        do
+            case $WG_INTERFACE in
+                wg1*)
+
+                    local I=$(echo "$WG_INTERFACE" | grep -oE "[1-9]*$")
+                    [ ${#I} -gt 2 ] && local I=${I#"${I%??}"} || local I=${I#"${I%?}"}
+                    if [ "$(Chain_exists "WGDNS${I}" "nat")" == "Y" ];then
+                        echo -e
+                        $IPT --line -t nat -nvL WGDNS${I} | grep -iE "WireGuard|Chain|pkts"
+                    fi
+                ;;
+                *)
+                ;;
+            esac
+
+        done
+
+    echo -e $cBYEL"\n\tDEBUG: $IPVER -t mangle \n"$cBCYA 2>&1
+    $IPT --line -t mangle -nvL FORWARD | grep -iE "WireGuard|Chain|pkts"
+    echo -e
+    $IPT --line -t mangle -nvL PREROUTING | grep -iE "WireGuard|Chain|pkts"
+
+}
+Diag_Routes() {
+
+    if [ "$1" == "4" ];then
+        local IPT="iptables"
+        local DASH6=
+        local IPVER=
+    else
+        local IPT="ip6tables"
+        local DASH6="-6"
+        local IPVER="IPv6"
+    fi
+
+    echo -e $cBYEL"\n\tDEBUG: $IPVER Routing info MTU etc.\n"$cBCYA 2>&1      # v1.07
+    for WG_INTERFACE in $(wg show interfaces)
+        do
+            ip $DASH6 a l $WG_INTERFACE                                # v1.07
+        done
+
+    echo -e $cBYEL"\n\tDEBUG: $IPVER Routing Table main\n"$cBCYA 2>&1
+    ip $DASH6 route | grep "wg."
+
+}
+Diag_Rules() {
+
+    if [ "$1" == "4" ];then
+        local IPT="iptables"
+        local DASH6=
+        local IPVER=
+    else
+        local IPT="ip6tables"
+        local DASH6="-6"
+        local IPVER="IPv6"
+    fi
+
+    echo -e $cBYEL"\n\tDEBUG: $IPVER RPDB rules\n"$cBCYA 2>&1
+    ip $DASH6 rule
+
+    for WG_INTERFACE in $(wg show interfaces)
+        do
+            local I=${WG_INTERFACE:3:1}
+            if [ "${WG_INTERFACE:0:3}" != "wg2" ];then
+                local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM clients WHERE peer='$WG_INTERFACE';")
+                local DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')
+                echo -e $cBYEL"\n\tDEBUG: $IPVER Routing Table 12$I (wg1$I) ${cBMAG}$DESC\n"$cBCYA 2>&1
+                ip $DASH6 route show table 12$I
+            fi
+        done
 }
 Check_Version_Update() {
 
@@ -3909,11 +3960,21 @@ Manage_IPSET() {
 }
 Build_Menu() {
     if [ -z "$SUPPRESSMENU" ];then
-
         # Generate dynamically context aware menu
         if [ "$(WireGuard_Installed)" == "Y" ];then
-            MENU_I="$(printf '%b1 %b = %bUpdate%b WireGuard modules' "${cBYEL}" "${cRESET}" "${cBGRE}" "${cRESET}")"
-            MENU_Z="$(printf '%b2 %b = %bRemove%b WireGuard/wg_manager\n' "${cBYEL}" "${cRESET}" "${cBRED}" "${cRESET}")"
+            # Currently using 3rd-Party/Entware Kernel module or intention in 'WireguardVPN.conf' to do so? then Highlight 'Update' option...
+            if [ -n "$(opkg list-installed | grep "wireguard-kernel")" ] || [ -n "$(grep -oE "^USE_ENTWARE_KERNEL_MODULE" ${INSTALL_DIR}WireguardVPN.conf)" ];then  # v4.12
+                MENU_I="$(printf '%b1 %b = %bUpdate%b WireGuard modules' "${cBYEL}" "${cRESET}" "${cBGRE}" "${cRESET}")"
+            else
+                # lowlight but don't disable option if firmware contains WireGuard module.
+                MENU_I="$(printf '%b1 %b = %bUpdate%b WireGuard modules' "${cBYEL}" "${cRESET}" "${cBGRA}" "${cBGRA}")"
+            fi
+
+            if [ -n "$(opkg list-installed | grep "wireguard-kernel")" ] || [ -n "$(opkg status wireguard-kernel | awk '/^Installed/ {print $2}')" ];then   # v4.12
+                MENU_Z="$(printf '%b2 %b = %bRemove%b WireGuard/WireGuard Manager (wg_manager)\n' "${cBYEL}" "${cRESET}" "${cBRED}" "${cRESET}")"
+            else
+                MENU_Z="$(printf '%b2 %b = %bRemove%b WireGuard/%bWireGuard Manager\n' "${cBYEL}" "${cRESET}" "${cBRED}" "${cBGRA}" "${cRESET}")"
+            fi
         else
             MENU_I="$(printf '%b1 %b = %bBegin%b WireGuard Installation Process' "${cBYEL}" "${cRESET}" "${cBGRE}" "${cRESET}")"
         fi
