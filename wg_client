@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.13b7"
-#============================================================================================ © 2021 Martineau v4.13b7
+VERSION="v4.13b8"
+#============================================================================================ © 2021 Martineau v4.13b8
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 01-Dec-2021
+# Last Updated Date: 08-Dec-2021
 #
 # Description:
 #
@@ -155,7 +155,12 @@ create_client_list(){
             echo -en $cRESET
 
             if [ -n "$PEER_DNS" ] && [ "$TARGET_LOOKUP" != "main" ] && [ "$VPN_IP" != "Any" ];then
-                iptables -t nat -A WGDNS$VPN_NUM -s ${VPN_IP} -j DNAT --to-destination $PEER_DNS -m comment --comment "WireGuard 'client${VPN_NUM} DNS'"     # v4.05
+                if [ -z "$(echo $VPN_IP | grep -F ":")" ];then          # v4.13
+                    iptables -t nat -A WGDNS$VPN_NUM -s ${VPN_IP} -j DNAT --to-destination $PEER_DNS -m comment --comment "WireGuard 'client${VPN_NUM} DNS'"     # v4.05
+                fi
+                if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo $VPN_IP | grep -F ":")" ];then    # v4.13
+                    ip6tables -t nat -A WGDNS$VPN_NUM -s ${VPN_IP} -j DNAT --to-destination $PEER_DNS -m comment --comment "WireGuard 'client${VPN_NUM} DNS'"
+                fi
             fi
         fi
     done
@@ -293,7 +298,8 @@ fi
 if [ "$MODE" == "client" ];then                         # v1.03
     if [ -z "$LOCALIP" ];then
        LOCALIP=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM clients where peer='$WG_INTERFACE';")
-       export LocalIP=$LOCALIP
+       [ -z "$LOCALIP" ] && { echo -e $cBRED"\a\n\t***ERROR: WireGuard '$MODE' doesn't have a LOCAL IP Address! - try 'peer $WG_INTERFACE ip=xxx.xxx.xxx.xxx/32'?\n"$cRESET ; exit 87 ; }   # v4.13
+       #export LocalIP=$LOCALIP
     fi
     PEER_DNS=$(sqlite3 $SQL_DATABASE "SELECT dns FROM clients where peer='$WG_INTERFACE';")        # v4.05
 
@@ -331,16 +337,17 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         if [ -n "$PEER_DNS" ];then            # v4.05
             if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.09
                 iptables -t nat -N WGDNS${VPN_NUM}                      # v4.05
+                [ $? -gt 0 ] && { echo -e $cBRED"\a\n\t"; logger -st "wireguard-${MODE}${VPN_NAME}" "***ERROR Failed to create -t nat WGDNS${VPN_NUM}."; echo -e $cRESET; exit 99; }
                 if [ "$USE_IPV6" == "Y" ];then                              # v4.11
                     ip6tables -t nat -N WGDNS${VPN_NUM}                     # v4.11
                 fi
-                [ $? -gt 0 ] && { echo -e $cBRED"\a\n\t"; logger -st "wireguard-${MODE}${VPN_NAME}" "***ERROR Failed to create -t nat WGDNS${VPN_NUM}."; echo -e $cRESET; exit 99; }
+                [ $? -gt 0 ] && { echo -e $cBRED"\a\n\t"; logger -st "wireguard-${MODE}${VPN_NAME}" "***ERROR IPv6 Failed to create -t nat WGDNS${VPN_NUM}."; echo -e $cRESET; exit 99; }
             else
                 #iptables -t nat -N WGDNS${WG_INTERFACE}                 # v4.09
                 if [ "$USE_IPV6" == "Y" ];then                              # v4.11
                     ip6tables -t nat -N WGDNS${WG_INTERFACE}                # v4.11
                 fi
-                [ $? -gt 0 ] && { echo -e $cBRED"\a\n\t"; logger -st "wireguard-${MODE}${WG_INTERFACE}" "***ERROR Failed to create -t nat WGDNS${WG_INTERFACE}."; echo -e $cRESET; exit 99; }
+                [ $? -gt 0 ] && { echo -e $cBRED"\a\n\t"; logger -st "wireguard-${MODE}${WG_INTERFACE}" "***ERROR IPv6 Failed to create -t nat WGDNS${WG_INTERFACE}."; echo -e $cRESET; exit 99; }
             fi
         fi
 
@@ -410,7 +417,12 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
             if [ "$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "0.0.0.0/0")" == "0.0.0.0/0" ];then
                 if [ -n "$PEER_DNS" ];then
                     if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.09
-                        iptables -t nat -A WGDNS$VPN_NUM -s ${LAN_SUBNET}.0/24 -j DNAT --to-destination $PEER_DNS -m comment --comment "WireGuard 'client${VPN_NUM} DNS'" # v4.05
+                        if [ -n "$(echo "${LAN_SUBNET}.0/24") | Is_IPv4_CIDR" ];then
+                            iptables -t nat -A WGDNS$VPN_NUM -s ${LAN_SUBNET}.0/24 -j DNAT --to-destination $PEER_DNS -m comment --comment "WireGuard 'client${VPN_NUM} DNS'" # v4.05
+                        fi
+                        if [ "$USE_IPV6" == "Y" ];then
+                            [ -n "$(nvram get ipv61_ipaddr)" ] && ip6tables -t nat -A WGDNS$VPN_NUM -s $(nvram get ipv61_ipaddr) -j DNAT --to-destination $PEER_DNS -m comment --comment "WireGuard 'client${VPN_NUM} DNS'"
+                        fi
                     else
                         iptables -t nat -A WGDNS$WG_INTERFACE -s ${LAN_SUBNET}.0/24 -j DNAT --to-destination $PEER_DNS -m comment --comment "WireGuard 'client${WG_INTERFACE} DNS'" # v4.09
                     fi
@@ -433,6 +445,10 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
                 for IPSET in $IPSETS
                     do
                         ipset list $IPSET >/dev/null 2>&1;if [ $? -eq 0 ]; then
+
+                            IPSET_FAMILY=$(ipset list $IPSET | awk '/^Header/ {print $3}')
+                            [ "$IPSET_FAMILY" == "inet6" ] && IPV_TEXT="IPv6" || IPV_TEXT="IPv4"
+
                             DSTSRC=$(sqlite3 $SQL_DATABASE "SELECT dstsrc FROM ipset WHERE ipset='$IPSET' AND peer='${WG_INTERFACE}';")
                             FWMARK=$(sqlite3 $SQL_DATABASE "SELECT fwmark FROM ipset WHERE ipset='$IPSET' AND peer='${WG_INTERFACE}';")
 
@@ -445,13 +461,17 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
                                 ip -6 rule add from ::/0 fwmark $TAG_MARK"/"$TAG_MARK table 12$VPN_NUM prio 999$VPN_NUM                      # v4.13
                             fi
 
-                            iptables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'" 2>/dev/null # v4.12
-                            iptables -t mangle -A PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'"             # v4.12
-                            if [ "$USE_IPV6" == "Y" ];then
-                                ip6tables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'" 2>/dev/null    # v4.12
-                                ip6tables -t mangle -A PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'"                # v4.12
+                            # Differentiate betwwn IPSETs containing IPv4 or IPv6 IPs
+                            if [ "$IPSET_FAMILY" != "inet6" ];then      # IPv4
+                                iptables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'" 2>/dev/null # v4.12
+                                iptables -t mangle -A PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'"             # v4.12
+                            else
+                                if [ "$USE_IPV6" == "Y" ];then          # IPv6
+                                    ip6tables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'" 2>/dev/null    # v4.12
+                                    ip6tables -t mangle -A PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'"                # v4.12
+                                fi
                             fi
-                            logger -t "wireguard-${MODE}${VPN_NAME}" "Adding IPSet '$IPSET' route through VPN 'client' Peer" $WG_INTERFACE
+                            logger -t "wireguard-${MODE}${VPN_NAME}" "Adding $IPV_TEXT IPSet '$IPSET' route through VPN 'client' Peer" $WG_INTERFACE
                         else
                             logger -t "wireguard-${MODE}${VPN_NAME}" "***ERROR IPSet '$IPSET' does NOT EXIST! for routing through VPN 'client' Peer "$WG_INTERFACE
                         fi
@@ -518,12 +538,20 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         Manage_Passthru
 
         # User Exit @ZebMcKayhan
-        [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh ] && { logger -t "wireguard-${MODE}${VPN_NAME}" "Executing Event:${VPN_ID}-up.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh; }
-                                             # v4.08
-        iptables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'"
-        iptables -t mangle -I FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'"
-        iptables -t mangle -I FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'"
-        iptables -t mangle -I PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'"
+        [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh ] && { logger -t "wireguard-${MODE}${VPN_NAME}" "Executing Event:${VPN_ID}-up.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh; }   # v4.08
+
+        if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -z "$(grep -E "^NOTCPMSS" /jffs/addons/wireguard/WireguardVPN.conf)" ];then    # v4.12
+            iptables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'"
+            iptables -t mangle -I FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'"
+        else
+            logger -t "wireguard-${MODE}${VPN_NAME}" "'NOTCPMSS' directive found ('WireguardVPN.conf') -t mangle FORWARD chain TCP '-j TCPMSS --clamp-mss-to-pmtu' NOT configured"    # v4.12
+        fi
+        if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -z "$(grep -E "^NOSETXMARK" /jffs/addons/wireguard/WireguardVPN.conf)" ];then    # v4.12
+            iptables -t mangle -I FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'"
+            iptables -t mangle -I PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'"
+        else
+            logger -t "wireguard-${MODE}${VPN_NAME}" "'NOSETXMARK' directive found ('WireguardVPN.conf') -t mangle FORWARD/PREROUTING chain'-j MARK --set-xmark 0x01/0x7' NOT configured"    # v4.12
+        fi
 
         if [ $FIRMWARE -ge 38601 ]  && [ -n "$(brctl show | grep -E "\.50[1-2]")" ];then         # Allow Guest #1 SSID VLANs SNB @ZebMcKayhan
             iptables -t filter -I FORWARD -i br1 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN"
@@ -543,10 +571,18 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
             fi
         fi
         if [ "$USE_IPV6" == "Y" ];then
-            ip6tables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'"
-            ip6tables -t mangle -I FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'"
-            ip6tables -t mangle -I FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'"
-            ip6tables -t mangle -I PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'"
+            if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -z "$(grep -E "^NOTCPMSS" /jffs/addons/wireguard/WireguardVPN.conf)" ];then    # v4.12
+                ip6tables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'"
+                ip6tables -t mangle -I FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'"
+            else
+                logger -t "wireguard-${MODE}${VPN_NAME}" "'NOTCPMSS' directive found ('WireguardVPN.conf') IPv6 -t mangle FORWARD chain TCP '-j TCPMSS --clamp-mss-to-pmtu' NOT configured"    # v4.12
+            fi
+            if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -z "$(grep -E "^NOSETXMARK" /jffs/addons/wireguard/WireguardVPN.conf)" ];then    # v4.12
+                ip6tables -t mangle -I FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'"
+                ip6tables -t mangle -I PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'"
+            else
+                logger -t "wireguard-${MODE}${VPN_NAME}" "'NOSETXMARK' directive found ('WireguardVPN.conf') IPv6 -t mangle FORWARD/PREROUTING chain'-j MARK --set-xmark 0x01/0x7' NOT configured"    # v4.12
+            fi
 
             if [ $FIRMWARE -ge 38601 ]  && [ -n "$(brctl show | grep -E "\.50[1-2]")" ];then         # Allow Guest #1 SSID VLANs SNB @ZebMcKayhan
                 ip6tables -t filter -I FORWARD -i br1 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN"
