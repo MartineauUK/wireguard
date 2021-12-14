@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.12bE"
-#============================================================================================ © 2021 Martineau v4.12bE
+VERSION="v4.13b"
+#============================================================================================ © 2021 Martineau v4.13b
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.12bE"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 08-Dec-2021
+# Last Updated Date: 14-Dec-2021
 #
 # Description:
 #
@@ -337,15 +337,20 @@ _Get_File() {
 
     local WEBFILE=$1
     local REPOSITORY_OWNER=$2
-    local REPOSITORY="https://github.com/odkrys/entware-makefile-for-merlin/raw/main/"      # v4.11
+    local FROM_REPOSITORY="main"
+    [ "$3" == "dev" ] && { local FROM_REPOSITORY=$3; local FROM_RESPOSITORY_TXT="${cRESET}${cWRED}Github '$FROM_REPOSITORY' branch$cRESET"; }                                                         # v4.12
+    REPOSITORY="https://github.com/odkrys/entware-makefile-for-merlin/raw/main/"      # v4.11
 
-    [ "$REPOSITORY_OWNER" != "odkrys" ] && local REPOSITORY="https://github.com/ZebMcKayhan/Wireguard/raw/main/"    # v4.11
+    [ "$REPOSITORY_OWNER" != "odkrys" ] && local REPOSITORY="https://github.com/ZebMcKayhan/Wireguard/raw/${FROM_REPOSITORY}/"    # v4.12 v4.11
 
-    [ -z "$(echo "$@" | grep "NOMSG")" ] && echo -e $cBCYA"\n\tDownloading WireGuard Kernel module ${cBWHT}'$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO) @$REPOSITORY_OWNER"$cRESET
+    [ -z "$(echo "$@" | grep "NOMSG")" ] && echo -e $cBCYA"\n\tDownloading WireGuard Kernel module ${cBWHT}'$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO) @$REPOSITORY_OWNER $FROM_RESPOSITORY_TXT"$cRESET    # v4.12
 
-    echo -e $cBGRA
+    echo -en $cBGRE
 
-    curl -# -fL --retry 3 ${REPOSITORY}${WEBFILE} -o ${INSTALL_DIR}${WEBFILE}           # v4.11
+    curl -# -s -fL --retry 3 ${REPOSITORY}${WEBFILE} -o ${INSTALL_DIR}${WEBFILE}      # v4.11
+    local RC=$?
+
+    [ $RC -ne 0 ] && { echo -e $cBRED; curl -# -fL --retry 3 ${REPOSITORY}${WEBFILE} -o ${INSTALL_DIR}${WEBFILE}; echo  "URL: '${REPOSITORY}${WEBFILE}'"; } || echo -e "Success!"   # v4.12
 
     return $?
 }
@@ -353,20 +358,25 @@ Download_Modules() {
 
 
     local ROUTER=$1
+    local FROM_REPOSITORY=$2                                                # v4.12
+    [ -z "$FROM_REPOSITORY" ] && local FROM_REPOSITORY="main"               # v4.12
     local REPOSITORY_OWNER="odkrys"                                         # v4.11
     local USE_ENTWARE_KERNEL_MODULE="N"                                     # v4.12
-    [ -n "$(grep -oE "^USE_ENTWARE_KERNEL_MODULE" ${INSTALL_DIR}WireguardVPN.conf)" ] && local USE_ENTWARE_KERNEL_MODULE="Y"
+    if [ -f ${INSTALL_DIR}WireguardVPN.conf ] &&  [ -n "$(grep -oE "^USE_ENTWARE_KERNEL_MODULE" ${INSTALL_DIR}WireguardVPN.conf)" ];then    # v4.12
+        local USE_ENTWARE_KERNEL_MODULE="Y"
+    fi
 
     #[ ! -d "${INSTALL_DIR}" ] && mkdir -p "${INSTALL_DIR}"
 
-    if [ -f /usr/sbin/wg ] && [ "$USE_ENTWARE_KERNEL_MODULE" == "N" ];then
+    if [ "$USE_ENTWARE_KERNEL_MODULE" == "Y" ];then
         rm ${INSTALL_DIR}*.ipk 2>/dev/null            # v4.12
         [ -n "$(opkg list-installed | grep "wireguard-kernel")" ] && opkg remove wireguard-kernel 1>/dev/null
         [ -n "$(opkg list-installed | grep "wireguard-tools")" ]  && opkg remove wireguard-tools  1>/dev/null
+        rm ${INSTALL_DIR}*.ipk 2>/dev/null
     fi
 
     #local WEBFILE_NAMES=$(curl -${SILENT}fL https://www.snbforums.com/threads/experimental-wireguard-for-hnd-platform-4-1-x-kernels.46164/ | grep "<a href=.*odkrys.*wireguard" | grep -oE "wireguard.*" | sed 's/\"//g' | tr '\n' ' ')
-    local WEBFILE_NAMES=$(curl -${SILENT}fL https://api.github.com/repos/odkrys/entware-makefile-for-merlin/git/trees/main | grep "\"path\": \"wireguard-.*\.ipk\"," | cut -d'"' -f 4 | tr '\r\n' ' ')  # v4.11 @defung pull request https://github.com/MartineauUK/wireguard/pull/3
+    local WEBFILE_NAMES=$(curl -${SILENT}fL https://api.github.com/repos/odkrys/entware-makefile-for-merlin/git/trees/main | grep "\"path\": \"wireguard-.*\.ipk\"," | cut -d'"' -f 4)  # v4.11 @defung pull request https://github.com/MartineauUK/wireguard/pull/3
 
     # Allow use of Entware/3rd Party Kernel modules even if included in firmware
     if [ ! -f /usr/sbin/wg ] || [ "$USE_ENTWARE_KERNEL_MODULE" == "Y" ];then
@@ -375,19 +385,21 @@ Download_Modules() {
         case "$ROUTER" in
 
             RT-AC86U|GT-AC2900)     # RT-AC86U, GT-AC2900 - 4.1.27          e.g. wireguard-kernel_1.0.20210606-k27_1_aarch64-3.10.ipk
-                local WEBFILE_NAMES=$(curl -${SILENT}fL https://api.github.com/repos/ZebMcKayhan/Wireguard/git/trees/main | grep "\"path\": \"wireguard-.*\.ipk\"," | cut -d'"' -f 4 | tr '\r\n' ' ')   # v4.11
+                local WEBFILE_NAMES=$(curl -${SILENT}fL https://api.github.com/repos/ZebMcKayhan/Wireguard/git/trees/$FROM_REPOSITORY | grep "\"path\": \"wireguard-.*\.ipk\"," | cut -d'"' -f 4)   # v4.12 v4.11
                 local REPOSITORY_OWNER="ZebMcKayhan"
-                _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $1}')" "$REPOSITORY_OWNER"     # k27_1
+                _Get_File "$(echo "$WEBFILE_NAMES" | awk '/k27/ {print}')" "$REPOSITORY_OWNER" "$FROM_REPOSITORY"  # k27_1
                 ;;
             RT-AX88U|GT-AX11000)    # RT-AX88U, GT-AX11000 - 4.1.51         e.g. wireguard-kernel_1.0.20210219-k52_1_aarch64-3.10.ipk
-                _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $2}')" "$REPOSITORY_OWNER"    # k51_1
+                local WEBFILE_NAMES=$(curl -${SILENT}fL https://api.github.com/repos/ZebMcKayhan/Wireguard/git/trees/$FROM_REPOSITORY | grep "\"path\": \"wireguard-.*\.ipk\"," | cut -d'"' -f 4)   # v4.12
+                local REPOSITORY_OWNER="ZebMcKayhan"
+                _Get_File "$(echo "$WEBFILE_NAMES" | awk '/k51/ {print}')" "$REPOSITORY_OWNER"    # k51_1
                 ;;
             RT-AX68U)               # RT-AX68U - 4.1.52                     e.g. wireguard-kernel_1.0.20210219-k52_1_aarch64-3.10.ipk
-                _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $3}')" "$REPOSITORY_OWNER"    # k52_1
+                _Get_File "$(echo "$WEBFILE_NAMES" | awk '/k52/ {print}')" "$REPOSITORY_OWNER"    # k52_1
                 ;;
             RT-AX86U|GT-AC5700)     # v4.12 These models have wireguard in the firmware
                     # RT-AX68U, RT-AX86U - 4.1.52           e.g. wireguard-kernel_1.0.20210219-k52_1_aarch64-3.10.ipk
-                    _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $3}')" "$REPOSITORY_OWNER"    # k52_1
+                    _Get_File "$(echo "$WEBFILE_NAMES" | awk '/k27/ {print}')" "$REPOSITORY_OWNER"    # k52_1
                 ;;
             *)
                 echo -e $cBRED"\a\n\t***ERROR: Unable to find 3rd-Party WireGuard Kernel module for $ROUTER (v$BUILDNO)\n"$cRESET
@@ -412,9 +424,10 @@ Download_Modules() {
 
     # User Space Tools - Allow use of Entware/3rd Party modules even if Modules included in firmware
     if [ ! -f /usr/sbin/wg ] || [ "$USE_ENTWARE_KERNEL_MODULE" == "Y" ];then    # v4.12 Is the User Space Tools included in the firmware?
-        WEBFILE=$(echo "$WEBFILE_NAMES" | awk '{print $NF}')
-        echo -e $cBCYA"\n\tDownloading WireGuard User space Tool$cBWHT '$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO) @$REPOSITORY_OWNER"$cRESET  # v4.11
-        _Get_File  "$WEBFILE" "$REPOSITORY_OWNER" "NOMSG"           # v4.11
+        WEBFILE=$(echo "$WEBFILE_NAMES" | awk '/wireguard-tools/ {print}')
+zz="============================================================================== 425 '$FROM_RESPOSITORY_TXT'"
+        echo -e $cBCYA"\n\tDownloading WireGuard User space Tool$cBWHT '$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO) @$REPOSITORY_OWNER $FROM_RESPOSITORY_TXT"$cRESET  # v4.11
+        _Get_File  "$WEBFILE" "$REPOSITORY_OWNER" "$FROM_REPOSITORY" "NOMSG"            # v4.12 v4.11
     else
         echo -e $cBYEL"\a\t\tUser Space tool exists in firmware - use ${cRESET}'vx'${cBYEL} command to override with 3rd-Party/Entware (if available)\n"$cRESET
     fi
@@ -423,7 +436,9 @@ Download_Modules() {
 Load_UserspaceTool() {
 
     local USE_ENTWARE_KERNEL_MODULE="N"                                     # v4.12
-    [ -n "$(grep -oE "^USE_ENTWARE_KERNEL_MODULE" ${INSTALL_DIR}WireguardVPN.conf)" ] && local USE_ENTWARE_KERNEL_MODULE="Y"
+    if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -oE "^USE_ENTWARE_KERNEL_MODULE" ${INSTALL_DIR}WireguardVPN.conf)" ];then     # v4.12
+        local USE_ENTWARE_KERNEL_MODULE="Y"
+    fi
 
     if [ ! -d "${INSTALL_DIR}" ];then
         echo -e $cRED"\a\n\tNo modules found - '/${INSTALL_DIR} doesn't exist'\n"
@@ -434,6 +449,8 @@ Load_UserspaceTool() {
 
             fi
     fi
+
+    local ACTIVE_WG_INTERFACES=$(echo "$(wg show interfaces)" | tr " " "\n" | sort -r | tr "\n" " ")    # v4.13
 
     STATUS=0
     if [ ! -f /usr/sbin/wg ] || [ "$USE_ENTWARE_KERNEL_MODULE" == "Y" ];then           # v4.12 Is the User Space Tools included in the firmware?
@@ -485,6 +502,8 @@ Load_UserspaceTool() {
             return 1
         fi
     fi
+
+    [ -n "$ACTIVE_WG_INTERFACES" ] && Manage_Wireguard_Sessions "start" "$ACTIVE_WG_INTERFACES" # v4.13
 }
 Show_MD5() {
 
@@ -527,7 +546,9 @@ Check_Module_Versions() {
     local WGTOOLS=$(opkg list-installed | grep "wireguard-tools" | awk '{print $3}' | sed 's/\-.*$//')
 
     local USE_ENTWARE_KERNEL_MODULE="N"                                     # v4.12
-    [ -n "$(grep -oE "^USE_ENTWARE_KERNEL_MODULE" ${INSTALL_DIR}WireguardVPN.conf)" ] && local USE_ENTWARE_KERNEL_MODULE="Y"
+    if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -oE "^USE_ENTWARE_KERNEL_MODULE" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+        local USE_ENTWARE_KERNEL_MODULE="Y"
+    fi
 
     if [ -f /usr/sbin/wg ] && [ "$USE_ENTWARE_KERNEL_MODULE" == "N" ];then
         local FPATH=$(modprobe --show-depends wireguard | awk '{print $2}')
@@ -1636,6 +1657,8 @@ Manage_Wireguard_Sessions() {
     # v4.12 Ensure 'server' peers are initialised before 'client' peers e.g. this order:  wg22 wg21 wg15 wg14 wg13 wg12 wg11
     WG_INTERFACE=$(echo "$WG_INTERFACE" | tr " " "\n" | sort -r | tr "\n" " ")  # v4.12
 
+    WG_INTERFACE=$(echo "$WG_INTERFACE" | awk '{$1=$1};1')    # v4.13  strip leading/trailing spaces/tabs
+
     [ -n "$WG_INTERFACE" ] && echo -e $cBWHT"\n\tRequesting WireGuard VPN Peer ${ACTION}$CATEGORY (${cBMAG}$WG_INTERFACE"$cRESET")"
 
     case "$ACTION" in
@@ -1814,6 +1837,7 @@ Manage_Wireguard_Sessions() {
     esac
 }
 Manage_alias() {
+                [ ! -f /jffs/configs/profile.add ] && true > /jffs/configs/profile.add      # v4.12
 
     local ALIASES="start stop restart show diag"
 
@@ -2829,7 +2853,7 @@ Install_WireGuard_Manager() {
         exit 96
     else
         if [ ! -f "$ENTWARE_INFO" ] || [ "$(grep  "^arch" $ENTWARE_INFO | awk -F'=' '{print $2}' )" != "aarch64" ];then     # v4.12 v4.11 Hotfix
-            echo -e $cBRED"\a\n\n\t***ERROR: ${cRESET}Entware${cBRED} version not compatible with ${cRESET}WireGuard!\n"       # v4.11
+            echo -e $cBRED"\a\n\n\t***ERROR: ${cRESET}3rd-Party Entware${cBRED} version not compatible with ${cRESET}WireGuard!\n"       # v4.13 v4.11
             [ ! -f /usr/sbin/wg ] && exit 97        # v4.12
         fi
     fi
@@ -2861,8 +2885,11 @@ Install_WireGuard_Manager() {
     opkg install column                     # v2.02
     opkg install coreutils-mkfifo
 
-    if [ "$(which wg)" != "/usr/sbin/wg" ];then # v4.12
-        # Kernel module
+    # Kernel module in firmware?
+    if [ "$(which wg)" == "/usr/sbin/wg" ];then # v4.12
+        ROUTER_COMPATIBLE="Y"                   # v4.13
+    else
+        # SEe if 3rd-Party Entware Kernel module exists
         echo -e $cBCYA"\tDownloading Wireguard Kernel module for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
 
         ROUTER_COMPATIBLE="Y"
@@ -3971,9 +3998,9 @@ Build_Menu() {
             fi
 
             if [ -n "$(opkg list-installed | grep "wireguard-kernel")" ] || [ -n "$(opkg status wireguard-kernel | awk '/^Installed/ {print $2}')" ];then   # v4.12
-                MENU_Z="$(printf '%b2 %b = %bRemove%b WireGuard/WireGuard Manager (wg_manager)\n' "${cBYEL}" "${cRESET}" "${cBRED}" "${cRESET}")"
+                MENU_Z="$(printf '%b2 %b = %bRemove%b WireGuard/(wg_manager)\n' "${cBYEL}" "${cRESET}" "${cBRED}" "${cRESET}")"
             else
-                MENU_Z="$(printf '%b2 %b = %bRemove%b WireGuard/%bWireGuard Manager\n' "${cBYEL}" "${cRESET}" "${cBRED}" "${cBGRA}" "${cRESET}")"
+                MENU_Z="$(printf '%b2 %b = %bRemove%b WireGuard/%b(wg_manager)\n' "${cBYEL}" "${cRESET}" "${cBRED}" "${cBGRA}" "${cRESET}")"
             fi
         else
             MENU_I="$(printf '%b1 %b = %bBegin%b WireGuard Installation Process' "${cBYEL}" "${cRESET}" "${cBGRE}" "${cRESET}")"
@@ -4130,9 +4157,14 @@ Process_User_Choice() {
                 Manage_alias "$ARG"                                     # v1.05
 
                 ;;
-            getmod*)
+            getmod*)                                                    # [dev]
 
-                Download_Modules $HARDWARE_MODEL
+                local ARG=
+                if [ "$(echo "$menu1" | wc -w)" -ge 2 ];then
+                    local ARG="$(printf "%s" "$menu1" | cut -d' ' -f2)" # v4.12
+                fi
+
+                Download_Modules $HARDWARE_MODEL "$ARG"                 # v4.12
                 ;;
             loadmod*)
 
@@ -4263,15 +4295,24 @@ Process_User_Choice() {
                         local VAL=$(cat /proc/sys/net/ipv4/conf/$WAN_IF/rp_filter)                  # v4.11
                         [ "$VAL" == "1" ] && STATE="ENABLED" || STATE="${cBRED}DISABLED${cBGRE}"    # v4.11
                         echo -e $cBGRE"\n\t[ℹ ] Reverse Path Filtering $STATE\n"$cRESET            # v4.11
-                        # Override IPv6 ?
 
+                        if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOTCPMSS" ${INSTALL_DIR}WireguardVPN.conf)" ];then   # v4.12 v4.11
+                            echo -e $cBRED"\t[✖]${cBWHT} 'NOTCPMSS' specified, TCP clamping to PMTU (-t mangle '--tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu')$cBRED DISABLED$cRESET" # v4.12
+                        fi
+                        if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOSETXMARK" ${INSTALL_DIR}WireguardVPN.conf)" ];then   # v4.12 v4.11
+                            echo -e $cBRED"\t[✖]${cBWHT} 'NOSETXMARK' specified, (-t mangle  '-j MARK --set-xmark 0x01/0x7')$cBRED  DISABLED" # v4.12
+                        fi
+
+                        # Override IPv6 ?
                         if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOIP[Vv]6" ${INSTALL_DIR}WireguardVPN.conf)" ];then   # v4.11
                             [ "$(nvram get ipv6_service)" != "disabled" ] && echo -e $cBRED"\t[✖]${cBWHT} 'NOIPV6' specified, IPv6 ${cRED} is not allowed  - IPv4 configs ONLY$cRESET" # v4.11
                         fi
 
-                        echo -e $cBGRE"\t[ℹ ] Speedtest quick link${cBYEL} https://fast.com/en/gb/ \n"$cRESET       # v4.12
-
                         Manage_Stats
+
+                        echo -e $cBGRE"\n\t[ℹ ] Speedtest quick link${cBYEL} https://fast.com/en/gb/ \n"$cRESET       # v4.12
+
+                        echo -e $cBGRE"\t[ℹ ] ${cRESET}@ZebMcKayhan's$cBGRE Hint's and Tips Guide${cBYEL} https://github.com/ZebMcKayhan/WireguardManager/blob/main/README.md#table-of-content \n"$cRESET   # v4.13
 
                         ;;
                     *)
