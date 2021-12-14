@@ -38,7 +38,8 @@ Example successful install.....
 
     e  = Exit Script [?]
 
-E:Option ==> 1
+To prove the exception, RT-AX58U using Beta firmware (which includes the WireGuard firmware) whilst it's designated 'AX' it uses CPU ARMv7 ('arm') rather 'aarch64'
+    E:Option ==> 1
 
 	Installing WireGuard Manager - Router RT-AX58U (v3.0.0.4.386.3_beta3) arch=arm
 
