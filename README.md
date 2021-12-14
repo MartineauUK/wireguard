@@ -18,16 +18,21 @@ Example successful install.....
     +======================================================================+
     |  Welcome to the WireGuard Manager/Installer script (Asuswrt-Merlin)  |
     |                                                                      |
-    |                      Version v4.10 by Martineau                      |
+    |                      Version v4.13b by Martineau                     |
     |                                                                      |
-    | Requirements: USB drive with Entware installed                       |
+    | Requirements: HND or AX router with Kernel 4.1.xx or later           |
+    |                         e.g. RT-AC86U or RT-AX86U etc.               |
+    |                                                                      |
+    |               USB drive with Entware installed                       |
     |                                                                      |
     |   1 = Install WireGuard                                              |
-    |       o1. Enable nat-start protection for Firewall rules             |
+    |       o1. Enable firewall-start protection for Firewall rules        |
     |       o2. Enable DNS                                                 |
     |                                                                      |
     |                                                                      |
     +======================================================================+
+
+ 	WireGuard ACTIVE Peer Status: Clients 0, Servers 0
 
 	    WireGuard ACTIVE Peer Status: Clients 0, Servers 0
 
@@ -35,72 +40,112 @@ Example successful install.....
 
     e  = Exit Script [?]
 
-    E:Option ==> 1
+E:Option ==> 1
 
-	Installing WireGuard Manager - Router RT-AC86U (v386.1) arch=aarch64
+	Installing WireGuard Manager - Router RT-AX58U (v3.0.0.4.386.3_beta3) arch=arm
+
+
+
+	***ERROR: Entware version not compatible with WireGuard!
+
+
+	Warning: obsolete WireGuard Session Manager v1.xx config directory Found!!! ('/opt/etc/wireguard'{})
+
 	Downloading scripts
 	wg_client downloaded successfully 
 	wg_server downloaded successfully 
+	UDP_Updater.sh downloaded successfully 
 
-	Downloading Wireguard Kernel module for RT-AC86U (v386.1)
-
-	Downloading WireGuard Kernel module 'wireguard-kernel_1.0.20210219-k27_aarch64-3.10.ipk' for RT-AC86U (v386.1)...
-
-    ##################################################################################################################################################################################### 100.0%##################################################################################################################################################################################### 100.0%
-
-	Downloading WireGuard User space Tool 'wireguard-tools_1.0.20210223-1_aarch64-3.10.ipk' for RT-AC86U (v386.1)
-
-     ##################################################################################################################################################################################### 100.0%##################################################################################################################################################################################### 100.0%
-
-	Loading WireGuard Kernel module and Userspace Tool for RT-AC86U (v386.1)
-    Installing wireguard-kernel (1.0.20210219-k27) to root...
-    Configuring wireguard-kernel.
-
-    Installing wireguard-tools (1.0.20210223-1) to root...
-    Configuring wireguard-tools.
-	wireguard: WireGuard 1.0.20210219 loaded. See www.wireguard.com for information.
-	wireguard: Copyright (C) 2015-2019 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
-
+Installing column (2.37-1) to root...
+Downloading https://bin.entware.net/armv7sf-k3.2/column_2.37-1_armv7-3.2.ipk
+Configuring column.
+Installing coreutils-mkfifo (8.32-6) to root...
+Downloading https://bin.entware.net/armv7sf-k3.2/coreutils-mkfifo_8.32-6_armv7-3.2.ipk
+Configuring coreutils-mkfifo.
 
 	Creating WireGuard configuration file '/jffs/addons/wireguard/WireguardVPN.conf'
-	Creating WireGuard 'Client' and 'Server' Peer templates 'wg11.conf' and wg21.conf'
-	Creating WireGuard Private/Public key-pairs for RT-AC86U (v386.1)
-	Test Initialising the Sample WireGuard 'client' and 'server' Peers, BUT ONLY the Sample 'server' (wg21) will Initialise WITHOUT errors!!!! :-)
 
-    (wg_manager.sh): 26628 v2.01b8 Requesting WireGuard VPN Peer auto-start (wg11 wg21 )
+	No Peer entries to auto-migrate from '/jffs/addons/wireguard/WireguardVPN.conf', but you will need to manually import the 'device' Peer '*.conf' files:
 
-	wireguard-server1: Initialising Wireguard VPN 'Server' Peer (wg21) on 0.0.0.0:51820 (# RT-AC86U Local Host Peer 1)
+
+
+	[✔] WireGuard Peer SQL Database initialised OK
+
+	Creating WireGuard 'Server' Peer (wg21)'
+	Creating WireGuard Private/Public key-pairs for RT-AX58U (v3.0.0.4.386.3_beta3)
+	Initialising WireGuard VPN 'server' Peer
+
+	Requesting WireGuard VPN Peer start (wg21)
+
+	wireguard-server1: Initialising Wireguard VPN 'Server' Peer (wg21) on 10.88.8.1:51820 (# RT-AX58U Server #1)
 	wireguard-server1: Initialisation complete.
-		
-	interface: wg21 	('server' # RT-AC86U Local Host Peer 1)
-		 public key: RPLF0ksVHyLvffhzNG7agfvaAbN3L3QIl08qkZ3pH0U=
-		 private key: (hidden)
-		 listening port: 51820
 
+	[✔] Statistics gathering is ENABLED
 
-	Terminating ACTIVE WireGuard Peers ...
-	Requesting termination of Active WireGuard VPN Peers (wg21)
-
-    (wg_manager.sh): 27073 v2.01b8 Requesting termination of WireGuard VPN 'server' Peer ('wg21')
-	wireguard-server1: Wireguard VPN '' Peer (wg21) on 0.0.0.0:51820 (# RT-AC86U Local Host Peer 1) DELETED
-
-	nat-start updated to protect WireGuard firewall rules
-	Added 'wg*' interfaces to DNSMasq
+	firewall-start updated to protect WireGuard firewall rules
+	Restarting DNSmasq to add 'wg*' interfaces
 
     Done.
+
 	Creating 'wg_manager' alias for 'wg_manager.sh'
+
+	Event scripts
+
 	Adding Peer Auto-start @BOOT
 	Installing QR rendering module
-    Package qrencode (4.1.1-1) installed in root is up to date.
-	Press y to Display QR Code for Scanning into WireGuard App on device '' or press [Enter] to SKIP.
+    Installing qrencode (4.1.1-1) to root...
+    Downloading https://bin.entware.net/armv7sf-k3.2/qrencode_4.1.1-1_armv7-3.2.ipk
+    Configuring qrencode.
+	Installing xargs module
+    Package findutils (4.8.0-1) installed in root is up to date.
+	Do you want to create a 'device' Peer for 'server' Peer (wg21) ?
+	Press y to create 'device' Peer or press [Enter] to skip
+    y
+    Enter the device name e.g. iPhone
+    iPhone
+
+	Creating Wireguard Private/Public key pair for device 'iPhone'
+	Device 'iPhone' Public key=K2RjDsyCvT1sJWhk5zHOGNer4Q+pt7Fcbf4mPiiyOm8=
+
+	Device 'iPhone' Pre-shared key=K2RjDsyCvT1sJWhk5zHOGNer4Q+pt7Fcbf4mPiiyOm8=
+
+	Using Public key for 'server' Peer 'wg21'
+
+	Warning: No DDNS is configured!
+	Press y to use the current WAN IP or enter DDNS name or press [Enter] to SKIP.
+
+
+	WireGuard config for Peer device 'iPhone' (10.50.1.2/32) created (Allowed IP's 0.0.0.0/0 # ALL Traffic)
+
+	Press y to Display QR Code for Scanning into WireGuard App on device 'iPhone' or press [Enter] to SKIP.
+
+	Press y to ADD device 'iPhone' to 'server' Peer (wg21) or press [Enter] to SKIP.
     y
 
-***QR code image goes here***
-
-	WireGuard install COMPLETED.
+	Adding device Peer 'iPhone' 10.50.1.2/32 to RT-AX58U 'server' (wg21) and WireGuard config
 
 
-	WireGuard ACTIVE Peer Status: Clients 0, Servers 0
+	WireGuard 'server' Peer needs to be restarted to listen for 'client' Peer iPhone "Device"
+	Press y to restart 'server' Peer (wg21) or press [Enter] to SKIP.
+    y
+
+	Requesting WireGuard VPN Peer restart (wg21)
+
+	Restarting Wireguard 'server' Peer (wg21)
+	wireguard-server1: Wireguard VPN '' Peer (wg21) on 10.88.8.1:51820 (# RT-AX58U Server #1) Terminated
+
+	wireguard-server1: Initialising Wireguard VPN 'Server' Peer (wg21) on 10.88.8.1:51820 (# RT-AX58U Server #1)
+	wireguard-server1: Initialisation complete.
+
+
+	interface: wg21 	Port:51820	10.50.1.1/24 		VPN Tunnel Network	# RT-AX58U Server #1
+		peer: K2RjDsyCvT1sJWhk5zHOGNer4Q+pt7Fcbf4mPiiyOm8= 	10.50.1.2/32		# iPhone "Device"	
+
+	v4.12 WireGuard Session Manager install COMPLETED.
+
+
+ 	WireGuard ACTIVE Peer Status: Clients 0, Servers 1 
+
 
 
 
