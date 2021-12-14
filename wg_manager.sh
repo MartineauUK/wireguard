@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.13b"
-#============================================================================================ © 2021 Martineau v4.13b
+VERSION="v4.13b2"
+#============================================================================================ © 2021 Martineau v4.13b2
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -387,19 +387,23 @@ Download_Modules() {
             RT-AC86U|GT-AC2900)     # RT-AC86U, GT-AC2900 - 4.1.27          e.g. wireguard-kernel_1.0.20210606-k27_1_aarch64-3.10.ipk
                 local WEBFILE_NAMES=$(curl -${SILENT}fL https://api.github.com/repos/ZebMcKayhan/Wireguard/git/trees/$FROM_REPOSITORY | grep "\"path\": \"wireguard-.*\.ipk\"," | cut -d'"' -f 4)   # v4.12 v4.11
                 local REPOSITORY_OWNER="ZebMcKayhan"
-                _Get_File "$(echo "$WEBFILE_NAMES" | awk '/k27/ {print}')" "$REPOSITORY_OWNER" "$FROM_REPOSITORY"  # k27_1
+                local MODULE="$(echo "$WEBFILE_NAMES" | awk "/$ROUTER/ {print}")"   # v4.13
+                [ -z "$MODULE" ] && local MODULE=$(echo "$WEBFILE_NAMES" | awk "/k27/ {print}") # v4.13
+                _Get_File "$MODULE" "$REPOSITORY_OWNER" "$FROM_REPOSITORY"
                 ;;
-            RT-AX88U|GT-AX11000)    # RT-AX88U, GT-AX11000 - 4.1.51         e.g. wireguard-kernel_1.0.20210219-k52_1_aarch64-3.10.ipk
+            RT-AX88U|GT-AX11000)    # RT-AX88U, GT-AX11000 - 4.1.51         e.g. wireguard-kernel_1.0.20210219-k51_1_aarch64-3.10.ipk
                 local WEBFILE_NAMES=$(curl -${SILENT}fL https://api.github.com/repos/ZebMcKayhan/Wireguard/git/trees/$FROM_REPOSITORY | grep "\"path\": \"wireguard-.*\.ipk\"," | cut -d'"' -f 4)   # v4.12
                 local REPOSITORY_OWNER="ZebMcKayhan"
-                _Get_File "$(echo "$WEBFILE_NAMES" | awk '/k51/ {print}')" "$REPOSITORY_OWNER"    # k51_1
+                local MODULE="$(echo "$WEBFILE_NAMES" | awk "/$ROUTER/ {print}")"   # v4.13
+                [ -z "$MODULE" ] && local MODULE=$(echo "$WEBFILE_NAMES" | awk "/k51/ {print}") # v4.13
+                _Get_File "$MODULE" "$REPOSITORY_OWNER" "$FROM_REPOSITORY"
                 ;;
             RT-AX68U)               # RT-AX68U - 4.1.52                     e.g. wireguard-kernel_1.0.20210219-k52_1_aarch64-3.10.ipk
-                _Get_File "$(echo "$WEBFILE_NAMES" | awk '/k52/ {print}')" "$REPOSITORY_OWNER"    # k52_1
+                _Get_File "$(echo "$WEBFILE_NAMES" | awk '/k52/ {print}')" "$REPOSITORY_OWNER" "$FROM_REPOSITORY"   # k52_1
                 ;;
             RT-AX86U|GT-AC5700)     # v4.12 These models have wireguard in the firmware
                     # RT-AX68U, RT-AX86U - 4.1.52           e.g. wireguard-kernel_1.0.20210219-k52_1_aarch64-3.10.ipk
-                    _Get_File "$(echo "$WEBFILE_NAMES" | awk '/k27/ {print}')" "$REPOSITORY_OWNER"    # k52_1
+                    _Get_File "$(echo "$WEBFILE_NAMES" | awk '/k27/ {print}')" "$REPOSITORY_OWNER" "$FROM_REPOSITORY"   # k52_1
                 ;;
             *)
                 echo -e $cBRED"\a\n\t***ERROR: Unable to find 3rd-Party WireGuard Kernel module for $ROUTER (v$BUILDNO)\n"$cRESET
@@ -411,7 +415,7 @@ Download_Modules() {
                 #        * opkg_install_cmd: Cannot install package wireguard-kernel.
                 #
                 #
-                _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $1}')" "$REPOSITORY_OWNER"
+                _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $1}')" "$REPOSITORY_OWNER" "$FROM_REPOSITORY"
                 ROUTER_COMPATIBLE="N"
                 ;;
         esac
@@ -425,7 +429,6 @@ Download_Modules() {
     # User Space Tools - Allow use of Entware/3rd Party modules even if Modules included in firmware
     if [ ! -f /usr/sbin/wg ] || [ "$USE_ENTWARE_KERNEL_MODULE" == "Y" ];then    # v4.12 Is the User Space Tools included in the firmware?
         WEBFILE=$(echo "$WEBFILE_NAMES" | awk '/wireguard-tools/ {print}')
-zz="============================================================================== 425 '$FROM_RESPOSITORY_TXT'"
         echo -e $cBCYA"\n\tDownloading WireGuard User space Tool$cBWHT '$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO) @$REPOSITORY_OWNER $FROM_RESPOSITORY_TXT"$cRESET  # v4.11
         _Get_File  "$WEBFILE" "$REPOSITORY_OWNER" "$FROM_REPOSITORY" "NOMSG"            # v4.12 v4.11
     else
