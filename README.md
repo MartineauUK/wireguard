@@ -1,4 +1,4 @@
-# wireguard
+# WireGuard
 Manage/Install WireGuard on applicable ASUS routers
 
 see https://www.snbforums.com/threads/experimental-wireguard-for-rt-ac86u-gt-ac2900-rt-ax88u-rt-ax86u.46164/
