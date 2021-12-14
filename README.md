@@ -44,10 +44,7 @@ E:Option ==> 1
 
 	Installing WireGuard Manager - Router RT-AX58U (v3.0.0.4.386.3_beta3) arch=arm
 
-
-
-	***ERROR: Entware version not compatible with WireGuard!
-
+	***ERROR: 3rd-Party Entware version not compatible with WireGuard!
 
 	Warning: obsolete WireGuard Session Manager v1.xx config directory Found!!! ('/opt/etc/wireguard'{})
 
