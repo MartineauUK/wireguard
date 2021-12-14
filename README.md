@@ -1,4 +1,4 @@
-# WireGuard
+# WireGuard Manager © Copyright 2021 MartineauK All Rights Reserved.
 © Copyright 2015-2021 Jason A. Donenfeld. All Rights Reserved. "WireGuard" and the "WireGuard" logo are registered trademarks of Jason A. Donenfeld.
 https://www.wireguard.com/
 
