@@ -32,8 +32,6 @@ Example successful install.....
     |                                                                      |
     +======================================================================+
 
- 	WireGuard ACTIVE Peer Status: Clients 0, Servers 0
-
 	    WireGuard ACTIVE Peer Status: Clients 0, Servers 0
 
     1  = Begin WireGuard Installation Process						
@@ -49,12 +47,12 @@ E:Option ==> 1
 	wg_server downloaded successfully 
 	UDP_Updater.sh downloaded successfully 
 
-Installing column (2.37-1) to root...
-Downloading https://bin.entware.net/armv7sf-k3.2/column_2.37-1_armv7-3.2.ipk
-Configuring column.
-Installing coreutils-mkfifo (8.32-6) to root...
-Downloading https://bin.entware.net/armv7sf-k3.2/coreutils-mkfifo_8.32-6_armv7-3.2.ipk
-Configuring coreutils-mkfifo.
+    Installing column (2.37-1) to root...
+    Downloading https://bin.entware.net/armv7sf-k3.2/column_2.37-1_armv7-3.2.ipk
+    Configuring column.
+    Installing coreutils-mkfifo (8.32-6) to root...
+    Downloading https://bin.entware.net/armv7sf-k3.2/coreutils-mkfifo_8.32-6_armv7-3.2.ipk
+    Configuring coreutils-mkfifo.
 
 	Creating WireGuard configuration file '/jffs/addons/wireguard/WireguardVPN.conf'
 
@@ -139,28 +137,27 @@ Configuring coreutils-mkfifo.
 
  	WireGuard ACTIVE Peer Status: Clients 0, Servers 1 
 
-
-
-
-WireGuard Manager v2.0 now uses a menu (amtm compatible)
+Display interactive WireGuard Manager menu
 
     wgm
 
     +======================================================================+
     |  Welcome to the WireGuard Manager/Installer script (Asuswrt-Merlin)  |
     |                                                                      |
-    |                      Version v4.09 by Martineau                      |
+    |                      Version v4.12 by Martineau                      |
     |                                                                      |
     +======================================================================+
+    
 	       WireGuard ACTIVE Peer Status: Clients 3, Servers 2
 
     =============================================================================================================================================================
 
-    1  = Update Wireguard modules					7  = Display QR code for a Peer {device} e.g. iPhone
-    2  = Remove WireGuard/wg_manager				8  = Peer management [ "list" | "category" | "new" ] | [ {Peer | category} [ del | show | add [{"auto="[y|n|p]}] ]
-									9  = Create Key-pair for Peer {Device} e.g. Nokia6310i (creates Nokia6310i.conf etc.)
-    3  = List ACTIVE Peers Summary [Peer...] [full]			10 = IPSet management [ "list" ] | [ "upd" { ipset [ "fwmark" {fwmark} ] | [ "enable" {"y"|"n"}] | [ "dstsrc"] ] } ] 
-    4  = Start   [ [Peer [nopolicy]...] | category ] e.g. start clients 									
+
+    1  = Update WireGuard modules						7  = QRcode for a Peer {device} e.g. iPhone
+    2  = Remove WireGuard/(wg_manager)					8  = Peer management [ "list" | "category" | "new" ] | [ {Peer | category} [ del | show | add [{"auto="[y|n|p]}] ]
+									        9  = Create[split] Key-pair for Peer {Device} e.g. Nokia6310i (creates Nokia6310i.conf etc.)
+    3  = List ACTIVE Peers Summary [Peer...] [full]				10 = IPSet management [ "list" ] | [ "upd" { ipset [ "fwmark" {fwmark} ] | [ "enable" {"y"|"n"}] | [ "dstsrc"] ] } ] 
+    4  = Start   [ [Peer [nopolicy]...] | category ] e.g. start clients 	11 = Import WireGuard configuration { [ "?" | [ "dir" directory ] | [/path/]config_file [ "name="rename_as ] ]} 
     5  = Stop    [ [Peer... ] | category ] e.g. stop clients									
     6  = Restart [ [Peer... ] | category ] e.g. restart servers									
 
@@ -168,6 +165,8 @@ WireGuard Manager v2.0 now uses a menu (amtm compatible)
     v  = View ('/jffs/addons/wireguard/WireguardVPN.conf')		
 
     e  = Exit Script [?]
+
+    E:Option ==> 
     
 e.g.
 
@@ -193,18 +192,31 @@ e.g.
 
     E:Option ==> ?
 
-	No updates available - you have the latest version
-	Checking for WireGuard Kernel and Userspace Tool updates...
-	wireguard: WireGuard 1.0.20210219 loaded. See www.wireguard.com for information.
-	wireguard: Copyright (C) 2015-2019 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
+	Router RT-AX58U Firmware (v3.0.0.4.386.3_beta3)
 
-	[✔] WireGuard Module is LOADED
+	[✔] Entware Architecture arch=arm
 
-	MD5=07a24a0efa926b3ad2c564d18b12312f wireguard-kernel_1.0.20210219-k27_aarch64-3.10.ipk
-	MD5=d7fdc2f1a770856a66c2c677ecb64d1b wireguard-tools_1.0.20210223-1_aarch64-3.10.ipk
 
-	WireGuard Kernel and Userspace Tool up to date.
+	v4.12 WireGuard Session Manager (Change Log: https://github.com/MartineauUK/wireguard/commits/main/wg_manager.sh)
+	MD5=e78a51b9ef616c1d062038e5adada441 /jffs/addons/wireguard/wg_manager.sh
 
+	[✔] WireGuard Kernel module/User Space Tools included in Firmware (1.0.20210124)
+
+
+	[✔] DNSmasq is listening on ALL WireGuard interfaces 'wg*'
+
+	[✔] firewall-start is monitoring WireGuard Firewall rules
+
+	[✖] WAN KILL-Switch is DISABLED (use 'vx' command for info)
+	[✖] UDP monitor is DISABLED
+
+	[ℹ ] Reverse Path Filtering ENABLED
+
+	[✔] Statistics gathering is ENABLED
+
+	[ℹ ] Speedtest quick link https://fast.com/en/gb/ 
+
+	[ℹ ] @ZebMcKayhan's Hint's and Tips Guide https://github.com/ZebMcKayhan/WireguardManager/blob/main/README.md#table-of-content 
 
 
 	WireGuard ACTIVE Peer Status: Clients 3, Servers 2
