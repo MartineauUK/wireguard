@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.13b2"
-#============================================================================================ © 2021 Martineau v4.13b2
+VERSION="v4.13b3"
+#============================================================================================ © 2021 Martineau v4.13b3
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -381,7 +381,6 @@ Download_Modules() {
     # Allow use of Entware/3rd Party Kernel modules even if included in firmware
     if [ ! -f /usr/sbin/wg ] || [ "$USE_ENTWARE_KERNEL_MODULE" == "Y" ];then
 
-        # The file list MAY NOT ALWAYS be in the correct Router Model order for the following 'case' statement?
         case "$ROUTER" in
 
             RT-AC86U|GT-AC2900)     # RT-AC86U, GT-AC2900 - 4.1.27          e.g. wireguard-kernel_1.0.20210606-k27_1_aarch64-3.10.ipk
@@ -4094,7 +4093,8 @@ Validate_User_Choice() {
             generatestats) ;;
             killsw*) ;;             # v2.03
             killinter*) ip link del dev $(echo "$menu1" | awk '{print $2}'); menu1=;;
-            rpfilter*|rp_filter*);;         # v4.11
+            rpfilter*|rp_filter*);; # v4.11
+            vpndirector*);;         # v4.13
             "") ;;
             e*) ;;
             *) printf '\n\a\t%bInvalid Option%b "%s"%b Please enter a valid option\n' "$cBRED" "$cRESET" "$menu1" "$cBRED"
@@ -4553,6 +4553,51 @@ Process_User_Choice() {
                         echo -en $cRED"\a\n\t***ERROR: Invalid Reverse Path Filter request $cBWHT'"$ARG"'$cBRED - use 'disable|enable'\n"$cRESET
                     ;;
                 esac
+            ;;
+            vpndirector*)                   # v4.13 'vpndirector [list]'
+                local ARG=
+                local ACTION="$(echo "$menu1"| awk '{print $2}')"
+
+                if [ "$ACTION" != "list" ];then
+                    if [ -s /jffs/openvpn/vpndirector_rulelist ];then
+                        echo -e $cRESET"\n\tAuto clone VPN Director rules\n"
+                        cat /jffs/openvpn/vpndirector_rulelist | sed 's/>WAN/>WAN\n/g' | sed 's/>OVPN1/>OVPN1\n/g' | sed 's/>OVPN2/>OVPN2\n/g' | sed 's/>OVPN3/>OVPN3\n/g' > /tmp/VPNDirectorRules.txt
+                        while read -r LINE || [ -n "$LINE" ]; do
+                            #local ACTIVE=$(echo "$LINE" | awk -F '>' '{print $1}' VPNDIrector.txt)
+                            local COMMENT=$(echo "$LINE"        | awk -F '>' '{print $2}')
+                            local SRC=$(echo "$LINE"            | awk -F '>' '{print $3}')
+                            local DST=$(echo "$LINE"            | awk -F '>' '{print $4}')
+                            local TARGET_IFACE=$(echo "$LINE"   | awk -F '>' '{print $NF}')
+
+                            if [ -z "$SRC" ] && [ -n "$DST" ];then
+                                local DST="dst="$DST
+                            fi
+
+                            local VPN_NUM=${TARGET_IFACE#"${TARGET_IFACE%?}"}
+                            [ "$VPN_NUM" != "N" ] && local PEER="wg1"$VPN_NUM || local PEER="wg11"
+
+                            [ "$TARGET_IFACE" == "WAN" ] && local TARGET_IFACE="wan" || local TARGET_IFACE="vpn"
+                            echo -en "\tpeer" $PEER" rule add "$TARGET_IFACE $SRC $DST "comment" "$COMMENT"
+                            Manage_RPDB_rules peer $PEER rule add $TARGET_IFACE $SRC $DST comment VPN Director: $COMMENT    # v4.13
+
+                            local IFACE=
+                            local SRC=
+                            local COMMENT=
+
+                        done < /tmp/VPNDirectorRules.txt
+
+                        #rm /tmp/VPNDirectorRules.txt
+                    else
+                        echo -en $cRED"\a\n\t***ERROR: No VPN Director Policy rules found'\n"$cRESET
+                    fi
+                else
+                    if [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(tag) FROM policy WHERE tag LIKE 'VPN Director:%';")" -gt 0 ];then
+                        echo -e $cBCYA"\n\tVPN Director Selective Routing RPDB rules\n"$cRESET
+                        sqlite3 $SQL_DATABASE "SELECT rowid,peer,iface,srcip,dstip,tag FROM policy WHERE tag LIKE 'VPN Director:%' ORDER BY iface DESC;" |column -t  -s '|' --table-columns ID,Peer,Interface,Source,Destination,Description # v4.13
+                    else
+                        echo -en $cRED"\a\n\t***ERROR: No VPN Director Policy rules found'\n"$cRESET
+                    fi
+                fi
             ;;
             *)
                 printf '\n\a\t%bInvalid Option%b "%s"%b Please enter a valid option\n' "$cBRED" "$cRESET" "$menu1" "$cBRED"    # v4.03 v3.04 v1.09
