@@ -42,7 +42,8 @@ Example successful install.....
 
     e  = Exit Script [?]
 
-To prove the exception, RT-AX58U using Beta firmware (which includes the WireGuard firmware) whilst it's designated 'AX' it uses CPU ARMv7 ('arm') rather 'aarch64'
+To prove the exception, RT-AX58U using @RMerlin Beta firmware (which includes the ASUS WireGuard Kernel/Userspace tools modules) although it's designated 'AX' it uses CPU ARMv7 ('arm') rather than 'aarch64'.....
+
     E:Option ==> 1
 
 	Installing WireGuard Manager - Router RT-AX58U (v3.0.0.4.386.3_beta3) arch=arm
