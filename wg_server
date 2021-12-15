@@ -1,16 +1,16 @@
 #!/bin/sh
-VERSION="v4.12"
-#============================================================================================ © 2021 Martineau v4.12
+VERSION="v4.13"
+#============================================================================================ © 2021 Martineau v4.13
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 12-Dec-2021
+# Last Updated Date: 15-Dec-2021
 #
 # Description:
 #
 # Acknowledgement:
 #
-# Contributors: odkrys,ZebMcKayhan,Torson
+# Contributors: odkrys,ZebMcKayhan,Torson,chongnt
 
 # shellcheck disable=SC2034
 ANSIColours() {
@@ -56,6 +56,7 @@ Firewall_delete() {
 Manage_Passthru(){
 
     local PASSTHRU_CLIENTS=$(sqlite3 /opt/etc/wireguard.d/WireGuard.db "SELECT client FROM passthru where server='$WG_INTERFACE';" | sort | uniq | tr '\n' ' ')
+    local VPN_ID=           # v4.13 Fix @chongnt
 
     local ACTION="add"
     [ -n "$1" ] && ACTION=$1        # "del" or "add"
@@ -78,9 +79,10 @@ Manage_Passthru(){
                         done << EOR
 $(ip route | grep "$WG_INTERFACE")
 EOR
-                    else
-                        ip rule $ACTION from $IP_ADDR table $TABLE
                     fi
+                    
+                    ip rule $ACTION from $IP_ADDR table $TABLE      # v4.13 Fix @chongnt
+         
                 else
                     ip rule $ACTION from $IP_ADDR table $TABLE 2>/dev/null
                 fi
