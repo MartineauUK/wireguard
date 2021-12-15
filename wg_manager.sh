@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.12"
-#============================================================================================ © 2021 Martineau v4.12
+VERSION="v4.13"
+#============================================================================================ © 2021 Martineau v4.13
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.12"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 12-Dec-2021
+# Last Updated Date: 15-Dec-2021
 #
 # Description:
 #
@@ -356,7 +356,6 @@ _Get_File() {
 }
 Download_Modules() {
 
-
     local ROUTER=$1
     local FROM_REPOSITORY=$2                                                # v4.12
     [ -z "$FROM_REPOSITORY" ] && local FROM_REPOSITORY="main"               # v4.12
@@ -365,8 +364,6 @@ Download_Modules() {
     if [ -f ${INSTALL_DIR}WireguardVPN.conf ] &&  [ -n "$(grep -oE "^USE_ENTWARE_KERNEL_MODULE" ${INSTALL_DIR}WireguardVPN.conf)" ];then    # v4.12
         local USE_ENTWARE_KERNEL_MODULE="Y"
     fi
-
-    #[ ! -d "${INSTALL_DIR}" ] && mkdir -p "${INSTALL_DIR}"
 
     if [ "$USE_ENTWARE_KERNEL_MODULE" == "Y" ];then
         rm ${INSTALL_DIR}*.ipk 2>/dev/null            # v4.12
@@ -381,25 +378,28 @@ Download_Modules() {
     # Allow use of Entware/3rd Party Kernel modules even if included in firmware
     if [ ! -f /usr/sbin/wg ] || [ "$USE_ENTWARE_KERNEL_MODULE" == "Y" ];then
 
-        # The file list MAY NOT ALWAYS be in the correct Router Model order for the following 'case' statement?
         case "$ROUTER" in
 
             RT-AC86U|GT-AC2900)     # RT-AC86U, GT-AC2900 - 4.1.27          e.g. wireguard-kernel_1.0.20210606-k27_1_aarch64-3.10.ipk
                 local WEBFILE_NAMES=$(curl -${SILENT}fL https://api.github.com/repos/ZebMcKayhan/Wireguard/git/trees/$FROM_REPOSITORY | grep "\"path\": \"wireguard-.*\.ipk\"," | cut -d'"' -f 4)   # v4.12 v4.11
                 local REPOSITORY_OWNER="ZebMcKayhan"
-                _Get_File "$(echo "$WEBFILE_NAMES" | awk '/k27/ {print}')" "$REPOSITORY_OWNER" "$FROM_REPOSITORY"  # k27_1
+                local MODULE="$(echo "$WEBFILE_NAMES" | awk "/$ROUTER/ {print}")"   # v4.13
+                [ -z "$MODULE" ] && local MODULE=$(echo "$WEBFILE_NAMES" | awk "/k27/ {print}") # v4.13
+                _Get_File "$MODULE" "$REPOSITORY_OWNER" "$FROM_REPOSITORY"
                 ;;
-            RT-AX88U|GT-AX11000)    # RT-AX88U, GT-AX11000 - 4.1.51         e.g. wireguard-kernel_1.0.20210219-k52_1_aarch64-3.10.ipk
+            RT-AX88U|GT-AX11000)    # RT-AX88U, GT-AX11000 - 4.1.51         e.g. wireguard-kernel_1.0.20210219-k51_1_aarch64-3.10.ipk
                 local WEBFILE_NAMES=$(curl -${SILENT}fL https://api.github.com/repos/ZebMcKayhan/Wireguard/git/trees/$FROM_REPOSITORY | grep "\"path\": \"wireguard-.*\.ipk\"," | cut -d'"' -f 4)   # v4.12
                 local REPOSITORY_OWNER="ZebMcKayhan"
-                _Get_File "$(echo "$WEBFILE_NAMES" | awk '/k51/ {print}')" "$REPOSITORY_OWNER"    # k51_1
+                local MODULE="$(echo "$WEBFILE_NAMES" | awk "/$ROUTER/ {print}")"   # v4.13
+                [ -z "$MODULE" ] && local MODULE=$(echo "$WEBFILE_NAMES" | awk "/k51/ {print}") # v4.13
+                _Get_File "$MODULE" "$REPOSITORY_OWNER" "$FROM_REPOSITORY"
                 ;;
             RT-AX68U)               # RT-AX68U - 4.1.52                     e.g. wireguard-kernel_1.0.20210219-k52_1_aarch64-3.10.ipk
-                _Get_File "$(echo "$WEBFILE_NAMES" | awk '/k52/ {print}')" "$REPOSITORY_OWNER"    # k52_1
+                _Get_File "$(echo "$WEBFILE_NAMES" | awk '/k52/ {print}')" "$REPOSITORY_OWNER" "$FROM_REPOSITORY"   # k52_1
                 ;;
             RT-AX86U|GT-AC5700)     # v4.12 These models have wireguard in the firmware
                     # RT-AX68U, RT-AX86U - 4.1.52           e.g. wireguard-kernel_1.0.20210219-k52_1_aarch64-3.10.ipk
-                    _Get_File "$(echo "$WEBFILE_NAMES" | awk '/k27/ {print}')" "$REPOSITORY_OWNER"    # k52_1
+                    _Get_File "$(echo "$WEBFILE_NAMES" | awk '/k27/ {print}')" "$REPOSITORY_OWNER" "$FROM_REPOSITORY"   # k52_1
                 ;;
             *)
                 echo -e $cBRED"\a\n\t***ERROR: Unable to find 3rd-Party WireGuard Kernel module for $ROUTER (v$BUILDNO)\n"$cRESET
@@ -411,7 +411,7 @@ Download_Modules() {
                 #        * opkg_install_cmd: Cannot install package wireguard-kernel.
                 #
                 #
-                _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $1}')" "$REPOSITORY_OWNER"
+                #_Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $1}')" "$REPOSITORY_OWNER" "$FROM_REPOSITORY"
                 ROUTER_COMPATIBLE="N"
                 ;;
         esac
@@ -424,10 +424,11 @@ Download_Modules() {
 
     # User Space Tools - Allow use of Entware/3rd Party modules even if Modules included in firmware
     if [ ! -f /usr/sbin/wg ] || [ "$USE_ENTWARE_KERNEL_MODULE" == "Y" ];then    # v4.12 Is the User Space Tools included in the firmware?
-        WEBFILE=$(echo "$WEBFILE_NAMES" | awk '/wireguard-tools/ {print}')
-zz="============================================================================== 425 '$FROM_RESPOSITORY_TXT'"
-        echo -e $cBCYA"\n\tDownloading WireGuard User space Tool$cBWHT '$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO) @$REPOSITORY_OWNER $FROM_RESPOSITORY_TXT"$cRESET  # v4.11
-        _Get_File  "$WEBFILE" "$REPOSITORY_OWNER" "$FROM_REPOSITORY" "NOMSG"            # v4.12 v4.11
+        if [ "$ROUTER_COMPATIBLE" == "N" ];then     # v4.13
+            WEBFILE=$(echo "$WEBFILE_NAMES" | awk '/wireguard-tools/ {print}')
+            echo -e $cBCYA"\n\tDownloading WireGuard User space Tool$cBWHT '$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO) @$REPOSITORY_OWNER $FROM_RESPOSITORY_TXT"$cRESET  # v4.11
+            _Get_File  "$WEBFILE" "$REPOSITORY_OWNER" "$FROM_REPOSITORY" "NOMSG"            # v4.12 v4.11
+        fi
     else
         echo -e $cBYEL"\a\t\tUser Space tool exists in firmware - use ${cRESET}'vx'${cBYEL} command to override with 3rd-Party/Entware (if available)\n"$cRESET
     fi
@@ -449,6 +450,8 @@ Load_UserspaceTool() {
 
             fi
     fi
+
+    local ACTIVE_WG_INTERFACES=$(echo "$(wg show interfaces)" | tr " " "\n" | sort -r | tr "\n" " ")    # v4.13
 
     STATUS=0
     if [ ! -f /usr/sbin/wg ] || [ "$USE_ENTWARE_KERNEL_MODULE" == "Y" ];then           # v4.12 Is the User Space Tools included in the firmware?
@@ -500,6 +503,8 @@ Load_UserspaceTool() {
             return 1
         fi
     fi
+
+    [ -n "$ACTIVE_WG_INTERFACES" ] && Manage_Wireguard_Sessions "start" "$ACTIVE_WG_INTERFACES" # v4.13
 }
 Show_MD5() {
 
@@ -1653,6 +1658,8 @@ Manage_Wireguard_Sessions() {
     # v4.12 Ensure 'server' peers are initialised before 'client' peers e.g. this order:  wg22 wg21 wg15 wg14 wg13 wg12 wg11
     WG_INTERFACE=$(echo "$WG_INTERFACE" | tr " " "\n" | sort -r | tr "\n" " ")  # v4.12
 
+    WG_INTERFACE=$(echo "$WG_INTERFACE" | awk '{$1=$1};1')    # v4.13  strip leading/trailing spaces/tabs
+
     [ -n "$WG_INTERFACE" ] && echo -e $cBWHT"\n\tRequesting WireGuard VPN Peer ${ACTION}$CATEGORY (${cBMAG}$WG_INTERFACE"$cRESET")"
 
     case "$ACTION" in
@@ -2210,6 +2217,77 @@ Manage_PASSTHRU_rules() {
     fi
 
     return $REDISPLAY
+}
+Manage_VPNDirector_rules() {
+
+    local REDISPLAY=0
+
+    local ACTION=$2             # vpndirector [ clone | delete | list]
+
+    [ -z "$ACTION"  ] && local ACTION="list"
+
+    case $ACTION in
+        clone|copy)
+            if [ -s /jffs/openvpn/vpndirector_rulelist ];then
+                echo -e $cRESET"\n\tAuto clone VPN Director rules\n" 2>&1
+                cat /jffs/openvpn/vpndirector_rulelist | sed 's/>WAN/>WAN\n/g' | sed 's/>OVPN1/>OVPN1\n/g' | sed 's/>OVPN2/>OVPN2\n/g' | sed 's/>OVPN3/>OVPN3\n/g' > /tmp/VPNDirectorRules.txt
+                while read -r LINE || [ -n "$LINE" ]; do
+                    #local ACTIVE=$(echo "$LINE" | awk -F '>' '{print $1}' VPNDIrector.txt)
+                    local COMMENT=$(echo "$LINE"        | awk -F '>' '{print $2}')
+                    local SRC=$(echo "$LINE"            | awk -F '>' '{print $3}')
+                    local DST=$(echo "$LINE"            | awk -F '>' '{print $4}')
+                    local TARGET_IFACE=$(echo "$LINE"   | awk -F '>' '{print $NF}')
+
+                    if [ -z "$SRC" ] && [ -n "$DST" ];then
+                        local DST="dst="$DST
+                    fi
+
+                    local VPN_NUM=${TARGET_IFACE#"${TARGET_IFACE%?}"}
+                    [ "$VPN_NUM" != "N" ] && local PEER="wg1"$VPN_NUM || local PEER="wg11"
+
+                    [ "$TARGET_IFACE" == "WAN" ] && local TARGET_IFACE="wan" || local TARGET_IFACE="vpn"
+                    echo -en "\tpeer" $PEER" rule add "$TARGET_IFACE $SRC $DST "comment" "$COMMENT" 2>&1
+                    Manage_RPDB_rules peer $PEER rule add $TARGET_IFACE $SRC $DST comment VPN Director: $COMMENT    # v4.13
+
+                    local IFACE=
+                    local SRC=
+                    local COMMENT=
+
+                done < /tmp/VPNDirectorRules.txt
+
+                #rm /tmp/VPNDirectorRules.txt
+            else
+                echo -en $cRED"\a\n\t***ERROR: No VPN Director Policy rules configured in firmware!\n"$cRESET 2>&1
+                return 0
+            fi
+
+            local REDISPLAY=1
+        ;;
+        list)
+            if [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(tag) FROM policy WHERE tag LIKE 'VPN Director:%';")" -gt 0 ];then
+                echo -e $cBCYA"\n\tVPN Director Selective Routing RPDB rules\n"$cRESET 2>&1
+                sqlite3 $SQL_DATABASE "SELECT rowid,peer,iface,srcip,dstip,tag FROM policy WHERE tag LIKE 'VPN Director:%' ORDER BY iface DESC;" |column -t  -s '|' --table-columns ID,Peer,Interface,Source,Destination,Description 2>&1 # v4.13
+            else
+                echo -en $cRED"\a\n\tNo WirGuard VPN Director Policy rules found\n"$cRESET 2>&1
+            fi
+        ;;
+        delete|flush)
+            if [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(tag) FROM policy WHERE tag LIKE 'VPN Director:%';")" -gt 0 ];then
+                echo -e $cBCYA"\a\n\tDo you want to DELETE ALL VPN Director Policy rules?"$cRESET 2>&1
+                echo -e "\tPress$cBRED y$cRESET to$cBRED CONFIRM${cRESET} or press$cBGRE [Enter] to SKIP." 2>&1
+                read -r "ANS"
+                if [ "$ANS" == "y" ];then
+                    sqlite3 $SQL_DATABASE "DELETE FROM policy WHERE tag LIKE 'VPN Director:%';"
+                    echo -e $cBGRE"\n\t[✔] Deleted ALL VPN Director Policy rules\n"$cRESET  2>&1
+                fi
+            else
+                echo -en $cRED"\a\n\t***ERROR: No VPN Director Policy rules found to delete'\n"$cRESET 2>&1
+            fi
+        ;;
+    esac
+
+    return $REDISPLAY
+
 }
 Initialise_SQL() {
 
@@ -2847,8 +2925,10 @@ Install_WireGuard_Manager() {
         exit 96
     else
         if [ ! -f "$ENTWARE_INFO" ] || [ "$(grep  "^arch" $ENTWARE_INFO | awk -F'=' '{print $2}' )" != "aarch64" ];then     # v4.12 v4.11 Hotfix
-            echo -e $cBRED"\a\n\n\t***ERROR: ${cRESET}Entware${cBRED} version not compatible with ${cRESET}WireGuard!\n"       # v4.11
-            [ ! -f /usr/sbin/wg ] && exit 97        # v4.12
+            if [ ! -f /usr/sbin/wg ];then
+                echo -e $cBRED"\a\n\n\t***ERROR: ${cRESET}3rd-Party Entware${cBRED} version not compatible with ${cRESET}WireGuard!\n"       # v4.13 v4.11
+                exit 97        # v4.12
+            fi
         fi
     fi
 
@@ -2879,8 +2959,11 @@ Install_WireGuard_Manager() {
     opkg install column                     # v2.02
     opkg install coreutils-mkfifo
 
-    if [ "$(which wg)" != "/usr/sbin/wg" ];then # v4.12
-        # Kernel module
+    # Kernel module in firmware?
+    if [ "$(which wg)" == "/usr/sbin/wg" ];then # v4.12
+        ROUTER_COMPATIBLE="Y"                   # v4.13
+    else
+        # SEe if 3rd-Party Entware Kernel module exists
         echo -e $cBCYA"\tDownloading Wireguard Kernel module for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
 
         ROUTER_COMPATIBLE="Y"
@@ -4082,7 +4165,8 @@ Validate_User_Choice() {
             generatestats) ;;
             killsw*) ;;             # v2.03
             killinter*) ip link del dev $(echo "$menu1" | awk '{print $2}'); menu1=;;
-            rpfilter*|rp_filter*);;         # v4.11
+            rpfilter*|rp_filter*);; # v4.11
+            vpndirector*);;         # v4.13
             "") ;;
             e*) ;;
             *) printf '\n\a\t%bInvalid Option%b "%s"%b Please enter a valid option\n' "$cBRED" "$cRESET" "$menu1" "$cBRED"
@@ -4299,9 +4383,11 @@ Process_User_Choice() {
                             [ "$(nvram get ipv6_service)" != "disabled" ] && echo -e $cBRED"\t[✖]${cBWHT} 'NOIPV6' specified, IPv6 ${cRED} is not allowed  - IPv4 configs ONLY$cRESET" # v4.11
                         fi
 
-                        echo -e $cBGRE"\t[ℹ ] Speedtest quick link${cBYEL} https://fast.com/en/gb/ \n"$cRESET       # v4.12
-
                         Manage_Stats
+
+                        echo -e $cBGRE"\n\t[ℹ ] Speedtest quick link${cBYEL} https://fast.com/en/gb/ \n"$cRESET       # v4.12
+
+                        echo -e $cBGRE"\t[ℹ ] ${cRESET}@ZebMcKayhan's$cBGRE Hint's and Tips Guide${cBYEL} https://github.com/ZebMcKayhan/WireguardManager/blob/main/README.md#table-of-content \n"$cRESET   # v4.13
 
                         ;;
                     *)
@@ -4539,6 +4625,12 @@ Process_User_Choice() {
                         echo -en $cRED"\a\n\t***ERROR: Invalid Reverse Path Filter request $cBWHT'"$ARG"'$cBRED - use 'disable|enable'\n"$cRESET
                     ;;
                 esac
+            ;;
+            vpndirector*)                   # v4.13 'vpndirector [list | clone | delete]'
+
+                Manage_VPNDirector_rules $menu1
+                [ $? -eq 1 ] && Manage_VPNDirector_rules list   # Show VPN Director rules for successful 'clone'
+
             ;;
             *)
                 printf '\n\a\t%bInvalid Option%b "%s"%b Please enter a valid option\n' "$cBRED" "$cRESET" "$menu1" "$cBRED"    # v4.03 v3.04 v1.09
