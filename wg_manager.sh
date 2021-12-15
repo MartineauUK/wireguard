@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.13"
-#============================================================================================ © 2021 Martineau v4.13
+VERSION="v4.14b"
+#============================================================================================ © 2021 Martineau v4.14b
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -978,6 +978,10 @@ Import_Peer() {
                                 "#"MTU) local MTU=${LINE##* };;                 # v4.09
                                 "#"DNS) local COMMENT_DNS=${LINE##* } ;;
                                 "#"Address) local COMMENT_SUBNET=${LINE##* } ;;
+                                ListenPort)                                     # v4.14
+                                    # This must be commented out!
+                                    [ "$MODE" == "client" ] && COMMENT_OUT="Y"
+                                ;;
                                 MTU) local MTU=${LINE##* }                      # v4.09
                                     # This must be commented out!
                                     [ "$MODE" == "client" ] && COMMENT_OUT="Y"
@@ -1078,6 +1082,7 @@ Import_Peer() {
                             sed -i 's/^DNS/#DNS/' ${IMPORT_DIR}${WG_INTERFACE}.conf
                             sed -i 's/^Address/#Address/' ${IMPORT_DIR}${WG_INTERFACE}.conf
                             sed -i 's/^MTU/#MTU/' ${IMPORT_DIR}${WG_INTERFACE}.conf # v4.09
+                            sed -i 's/^ListenPort/#ListenPort/' ${IMPORT_DIR}${WG_INTERFACE}.conf # v4.14
                             # Insert the tag
                             if [ "$ANNOTATE" != "# N/A" ];then
                                 if [ "$INSERT_COMMENT" != "N" ];then                    # v4.03
