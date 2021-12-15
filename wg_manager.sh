@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.13b4"
-#============================================================================================ © 2021 Martineau v4.13b4
+VERSION="v4.13"
+#============================================================================================ © 2021 Martineau v4.13
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -411,7 +411,7 @@ Download_Modules() {
                 #        * opkg_install_cmd: Cannot install package wireguard-kernel.
                 #
                 #
-                _Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $1}')" "$REPOSITORY_OWNER" "$FROM_REPOSITORY"
+                #_Get_File "$(echo "$WEBFILE_NAMES" | awk '{print $1}')" "$REPOSITORY_OWNER" "$FROM_REPOSITORY"
                 ROUTER_COMPATIBLE="N"
                 ;;
         esac
@@ -424,9 +424,11 @@ Download_Modules() {
 
     # User Space Tools - Allow use of Entware/3rd Party modules even if Modules included in firmware
     if [ ! -f /usr/sbin/wg ] || [ "$USE_ENTWARE_KERNEL_MODULE" == "Y" ];then    # v4.12 Is the User Space Tools included in the firmware?
-        WEBFILE=$(echo "$WEBFILE_NAMES" | awk '/wireguard-tools/ {print}')
-        echo -e $cBCYA"\n\tDownloading WireGuard User space Tool$cBWHT '$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO) @$REPOSITORY_OWNER $FROM_RESPOSITORY_TXT"$cRESET  # v4.11
-        _Get_File  "$WEBFILE" "$REPOSITORY_OWNER" "$FROM_REPOSITORY" "NOMSG"            # v4.12 v4.11
+        if [ "$ROUTER_COMPATIBLE" == "N" ];then     # v4.13
+            WEBFILE=$(echo "$WEBFILE_NAMES" | awk '/wireguard-tools/ {print}')
+            echo -e $cBCYA"\n\tDownloading WireGuard User space Tool$cBWHT '$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO) @$REPOSITORY_OWNER $FROM_RESPOSITORY_TXT"$cRESET  # v4.11
+            _Get_File  "$WEBFILE" "$REPOSITORY_OWNER" "$FROM_REPOSITORY" "NOMSG"            # v4.12 v4.11
+        fi
     else
         echo -e $cBYEL"\a\t\tUser Space tool exists in firmware - use ${cRESET}'vx'${cBYEL} command to override with 3rd-Party/Entware (if available)\n"$cRESET
     fi
@@ -2923,8 +2925,10 @@ Install_WireGuard_Manager() {
         exit 96
     else
         if [ ! -f "$ENTWARE_INFO" ] || [ "$(grep  "^arch" $ENTWARE_INFO | awk -F'=' '{print $2}' )" != "aarch64" ];then     # v4.12 v4.11 Hotfix
-            echo -e $cBRED"\a\n\n\t***ERROR: ${cRESET}3rd-Party Entware${cBRED} version not compatible with ${cRESET}WireGuard!\n"       # v4.13 v4.11
-            [ ! -f /usr/sbin/wg ] && exit 97        # v4.12
+            if [ ! -f /usr/sbin/wg ];then
+                echo -e $cBRED"\a\n\n\t***ERROR: ${cRESET}3rd-Party Entware${cBRED} version not compatible with ${cRESET}WireGuard!\n"       # v4.13 v4.11
+                exit 97        # v4.12
+            fi
         fi
     fi
 
