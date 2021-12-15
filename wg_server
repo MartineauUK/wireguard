@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.13b"
-#============================================================================================ © 2021 Martineau v4.13b
+VERSION="v4.13"
+#============================================================================================ © 2021 Martineau v4.13
 #
 
 # Maintainer: Martineau
@@ -79,9 +79,10 @@ Manage_Passthru(){
                         done << EOR
 $(ip route | grep "$WG_INTERFACE")
 EOR
-                    else
-                        ip rule $ACTION from $IP_ADDR table $TABLE
                     fi
+                    
+                    ip rule $ACTION from $IP_ADDR table $TABLE      # v4.13 Fix @chongnt
+         
                 else
                     ip rule $ACTION from $IP_ADDR table $TABLE 2>/dev/null
                 fi
