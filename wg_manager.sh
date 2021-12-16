@@ -24,7 +24,7 @@ VERSION="v4.13"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 15-Dec-2021
+# Last Updated Date: 16-Dec-2021
 #
 # Description:
 #
@@ -399,7 +399,7 @@ Download_Modules() {
                 ;;
             RT-AX86U|GT-AC5700)     # v4.12 These models have wireguard in the firmware
                     # RT-AX68U, RT-AX86U - 4.1.52           e.g. wireguard-kernel_1.0.20210219-k52_1_aarch64-3.10.ipk
-                    _Get_File "$(echo "$WEBFILE_NAMES" | awk '/k27/ {print}')" "$REPOSITORY_OWNER" "$FROM_REPOSITORY"   # k52_1
+                    _Get_File "$(echo "$WEBFILE_NAMES" | awk '/k52/ {print}')" "$REPOSITORY_OWNER" "$FROM_REPOSITORY"   # k52_1
                 ;;
             *)
                 echo -e $cBRED"\a\n\t***ERROR: Unable to find 3rd-Party WireGuard Kernel module for $ROUTER (v$BUILDNO)\n"$cRESET
@@ -424,7 +424,7 @@ Download_Modules() {
 
     # User Space Tools - Allow use of Entware/3rd Party modules even if Modules included in firmware
     if [ ! -f /usr/sbin/wg ] || [ "$USE_ENTWARE_KERNEL_MODULE" == "Y" ];then    # v4.12 Is the User Space Tools included in the firmware?
-        if [ "$ROUTER_COMPATIBLE" == "N" ];then     # v4.13
+        if [ "$ROUTER_COMPATIBLE" != "N" ];then     # v4.13 HOTFIX
             WEBFILE=$(echo "$WEBFILE_NAMES" | awk '/wireguard-tools/ {print}')
             echo -e $cBCYA"\n\tDownloading WireGuard User space Tool$cBWHT '$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO) @$REPOSITORY_OWNER $FROM_RESPOSITORY_TXT"$cRESET  # v4.11
             _Get_File  "$WEBFILE" "$REPOSITORY_OWNER" "$FROM_REPOSITORY" "NOMSG"            # v4.12 v4.11
