@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.14b"
-#============================================================================================ © 2021 Martineau v4.14b
+VERSION="v4.14b1"
+#============================================================================================ © 2021 Martineau v4.14b1
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.14b"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 15-Dec-2021
+# Last Updated Date: 18-Dec-2021
 #
 # Description:
 #
@@ -160,7 +160,7 @@ Is_IPv6() {
     grep -oE '([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4}'       # IPv6 format -very crude
 }
 Is_IPv4_CIDR() {
-        grep -oE '^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$'         # IPv4 CIDR range notation
+        grep -oE '^([0-9]{1,3}\.){3}[0-9]{1,3}/(3[012]|[12]?[0-9])$'    # IPv4 CIDR range notation
 }
 Is_IPv6() {
     # Note this matches compression anywhere in the address, though it won't match the loopback address ::1
@@ -361,6 +361,7 @@ Download_Modules() {
     [ -z "$FROM_REPOSITORY" ] && local FROM_REPOSITORY="main"               # v4.12
     local REPOSITORY_OWNER="odkrys"                                         # v4.11
     local USE_ENTWARE_KERNEL_MODULE="N"                                     # v4.12
+
     if [ -f ${INSTALL_DIR}WireguardVPN.conf ] &&  [ -n "$(grep -oE "^USE_ENTWARE_KERNEL_MODULE" ${INSTALL_DIR}WireguardVPN.conf)" ];then    # v4.12
         local USE_ENTWARE_KERNEL_MODULE="Y"
     fi
@@ -399,7 +400,7 @@ Download_Modules() {
                 ;;
             RT-AX86U|GT-AC5700)     # v4.12 These models have wireguard in the firmware
                     # RT-AX68U, RT-AX86U - 4.1.52           e.g. wireguard-kernel_1.0.20210219-k52_1_aarch64-3.10.ipk
-                    _Get_File "$(echo "$WEBFILE_NAMES" | awk '/k27/ {print}')" "$REPOSITORY_OWNER" "$FROM_REPOSITORY"   # k52_1
+                    _Get_File "$(echo "$WEBFILE_NAMES" | awk '/k52/ {print}')" "$REPOSITORY_OWNER" "$FROM_REPOSITORY"   # k52_1
                 ;;
             *)
                 echo -e $cBRED"\a\n\t***ERROR: Unable to find 3rd-Party WireGuard Kernel module for $ROUTER (v$BUILDNO)\n"$cRESET
@@ -424,7 +425,7 @@ Download_Modules() {
 
     # User Space Tools - Allow use of Entware/3rd Party modules even if Modules included in firmware
     if [ ! -f /usr/sbin/wg ] || [ "$USE_ENTWARE_KERNEL_MODULE" == "Y" ];then    # v4.12 Is the User Space Tools included in the firmware?
-        if [ "$ROUTER_COMPATIBLE" == "N" ];then     # v4.13
+        if [ "$ROUTER_COMPATIBLE" != "N" ];then     # v4.13 HOTFIX
             WEBFILE=$(echo "$WEBFILE_NAMES" | awk '/wireguard-tools/ {print}')
             echo -e $cBCYA"\n\tDownloading WireGuard User space Tool$cBWHT '$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO) @$REPOSITORY_OWNER $FROM_RESPOSITORY_TXT"$cRESET  # v4.11
             _Get_File  "$WEBFILE" "$REPOSITORY_OWNER" "$FROM_REPOSITORY" "NOMSG"            # v4.12 v4.11
@@ -1186,6 +1187,7 @@ Manage_Peer() {
     [ -z "$CMD" ] && CMD="list"
 
     [ -n "$(echo $@ | grep -iw "ipset")" ] && { local SUBCMD=$CMD;local CMD="ipset"; }
+    [ -n "$(echo $@ | grep -iw "subnet")" ] && { local SUBCMD=$CMD;local CMD="subnet"; }    # v4.14
 
         case $CMD in
             list)
@@ -1214,10 +1216,12 @@ Manage_Peer() {
 
                     echo -e "\tpeer peer_name [del|add] ipset {ipset_name[...]}\t\t\t- Selectively Route IPSets e.g. peer wg13 add ipset NetFlix Hulu"
 
+                    echo -e "\tpeer peer_name [add] subnet {IPSubnet[...]}\t\t\t\t- Configure downstream subnets e.g. peer wg13 add subnet 192.168.5.0/24"
+
                     echo -e "\tpeer peer_name {rule [del {id_num} |add [wan] rule_def]}\t\t- Manage Policy rules e.g. peer wg13 rule add 172.16.1.0/24 comment All LAN"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg13 rule add wan 52.97.133.162 comment smtp.office365.com"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg13 rule add wan 172.16.1.100 9.9.9.9 comment Quad9 DNS"
-                    echo -e "\tpeer serv_peer_name {passthru client_peer {[add|del] [device|IP/CIDR]}} - Manage passthu' rules for inbound 'server' peer devices/IPs/CIDR outbound via 'client' peer tunnel"
+                    echo -e "\tpeer serv_peer_name {passthru client_peer {[add|del] [device|IP/CIDR]}} - Manage passthu' rules; 'server' peer devices/IPs/CIDR outbound via 'client' peer"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru add wg11 SGS8"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru add wg15 all"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru add wg12 10.100.100.0/27"
@@ -1508,6 +1512,16 @@ Manage_Peer() {
                                     fi
                                 else
                                      echo -e $cBRED"\a\n\t***ERROR 'server' Peer '$WG_INTERFACE' cannot set MTU\n"$cRESET
+                                fi
+                            ;;
+                            subnet*)                                # peer wg11 {[add | del ]} {xxx.xxx.xxx.0/24[...]}
+
+                                local ARGS=$@
+                                if [ "$SUBCMD" == "add" ] || [ "$SUBCMD" == "del" ] || [ "$SUBCMD" == "upd" ];then
+                                    shift 2
+                                    Manage_Custom_Subnets "$SUBCMD" "$WG_INTERFACE" "$@"
+                                else
+                                    echo -e $cBRED"\a\n\t***ERROR Invalid command '$SUBCMD' e.g. [add | del | upd]\n"$cRESET
                                 fi
                             ;;
                             add*|ipset*)                            # peer wg13 [add|del|edit] ipset Netflix[.....]
@@ -2227,7 +2241,15 @@ Manage_VPNDirector_rules() {
 
     local REDISPLAY=0
 
-    local ACTION=$2             # vpndirector [ clone | delete | list]
+    local ACTION=$2             # vpndirector [ clone [ 'wan' | 'ovpnc'n [ changeto_vpn_num]]| delete | list]
+
+    local FILTER=$3
+    if [ -n "$FILTER" ];then
+        local FILTER=$(echo "$FILTER" | tr 'a-z' 'A-Z')
+        [ "$FILTER" != "WAN" ] && local FILTER="OVPN"$FILTER
+    fi
+
+    local WG_INTERFACE=$4
 
     [ -z "$ACTION"  ] && local ACTION="list"
 
@@ -2243,16 +2265,27 @@ Manage_VPNDirector_rules() {
                     local DST=$(echo "$LINE"            | awk -F '>' '{print $4}')
                     local TARGET_IFACE=$(echo "$LINE"   | awk -F '>' '{print $NF}')
 
+                    if [ -n "$FILTER" ];then
+                        if [ "$FILTER" != "$TARGET_IFACE" ];then
+                            echo -e $cBRED"\tVPN Director clone Filter: '$FILTER' skipping '$TARGET_IFACE ($COMMENT)'"$cRESET
+                            continue
+                        fi
+                    fi
+
                     if [ -z "$SRC" ] && [ -n "$DST" ];then
                         local DST="dst="$DST
                     fi
 
                     local VPN_NUM=${TARGET_IFACE#"${TARGET_IFACE%?}"}
-                    [ "$VPN_NUM" != "N" ] && local PEER="wg1"$VPN_NUM || local PEER="wg11"
+                    if [ "$VPN_NUM" != "N" ];then
+                        [ -z "$4" ] && local WG_INTERFACE="wg1"$VPN_NUM || local WG_INTERFACE="wg1"$4
+                    else
+                        local WG_INTERFACE="wg11"
+                    fi
 
                     [ "$TARGET_IFACE" == "WAN" ] && local TARGET_IFACE="wan" || local TARGET_IFACE="vpn"
-                    echo -en "\tpeer" $PEER" rule add "$TARGET_IFACE $SRC $DST "comment" "$COMMENT" 2>&1
-                    Manage_RPDB_rules peer $PEER rule add $TARGET_IFACE $SRC $DST comment VPN Director: $COMMENT    # v4.13
+                    echo -en "\tpeer" $WG_INTERFACE" rule add "$TARGET_IFACE $SRC $DST "comment" "$COMMENT" 2>&1
+                    Manage_RPDB_rules peer $WG_INTERFACE rule add $TARGET_IFACE $SRC $DST comment VPN Director: $COMMENT    # v4.13
 
                     local IFACE=
                     local SRC=
@@ -4064,6 +4097,62 @@ Manage_IPSET() {
         ;;
     esac
 }
+Manage_Custom_Subnets() {
+
+    local ACTION=$1
+    local WG_INTERFACE=$2
+    local EDIT=0
+
+    case $ACTION in
+        add|del)
+            shift 2
+        ;;
+        *)
+            echo -e $cBRED"\a\n\t***ERROR Subnet cmd '$ACTION' e.g. [new | add | del ]\n"$cRESET
+            return 1
+        ;;
+    esac
+
+    # Simply open the appropriate scripts for editing?
+    FN="${INSTALL_DIR}/Scripts/${WG_INTERFACE}-route-up.sh"
+    if [ ! -f $FN ];then
+        cat > $FN << EOF
+#!/bin/sh
+
+# Add Downstream IP/Subnets such as WiFi IoT
+#     iptables -t nat -I PREROUTING -s xxx.xxx.xxx.xxx/24 -o $VPN_ID -j MASQUERADE -m comment --comment "WireGuard 'client'" 2>/dev/null
+
+EOF
+    for SUBNET in $@
+        do
+            if [ -n "$(echo "$SUBNET" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$SUBNET" | Is_IPv4)" ];then
+                echo -e "iptables -t nat -I PREROUTING -s $SUBNET -o $WG_INTERFACE -j MASQUERADE -m comment --comment \"WireGuard 'client'\" 2>/dev/null" >> $FN
+            else
+                echo -e $cBRED"\n\a\t***ERROR: Invalid IP/Subnet '${cBWHT}${SUBNET}${cBRED}'"$RESET
+                echo -e "# ==> Invalid IP/Subnet iptables -t nat -I PREROUTING -s $SUBNET -o $WG_INTERFACE -j MASQUERADE -m comment --comment \"WireGuard 'client'\" 2>/dev/null" >> $FN
+                local EDIT=1
+            fi
+        done
+    fi
+    [ $EDIT -eq 1 ] && nano --unix $FN
+    echo -e $cRESET"\n\t'$FN'$cBGRE modified for custom Subnet management"$cRESET
+    FN="${INSTALL_DIR}/Scripts/${WG_INTERFACE}-route-down.sh"
+    if [ ! -f $FN ];then
+        cat > $FN << EOF
+#!/bin/sh
+
+# Remove Downstream IP/Subnets such as WiFi IoT
+#     iptables -t nat -D PREROUTING -s xxx.xxx.xxx.xxx/24 -o $WG_INTERFACE -j MASQUERADE -m comment --comment "WireGuard 'client'" 2>/dev/null
+
+EOF
+    for SUBNET in $@
+        do
+            echo -e "iptables -t nat -D PREROUTING -s $SUBNET -o $VPN_ID -j MASQUERADE -m comment --comment \"WireGuard 'client'\" 2>/dev/null" >> $FN
+        done
+    fi
+    #nano --unix $FN
+    echo -e $cRESET"\t'$FN'$cBGRE modified for custom Subnet management"$cRESET
+}
 Build_Menu() {
     if [ -z "$SUPPRESSMENU" ];then
         # Generate dynamically context aware menu
@@ -4172,6 +4261,7 @@ Validate_User_Choice() {
             killinter*) ip link del dev $(echo "$menu1" | awk '{print $2}'); menu1=;;
             rpfilter*|rp_filter*);; # v4.11
             vpndirector*);;         # v4.13
+            useentware*|allowentware*);;    # v4.14
             "") ;;
             e*) ;;
             *) printf '\n\a\t%bInvalid Option%b "%s"%b Please enter a valid option\n' "$cBRED" "$cRESET" "$menu1" "$cBRED"
@@ -4386,6 +4476,17 @@ Process_User_Choice() {
                         # Override IPv6 ?
                         if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOIP[Vv]6" ${INSTALL_DIR}WireguardVPN.conf)" ];then   # v4.11
                             [ "$(nvram get ipv6_service)" != "disabled" ] && echo -e $cBRED"\t[✖]${cBWHT} 'NOIPV6' specified, IPv6 ${cRED} is not allowed  - IPv4 configs ONLY$cRESET" # v4.11
+                        fi
+
+                        # Allow use of 3rd-Party Entware Kernel/Userspace Tools
+                        if [ -f ${INSTALL_DIR}WireguardVPN.conf ] &&  [ -n "$(grep -oE "USE_ENTWARE_KERNEL_MODULE" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                                if [ -f /usr/sbin/wg ];then
+                                    if [ -n "$(grep -oE "^USE_ENTWARE_KERNEL_MODULE" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                                        echo -e $cBGRE"\t[✔]${cBWHT} Use 3rd-party Entware/Userspace Tools ${cBGRE}modules is ALLOWED\n$cRESET"
+                                    else
+                                        echo -e $cBRED"\t[✖]${cBWHT} Use 3rd-party Entware/Userspace Tools ${cBGRE}modules is ${cBRED}DENIED\n$cRESET"
+                                    fi
+                                fi
                         fi
 
                         Manage_Stats
@@ -4631,11 +4732,33 @@ Process_User_Choice() {
                     ;;
                 esac
             ;;
-            vpndirector*)                   # v4.13 'vpndirector [list | clone | delete]'
+            vpndirector*)                   # v4.13 'vpndirector [ clone [ 'wan' | ovpnc_num [ changeto_vpn_num]]| delete | list]'
 
                 Manage_VPNDirector_rules $menu1
                 [ $? -eq 1 ] && Manage_VPNDirector_rules list   # Show VPN Director rules for successful 'clone'
 
+            ;;
+            useentware*|allowentware*)      # v4.14 'allowentware [on | off | yes | no]'
+
+                local ACTION="$(echo "$menu1"| awk '{print $2}')"
+
+                if [ -f ${INSTALL_DIR}WireguardVPN.conf ] &&  [ -n "$(grep -oE "USE_ENTWARE_KERNEL_MODULE" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                case $ACTION in
+                    on|yes)
+                        sed -i 's/^#USE_ENTWARE_KERNEL_MODULE/USE_ENTWARE_KERNEL_MODULE/' ${INSTALL_DIR}WireguardVPN.conf
+                        echo -e $cBGRE"\n\t[✔] Use 3rd-party Entware Kernel/Userspace Tools modules ALLOWED\n"$cRESET
+                ;;
+                    off|no)
+                        sed -i 's/^USE_ENTWARE_KERNEL_MODULE/#USE_ENTWARE_KERNEL_MODULE/' ${INSTALL_DIR}WireguardVPN.conf
+                        echo -e $cRED"\n\t[✖]${cBGRE}  Use 3rd-party Entware Kernel/Userspace Tools modules ${cBRED}DENIED\n"$cRESET
+                ;;
+                    *)
+                    echo -en $cRED"\a\n\t***ERROR: Invalid arg $cBWHT'"$ACTION"'$cBRED for 'Use Entware Module' request  - valid 'on' or 'off' only!\n"$cRESET
+                ;;
+                esac
+                else
+                    echo -en $cRED"\a\n\t***ERROR: Use Entware Module request $cBWHT'"$ACTION"'$cBRED feature not available!\n"$cRESET
+                fi
             ;;
             *)
                 printf '\n\a\t%bInvalid Option%b "%s"%b Please enter a valid option\n' "$cBRED" "$cRESET" "$menu1" "$cBRED"    # v4.03 v3.04 v1.09
