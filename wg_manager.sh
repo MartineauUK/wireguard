@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.14b1"
-#============================================================================================ © 2021 Martineau v4.14b1
+VERSION="v4.14b2"
+#============================================================================================ © 2021 Martineau v4.14b2
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -1522,6 +1522,25 @@ Manage_Peer() {
                                     Manage_Custom_Subnets "$SUBCMD" "$WG_INTERFACE" "$@"
                                 else
                                     echo -e $cBRED"\a\n\t***ERROR Invalid command '$SUBCMD' e.g. [add | del | upd]\n"$cRESET
+                                fi
+                            ;;
+                            port*)                                  # v4.14 peer wg23 port=12345 (useful if Torguard Listenport = 51820)
+                                shift
+                                local Mode=$(Server_or_Client "$WG_INTERFACE")
+                                local PORT=$(echo "$CMD" | sed -n "s/^.*port=//p" | awk '{print $1}')
+
+                                if [ "$Mode" = "server" ];then
+
+                                    if [ -n "$(echo "$PORT" | grep -E "^[0-9]{1,}$")" ] && [ "$PORT" -ge "1024" ] && [ "$PORT" -le "65365" ];then   # v4.14
+                                        sqlite3 $SQL_DATABASE "UPDATE servers SET port='$PORT' WHERE peer='$WG_INTERFACE';"                         # v4.14
+                                        sed -i "/^ListenPort/ s~[^ ]*[^ ]~$PORT~3" ${CONFIG_DIR}${WG_INTERFACE}.conf
+
+                                        echo -e $cBGRE"\n\t[✔] Updated 'server' Peer Listen Port\n"$cRESET
+                                    else
+                                        echo -e $cBRED"\a\n\t***ERROR 'server' Peer '$WG_INTERFACE' Listen Port '$PORT' invalid!\n"$cRESET    # v4.14
+                                    fi
+                                else
+                                     echo -e $cBRED"\a\n\t***ERROR 'client' Peer '$WG_INTERFACE' cannot set Listen Port\n"$cRESET
                                 fi
                             ;;
                             add*|ipset*)                            # peer wg13 [add|del|edit] ipset Netflix[.....]
