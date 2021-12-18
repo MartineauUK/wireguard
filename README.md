@@ -19,6 +19,29 @@ Enable SSH on router, then use your preferred SSH Client e.g. Xshell6,MobaXterm,
     
 Example successful install.....
 
+    +======================================================================+
+    |  Welcome to the WireGuard Manager/Installer script (Asuswrt-Merlin)  |
+    |                                                                      |
+    |                      Version v4.14b by Martineau                     |
+    |                                                                      |
+    | Requirements: HND or AX router with Kernel 4.1.xx or later           |
+    |                         e.g. RT-AC86U or RT-AX86U etc.               |
+    |                                                                      |
+    |               USB drive with Entware installed                       |
+    |                                                                      |
+    |   1 = Install WireGuard                                              |
+    |       o1. Enable firewall-start protection for Firewall rules        |
+    |       o2. Enable DNS                                                 |
+    |                                                                      |
+    |                                                                      |
+    +======================================================================+
+
+	    WireGuard ACTIVE Peer Status: Clients 0, Servers 0
+
+    1  = Begin WireGuard Installation Process						
+
+    e  = Exit Script [?]
+
 	Downloading scripts
 	wg_client downloaded successfully 
 	wg_server downloaded successfully 
