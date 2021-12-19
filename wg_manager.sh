@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.14b2"
-#============================================================================================ © 2021 Martineau v4.14b2
+VERSION="v4.14b3"
+#============================================================================================ © 2021 Martineau v4.14b3
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.14b2"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 18-Dec-2021
+# Last Updated Date: 19-Dec-2021
 #
 # Description:
 #
@@ -979,6 +979,26 @@ Import_Peer() {
                                 "#"MTU) local MTU=${LINE##* };;                 # v4.09
                                 "#"DNS) local COMMENT_DNS=${LINE##* } ;;
                                 "#"Address) local COMMENT_SUBNET=${LINE##* } ;;
+                                "#"PreUp);;                                     # v4.14
+                                PreUp)                                          # v4.14
+                                    # This must be commented out!
+                                    [ "$MODE" == "client" ] && COMMENT_OUT="Y"
+                                ;;
+                                "#"PostUp);;                                    # v4.14
+                                PostUp)                                         # v4.14
+                                    # This must be commented out!
+                                    [ "$MODE" == "client" ] && COMMENT_OUT="Y"
+                                ;;
+                                "#"PreDown);;                                   # v4.14
+                                PreDown)                                        # v4.14
+                                    # This must be commented out!
+                                    [ "$MODE" == "client" ] && COMMENT_OUT="Y"
+                                ;;
+                                "#"PostDown);;                                  # v4.14
+                                PostDown)                                       # v4.14
+                                    # This must be commented out!
+                                    [ "$MODE" == "client" ] && COMMENT_OUT="Y"
+                                ;;
                                 ListenPort)                                     # v4.14
                                     # This must be commented out!
                                     [ "$MODE" == "client" ] && COMMENT_OUT="Y"
@@ -1083,7 +1103,11 @@ Import_Peer() {
                             sed -i 's/^DNS/#DNS/' ${IMPORT_DIR}${WG_INTERFACE}.conf
                             sed -i 's/^Address/#Address/' ${IMPORT_DIR}${WG_INTERFACE}.conf
                             sed -i 's/^MTU/#MTU/' ${IMPORT_DIR}${WG_INTERFACE}.conf # v4.09
-                            sed -i 's/^ListenPort/#ListenPort/' ${IMPORT_DIR}${WG_INTERFACE}.conf # v4.14
+                            sed -i 's/^ListenPort/#ListenPort/' ${IMPORT_DIR}${WG_INTERFACE}.conf   # v4.14
+                            sed -i 's/^PreUp/#PreUp/g' ${IMPORT_DIR}${WG_INTERFACE}.conf            # v4.14
+                            sed -i 's/^PostUp/#PostUp/g' ${IMPORT_DIR}${WG_INTERFACE}.conf          # v4.14
+                            sed -i 's/^PreDown/#PreDown/g' ${IMPORT_DIR}${WG_INTERFACE}.conf        # v4.14
+                            sed -i 's/^PostDown/#PostDown/g' ${IMPORT_DIR}${WG_INTERFACE}.conf      # v4.14
                             # Insert the tag
                             if [ "$ANNOTATE" != "# N/A" ];then
                                 if [ "$INSERT_COMMENT" != "N" ];then                    # v4.03
@@ -3377,19 +3401,19 @@ Show_Peer_Status() {
                                 TX=$(Convert_1024KMG "$TX" "$TXU")
 
                                 # Need to get the last logged RX/TX Total values for the Peer, and only add to SQL if total > 0
-                                Parse "$(sqlite3 $SQL_DATABASE "select rxtotal,txtotal from traffic WHERE peer='$WG_INTERFACE' order by timestamp desc limit 1;")" "|" RX_OLD TX_OLD    # v4.11
+                                Parse "$(sqlite3 $SQL_DATABASE "SELECT rxtotal,txtotal FROM traffic WHERE peer='$WG_INTERFACE' order by timestamp desc limit 1;")" "|" RX_OLD TX_OLD    # v4.11
 
                                 if [ -n "$RX_OLD" ] && [ -n "$TX_OLD" ];then
                                     #local RX_DELTA=$((RX-RX_OLD))
                                     #local TX_DELTA=$((TX-TX_OLD))
                                     # Old-skool - slower but doesn't create negative result
                                     #   WTF!!! echo $((1191071409+2037987240))
-                                    if [ -n "$RX" ] && [ -n "$RX_OLD" ];then    # v4.11 @Torson
+                                    if [ "$RX_OLD" != "*" ] && [ -n "$RX" ] && [ -n "$RX_OLD" ];then    # v4.11 @Torson
                                         local RX_DELTA=$(expr "$RX" - "$RX_OLD")    # v4.11 @ZebMcKayhan
                                     else
                                         local RX_DELTA=0
                                     fi
-                                    if [ -n "$TX" ] && [ -n "$RX_OLD" ];then    # v4.11 @Torson
+                                    if [ "$TX_OLD" != "*" ] && [ -n "$TX" ] && [ -n "$RX_OLD" ];then    # v4.11 @Torson
                                         local TX_DELTA=$(expr "$TX" - "$TX_OLD")    # v4.11 @ZebMcKayhan
                                     else
                                         local TX_DELTA=0
