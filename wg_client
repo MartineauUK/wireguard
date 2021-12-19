@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.13b8"
-#============================================================================================ © 2021 Martineau v4.13b8
+VERSION="v4.14b1"
+#============================================================================================ © 2021 Martineau v4.14b1
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 08-Dec-2021
+# Last Updated Date: 19-Dec-2021
 #
 # Description:
 #
@@ -385,6 +385,19 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         sqlite3 $SQL_DATABASE "INSERT into session values('$WG_INTERFACE','Start','$TIMESTAMP');"   # v1.08
         sqlite3 $SQL_DATABASE "INSERT into traffic values('$WG_INTERFACE','$TIMESTAMP','0','0','0','0');"
 
+        # v4.14 Process 'PreUp' commands
+        while IFS='' read -r LINE || [ -n "$LINE" ]; do # v4.14
+
+            if [ "${LINE:0:6}" == "#PreUp" ];then           # v4.14
+                CMDTYPE=$(echo "${LINE%% *}" | sed 's/#//')
+                CMD="$(echo "$LINE" | cut -d' ' -f3-)"  # v4.14
+                logger -t "wireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"
+                #echo -e $cBCYA"\twireguard-${MODE}${VPN_NAME}:" "Executing $CMDTYPE: $cRESET'$CMD'"
+                $CMD                                    # v4.14
+            fi
+
+        done < ${CONFIG_DIR}${VPN_ID}.conf              # v4.14ABASE "INSERT into traffic values('$WG_INTERFACE','$TIMESTAMP','0','0','0','0');"
+
         # User Exit @Torson
         [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-route-up.sh ] && { logger -t "wireguard-${MODE}${VPN_NAME}" "Executing Event:${VPN_ID}-route-up.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-route-up.sh; }
 
@@ -594,13 +607,26 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
 
         fi
 
-            # Shouldn't fire as I use '-t nat WGDNSx' chain
-            if [ "$wgdns" != "" ] && [ ! -f /tmp/resolv.dnsmasq_backup.$WG_INTERFACE ]; then {
-                    cp /tmp/resolv.dnsmasq /tmp/resolv.dnsmasq_backup..$WG_INTERFACE 2>/dev/null
-                            echo "server=$wgdns" > /tmp/resolv.dnsmasq
-                            service restart_dnsmasq
-                    }
+        # Shouldn't fire as I use '-t nat WGDNSx' chain
+        if [ "$wgdns" != "" ] && [ ! -f /tmp/resolv.dnsmasq_backup.$WG_INTERFACE ]; then {
+                cp /tmp/resolv.dnsmasq /tmp/resolv.dnsmasq_backup..$WG_INTERFACE 2>/dev/null
+                        echo "server=$wgdns" > /tmp/resolv.dnsmasq
+                        service restart_dnsmasq
+                }
+        fi
+
+        # v4.14 Process 'PostUp' commands
+        while IFS='' read -r LINE || [ -n "$LINE" ]; do # v4.14
+
+            if [ "${LINE:0:6}" == "#PostUp" ];then          # v4.14
+                CMDTYPE=$(echo "${LINE%% *}" | sed 's/#//')
+                CMD="$(echo "$LINE" | cut -d' ' -f3-)"  # v4.14
+                logger -t "wireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"
+                #echo -e $cBCYA"\twireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: $cRESET'$CMD'"
+                $CMD                                    # v4.14
             fi
+
+        done < ${CONFIG_DIR}${VPN_ID}.conf              # v4.14
 
         echo -en $cBGRE"\t"
         logger -st "wireguard-${MODE}${VPN_NAME}" "Initialisation complete."
@@ -610,6 +636,19 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         echo -e
     fi
 else
+
+    # v4.14 Process 'PreDown' commands
+    while IFS='' read -r LINE || [ -n "$LINE" ]; do # v4.14
+
+        if [ "${LINE:0:8}" == "#PreDown" ];then         # v4.14
+            CMDTYPE=$(echo "${LINE%% *}" | sed 's/#//')
+            CMD="$(echo "$LINE" | cut -d' ' -f3-)"  # v4.14
+            logger -t "wireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"
+            #echo -e $cBCYA"\twireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: $cRESET'$CMD'"
+            $CMD                                    # v4.14
+        fi
+
+    done < ${CONFIG_DIR}${VPN_ID}.conf              # v4.14
 
     # User Exit @Torson
     [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-route-down.sh ] && { logger -t "wireguard-${MODE}${VPN_NAME}" "Executing Event:${VPN_ID}-route-down.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-route-down.sh; }
@@ -718,6 +757,19 @@ else
             # ip6tables -t nat -X WGDNS$WG_INTERFACE 2>/dev/null          # v4.0
         # fi
     #fi
+
+    # v4.14 Process 'PostDown' commands
+    while IFS='' read -r LINE || [ -n "$LINE" ]; do # v4.14
+
+        if [ "${LINE:0:9}" == "#PostDown" ];then    # v4.14
+            CMDTYPE=$(echo "${LINE%% *}" | sed 's/#//')
+            CMD="$(echo "$LINE" | cut -d' ' -f3-)"  # v4.14
+            logger -t "wireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"
+            #echo -e $cBCYA"\twireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: $cRESET'$CMD'"
+            $CMD                                    # v4.14
+        fi
+
+    done < ${CONFIG_DIR}${VPN_ID}.conf              # v4.14
 
     logger -t "wireguard-${MODE}${VPN_NAME}" "Wireguard VPN '$MODE' Peer ($VPN_ID) $TXT $SOCKET ($DESC) Terminated"
     echo -e $cBGRE"\twireguard-${MODE}${VPN_NAME}: Wireguard VPN '$MODE' Peer (${cBMAG}$VPN_ID${cBGRE}) $TXT $SOCKET (${cBMAG}$DESC${cBGRE}) ${cBRED}Terminated"$cRESET
