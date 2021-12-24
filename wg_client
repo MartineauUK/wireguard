@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.14b1"
-#============================================================================================ © 2021 Martineau v4.14b1
+VERSION="v4.14b2"
+#============================================================================================ © 2021 Martineau v4.14b2
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 19-Dec-2021
+# Last Updated Date: 24-Dec-2021
 #
 # Description:
 #
@@ -50,7 +50,7 @@ Is_IPv4 () {
         grep -oE '^([0-9]{1,3}\.){3}[0-9]{1,3}$'                    # IPv4 format
 }
 Is_IPv4_CIDR () {
-        grep -oE '^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$'         # IPv4 CIDR range notation
+grep -oE '^([0-9]{1,3}\.){3}[0-9]{1,3}/(3[012]|[12]?[0-9])$'    # IPv4 CIDR range notation
 }
 Is_IPv6() {
     # Note this matches compression anywhere in the address, though it won't match the loopback address ::1
@@ -172,8 +172,8 @@ purge_client_list(){
         if [ "$PRIO" -ge "$START_PRIO" ] && [ "$PRIO" -le "$END_PRIO" ]
         then
             ip rule del prio $PRIO
-            echo -en $cBCYA"\t"
-            logger -st "wireguard-${MODE}${VPN_NAME}" "Removing Wireguard 'client' Peer rule $PRIO from routing policy"
+            #echo -en $cBCYA"\t"
+            logger -t "wireguard-${MODE}${VPN_NAME}" "Removing Wireguard 'client' Peer rule $PRIO from routing policy"
             echo -en $cRESET
         fi
     done
@@ -265,9 +265,25 @@ WG_INTERFACE=$VPN_ID
 LAN_ADDR=$(nvram get lan_ipaddr)                                # v4.05
 LAN_SUBNET=${LAN_ADDR%.*}                                       # v4.05
 
-#[ -n "$(echo "$Subnet" | Is_Private_IPv6)" ] && { USE_IPV6="Y"; IPV6_TXT="(IPv6) "; }
-[ "$(nvram get ipv6_service)" != "disabled" ] && { USE_IPV6="Y"; IPV6_TXT="(IPv6) "; }          # 4.08
-
+ Test for IPv6
+IPV6_SERVICE=$(nvram get ipv6_service)
+if [ "$IPV6_SERVICE" != "disabled" ];then       # v4.1]
+    case $IPV6_SERVICE in
+        ipv6pt|dhcp6)
+            # ip -6 addr | grep "scope global"
+            USE_IPV6="Y"; IPV6_TXT="(IPv6) "    # 4.08
+        ;;
+        6to4|6in4|6rd)
+            :
+        ;;
+        other)
+            :
+        ;;
+        spoof|simulate)
+            USE_IPV6="Y"; IPV6_TXT="(IPv6) Simulate "   # v4.14
+        ;;
+    esac
+fi
 # Override IPv6 ?
 if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -n "$(grep -E "^NOIPV6" /jffs/addons/wireguard/WireguardVPN.conf)" ];then    # v4.12
     USE_IPV6="N"; IPV6_TXT=
@@ -419,13 +435,29 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
                     done
             fi
             # 0.0.0.0/0 Default
-            ip route add 0/1   dev $VPN_ID 2>/dev/null
-            ip route add 128/1 dev $VPN_ID 2>/dev/null
-            if [ "$USE_IPV6" == "Y" ];then
-                ip -6 route add ::/1     dev $VPN_ID 2>/dev/null    # v4.12
-                ip -6 route add 8000::/1 dev $VPN_ID 2>/dev/null    # v4.12
+            if [ -n "$(awk '/^AllowedIPs/ {print $0}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "0.0.0.0/0")" ] || [ -n "$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "::0/0")" ];then  # v4.14
+                if [ "$(awk '/^AllowedIPs/ {print $0}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "0.0.0.0/0")" == "0.0.0.0/0" ];then   # v4.14
+                    ip route add 0/1   dev $VPN_ID 2>/dev/null
+                    ip route add 128/1 dev $VPN_ID 2>/dev/null
+                fi
+                if [ "$(awk '/^AllowedIPs/ {print $0}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "::0/0")" == "::0/0" ];then   # v4.14
+                    if [ "$USE_IPV6" == "Y" ];then
+                        ip -6 route add ::/1     dev $VPN_ID 2>/dev/null    # v4.12
+                        ip -6 route add 8000::/1 dev $VPN_ID 2>/dev/null    # v4.12
+                    fi
+                fi
+            else
+                for ALLOWIP in $(awk '/^AllowedIPs/ {$1="";$2="";print $0}' ${CONFIG_DIR}${VPN_ID}.conf | tr ',' ' ')
+                    do
+                        if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$ALLOWIP" | grep -F ":")" ];then     # v4.12
+                            ip -6 route add $ALLOWIP dev $VPN_ID 2>/dev/null
+                        else
+                            if [ -n "$(echo "$ALLOWIP" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$ALLOWIP" | Is_IPv4)" ];then
+                                ip route add $ALLOWIP dev $VPN_ID 2>/dev/null
+                            fi
+                        fi
+                    done
             fi
-
             # Could be anything really....  e.g. 0.0.0.0/0,::0/0
             if [ "$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "0.0.0.0/0")" == "0.0.0.0/0" ];then
                 if [ -n "$PEER_DNS" ];then
@@ -495,13 +527,15 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
 
         fi
 
+        if [ -n "$(awk '/^AllowedIPs/ {print $0}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "0.0.0.0/0")" ] || [ -n "$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "::0/0")" ];then  # v4.14
+            ip route add 0/1   dev $VPN_ID table 12$VPN_NUM 2>/dev/null
+            ip route add 128/1 dev $VPN_ID table 12$VPN_NUM 2>/dev/null
 
-        ip route add 0/1   dev $VPN_ID table 12$VPN_NUM 2>/dev/null
-        ip route add 128/1 dev $VPN_ID table 12$VPN_NUM 2>/dev/null
-        if [ "$USE_IPV6" == "Y" ];then                                      # v4.08
-            ip -6 route add ::/1     dev $VPN_ID table 12$VPN_NUM 2>/dev/null   # v4.12
-            ip -6 route add 8000::/1 dev $VPN_ID table 12$VPN_NUM 2>/dev/null   # v4.12
-        fi
+            if [ "$USE_IPV6" == "Y" ];then                                      # v4.08
+                ip -6 route add ::/1     dev $VPN_ID table 12$VPN_NUM 2>/dev/null   # v4.12
+                ip -6 route add 8000::/1 dev $VPN_ID table 12$VPN_NUM 2>/dev/null   # v4.12
+            fi
+
         #ip route add default dev $VPN_ID table 12$VPN_NUM 2>/dev/null      # v4.03
 
         ip route add $(echo $LOCALIP | cut -d"." -f1-3).0/24 dev $VPN_ID  proto kernel  scope link  src $LOCALIP 2>/dev/null
@@ -663,6 +697,16 @@ else
             ip -6 route del 8000::/1 dev $VPN_ID   2>/dev/null      # v4.12
         fi
 
+        for ALLOWIP in $(awk '/^AllowedIPs/ {$1="";$2="";print $0}' ${CONFIG_DIR}${VPN_ID}.conf | tr ',' ' ')   # v4.14
+            do
+                if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$ALLOWIP" | grep -F ":")" ];then
+                    ip -6 route del $ALLOWIP dev $VPN_ID 2>/dev/null
+                else
+                    if [ -n "$(echo "$ALLOWIP" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$ALLOWIP" | Is_IPv4)" ];then
+                        ip route del $ALLOWIP dev $VPN_ID 2>/dev/null
+                    fi
+                fi
+
         # Set the default to the last ACTIVE WireGuard interface where the default route is required.
         # 'wg show interfaces' returns  list of Peers orfered oldest -> latest, so reverse the list so we travers latest -> oldest
         for WG_IFACE in $(wg show interfaces | grep -E "wg1|wg0" | awk '{do printf "%s"(NF>1?FS:RS),$NF;while(--NF)}')      # v4.07
@@ -731,8 +775,8 @@ else
             logger -t "wireguard-${MODE}${VPN_NAME}" "Removing IPSet '$IPSET' routing through VPN 'client' Peer" $WG_INTERFACE
         done
 
-        # PASSTHRU ?
-        Manage_Passthru "del"
+    # PASSTHRU ?
+    Manage_Passthru "del"
 
     # User Exit @ZebMcKayhan
     [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh ] && { logger -t "wireguard-${MODE}${VPN_NAME}" "Executing Event:${VPN_ID}-down.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh; }
@@ -781,4 +825,3 @@ fi
 ###############################################################################################################################
 
 exit
-
