@@ -50,7 +50,7 @@ Is_IPv4 () {
         grep -oE '^([0-9]{1,3}\.){3}[0-9]{1,3}$'                    # IPv4 format
 }
 Is_IPv4_CIDR () {
-grep -oE '^([0-9]{1,3}\.){3}[0-9]{1,3}/(3[012]|[12]?[0-9])$'    # IPv4 CIDR range notation
+        grep -oE '^([0-9]{1,3}\.){3}[0-9]{1,3}/(3[012]|[12]?[0-9])$'    # IPv4 CIDR range notation
 }
 Is_IPv6() {
     # Note this matches compression anywhere in the address, though it won't match the loopback address ::1
@@ -173,7 +173,7 @@ purge_client_list(){
         then
             ip rule del prio $PRIO
             #echo -en $cBCYA"\t"
-            logger -t "wireguard-${MODE}${VPN_NAME}" "Removing Wireguard 'client' Peer rule $PRIO from routing policy"
+            logger -st "wireguard-${MODE}${VPN_NAME}" "Removing Wireguard 'client' Peer rule $PRIO from routing policy"
             echo -en $cRESET
         fi
     done
@@ -265,9 +265,8 @@ WG_INTERFACE=$VPN_ID
 LAN_ADDR=$(nvram get lan_ipaddr)                                # v4.05
 LAN_SUBNET=${LAN_ADDR%.*}                                       # v4.05
 
- Test for IPv6
 IPV6_SERVICE=$(nvram get ipv6_service)
-if [ "$IPV6_SERVICE" != "disabled" ];then       # v4.1]
+if [ "$IPV6_SERVICE" != "disabled" ];then       # v4.1
     case $IPV6_SERVICE in
         ipv6pt|dhcp6)
             # ip -6 addr | grep "scope global"
@@ -284,6 +283,7 @@ if [ "$IPV6_SERVICE" != "disabled" ];then       # v4.1]
         ;;
     esac
 fi
+
 # Override IPv6 ?
 if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -n "$(grep -E "^NOIPV6" /jffs/addons/wireguard/WireguardVPN.conf)" ];then    # v4.12
     USE_IPV6="N"; IPV6_TXT=
@@ -412,7 +412,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
                 $CMD                                    # v4.14
             fi
 
-        done < ${CONFIG_DIR}${VPN_ID}.conf              # v4.14ABASE "INSERT into traffic values('$WG_INTERFACE','$TIMESTAMP','0','0','0','0');"
+        done < ${CONFIG_DIR}${VPN_ID}.conf
 
         # User Exit @Torson
         [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-route-up.sh ] && { logger -t "wireguard-${MODE}${VPN_NAME}" "Executing Event:${VPN_ID}-route-up.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-route-up.sh; }
@@ -458,6 +458,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
                         fi
                     done
             fi
+
             # Could be anything really....  e.g. 0.0.0.0/0,::0/0
             if [ "$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "0.0.0.0/0")" == "0.0.0.0/0" ];then
                 if [ -n "$PEER_DNS" ];then
@@ -535,7 +536,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
                 ip -6 route add ::/1     dev $VPN_ID table 12$VPN_NUM 2>/dev/null   # v4.12
                 ip -6 route add 8000::/1 dev $VPN_ID table 12$VPN_NUM 2>/dev/null   # v4.12
             fi
-
+        fi
         #ip route add default dev $VPN_ID table 12$VPN_NUM 2>/dev/null      # v4.03
 
         ip route add $(echo $LOCALIP | cut -d"." -f1-3).0/24 dev $VPN_ID  proto kernel  scope link  src $LOCALIP 2>/dev/null
@@ -706,6 +707,7 @@ else
                         ip route del $ALLOWIP dev $VPN_ID 2>/dev/null
                     fi
                 fi
+            done
 
         # Set the default to the last ACTIVE WireGuard interface where the default route is required.
         # 'wg show interfaces' returns  list of Peers orfered oldest -> latest, so reverse the list so we travers latest -> oldest
