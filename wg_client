@@ -173,7 +173,7 @@ purge_client_list(){
         then
             ip rule del prio $PRIO
             #echo -en $cBCYA"\t"
-            logger -st "wireguard-${MODE}${VPN_NAME}" "Removing Wireguard 'client' Peer rule $PRIO from routing policy"
+            logger -t "wireguard-${MODE}${VPN_NAME}" "Removing Wireguard 'client' Peer rule $PRIO from routing policy"
             echo -en $cRESET
         fi
     done
