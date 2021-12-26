@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.14b3"
-#============================================================================================ © 2021 Martineau v4.14b3
+VERSION="v4.14b4"
+#============================================================================================ © 2021 Martineau v4.14b4
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.14b3"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 24-Dec-2021
+# Last Updated Date: 26-Dec-2021
 #
 # Description:
 #
@@ -2379,6 +2379,44 @@ Manage_VPNDirector_rules() {
     return $REDISPLAY
 
 }
+Manage_FC() {
+
+    local STATUS=
+
+    if [ "$(which fc)" == "/bin/fc" ];then
+
+        case "$1" in
+            disable|off)
+
+                if [ -n "$(fc status | grep "Flow Learning Enabled")" ];then
+                    fc disable
+                    fc flush
+                    SayT "Broadcom Packet Flow Cache learning via BLOG (Flow Cache) DISABLED"   # v4.11 @Torson
+                    nvram set fc_disable=1      # v4.12
+                    nvram commit                # v4.12
+                fi
+                local STATUS="\t${cBRED}Disabled"
+            ;;
+            enable|off)
+
+                if [ -z "$(fc status | grep "Flow Learning Enabled")" ];then
+                    fc enable
+                    fc flush
+                    SayT "Broadcom Packet Flow Cache learning via BLOG (Flow Cache) ENABLED"   # v4.11 @Torson
+                    nvram set fc_disable=0      # v4.12
+                    nvram commit                # v4.12
+                fi
+                local STATUS="\t${cBGRE}Enabled"
+            ;;
+            *)
+                [ -n "$(fc status | grep "Flow Learning Enabled")" ] && local STATUS="\tFlow Cache Enabled" || local STATUS="\tFlow Cache Disabled"
+            ;;
+        esac
+    fi
+
+    echo "$STATUS"
+
+}
 Initialise_SQL() {
 
     local ACTION=$1                 # v4.14
@@ -4334,6 +4372,7 @@ Validate_User_Choice() {
             killinter*) ip link del dev $(echo "$menu1" | awk '{print $2}'); menu1=;;
             rpfilter*|rp_filter*);; # v4.11
             useentware*|allowentware*);;    # v4.14
+            fc*);;    # v4.14
             "") ;;
             e*) ;;
             *) printf '\n\a\t%bInvalid Option%b "%s"%b Please enter a valid option\n' "$cBRED" "$cRESET" "$menu1" "$cBRED"
@@ -4532,6 +4571,19 @@ Process_User_Choice() {
                         else
                             echo -e $cRED"\t[✖]${cBWHT} UDP ${cBGRE}monitor is ${cBRED}DISABLED$cRESET"
                         fi
+
+                        local FC_STATUS=$(Manage_FC "?")                          # v4.14
+                        case "$FC_STATUS" in
+                            *[Ee]nabled*)
+                                echo -e $cBGRE"\n\t[✔]${cBWHT} Flow Cache ${cBGRE}is ENABLED$cRESET"
+                            ;;
+                            *[Dd]isabled*)
+                                echo -e $cRED"\n\t[✖]${cBWHT} Flow Cache ${cBGRE}is ${cBRED}DISABLED$cRESET"
+                            ;;
+                            *)
+                                echo -e $cBGRE"\n\t[✔]${cBWHT} Flow Cache status ${cBGRE} N/A$cRESET"
+                            ;;
+                        esac
 
                         local WAN_IF=$(Get_WAN_IF_Name)                                             # v4.11
                         local VAL=$(cat /proc/sys/net/ipv4/conf/$WAN_IF/rp_filter)                  # v4.11
@@ -4831,6 +4883,19 @@ Process_User_Choice() {
                 else
                     echo -en $cRED"\a\n\t***ERROR: Use Entware Module request $cBWHT'"$ACTION"'$cBRED feature not available!\n"$cRESET
                 fi
+            ;;
+            fc*)                            # v4.14 ALlow management of Flow Cache setting
+                local ACTION="$(echo "$menu1"| awk '{print $2}')"
+
+                case "$ACTION" in
+
+                    enable|disable|"?")
+                        echo -e "\n$(Manage_FC "$ACTION")"
+                    ;;
+                    *)
+                        echo -en $cRED"\a\n\t***ERROR: Flow Cache arg $cBWHT'"$ACTION"'$cBRED invalid - enable or disable or ? ONLY\n"$cRESET
+                    ;;
+                esac
             ;;
             *)
                 printf '\n\a\t%bInvalid Option%b "%s"%b Please enter a valid option\n' "$cBRED" "$cRESET" "$menu1" "$cBRED"    # v4.03 v3.04 v1.09
@@ -5308,13 +5373,7 @@ if [ "$1" != "install" ];then   # v2.01
 
                 # http://www.snbforums.com/threads/beta-wireguard-session-manager.70787/post-688282
                 if [ "$HARDWARE_MODEL" == "RT-AX86U" ];then
-                    if [ -n "$(fc status | grep "Flow Learning Enabled")" ];then
-                        fc disable
-                        fc flush
-                        Say "Broadcom Packet Flow Cache learning via BLOG (Flow Cache) DISABLED"   # v4.11 @Torson
-                        nvram set fc_disable=1      # v4.12
-                        nvram commit                # v4.12
-                    fi
+                    local RC="$(Manage_FC "disable")"                           # v4.14
                 fi
 
                 Manage_Wireguard_Sessions "start" "$PEER" "$NOPOLICY"
