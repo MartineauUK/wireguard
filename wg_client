@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.14b3"
-#============================================================================================ © 2021 Martineau v4.14b3
+VERSION="v4.14b4"
+#============================================================================================ © 2021 Martineau v4.14b4
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 27-Dec-2021
+# Last Updated Date: 29-Dec-2021
 #
 # Description:
 #
@@ -338,6 +338,7 @@ else
 fi
 
 DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM clients where peer='$WG_INTERFACE';")
+[ -z "$DESC" ] && DESC=$(grep -FB1 "[Interface]" ${CONFIG_DIR}${WG_INTERFACE}.conf | grep -vF "[Interface]")    # v4.14
 DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')
 [ -z "$DESC" ] && DESC="# Unidentified"
 
@@ -406,7 +407,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
 
             if [ "${LINE:0:6}" == "#PreUp" ];then           # v4.14
                 CMDTYPE=$(echo "${LINE%% *}" | sed 's/#//')
-                CMD="$(echo "$LINE" | cut -d' ' -f3-)"  # v4.14
+                CMD="$(echo "$LINE" | cut -d' ' -f3- | sed "s/\%i/$WG_INTERFACE/g")"  # v4.14
                 logger -t "wireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"
                 #echo -e $cBCYA"\twireguard-${MODE}${VPN_NAME}:" "Executing $CMDTYPE: $cRESET'$CMD'"
                 $CMD                                    # v4.14
@@ -653,9 +654,9 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         # v4.14 Process 'PostUp' commands
         while IFS='' read -r LINE || [ -n "$LINE" ]; do # v4.14
 
-            if [ "${LINE:0:6}" == "#PostUp" ];then          # v4.14
+            if [ "${LINE:0:7}" == "#PostUp" ];then          # v4.14
                 CMDTYPE=$(echo "${LINE%% *}" | sed 's/#//')
-                CMD="$(echo "$LINE" | cut -d' ' -f3-)"  # v4.14
+                CMD="$(echo "$LINE" | cut -d' ' -f3- | sed "s/\%i/$WG_INTERFACE/g")"  # v4.14
                 logger -t "wireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"
                 #echo -e $cBCYA"\twireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: $cRESET'$CMD'"
                 $CMD                                    # v4.14
@@ -677,7 +678,7 @@ else
 
         if [ "${LINE:0:8}" == "#PreDown" ];then         # v4.14
             CMDTYPE=$(echo "${LINE%% *}" | sed 's/#//')
-            CMD="$(echo "$LINE" | cut -d' ' -f3-)"  # v4.14
+            CMD="$(echo "$LINE" | cut -d' ' -f3- | sed "s/\%i/$WG_INTERFACE/g")"  # v4.14
             logger -t "wireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"
             #echo -e $cBCYA"\twireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: $cRESET'$CMD'"
             $CMD                                    # v4.14
@@ -809,7 +810,7 @@ else
 
         if [ "${LINE:0:9}" == "#PostDown" ];then    # v4.14
             CMDTYPE=$(echo "${LINE%% *}" | sed 's/#//')
-            CMD="$(echo "$LINE" | cut -d' ' -f3-)"  # v4.14
+            CMD="$(echo "$LINE" | cut -d' ' -f3- | sed "s/\%i/$WG_INTERFACE/g")"  # v4.14
             logger -t "wireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"
             #echo -e $cBCYA"\twireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: $cRESET'$CMD'"
             $CMD                                    # v4.14
