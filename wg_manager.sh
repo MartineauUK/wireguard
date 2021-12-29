@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.14b5"
-#============================================================================================ © 2021 Martineau v4.14b5
+VERSION="v4.14b6"
+#============================================================================================ © 2021 Martineau v4.14b6
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -2619,6 +2619,15 @@ STATS
 #     Use command 'vx' to edit this setting.
 #NOSETXMARK
 
+# Override setting of the TCP MSS clamping of -t mangle FORWARD chain '-p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu'
+#     Use command 'vx' to edit this setting.
+#     https://www.linuxtopia.org/Linux_Firewall_iptables/x4700.html
+#NOTCPMSS
+
+# Override use of 'Pg-Up' key to retrieve previous commands
+#     Use command 'vx' to edit this setting.
+#NOPG_UP
+
 EOF
     return 0
 }
@@ -4374,11 +4383,12 @@ Validate_User_Choice() {
             killinter*) ip link del dev $(echo "$menu1" | awk '{print $2}'); menu1=;;
             rpfilter*|rp_filter*);; # v4.11
             useentware*|allowentware*);;    # v4.14
-            fc*);;    # v4.14
+            fc*);;      # v4.14
+            pgup*);;    # v4.14
             "") ;;
             e*) ;;
-            *) printf '\n\a\t%bInvalid Option%b "%s"%b Please enter a valid option\n' "$cBRED" "$cRESET" "$menu1" "$cBRED"
-               menu1=
+            *)
+               :
                ;;
         esac
 
@@ -4614,6 +4624,8 @@ Process_User_Choice() {
                                     fi
                                 fi
                         fi
+
+                        [ "READLINE" != "Readline" ] && echo -e $cBRED"\t[✖]${cBWHT} Use of 'Pg-Up' Key for command retrieval is ${cBRED}DISABLED\n$cRESET" # v4.14
 
                         Manage_Stats
 
@@ -4897,6 +4909,27 @@ Process_User_Choice() {
                     *)
                         echo -en $cRED"\a\n\t***ERROR: Flow Cache arg $cBWHT'"$ACTION"'$cBRED invalid - enable or disable or ? ONLY\n"$cRESET
                     ;;
+                esac
+            ;;
+            pgup*)                            # v4.14 Allow management of Pg-Up key command retrieval
+                local ACTION="$(echo "$menu1"| awk '{print $2}')"
+
+                case $ACTION in
+                    on|yes)
+                        [ -f ${INSTALL_DIR}WireguardVPN.conf ] && sed -i 's/^NOPG_UP/#NOPG_UP/' ${INSTALL_DIR}WireguardVPN.conf
+                        echo -e $cBGRE"\n\t[✔] Use of 'PG-Up' key for command retrieval ENABLED\n"$cRESET
+                        READLINE="Readline"
+                        # Restart wireguard_manager ?
+                        exec "$0" "$@"
+                ;;
+                    off|no)
+                        [ -f ${INSTALL_DIR}WireguardVPN.conf ] && sed -i 's/^#NOPG_UP/NOPG_UP/' ${INSTALL_DIR}WireguardVPN.conf
+                        echo -e $cRED"\n\t[✖]${cBGRE}  Use of 'PG-Up' key for command retrieval ${cBRED}DISABLED\n"$cRESET
+                        READLINE=
+                ;;
+                    *)
+                    echo -en $cRED"\a\n\t***ERROR: Invalid arg $cBWHT'"$ACTION"'$cBRED for 'Use Pg-Up key command retrieval - valid 'on' or 'off' only!\n"$cRESET
+                ;;
                 esac
             ;;
             *)
@@ -5286,9 +5319,9 @@ FIRMWARE=$(echo $(nvram get buildno) | awk 'BEGIN { FS = "." } {printf("%03d%02d
 HARDWARE_MODEL=$(Get_Router_Model)
 # v384.13+ NVRAM variable 'lan_hostname' supersedes 'computer_name'
 [ -n "$(nvram get computer_name)" ] && MYROUTER=$(nvram get computer_name) || MYROUTER=$(nvram get lan_hostname)
-BUILDNO=$(nvram get buildno)
-#[ "${#BUILDNO}" -eq 3 ] && BUILDNO=$(nvram get innerver)            # v4.12
-BUILDNO=$(nvram get innerver)            # v4.12
+#BUILDNO=$(nvram get innerver)              # v4.12
+BUILDNO=$(nvram get buildno)                # v4.14
+BUILDNO=${BUILDNO}_$(nvram get extendno)    # v4.14
 SCRIPT_NAME="${0##*/}"
 ENTWARE_INFO="/opt/etc/entware_release"
 
@@ -5457,6 +5490,11 @@ if [ "$1" != "install" ];then   # v2.01
             exit_message
         fi
     fi
+fi
+
+# Override use of Pg-Up key for command retrieval?
+if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOPG_UP" ${INSTALL_DIR}WireguardVPN.conf)" ];then    # v4.14
+    READLINE=                                                                                                       # v4.14
 fi
 
 clear
