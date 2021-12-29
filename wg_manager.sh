@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.14b4"
-#============================================================================================ © 2021 Martineau v4.14b4
+VERSION="v4.14b5"
+#============================================================================================ © 2021 Martineau v4.14b5
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.14b4"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 26-Dec-2021
+# Last Updated Date: 29-Dec-2021
 #
 # Description:
 #
@@ -604,6 +604,7 @@ Check_Module_Versions() {
 Create_Peer() {
 
     local ACTION=$1;shift
+
     local USE_IPV6="N"
 
     while [ $# -gt 0 ]; do          # v3.02
@@ -726,7 +727,7 @@ EOF
         local PRI_KEY=$(cat ${CONFIG_DIR}${SERVER_PEER}_private.key)
         local PRI_KEY=$(Convert_Key "$PRI_KEY")
         local PUB_KEY=$(cat ${CONFIG_DIR}${SERVER_PEER}_public.key)
-        local PUB_KEY=$(Convert_Key "$PRI_KEY")
+        local PUB_KEY=$(Convert_Key "$PUB_KEY")                         # v4.14
         sed -i "/^PrivateKey/ s~[^ ]*[^ ]~$PRI_KEY~3" ${CONFIG_DIR}${SERVER_PEER}.conf
 
         local ANNOTATE="# $HARDWARE_MODEL ${IPV6_TXT}Server $INDEX"
@@ -735,7 +736,8 @@ EOF
 
     echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED Start ${IPV6_TXT}'server' Peer ($SERVER_PEER) or press$cBGRE [Enter] to SKIP."
     read -r "ANS"
-    [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "start" "$SERVER_PEER"; Show_Peer_Status "show"; } # v3.03
+    [ "$ANS" == "y" ] && Manage_Wireguard_Sessions "start" "$SERVER_PEER"
+    Show_Peer_Status "show" # v3.03
 
     # Firewall rule to listen on multiple ports?
     #   e.g. iptables -t nat -I PREROUTING -i $WAN_IF -d <yourIP/32> -p udp -m multiport --dports 53,80,4444  -j REDIRECT --to-ports $LISTEN_PORT
@@ -4979,11 +4981,11 @@ Create_RoadWarrior_Device() {
     local DEVICE_NAME=$2
 
     local TAG="$(echo "$@" | sed -n "s/^.*tag=//p" | awk '{print $0}')"
-    local ADD_ALLOWED_IPS="$(echo "$@" | sed -n "s/^.*ip=//p" | awk '{print $0}')"
+    local ADD_ALLOWED_IPS="$(echo "$@" | sed -n "s/^.*ips=//p" | awk '{print $0}')"
     local DNS_RESOLVER="$(echo "$@" | sed -n "s/^.*dns=//p" | awk '{print $0}')"        # v3.04 Hotfix
 
-    # List of 'server' Peers for device to be added to?
     local SERVER_PEER=
+    local PEER_TOPOLOGY="device"    # 4.14
 
     while [ $# -gt 0 ]; do          # v3.03
         case "$1" in
@@ -4994,7 +4996,13 @@ Create_RoadWarrior_Device() {
                 SERVER_PEER=$1
             ;;
             peer*)
-                local ALLOW_TUNNEL_PEERS="Y"    # v4.11
+                local ALLOW_TUNNEL_PEERS="Y"        # v4.11
+            ;;
+            site)
+                local SITE2SITE="Y"                 # v4.14
+                local PEER_TOPOLOGY="Site-to-Site"  # v4.14
+                local TAG=$PEER_TOPOLOGY            # v4.14
+                local REMOTE_LISTEN_PORT="$(echo "$@" | sed -n "s/^.*port=//p" | awk '{print $0}')" # v4.14
             ;;
             *)
 
@@ -5024,13 +5032,14 @@ Create_RoadWarrior_Device() {
     if [ -n "$DEVICE_NAME" ];then
 
         if [ ! -f ${CONFIG_DIR}${DEVICE_NAME} ] && [ -z "$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE name='$DEVICE_NAME';")" ];then
-                echo -e $cBCYA"\n\tCreating Wireguard Private/Public key pair for device '${cBMAG}${DEVICE_NAME}${cBCYA}'"$cBYEL
+                echo -e $cBCYA"\n\tCreating Wireguard Private/Public key pair for $PEER_TOPOLOGY '${cBMAG}${DEVICE_NAME}${cBCYA}'"$cBYEL
                 wg genkey | tee ${CONFIG_DIR}${DEVICE_NAME}_private.key | wg pubkey > ${CONFIG_DIR}${DEVICE_NAME}_public.key
-                echo -e $cBYEL"\tDevice '"$DEVICE_NAME"' Public key="$(cat ${CONFIG_DIR}${DEVICE_NAME}_public.key)"\n"$cRESET
+                echo -e $cBYEL"\t$PEER_TOPOLOGY '"$DEVICE_NAME"' Peer Public key="$(cat ${CONFIG_DIR}${DEVICE_NAME}_public.key)"\n"$cRESET
                 umask 077
                 wg genpsk > ${CONFIG_DIR}${DEVICE_NAME}_pre-shared.key                  # v4.12 or openssl rand -base64 32 > ${CONFIG_DIR}${SERVER_PEER}_pre-shared.key
-                echo -e $cBYEL"\tDevice '"$DEVICE_NAME"' Pre-shared key="$(cat ${CONFIG_DIR}${DEVICE_NAME}_public.key)"\n"$cRESET   # v4.12
                 local PRE_SHARED_KEY=$(cat ${CONFIG_DIR}${DEVICE_NAME}_pre-shared.key)  # v4.12
+                echo -e $cBYEL"\t$PEER_TOPOLOGY '"$DEVICE_NAME"' Peer Pre-shared key="$(cat ${CONFIG_DIR}${DEVICE_NAME}_pre-shared.key)"\n"$cRESET   # v4.14 v4.12
+
                 #local PRE_SHARED_KEY=$(Convert_Key "$PRE-SHARED_KEY")                  # v4.12
 
                 # Generate the Peer config to be imported into the device
@@ -5192,18 +5201,35 @@ PersistentKeepalive = 25
 # $DEVICE_NAME End
 EOF
 
-                echo -e $cBGRE"\n\tWireGuard config for Peer device '${cBMAG}${DEVICE_NAME}${cBGRE}' (${cBWHT}${VPN_POOL_IP}${cBGRE}) created ${cBWHT}(Allowed IP's ${ALLOWED_IPS} ${SPLIT_TXT})\n"$cRESET
+                echo -e $cBGRE"\n\tWireGuard config for $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBGRE}' (${cBWHT}${VPN_POOL_IP}${cBGRE}) created ${cBWHT}(Allowed IP's ${ALLOWED_IPS} ${SPLIT_TXT})\n"$cRESET
                 fi
 
-                Display_QRCode "${CONFIG_DIR}${DEVICE_NAME}.conf"
+                if [ -z "$SITE2SITE" ];then                                 # v4.14
+                    Display_QRCode "${CONFIG_DIR}${DEVICE_NAME}.conf"
+                else
+                    cat > ${CONFIG_DIR}${DEVICE_NAME}_Site.conf << EOF  # v4.14
+# Remote 'server' Peer '${DEVICE_NAME}'
+[Interface]
+PrivateKey = $PRI_KEY
+ListenPort = $REMOTE_LISTEN_PORT
 
-                echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED ADD device '${cBMAG}${DEVICE_NAME}${cBRED}' ${cRESET}to 'server' Peer (${cBMAG}${SERVER_PEER}${cRESET}) or press$cBGRE [Enter] to SKIP."
+
+[Peer]
+PublicKey = $PUB_SERVER_KEY
+Endpoint = $ROUTER_DDNS:$LISTEN_PORT
+PersistentKeepalive = 25
+EOF
+
+                echo -e $cBGRE"\n\tWireGuard config for 'server' $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBGRE}' (created ${cBWHT}(Allowed IP's ${ALLOWED_IPS} ${SPLIT_TXT})\n"$cRESET
+                fi
+
+                echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED ADD $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBRED}' ${cRESET}to 'server' Peer (${cBMAG}${SERVER_PEER}${cRESET}) or press$cBGRE [Enter] to SKIP."
                 read -r "ANS"
                 if [ "$ANS" == "y" ];then
 
                     for SERVER_PEER in $SERVER_PEER                                         # v3.03
                         do
-                            echo -e $cBCYA"\n\tAdding device Peer '${cBMAG}${DEVICE_NAME}${cBCYA}' ${cBWHT}${VPN_POOL_IP}${cBCYA} to $HARDWARE_MODEL 'server' (${cBMAG}$SERVER_PEER${cBCYA}) and WireGuard config\n"
+                            echo -e $cBCYA"\n\tAdding $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBCYA}' ${cBWHT}${VPN_POOL_IP}${cBCYA} to $HARDWARE_MODEL 'server' (${cBMAG}$SERVER_PEER${cBCYA}) and WireGuard config\n"
 
                             # Erase 'client' Peer device entry if it exists....
                             [ -n "$(grep "$DEVICE_NAME" ${CONFIG_DIR}${SERVER_PEER}.conf)" ] && sed -i "/# $DEVICE_NAME/,/# $DEVICE_NAME End/d" ${CONFIG_DIR}${SERVER_PEER}.conf    # v1.08
@@ -5213,7 +5239,7 @@ EOF
 
                     echo -e >> ${CONFIG_DIR}${SERVER_PEER}.conf
                     cat >> ${CONFIG_DIR}${SERVER_PEER}.conf << EOF
-# $DEVICE_NAME
+# $DEVICE_NAME $PEER_TOPOLOGY
 [Peer]
 PublicKey = $PUB_KEY
 AllowedIPs = $VPN_POOL_IP
@@ -5231,19 +5257,19 @@ EOF
 
                     #tail -n 1 ${INSTALL_DIR}WireguardVPN.conf
 
-                    # Need to Restart the Peer (if it is UP) or Start it so it can listen for new 'client' Peer device
+                    # Need to Restart the Peer (if it is UP) or Start it so it can listen for new 'client' Peer device/site-2-site
                     [ -n "$(wg show interfaces | grep "$SERVER_PEER")" ] && CMD="restart" ||  CMD="start"   # v1.08
-                    echo -e $cBWHT"\a\n\tWireGuard 'server' Peer needs to be ${CMD}ed to listen for 'client' Peer ${cBMAG}$DEVICE_NAME $TAG"
+                    echo -e $cBWHT"\a\n\tWireGuard 'server' Peer needs to be ${CMD}ed to listen for 'client' $PEER_TOPOLOGY Peer ${cBMAG}$DEVICE_NAME $TAG"
                     echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer ($SERVER_PEER) or press$cBGRE [Enter] to SKIP."
                     read -r "ANS"
                     [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$SERVER_PEER"; Show_Peer_Status "show"; }  # v3.03
 
                 fi
         else
-            echo -e $cRED"\a\n\t***ERROR: Peer device '${cBMAG}${DEVICE_NAME}${cRED}' already EXISTS!"
+            echo -e $cRED"\a\n\t***ERROR: Peer $PEER_TOPOLOGY '${cBMAG}${DEVICE_NAME}${cRED}' already EXISTS!"
         fi
     else
-        echo -e $cBRED"\a\n\t***ERROR Missing name of 'client' Peer device! e.g. iPhone\n"$cRESET
+        echo -e $cBRED"\a\n\t***ERROR Missing name of 'client' Peer $PEER_TOPOLOGY! e.g. iPhone\n"$cRESET
     fi
 }
 #For verbose debugging, uncomment the following two lines, and uncomment the last line of this script
