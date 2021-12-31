@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.13"
-#============================================================================================ © 2021 Martineau v4.13
+VERSION="v4.14.1"
+#============================================================================================ © 2021 Martineau v4.14.1
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 15-Dec-2021
+# Last Updated Date: 31-Dec-2021
 #
 # Description:
 #
@@ -80,11 +80,11 @@ Manage_Passthru(){
 $(ip route | grep "$WG_INTERFACE")
 EOR
                     fi
-                    
-                    ip rule $ACTION from $IP_ADDR table $TABLE      # v4.13 Fix @chongnt
-         
+
+                    ip rule $ACTION from $IP_ADDR table $TABLE prio 998$VPN_NUM                 # v4.14 v4.13 Fix @chongnt
+
                 else
-                    ip rule $ACTION from $IP_ADDR table $TABLE 2>/dev/null
+                    ip rule $ACTION from $IP_ADDR table $TABLE prio 998$VPN_NUM 2>/dev/null     # v4.14
                 fi
             done
     fi
@@ -171,6 +171,19 @@ if [ "$2" != "disable" ];then
 
     wg setconf $VPN_ID ${CONFIG_DIR}$VPN_ID.conf
 
+    # v4.14 Process 'PreUp' commands
+    while IFS='' read -r LINE || [ -n "$LINE" ]; do # v4.14
+
+        if [ "${LINE:0:6}" == "#PreUp" ];then           # v4.14
+            CMDTYPE=$(echo "${LINE%% *}" | sed 's/#//')
+            CMD="$(echo "$LINE" | cut -d' ' -f3- | sed "s/\%i/$WG_INTERFACE/g")"  # v4.14
+            logger -t "wireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"
+            #echo -e $cBCYA"\twireguard-${MODE}${VPN_NAME}:" "Executing $CMDTYPE: $cRESET'$CMD'"
+            $CMD                                    # v4.14
+        fi
+
+    done < ${CONFIG_DIR}${VPN_ID}.conf
+
     ip address add dev $VPN_ID $Subnet
     ip link set up dev $VPN_ID
     if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$Subnet" | grep ":")" ];then         # v4.05
@@ -241,6 +254,19 @@ if [ "$2" != "disable" ];then
     # User Exit @ZebMcKayhan
     [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh ] && { logger -t "wireguard-server${VPN_ID:3:1}" "Executing ${VPN_ID}-up.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh; }
 
+    # v4.14 Process 'PostUp' commands
+    while IFS='' read -r LINE || [ -n "$LINE" ]; do # v4.14
+
+        if [ "${LINE:0:7}" == "#PostUp" ];then          # v4.14
+            CMDTYPE=$(echo "${LINE%% *}" | sed 's/#//')
+            CMD="$(echo "$LINE" | cut -d' ' -f3- | sed "s/\%i/$WG_INTERFACE/g")"  # v4.14
+            logger -t "wireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"
+            #echo -e $cBCYA"\twireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: $cRESET'$CMD'"
+            $CMD                                    # v4.14
+        fi
+
+    done < ${CONFIG_DIR}${VPN_ID}.conf              # v4.14
+
     ###############################################################EIC Hack 5 of 5##############################
     #logger -st "($(basename $0))" "Configuring Wireguard to VPN Client (pass-thru)"
     #[ -n "$(wg show interfaces | grep -E "wg[0-1]")" ] && iptables -I POSTROUTING -t nat -s $Subnet -o wg1+ -j MASQUERADE -m comment --comment "WireGuard 'server'"
@@ -249,6 +275,20 @@ if [ "$2" != "disable" ];then
     echo -e $cRESET
     ############################################################################################################
 else
+
+    # v4.14 Process 'PreDown' commands
+    while IFS='' read -r LINE || [ -n "$LINE" ]; do # v4.14
+
+        if [ "${LINE:0:8}" == "#PreDown" ];then         # v4.14
+            CMDTYPE=$(echo "${LINE%% *}" | sed 's/#//')
+            CMD="$(echo "$LINE" | cut -d' ' -f3- | sed "s/\%i/$WG_INTERFACE/g")"  # v4.14
+            logger -t "wireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"
+            #echo -e $cBCYA"\twireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: $cRESET'$CMD'"
+            $CMD                                    # v4.14
+        fi
+
+    done < ${CONFIG_DIR}${VPN_ID}.conf              # v4.14
+
     ip link del dev $VPN_ID 2>/dev/null
 
     TIMESTAMP=$(date +%s)
@@ -269,6 +309,19 @@ else
 
     # User Exit @ZebMcKayhan
     [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh ] && { logger -t "wireguard-server${VPN_ID:3:1}" "Executing ${VPN_ID}-down.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh; }
+
+    # v4.14 Process 'PostDown' commands
+    while IFS='' read -r LINE || [ -n "$LINE" ]; do # v4.14
+
+        if [ "${LINE:0:9}" == "#PostDown" ];then    # v4.14
+            CMDTYPE=$(echo "${LINE%% *}" | sed 's/#//')
+            CMD="$(echo "$LINE" | cut -d' ' -f3- | sed "s/\%i/$WG_INTERFACE/g")"  # v4.14
+            logger -t "wireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"
+            #echo -e $cBCYA"\twireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: $cRESET'$CMD'"
+            $CMD                                    # v4.14
+        fi
+
+    done < ${CONFIG_DIR}${VPN_ID}.conf              # v4.14
 
     logger -t "wireguard-server${VPN_ID:3:1}" "Wireguard VPN 'server' Peer ($VPN_ID) on" $SOCKET "Terminated"
 
