@@ -1,10 +1,10 @@
 #!/bin/sh
 VERSION="v4.14.1"
-#============================================================================================ © 2021 Martineau v4.14.1
+#============================================================================================ © 2021-2022 Martineau v4.14.1
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 31-Dec-2021
+# Last Updated Date: 03-Jan-2022
 #
 # Description:
 #
@@ -36,6 +36,7 @@ Firewall_delete() {
     iptables -D INPUT -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
     iptables -D FORWARD -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
     iptables -D FORWARD -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
+    iptables -D FORWARD -i br0 -o $VPN_ID -j ACCEPT -m comment --comment "LAN to WireGuard 'server clients'" 2>/dev/null
     iptables -D OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
     iptables -t nat -D PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
     iptables -t nat -D POSTROUTING -s $Subnet -o wg1+ -j MASQUERADE -m comment --comment "WireGuard 'server'"  2>/dev/null  # v1.11
@@ -50,6 +51,7 @@ Firewall_delete() {
         ip6tables -D INPUT -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
         ip6tables -D FORWARD -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
         ip6tables -D FORWARD -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
+        ip6tables -D FORWARD -i br0 -o $VPN_ID -j ACCEPT -m comment --comment "LAN to WireGuard 'server clients'" 2>/dev/null
         ip6tables -D OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
     fi
 }
@@ -89,7 +91,19 @@ EOR
             done
     fi
 }
-
+Process_Pre_Post_Commands() {
+    # v4.14.1
+    while read LINE; do
+            CMDTYPE=$1
+            CMD="$(echo "$LINE" | sed "s/\%i/$WG_INTERFACE/g" | sed "s/\%w/$WAN_IF/g")"  # v4.14.1
+            if [ -n "$CMD" ];then
+                logger -t "wireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"
+                $CMD
+            fi
+    done << EOR
+$(grep -E "^#${1}" ${CONFIG_DIR}${WG_INTERFACE}.conf | tr ';' '\n' | sed 's/^#.*=//')
+EOR
+}
 #For verbose debugging, uncomment the following two lines, and uncomment the last line of this script
 #set -x
 #(
@@ -132,22 +146,42 @@ WG_INTERFACE=$1
 
 DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM servers where peer='$WG_INTERFACE';")
 DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')
+
 [ -z "$DESC" ] && DESC="# Unidentified"
+
+    IPV6_SERVICE=$(nvram get ipv6_service)          # v4.14.1
+    if [ "$IPV6_SERVICE" != "disabled" ];then       # v4.1
+        case $IPV6_SERVICE in
+            native|ipv6pt|dhcp6)
+                # ip -6 addr | grep "scope global"
+                USE_IPV6="Y"; IPV6_TXT="(IPv6) "    # 4.08
+                LAN_SUBNET_IPV6=$(nvram get ipv6_prefix)        # v4.14.6
+                LAN_ADDR_IPV6=$(nvram get ipv6_rtr_addr)        # v4.14.6
+            ;;
+            6to4|6in4|6rd)
+                :
+            ;;
+            other)
+                :
+            ;;
+            spoof|simulate)
+                USE_IPV6="Y"; IPV6_TXT="(IPv6) Simulate "   # v4.14
+            ;;
+        esac
+    fi
+
+# Override IPv6 ?
+if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -n "$(grep -E "^NOIPV6" /jffs/addons/wireguard/WireguardVPN.conf)" ];then    # v4.12
+    USE_IPV6="N"; IPV6_TXT=
+    logger -t "wireguard-${MODE}${VPN_NAME}" "'NOIPV6' directive found ('WireguardVPN.conf')- IPv6 configuration forced to IPv4"    # v4.12
+fi
+
+WAN_IPV4=$(ip -4 addr | sed -ne 's|^.* inet  \([^/]*\)/.* scope global.*$|\1|p' | awk '{print $1}' | head -1)           # v4.14.1
+[ "$USE_IPV6" == "Y" ] && { WAN_IPV6=$(ip -6 addr | sed -ne 's|^.* inet6 \([^/]*\)/.* scope global.*$|\1|p' | head -1); IPV6_TXT=$IPV6_TXT"["$WAN_IPV6"] ";  }  # v4.14.1
 
 if [ "$2" != "disable" ];then
     wgport=$(awk '/Listen/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)
     Subnet=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers where peer='$WG_INTERFACE';") # v1.09 @here1310
-
-    if [ "$(nvram get ipv6_service)" != "disabled" ] || [ -n "$(echo "$Subnet" | Is_Private_IPv6)" ];then                                   # v4.05
-        # Override IPv6 ?
-        if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -n "$(grep -E "^NOIPV6" /jffs/addons/wireguard/WireguardVPN.conf)" ];then   # v4.05
-            USE_IPV6="N"; IPV6_TXT=
-            logger -t "wireguard-${MODE}${VPN_NAME}" "'NOIPV6' directive found ('WireguardVPN.conf')- IPv6 configuration forced to IPv4"    # v4..05
-        else
-            USE_IPV6="Y"
-            IPV6_TXT="(IPv6) "
-        fi
-    fi
 
     if [ "$USE_IPV6" != "Y" ];then
         # CIDR ?
@@ -172,17 +206,7 @@ if [ "$2" != "disable" ];then
     wg setconf $VPN_ID ${CONFIG_DIR}$VPN_ID.conf
 
     # v4.14 Process 'PreUp' commands
-    while IFS='' read -r LINE || [ -n "$LINE" ]; do # v4.14
-
-        if [ "${LINE:0:6}" == "#PreUp" ];then           # v4.14
-            CMDTYPE=$(echo "${LINE%% *}" | sed 's/#//')
-            CMD="$(echo "$LINE" | cut -d' ' -f3- | sed "s/\%i/$WG_INTERFACE/g")"  # v4.14
-            logger -t "wireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"
-            #echo -e $cBCYA"\twireguard-${MODE}${VPN_NAME}:" "Executing $CMDTYPE: $cRESET'$CMD'"
-            $CMD                                    # v4.14
-        fi
-
-    done < ${CONFIG_DIR}${VPN_ID}.conf
+    Process_Pre_Post_Commands "PreUp"   # v4.14.1
 
     ip address add dev $VPN_ID $Subnet
     ip link set up dev $VPN_ID
@@ -191,7 +215,6 @@ if [ "$2" != "disable" ];then
         ip -6 link set up dev $VPN_ID
     fi
 
-    #ifconfig $VPN_ID mtu 1380
     ifconfig $VPN_ID mtu 1420                       # v1.02
 
     TIMESTAMP=$(date +%s)
@@ -227,6 +250,7 @@ if [ "$2" != "disable" ];then
     iptables -I INPUT -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
     iptables -I FORWARD -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
     iptables -I FORWARD -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
+    iptables -I FORWARD -i br0 -o $VPN_ID -j ACCEPT -m comment --comment "LAN to WireGuard 'server clients'"    # v4.14.1 @ZebMcKayhan
     iptables -I OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
     iptables -t nat -I PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'"
 
@@ -248,24 +272,26 @@ if [ "$2" != "disable" ];then
         ip6tables -I INPUT -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
         ip6tables -I FORWARD -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
         ip6tables -I FORWARD -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
+        ip6tables -I FORWARD -i br0 -o $VPN_ID -j ACCEPT -m comment --comment "LAN to WireGuard 'server clients'"   # v4.14.1 @ZebMcKayhan
         ip6tables -I OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
     fi
+
+    for ALLOWIP in $(awk '/^AllowedIPs/ {$1="";$2="";print $0}' ${CONFIG_DIR}${VPN_ID}.conf | tr ',' ' ')   # v4.14.1
+    do
+        if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$ALLOWIP" | grep -F ":")" ];then
+            ip -6 route add $ALLOWIP dev $VPN_ID 2>/dev/null
+        else
+            if [ -n "$(echo "$ALLOWIP" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$ALLOWIP" | Is_IPv4)" ];then
+                ip route add $ALLOWIP dev $VPN_ID 2>/dev/null
+            fi
+        fi
+    done
 
     # User Exit @ZebMcKayhan
     [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh ] && { logger -t "wireguard-server${VPN_ID:3:1}" "Executing ${VPN_ID}-up.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh; }
 
     # v4.14 Process 'PostUp' commands
-    while IFS='' read -r LINE || [ -n "$LINE" ]; do # v4.14
-
-        if [ "${LINE:0:7}" == "#PostUp" ];then          # v4.14
-            CMDTYPE=$(echo "${LINE%% *}" | sed 's/#//')
-            CMD="$(echo "$LINE" | cut -d' ' -f3- | sed "s/\%i/$WG_INTERFACE/g")"  # v4.14
-            logger -t "wireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"
-            #echo -e $cBCYA"\twireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: $cRESET'$CMD'"
-            $CMD                                    # v4.14
-        fi
-
-    done < ${CONFIG_DIR}${VPN_ID}.conf              # v4.14
+    Process_Pre_Post_Commands "PostUp"  # v4.14.1
 
     ###############################################################EIC Hack 5 of 5##############################
     #logger -st "($(basename $0))" "Configuring Wireguard to VPN Client (pass-thru)"
@@ -277,17 +303,18 @@ if [ "$2" != "disable" ];then
 else
 
     # v4.14 Process 'PreDown' commands
-    while IFS='' read -r LINE || [ -n "$LINE" ]; do # v4.14
+    Process_Pre_Post_Commands "PreDown" # v4.14.1
 
-        if [ "${LINE:0:8}" == "#PreDown" ];then         # v4.14
-            CMDTYPE=$(echo "${LINE%% *}" | sed 's/#//')
-            CMD="$(echo "$LINE" | cut -d' ' -f3- | sed "s/\%i/$WG_INTERFACE/g")"  # v4.14
-            logger -t "wireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"
-            #echo -e $cBCYA"\twireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: $cRESET'$CMD'"
-            $CMD                                    # v4.14
-        fi
-
-    done < ${CONFIG_DIR}${VPN_ID}.conf              # v4.14
+    for ALLOWIP in $(awk '/^AllowedIPs/ {$1="";$2="";print $0}' ${CONFIG_DIR}${VPN_ID}.conf | tr ',' ' ')   # v4.14.1
+        do
+            if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$ALLOWIP" | grep -F ":")" ];then
+                ip -6 route del $ALLOWIP dev $VPN_ID 2>/dev/null
+            else
+                if [ -n "$(echo "$ALLOWIP" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$ALLOWIP" | Is_IPv4)" ];then
+                    ip route del $ALLOWIP dev $VPN_ID 2>/dev/null
+                fi
+            fi
+        done
 
     ip link del dev $VPN_ID 2>/dev/null
 
@@ -306,26 +333,15 @@ else
     ip -6 rule del prio 98${VPN_NUM}0      2>/dev/null     # v4.03
     ip -6 route flush cache                                # v4.03
 
-
     # User Exit @ZebMcKayhan
     [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh ] && { logger -t "wireguard-server${VPN_ID:3:1}" "Executing ${VPN_ID}-down.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh; }
 
     # v4.14 Process 'PostDown' commands
-    while IFS='' read -r LINE || [ -n "$LINE" ]; do # v4.14
-
-        if [ "${LINE:0:9}" == "#PostDown" ];then    # v4.14
-            CMDTYPE=$(echo "${LINE%% *}" | sed 's/#//')
-            CMD="$(echo "$LINE" | cut -d' ' -f3- | sed "s/\%i/$WG_INTERFACE/g")"  # v4.14
-            logger -t "wireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"
-            #echo -e $cBCYA"\twireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: $cRESET'$CMD'"
-            $CMD                                    # v4.14
-        fi
-
-    done < ${CONFIG_DIR}${VPN_ID}.conf              # v4.14
+    Process_Pre_Post_Commands "PostDown"    # v4.14.1
 
     logger -t "wireguard-server${VPN_ID:3:1}" "Wireguard VPN 'server' Peer ($VPN_ID) on" $SOCKET "Terminated"
 
-    echo -en $cBGRE"\twireguard-server${VPN_ID:3:1}: Wireguard VPN '$MODE' Peer (${cBMAG}$VPN_ID$cBGRE) on $SOCKET (${cBMAG}$DESC${cBGRE}) ${cBRED}Terminated\n"$cRESET
+    echo -en $cBGRE"\twireguard-server${VPN_ID:3:1}: Wireguard VPN ${IPV6_TXT}'Server' Peer (${cBMAG}$VPN_ID$cBGRE) on $SOCKET (${cBMAG}$DESC${cBGRE}) ${cBRED}Terminated\n"$cRESET
 
     echo -e $cRESET
 fi
