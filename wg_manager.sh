@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.14b6"
-#============================================================================================ © 2021 Martineau v4.14b6
+VERSION="v4.14b7"
+#============================================================================================ © 2021-2022 Martineau v4.14b7
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.14b6"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 29-Dec-2021
+# Last Updated Date: 03-Jan-2022
 #
 # Description:
 #
@@ -89,14 +89,14 @@ EOF
 }
 Is_HND() {
     # Use the following at the command line otherwise 'return X' makes the SSH session terminate!
-    #[ -n "$(uname -m | grep "aarch64")" ] && echo Y || echo N
-    [ -n "$(uname -m | grep "aarch64")" ] && { echo Y; return 0; } || { echo N; return 1; }
+    #[ -n "$(/bin/uname -m | grep "aarch64")" ] && echo Y || echo N
+    [ -n "$(/bin/uname -m | grep "aarch64")" ] && { echo Y; return 0; } || { echo N; return 1; }    # v4.14
 }
 Is_AX() {
     # Kernel is '4.1.52+' (i.e. isn't '2.6.36*') and it isn't HND
     # Use the following at the command line otherwise 'return X' makes the SSH session terminate!
-    # [ -n "$(uname -r | grep "^4")" ] && [ -z "$(uname -m | grep "aarch64")" ] && echo Y || echo N
-    [ -n "$(uname -r | grep "^4")" ] && [ -z "$(uname -m | grep "aarch64")" ] && { echo Y; return 0; } || { echo N; return 1; }
+    # [ -n "$(/bin/uname -r | grep "^4")" ] && [ -z "$(/bin/uname -m | grep "aarch64")" ] && echo Y || echo N
+    [ -n "$(/bin/uname -r | grep "^4")" ] && [ -z "$(/bin/uname -m | grep "aarch64")" ] && { echo Y; return 0; } || { echo N; return 1; }   # v4.14
 }
 Get_Router_Model() {
 
@@ -783,6 +783,8 @@ Delete_Peer() {
                         sqlite3 $SQL_DATABASE "DELETE FROM policy WHERE peer='$WG_INTERFACE';"
                         # IPsets
                         sqlite3 $SQL_DATABASE "DELETE FROM ipset WHERE peer='$WG_INTERFACE';"
+                        # Passthru
+                        #sqlite3 $SQL_DATABASE "DELETE FROM passthru WHERE peer='$WG_INTERFACE';"
 
                         #   DDNS martineau.homeip.net
                         #   Endpoint = martineau.homeip.net:51820
@@ -795,12 +797,13 @@ Delete_Peer() {
                                 #   # SGS8 End
 
                                 # Scan for 'server' Peer that accepts this 'client' connection
-                                SERVER_PEER=$(grep -HE "^#.*$WG_INTERFACE$" /opt/etc/wireguard.d/wg2*.conf | awk -F '[\/:\._]' '{print $6}')    # v4.11
+                                local MATCHTHIS="$(echo "$WG_INTERFACE" | sed 's/\"/\\\"/g')"
+                                SERVER_PEER=$(grep -HE "^#.*${MATCHTHIS} device" /opt/etc/wireguard.d/wg2*.conf | awk -F '[\/:\._]' '{print $6}')    # v4.11
 
                                 for SERVER_PEER in $SERVER_PEER
                                     do
                                         echo -e $cBGRE"\t'device' Peer ${cBMAG}${WG_INTERFACE}${cBGRE} removed from 'server' Peer (${cBMAG}${SERVER_PEER}${cBGRE})"     # 4.02
-                                        sed -i "/^# $WG_INTERFACE$/,/^# $WG_INTERFACE End$/d" ${CONFIG_DIR}${SERVER_PEER}.conf
+                                        sed -i "/^# ${MATCHTHIS} device/,/^# $WG_INTERFACE End$/d" ${CONFIG_DIR}${SERVER_PEER}.conf
                                         local RESTART_SERVERS=$RESTART_SERVERS" "$SERVER_PEER
                                     done
                             fi
@@ -1053,7 +1056,7 @@ Import_Peer() {
                             fi
                         fi
 
-                        if [ "$ASUS_NVRAM" == "Y" ] && [ "$(uname -o)" != "ASUSWRT-Merlin" ];then       # v4.12
+                        if [ "$ASUS_NVRAM" == "Y" ] && [ "$(/bin/uname -o)" != "ASUSWRT-Merlin" ];then       # v4.14 v4.12
                             # ASUS supported firmware, so use NVRAM
                             if [ $(nvram get wgc_unit) -ne 1 ];then
                                 local INDEX=$(($(nvram get wgc_unit)-1))
@@ -1133,7 +1136,7 @@ Import_Peer() {
                             [ "$RENAME" == "Y" ] && { mv ${CONFIG_DIR}${WG_INTERFACE}.conf ${CONFIG_DIR}${NEW_NAME}.conf; local AS_TXT="as ${cBMAG}$NEW_NAME "$cRESET; }
                         fi
 
-                        if [ "$ASUS_NVRAM" == "Y" ] && [ "$(uname -o)" != "ASUSWRT-Merlin" ];then
+                        if [ "$ASUS_NVRAM" == "Y" ] && [ "$(/bin/uname -o)" != "ASUSWRT-Merlin" ];then
                             [ -z "$AS_TXT" ] && local AS_TXT="as ${cBMAG}wgc${INDEX} "$cRESET || local AS_TXT="$AS_TXT, ${cBMAG}wgc${INDEX} "$cRESET
                         fi
 
@@ -3436,6 +3439,7 @@ Show_Peer_Status() {
                             # Tag it on screen if this is the default route
                             local DEFAULT_ROUTE=$(ip route | grep -Em 1 "^0.0.|128.0" | awk '{print $3}')       # v4.07
                             [ "$DEFAULT_ROUTE" == "$WG_INTERFACE" ] && DEF="$aUNDER" || DEF=
+
                             local LOCALIP=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM $TABLE WHERE peer='$WG_INTERFACE';")
                             [ "$(nvram get ipv6_service)" == "disabled"  ] && local LOCALIP=$(echo "$LOCALIP" | awk -F ',' '{print $1}')
 
@@ -3453,8 +3457,7 @@ Show_Peer_Status() {
 
                             local DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')
 
-
-                            local VPN_IP_TXT=${SOCKET}"\t\t\t${cBYEL}${LOCALIP}\t"
+                            [ -z "$(echo "$SOCKET" | grep -F ":")" ] && local VPN_IP_TXT=${SOCKET}"\t\t\t\t${cBYEL}${LOCALIP}\t" || VPN_IP_TXT=${SOCKET}"\t\t${cBYEL}${LOCALIP}\t"
 
                         fi
 
@@ -4512,7 +4515,11 @@ Process_User_Choice() {
                     local ARG="$(printf "%s" "$menu1" | cut -d' ' -f2)"
                 fi
 
-                Create_RoadWarrior_Device $menu1
+                if [ -z "$(echo "$ARG" | tr -cd \"\')" ];then   # v4.14 Peer name can't contain single/double quotes
+                    Create_RoadWarrior_Device $menu1
+                else
+                    echo -e $cBRED"\a\n\t***ERROR Peer '$ARG' contains quotes\n"$cRESET
+                fi
 
                 ;;
             "?"|u|u" "*|uf|uf" "*)
@@ -4618,14 +4625,14 @@ Process_User_Choice() {
                         if [ -f ${INSTALL_DIR}WireguardVPN.conf ] &&  [ -n "$(grep -oE "USE_ENTWARE_KERNEL_MODULE" ${INSTALL_DIR}WireguardVPN.conf)" ];then
                                 if [ -f /usr/sbin/wg ];then
                                     if [ -n "$(grep -oE "^USE_ENTWARE_KERNEL_MODULE" ${INSTALL_DIR}WireguardVPN.conf)" ];then
-                                        echo -e $cBGRE"\t[✔]${cBWHT} Use 3rd-party Entware/Userspace Tools ${cBGRE}modules is ALLOWED\n$cRESET"
+                                        echo -e $cBGRE"\t[✔]Use 3rd-party Entware/Userspace Tools ${cBGRE}modules is ALLOWED\n$cRESET"
                                     else
                                         echo -e $cBRED"\t[✖]${cBWHT} Use 3rd-party Entware/Userspace Tools ${cBGRE}modules is ${cBRED}DENIED\n$cRESET"
                                     fi
                                 fi
                         fi
 
-                        [ "READLINE" != "Readline" ] && echo -e $cBRED"\t[✖]${cBWHT} Use of 'Pg-Up' Key for command retrieval is ${cBRED}DISABLED\n$cRESET" # v4.14
+                        [ "$READLINE" == "ReadLine" ] && echo -e $cBGRE"\t[✔] Use of 'Pg-Up' Key for command retrieval is ENABLED\n$cRESET" || echo -e $cBRED"\t[✖]${cBWHT} Use of 'Pg-Up' Key for command retrieval is ${cBRED}DISABLED\n$cRESET" # v4.14
 
                         Manage_Stats
 
