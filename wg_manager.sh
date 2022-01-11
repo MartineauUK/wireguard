@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.14b7"
-#============================================================================================ © 2021-2022 Martineau v4.14b7
+VERSION="v4.14b8"
+#============================================================================================ © 2021-2022 Martineau v4.14b8
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,13 +24,13 @@ VERSION="v4.14b7"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 03-Jan-2022
+# Last Updated Date: 11-Jan-2022
 #
 # Description:
 #
 # Acknowledgement:
 #
-# Contributors: odkrys,Torson,ZebMcKayhan,jobhax,elorimer,Sh0cker54,here1310,defung,The Chief
+# Contributors: odkrys,Torson,ZebMcKayhan,jobhax,elorimer,Sh0cker54,here1310,defung,The Chief,abir1909
 
 GIT_REPO="wireguard"
 GITHUB_MARTINEAU="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/main"
@@ -1004,6 +1004,11 @@ Import_Peer() {
                                     # This must be commented out!
                                     [ "$MODE" == "client" ] && COMMENT_OUT="Y"
                                 ;;
+                                "#"SaveConfig);;                                  # v4.14
+                                SaveConfig)                                       # v4.14
+                                    # This must be commented out!
+                                    [ "$MODE" == "client" ] && COMMENT_OUT="Y"
+                                ;;
                                 ListenPort)                                     # v4.14
                                     # This must be commented out!
                                     [ "$MODE" == "client" ] && COMMENT_OUT="Y"
@@ -1113,6 +1118,8 @@ Import_Peer() {
                             sed -i 's/^PostUp/#PostUp/g' ${IMPORT_DIR}${WG_INTERFACE}.conf          # v4.14
                             sed -i 's/^PreDown/#PreDown/g' ${IMPORT_DIR}${WG_INTERFACE}.conf        # v4.14
                             sed -i 's/^PostDown/#PostDown/g' ${IMPORT_DIR}${WG_INTERFACE}.conf      # v4.14
+                            sed -i 's/^SaveConfig/#SaveConfig/g' ${IMPORT_DIR}${WG_INTERFACE}.conf      # v4.14
+
                             # Insert the tag
                             if [ "$ANNOTATE" != "# N/A" ];then
                                 if [ "$INSERT_COMMENT" != "N" ];then                    # v4.03
@@ -1661,6 +1668,7 @@ Manage_Wireguard_Sessions() {
     local ACTION=$1;shift
     local WG_INTERFACE=$1;shift
     local CATEGORY=
+    local SHOWCMDS=         # v4.14
 
     # ALL Peers?
     if [ -z "$WG_INTERFACE" ];then
@@ -1709,6 +1717,8 @@ Manage_Wireguard_Sessions() {
 
                 for PEER in $PEERS
                     do
+                        [ "$PEER" == "debug" ] && { local SHOWCMDS="debug"; continue; }             # v4.14
+                        [ "$PEER" == "policy" ] && { local FORCEPOLICY="forcepolicy"; continue; }   # v4.14
                         # Category  list (CSV or space delimited) ?     # v3.04
                         if [ "${PEER:0:2}" != "wg" ];then
                             if [ -z "$(wg show $PEER 2>/dev/null)" ];then
@@ -1750,11 +1760,15 @@ Manage_Wireguard_Sessions() {
 
             for WG_INTERFACE in $WG_INTERFACE
                 do
+                    [ "$WG_INTERFACE" == "debug" ] && { local SHOWCMDS="debug"; continue; }             # v4.14
+                    [ "$WG_INTERFACE" == "policy" ] && { local FORCEPOLICY="forcepolicy"; continue; }   # v4.14
+
                     Mode=$(Server_or_Client "$WG_INTERFACE")
 
                     [ "$Mode" == "server" ] && local TABLE="servers" || local TABLE="clients"
 
                     [ "$WG_INTERFACE" == "nopolicy" ] && continue                           # v2.02
+                    [ "$WG_INTERFACE" == "policy" ] && continue                           # v4.14
 
                     LOOKAHEAD=$(echo "$LOOKAHEAD" | awk '{$1=""}1')
                     if [ "$(echo "$LOOKAHEAD" | awk '{print $1}')" == "nopolicy" ];then     # v2.02
@@ -1762,9 +1776,9 @@ Manage_Wireguard_Sessions() {
                         POLICY_MODE="Policy override ENFORCED"
                     fi
 
-                    if [ -z "$Route" ];then
+                    if [ -z "$Route" ] || [ "$FORCEPOLICY" == "forcepolicy" ];then
                         if [ "$Mode" == "client" ];then
-                            if [ "$(sqlite3 $SQL_DATABASE "SELECT auto FROM $TABLE WHERE peer='$WG_INTERFACE';")" == "P" ];then
+                            if [ "$(sqlite3 $SQL_DATABASE "SELECT auto FROM $TABLE WHERE peer='$WG_INTERFACE';")" == "P" ] || [ "$FORCEPOLICY" == "forcepolicy" ];then
 
                                 if [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$WG_INTERFACE';")" -gt 0 ] || \
                                    [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM ipset WHERE peer='$WG_INTERFACE';")" -gt 0 ] || \
@@ -1785,7 +1799,7 @@ Manage_Wireguard_Sessions() {
                         if [ -n "$(ifconfig $WG_INTERFACE 2>/dev/null | grep inet)" ];then  # v1.09
                             echo -e $cBWHT"\tRestarting Wireguard '$Mode' Peer (${cBMAG}${WG_INTERFACE}${cBWHT})"$cRESET 2>&1
                             SayT "$VERSION Restarting Wireguard '$Mode' Peer ($WG_INTERFACE)"
-                            [ "$Mode" == "server" ] && /jffs/addons/wireguard/wg_server $WG_INTERFACE "disable" || ${INSTALL_DIR}wg_client $WG_INTERFACE "disable"                 # v1.09
+                            [ "$Mode" == "server" ] && /jffs/addons/wireguard/wg_server $WG_INTERFACE "disable" "$SHOWCMDS" || ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" "$SHOWCMDS"                 # v1.09
                         fi
                     fi
 
@@ -1801,7 +1815,7 @@ Manage_Wireguard_Sessions() {
                                 local TS=$(date +%s)
                                 #sh ${INSTALL_DIR}wg_server $WG_INTERFACE   # v4.12 http://www.snbforums.com/threads/vpnclient1-up-down-scripts-openvpn-ac86u-help-needed.56500/post-489924
                                 chmod +x ${INSTALL_DIR}wg_server            # v4.12
-                                ${INSTALL_DIR}wg_server $WG_INTERFACE       # v4.12
+                                ${INSTALL_DIR}wg_server $WG_INTERFACE "$SHOWCMDS"       # v4.12
 
 #[ "$(wg show interfaces | tr ' ' '\n' | grep "wg2[1-9]" | wc -w)" -eq 1 ] && local UDP_MONITOR=$(Manage_UDP_Monitor "server" "enable")
 
@@ -1821,11 +1835,11 @@ Manage_Wireguard_Sessions() {
                             elif [ "$Mode" == "client" ] && [ "$Route" != "policy" ] ; then
                                     #sh ${INSTALL_DIR}wg_client $WG_INTERFACE   # v4.12 http://www.snbforums.com/threads/vpnclient1-up-down-scripts-openvpn-ac86u-help-needed.56500/post-489924
                                     chmod +x ${INSTALL_DIR}wg_client            # v4.12
-                                    ${INSTALL_DIR}wg_client $WG_INTERFACE       # v4.12
-                                else
+                                    ${INSTALL_DIR}wg_client $WG_INTERFACE "$SHOWCMDS"   # v4.14 v4.12
+                            else
                                     #sh ${INSTALL_DIR}wg_client $WG_INTERFACE "policy"  # v4.12 http://www.snbforums.com/threads/vpnclient1-up-down-scripts-openvpn-ac86u-help-needed.56500/post-489924
                                     chmod +x ${INSTALL_DIR}wg_client                    # v4.12
-                                    ${INSTALL_DIR}wg_client $WG_INTERFACE "policy"      # v4.12
+                                    ${INSTALL_DIR}wg_client $WG_INTERFACE "policy" "$SHOWCMDS"      # v4.14 v4.12
 
                             fi
                         else
@@ -1859,6 +1873,7 @@ Manage_Wireguard_Sessions() {
 
             for WG_INTERFACE in $WG_INTERFACE
                 do
+                   [ "$WG_INTERFACE" == "debug" ] && { local SHOWCMDS="debug"; continue; }      # v4.14
                    if [ -n "$(wg show $WG_INTERFACE 2>/dev/null)" ] || [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
                         [ -z "$(grep -iE "^Endpoint" ${CONFIG_DIR}${WG_INTERFACE}.conf)" ] && { Mode="server"; TABLE="servers"; } || { Mode="client"; TABLE="clients"; }    # v4.11
 
@@ -1885,7 +1900,7 @@ Manage_Wireguard_Sessions() {
                                         sqlite3 $SQL_DATABASE "INSERT into session values('$DEVICE','End','$TIMESTAMP');"
                                     done
 
-                                sh ${INSTALL_DIR}wg_server $WG_INTERFACE "disable"
+                                sh ${INSTALL_DIR}wg_server $WG_INTERFACE "disable" "$SHOWCMDS"
 
                                 # If there are no 'server' Peers ACTIVE then terminate UDP monitoring
                                 # Will require REBOOT to reinstate! or 'wgm init'
@@ -1895,9 +1910,9 @@ Manage_Wireguard_Sessions() {
                                 # Dump the stats
                                 Show_Peer_Status "generatestats" "$WG_INTERFACE"                # v4.04
                                 if [ "$Mode" == "client" ] && [ "$Route" != "policy" ] ; then
-                                    wg show $WG_INTERFACE >/dev/null 2>&1 && sh ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" "$FORCE" || Say "WireGuard $Mode service ('$WG_INTERFACE') NOT running."
+                                    wg show $WG_INTERFACE >/dev/null 2>&1 && sh ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" "$FORCE" "$SHOWCMDS" || Say "WireGuard $Mode service ('$WG_INTERFACE') NOT running."
                                 else
-                                    wg show $WG_INTERFACE >/dev/null 2>&1 && sh ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" "policy" "$FORCE" || Say "WireGuard $Mode (Policy) service ('$WG_INTERFACE') NOT running."
+                                    wg show $WG_INTERFACE >/dev/null 2>&1 && sh ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" "policy" "$FORCE" "$SHOWCMDS" || Say "WireGuard $Mode (Policy) service ('$WG_INTERFACE') NOT running."
                                 fi
                             fi
 
@@ -2312,7 +2327,7 @@ Manage_VPNDirector_rules() {
     case $ACTION in
         clone|copy)
             if [ -s /jffs/openvpn/vpndirector_rulelist ];then
-                cat /jffs/openvpn/vpndirector_rulelist | sed 's/>WAN/>WAN\n/g' | sed -E 's/(>OVPN[1-5])/\1\n/g' > /tmp/VPNDirectorRules.txt     # v4.14
+                sed -E 's/(>OVPN[1-5]|>WAN)/\1\n/g' /jffs/openvpn/vpndirector_rulelist > /tmp/VPNDirectorRules.txt
                 [ -n "$FILTER" ] && local FILTER_TXT="(ONLY ${FILTER}) "                    # v4.14
                 echo -e $cRESET"\n\tAuto clone VPN Director ${FILTER_TXT}rules\n" 2>&1      # v4.14
                 while read -r LINE || [ -n "$LINE" ]; do
@@ -3426,7 +3441,7 @@ Show_Peer_Status() {
 
                             local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM $TABLE WHERE peer='$WG_INTERFACE';")
                             local DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')
-                            local VPN_IP_TXT="Port:${LISTEN_PORT}\t${VPN_ADDR} ${cBYEL}\t\tVPN Tunnel Network"
+                            local VPN_IP_TXT="Port:${LISTEN_PORT}\t${VPN_ADDR} ${cBYEL}\t\t\tVPN Tunnel Network"
                             [ "$WG_INTERFACE" == "wgs1" ] && DESC="${cBRED}***ASUS Internal GUI 'server' Peer***"
                         else
                             if [ "$MODE" == "client" ];then
@@ -3438,30 +3453,46 @@ Show_Peer_Status() {
 
                             # Tag it on screen if this is the default route
                             local DEFAULT_ROUTE=$(ip route | grep -Em 1 "^0.0.|128.0" | awk '{print $3}')       # v4.07
-                            [ "$DEFAULT_ROUTE" == "$WG_INTERFACE" ] && DEF="$aUNDER" || DEF=
+                            [ "$DEFAULT_ROUTE" == "$WG_INTERFACE" ] && DEF="$aREVERSE" || DEF=                  # v4.14
 
                             local LOCALIP=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM $TABLE WHERE peer='$WG_INTERFACE';")
-                            [ "$(nvram get ipv6_service)" == "disabled"  ] && local LOCALIP=$(echo "$LOCALIP" | awk -F ',' '{print $1}')
 
+                            #local LOCALIPS=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM $TABLE WHERE peer='$WG_INTERFACE';" | tr ',' ' ')   # v4.14
+                            # for LOCALIP in $LOCALIPS
+                                # do
+                                    # if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$LOCALIP" | grep -F ":")" ];then   # v4.14
+                                        # continue
+                                        # SayT "Warning: IPv6 'client' Peer '$LOCALIP' ('$WG_INTERFACE') skipped as IPv6 not ENABLED"
+                                    # else
+                                        # if [ -n "$(echo "$LOCALIP" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$LOCALIP" | Is_IPv4)" ];then
+                                            # break
+                                        # else
+                                            # echo -e $cBRED"\a\n\t***ERROR: Invalid IPv4 local address for 'client' Peer '$LOCALIP'"
+                                        # fi
+                                    # fi
+                                # done
 
                             case "$WG_INTERFACE" in
                                 wgc*|wgs*)
                                     local DESC="${cBRED}***ASUS Internal GUI 'client' Peer***"$cRESET
                                     ;;
                                 *)
-                                    #local SOCKET=$(sqlite3 $SQL_DATABASE "SELECT socket FROM $TABLE WHERE peer='$WG_INTERFACE';")
-                                    local SOCKET=$(awk '/^Endpoint/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)  # v4.12
+                                    local SOCKET=$(wg show $WG_INTERFACE endpoints | awk '{print $2}')          # 4.14
+
                                     local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM $TABLE WHERE peer='$WG_INTERFACE';")
                                 ;;
                             esac
 
                             local DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')
 
-                            [ -z "$(echo "$SOCKET" | grep -F ":")" ] && local VPN_IP_TXT=${SOCKET}"\t\t\t\t${cBYEL}${LOCALIP}\t" || VPN_IP_TXT=${SOCKET}"\t\t${cBYEL}${LOCALIP}\t"
+                            # Cosmetic IPv4 three tabs; IPv6 two tabs
+                            [ -n "$(echo "$SOCKET" | grep -F ".")" ] && local TABS="\t\t\t" || TABS="\t\t"
+
+                            local VPN_IP_TXT=${cBGRA}"EndPoint="${cRESET}${SOCKET}"${TABS}${cBYEL}${LOCALIP}\t"
 
                         fi
 
-                        local LINE=${DEF}${COLOR}${LINE}${cRESET}" ${cBMAG}\t${cBWHT}$VPN_IP_TXT\t${cBMAG}${DESC}"$cRESET  # v3.05 v3.01
+                        local LINE=${DEF}${COLOR}${LINE}${cRESET}" ${cBMAG}   ${cBWHT}${VPN_IP_TXT}\t${cBMAG}${DESC}"$cRESET  # v 4.14 v3.05 v3.01
                     else
                         local TAB="\t\t"
                         if [ -n "$(echo "$LINE" | grep -E "transfer:")" ];then
@@ -4351,7 +4382,7 @@ Validate_User_Choice() {
             0) ;;
             1|i)
                 [ -z "$(ls ${INSTALL_DIR}*.ipk 2>/dev/null)" ]  && menu1="install" || menu1="getmodules";;
-            2|z) menu1="uninstall";;
+            2|z|remove) menu1="uninstall";; # v4.14
             3*|list*|show*) menu1=$(echo "$menu1" | awk '{$1="list"}1');;
             4*|start*) menu1=$(echo "$menu1" | awk '{$1="start"}1') ;;
             5*|stop*) menu1=$(echo "$menu1" | awk '{$1="stop"}1') ;;
@@ -4499,7 +4530,14 @@ Process_User_Choice() {
                 ;;
             z|uninstall)
 
-                Uninstall_WireGuard
+                local ANS=
+
+                echo -e "\n\tPress$cBRED Y$cRESET to$cBRED Remove WireGuard $cRESET('${CONFIG_DIR}') or press$cBGRE [Enter] to cancel request." # v4.14
+                read -r "ANS"
+                if [ "$ANS" == "Y" ];then       # v4.14 @ZebMcKayhan
+                    Uninstall_WireGuard
+                fi
+
                 ;;
             createsplit*|create*)                                                            # {name} [{tag="desciption{"}}]     # v1.11 v1.03
                 # Create a Private/Public key-pair for your mobile phone etc.
@@ -5331,10 +5369,29 @@ BUILDNO=$(nvram get buildno)                # v4.14
 BUILDNO=${BUILDNO}_$(nvram get extendno)    # v4.14
 SCRIPT_NAME="${0##*/}"
 ENTWARE_INFO="/opt/etc/entware_release"
+SHELL=$(readlink /proc/$$/exe)              # 4.14
 
 EASYMENU="Y"
 
-#[ "$(nvram get ipv6_service)" != "disabled" ] && USE_IPV6="Y"               # v1.07
+IPV6_SERVICE=$(nvram get ipv6_service)                  # v4.14
+if [ "$IPV6_SERVICE" != "disabled" ];then               # v4.14
+    case $IPV6_SERVICE in
+        native|ipv6pt|dhcp6)
+            USE_IPV6="Y"; IPV6_TXT="(IPv6) "
+            LAN_SUBNET_IPV6=$(nvram get ipv6_prefix)    # v4.14.6
+            LAN_ADDR_IPV6=$(nvram get ipv6_rtr_addr)    # v4.14.6
+        ;;
+        6to4|6in4|6rd)
+            :
+        ;;
+        other)
+            :
+        ;;
+        spoof|simulate)
+            USE_IPV6="Y"; IPV6_TXT="(IPv6) Simulate "   # v4.14
+        ;;
+    esac
+fi
 
 TS=$(date +"%Y%m%d-%H%M%S")    # current date and time 'yyyymmdd-hhmmss'
 
@@ -5343,6 +5400,7 @@ PEER=$2
 NOPOLICY=$3
 
 #[ -f /usr/sbin/helper.sh ] && source /usr/sbin/helper.sh                                  # v 4.12 v2.07 Required for external 'am_settings_set()/am_settings_get()'
+#Say $SHELL
 
 # Need assistance ?
 if [ "$1" == "-h" ] || [ "$1" == "help" ];then
