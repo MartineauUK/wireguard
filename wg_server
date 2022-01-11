@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.14.1"
-#============================================================================================ © 2021-2022 Martineau v4.14.1
+VERSION="v4.14.2"
+#============================================================================================ © 2021-2022 Martineau v4.14.2
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 03-Jan-2022
+# Last Updated Date: 11-Jan-2022
 #
 # Description:
 #
@@ -40,6 +40,7 @@ Firewall_delete() {
     iptables -D OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
     iptables -t nat -D PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
     iptables -t nat -D POSTROUTING -s $Subnet -o wg1+ -j MASQUERADE -m comment --comment "WireGuard 'server'"  2>/dev/null  # v1.11
+    iptables -t nat -D POSTROUTING -s $Subnet -o br0 -j MASQUERADE -m comment --comment "WireGuard 'server clients to LAN'" 2>/dev/null # v4.14.2
 
     if [ "$(nvram get ipv6_service)" != "disabled" ];then
         ip6tables -t mangle -D PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'server'" 2>/dev/null
@@ -53,6 +54,9 @@ Firewall_delete() {
         ip6tables -D FORWARD -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
         ip6tables -D FORWARD -i br0 -o $VPN_ID -j ACCEPT -m comment --comment "LAN to WireGuard 'server clients'" 2>/dev/null
         ip6tables -D OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
+        ip6tables -t nat -D PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null   # v4.14.1
+        ip6tables -t nat -D POSTROUTING -s $Subnet -o wg1+ -j MASQUERADE -m comment --comment "WireGuard 'server'"  2>/dev/null # v4.14.1
+        ip6tables -t nat -D POSTROUTING -s $Subnet -o br0 -j MASQUERADE -m comment --comment "WireGuard 'server'"  2>/dev/null  # v4.14.1
     fi
 }
 Manage_Passthru(){
@@ -136,13 +140,14 @@ VPN_ID=$1
 [ -z "$1" ] && VPN_ID="wg21"
 #logger -st "wireguard-server${VPN_ID:2:1}" "Configuring Wireguard VPN Server ($VPN_ID) on Port:"$wgport
 
+WG_INTERFACE=$VPN_ID
 VPN_NUM=${VPN_ID#"${VPN_ID%?}"}                     # v4.02
 
 wgport=$(awk '/Listen/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)
+Subnet=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers where peer='$WG_INTERFACE';") # v1.09 @here1310
+
 SOCKET=$(nvram get wan_gateway)":"$wgport
 SOCKET=$(nvram get wan0_gateway)":"$wgport          # v4.04
-
-WG_INTERFACE=$1
 
 DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM servers where peer='$WG_INTERFACE';")
 DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')
@@ -179,17 +184,15 @@ fi
 WAN_IPV4=$(ip -4 addr | sed -ne 's|^.* inet  \([^/]*\)/.* scope global.*$|\1|p' | awk '{print $1}' | head -1)           # v4.14.1
 [ "$USE_IPV6" == "Y" ] && { WAN_IPV6=$(ip -6 addr | sed -ne 's|^.* inet6 \([^/]*\)/.* scope global.*$|\1|p' | head -1); IPV6_TXT=$IPV6_TXT"["$WAN_IPV6"] ";  }  # v4.14.1
 
-if [ "$2" != "disable" ];then
-    wgport=$(awk '/Listen/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)
-    Subnet=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers where peer='$WG_INTERFACE';") # v1.09 @here1310
-
-    if [ "$USE_IPV6" != "Y" ];then
-        # CIDR ?
-        if [ -z "$(echo "$Subnet" | Is_IPv4_CIDR)" ];then
-            SUBNET_PREFIX=${Subnet%.*}
-            Subnet=$SUBNET_PREFIX".0/24"
-        fi
+if [ "$USE_IPV6" != "Y" ];then
+    # CIDR ?
+    if [ -z "$(echo "$Subnet" | Is_IPv4_CIDR)" ];then
+        SUBNET_PREFIX=${Subnet%.*}
+        Subnet=$SUBNET_PREFIX".0/24"
     fi
+fi
+
+if [ "$2" != "disable" ];then
 
     logger -t "wireguard-server${VPN_ID:3:1}" "Initialising Wireguard VPN ${IPV6_TXT}'Server' Peer (${cBMAG}$VPN_ID$cBGRE) on $SOCKET"
     echo -e $cBCYA"\twireguard-server${VPN_ID:3:1}: Initialising Wireguard VPN ${IPV6_TXT}'Server' Peer (${cBMAG}$VPN_ID$cBCYA) on $SOCKET (${cBMAG}$DESC${cBCYA})"$cRESET
@@ -253,6 +256,7 @@ if [ "$2" != "disable" ];then
     iptables -I FORWARD -i br0 -o $VPN_ID -j ACCEPT -m comment --comment "LAN to WireGuard 'server clients'"    # v4.14.1 @ZebMcKayhan
     iptables -I OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
     iptables -t nat -I PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'"
+    iptables -t nat -I POSTROUTING -s $Subnet -o br0 -j MASQUERADE -m comment --comment "WireGuard 'server clients to LAN'" # v4.14.2
 
     if [ "$USE_IPV6" == "Y" ];then                          # v4.05
         if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -z "$(grep -E "^NOTCPMSS" /jffs/addons/wireguard/WireguardVPN.conf)" ];then    # v4.12
@@ -347,6 +351,5 @@ else
 fi
 
 
-############################################################################EIC Hack 3 of 3####################################
 #) 2>&1 | logger -t $(basename $0)"[$$_***DEBUG]"
-###############################################################################################################################
+
