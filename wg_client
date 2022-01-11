@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.14.6"
-#============================================================================================ © 2021-2022 Martineau v4.14.6
+VERSION="v4.14.7"
+#============================================================================================ © 2021-2022 Martineau v4.14.7
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 03-Jan-2022
+# Last Updated Date: 11-Jan-2022
 #
 # Description:
 #
@@ -259,15 +259,26 @@ EOR
 Process_Pre_Post_Commands() {
 
     while read LINE; do
-            CMDTYPE=$1
-            CMD="$(echo "$LINE" | sed "s/\%i/$WG_INTERFACE/g" | sed "s/\%w/$WAN_IF/g")"  # v4.14.6
-            if [ -n "$CMD" ];then
-                logger -t "wireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"
-                $CMD
+            if [ -n "$LINE" ];then
+                local CMDTYPE=$1
+                local CMD="$(echo "$LINE" | sed "s/\%i/$WG_INTERFACE/g" | sed "s/\%w/$WAN_IF/g")"  # v4.14.6
+                if [ -n "$CMD" ];then
+                    if [ -n "$(echo "$CMDTYPE" | grep "Up")" ] || [ -n "$(wg show | grep "$WG_INTERFACE")" ] || [ -z "$(echo "$CMD" | grep "$WG_INTERFACE")" ];then
+                        logger -t "wireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"
+                        [ "$SHOWCMDS" == "Y" ] && echo "[##] $CMD"
+                        $CMD
+                    else
+                        logger -t "wireguard-${MODE}${VPN_NAME}" "Skipping $CMDTYPE: '$CMD'"
+                    fi
+                fi
             fi
     done << EOR
 $(grep -E "^#${1}" ${CONFIG_DIR}${WG_INTERFACE}.conf | tr ';' '\n' | sed 's/^#.*=//')
 EOR
+}
+cmd() {
+    [ "$SHOWCMDS" == "Y" ] && echo "[#] $*" >&2     # v4.14.7
+    "$@"
 }
 #=============================================Main=============================================================
 
@@ -336,6 +347,7 @@ WAN_IPV4=$(ip -4 addr | sed -ne 's|^.* inet  \([^/]*\)/.* scope global.*$|\1|p' 
 
 [ -n "$(echo "$@" | grep "force")" ] && FORCE="force"
 
+[ -n "$(echo "$@" | grep "debug")" ] && SHOWCMDS="Y"                        # v4.14.7
 # Is this a standard 'client' Peer interface 'wg11-wg15'                    # v1.03
 if [ -z "$(echo "$VPN_ID" |  grep -oE "^wg[0-2]")" ];then      # v4.02 v1.03
     # Non-standard so identfy if it's a 'client' or 'server' Peer
@@ -413,15 +425,9 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         fi
 
         ip link del dev $VPN_ID 2>/dev/null
-        ip link add dev $VPN_ID type wireguard
+        cmd ip link add dev $VPN_ID type wireguard
 
-        if [ "$USE_IPV6" == "Y" ];then                      # v4.08
-            ip -6 link del dev $VPN_ID 2>/dev/null
-            ip -6 link add dev $VPN_ID type wireguard
-            ip -6 route add ::/0 dev $VPN_ID table 12$VPN_NUM
-        fi
-
-        wg setconf $VPN_ID ${CONFIG_DIR}$VPN_ID.conf
+        cmd wg setconf $VPN_ID ${CONFIG_DIR}$VPN_ID.conf
         #  Suppress the message if a domain is supplied i.e.'Error: any valid prefix is expected rather than "'xxx.com"
 
         # v4.12 Assign both IPv6 nd IPv6 IPs to interface as required
@@ -429,19 +435,19 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         for LOCALIP in $LOCALIPS
             do
                 if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$LOCALIP" | grep -F ":")" ];then     # v4.12
-                    ip -6 address add dev $VPN_ID $LOCALIP 2>/dev/null     # v4.02
-                    ip -6 link set up dev $VPN_ID
+                    cmd ip -6 address add dev $VPN_ID $LOCALIP     # v4.02
+                    cmd ip -6 link set up dev $VPN_ID
                 else
                     if [ -n "$(echo "$LOCALIP" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$LOCALIP" | Is_IPv4)" ];then
-                        ip address add dev $VPN_ID $LOCALIP 2>/dev/null # v4.02
-                        ip link set up dev $VPN_ID
+                        cmd ip address add dev $VPN_ID $LOCALIP  # v4.02
+                        cmd ip link set up dev $VPN_ID
                     fi
                 fi
             done
 
         #ifconfig $VPN_ID mtu 1380
-        ifconfig $VPN_ID mtu $MTU                           # v4.09 v1.02
-        ifconfig $VPN_ID txqueuelen 1000
+        cmd ifconfig $VPN_ID mtu $MTU                           # v4.09 v1.02
+        cmd ifconfig $VPN_ID txqueuelen 1000
 
         TIMESTAMP=$(date +%s)
         sqlite3 $SQL_DATABASE "INSERT into session values('$WG_INTERFACE','Start','$TIMESTAMP');"   # v1.08
@@ -473,23 +479,23 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
             # 0.0.0.0/0 Default
             if [ -n "$(awk '/^AllowedIPs/ {print $0}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "0.0.0.0/0")" ] || [ -n "$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "::0/0")" ];then  # v4.14
                 if [ "$(awk '/^AllowedIPs/ {print $0}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "0.0.0.0/0")" == "0.0.0.0/0" ];then   # v4.14
-                    ip route add 0/1   dev $VPN_ID 2>/dev/null
-                    ip route add 128/1 dev $VPN_ID 2>/dev/null
+                    cmd ip route add 0/1   dev $VPN_ID
+                    cmd ip route add 128/1 dev $VPN_ID
                 fi
                 if [ "$(awk '/^AllowedIPs/ {print $0}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "::0/0")" == "::0/0" ];then   # v4.14
                     if [ "$USE_IPV6" == "Y" ];then
                         #ip -6 route add ::/0 dev $VPN_ID table 12$VPN_NUM
-                        ip -6 rule add from all table 12$VPN_NUM prio 999$VPN_NUM
+                        cmd ip -6 rule add from all table 12$VPN_NUM prio 999$VPN_NUM
                     fi
                 fi
             else
                 for ALLOWIP in $(awk '/^AllowedIPs/ {$1="";$2="";print $0}' ${CONFIG_DIR}${VPN_ID}.conf | tr ',' ' ')
                     do
                         if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$ALLOWIP" | grep -F ":")" ];then     # v4.12
-                            ip -6 route add $ALLOWIP dev $VPN_ID 2>/dev/null
+                            cmd ip -6 route add $ALLOWIP dev $VPN_ID
                         else
                             if [ -n "$(echo "$ALLOWIP" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$ALLOWIP" | Is_IPv4)" ];then
-                                ip route add $ALLOWIP dev $VPN_ID 2>/dev/null
+                                cmd ip route add $ALLOWIP dev $VPN_ID
                             fi
                         fi
                     done
@@ -500,20 +506,20 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
                 if [ -n "$PEER_DNS" ];then
                     if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.09
                         if [ -n "$(echo "${LAN_SUBNET}.0/24") | Is_IPv4_CIDR" ];then
-                            iptables -t nat -A WGDNS$VPN_NUM -s ${LAN_SUBNET}.0/24 -j DNAT --to-destination $PEER_DNS -m comment --comment "WireGuard 'client${VPN_NUM} DNS'" # v4.05
+                            cmd iptables -t nat -A WGDNS$VPN_NUM -s ${LAN_SUBNET}.0/24 -j DNAT --to-destination $PEER_DNS -m comment --comment "WireGuard 'client${VPN_NUM} DNS'" # v4.05
                         fi
                         if [ "$USE_IPV6" == "Y" ];then
-                            [ -n "$(nvram get ipv61_ipaddr)" ] && ip6tables -t nat -A WGDNS$VPN_NUM -s $(nvram get ipv6_rtr_addr) -j DNAT --to-destination $PEER_DNS -m comment --comment "WireGuard 'client${VPN_NUM} DNS'"
+                            [ -n "$(nvram get ipv61_ipaddr)" ] && cmd ip6tables -t nat -A WGDNS$VPN_NUM -s $(nvram get ipv6_rtr_addr) -j DNAT --to-destination $PEER_DNS -m comment --comment "WireGuard 'client${VPN_NUM} DNS'"
                             #[ -z "$(nvram get ipv61_ipaddr)" ] && ip6tables -t nat -A WGDNS$VPN_NUM -s ::1 -j DNAT --to-destination $PEER_DNS -m comment --comment "WireGuard 'client${VPN_NUM} DNS'"
                         fi
                     else
-                        iptables -t nat -A WGDNS$WG_INTERFACE -s ${LAN_SUBNET}.0/24 -j DNAT --to-destination $PEER_DNS -m comment --comment "WireGuard 'client${WG_INTERFACE} DNS'" # v4.09
+                        cmd iptables -t nat -A WGDNS$WG_INTERFACE -s ${LAN_SUBNET}.0/24 -j DNAT --to-destination $PEER_DNS -m comment --comment "WireGuard 'client${WG_INTERFACE} DNS'" # v4.09
                     fi
                 fi
             fi
         else
             # [ -z "$(ip -6 route show dev $VPN_ID match ::/0" 2>/dev/null) ] && ip -6 route add "::/0" dev "$VPN_ID" prio 999$VPN_NUM
-            ip -6 route add ::/0 dev $VPN_ID table 12$VPN_NUM
+            cmd ip -6 route add ::/0 dev $VPN_ID table 12$VPN_NUM
 
             #ip rule add from $(nvram get lan_ipaddr | cut -d"." -f1-3).0/24 table 12$VPN_NUM prio 99$VPN_NUM"9"
             if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.09
@@ -540,21 +546,21 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
 
                             TAG_MARK=$(sqlite3 /opt/etc/wireguard.d/WireGuard.db "select fwmark from fwmark where peer='${WG_INTERFACE}';") # v4.12                                                                                                             # v4.12
                             ip rule del from 0/0 fwmark $TAG_MARK"/"$TAG_MARK table 12$VPN_NUM prio 999$VPN_NUM 2>/dev/null                 # v4.12
-                            ip rule add from 0/0 fwmark $TAG_MARK"/"$TAG_MARK table 12$VPN_NUM prio 999$VPN_NUM                             # v4.12
+                            cmd ip rule add from 0/0 fwmark $TAG_MARK"/"$TAG_MARK table 12$VPN_NUM prio 999$VPN_NUM                             # v4.12
                             echo 0 >/proc/sys/net/ipv4/conf/$WG_INTERFACE/rp_filter                                                         # v4.12
                             if [ "$USE_IPV6" == "Y" ];then
                                 ip -6 rule del from ::/0 fwmark $TAG_MARK"/"$TAG_MARK table 12$VPN_NUM prio 999$VPN_NUM 2>/dev/null          # v4.13
-                                ip -6 rule add from ::/0 fwmark $TAG_MARK"/"$TAG_MARK table 12$VPN_NUM prio 999$VPN_NUM                      # v4.13
+                                cmd ip -6 rule add from ::/0 fwmark $TAG_MARK"/"$TAG_MARK table 12$VPN_NUM prio 999$VPN_NUM                      # v4.13
                             fi
 
                             # Differentiate betwwn IPSETs containing IPv4 or IPv6 IPs
                             if [ "$IPSET_FAMILY" != "inet6" ];then      # IPv4
                                 iptables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'" 2>/dev/null # v4.12
-                                iptables -t mangle -A PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'"             # v4.12
+                                cmd iptables -t mangle -A PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'"             # v4.12
                             else
                                 if [ "$USE_IPV6" == "Y" ];then          # IPv6
                                     ip6tables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'" 2>/dev/null    # v4.12
-                                    ip6tables -t mangle -A PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'"                # v4.12
+                                    cmd ip6tables -t mangle -A PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'"                # v4.12
                                 fi
                             fi
                             logger -t "wireguard-${MODE}${VPN_NAME}" "Adding $IPV_TEXT IPSet '$IPSET' route through VPN 'client' Peer" $WG_INTERFACE
@@ -564,51 +570,36 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
                     done
             fi
 
-
-
         fi
 
         if [ -n "$(awk '/^AllowedIPs/ {print $0}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "0.0.0.0/0")" ] || [ -n "$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "::0/0")" ];then  # v4.14
-            ip route add 0/1   dev $VPN_ID table 12$VPN_NUM 2>/dev/null
-            ip route add 128/1 dev $VPN_ID table 12$VPN_NUM 2>/dev/null
+            cmd ip route add 0/1   dev $VPN_ID table 12$VPN_NUM
+            cmd ip route add 128/1 dev $VPN_ID table 12$VPN_NUM
 
-            if [ "$USE_IPV6" == "Y" ];then                                      # v4.08
-                #ip -6 route add ::/1     dev $VPN_ID table 12$VPN_NUM 2>/dev/null   # v4.12
-                #ip -6 route add 8000::/1 dev $VPN_ID table 12$VPN_NUM 2>/dev/null   # v4.12
-                ip -6 route add ::/0 $VPN_ID table 12$VPN_NUM 2>/dev/null
+            if [ "$USE_IPV6" == "Y" ];then                                              # v4.08
+                ip -6 route add ::/0 dev $VPN_ID table 12$VPN_NUM 2>/dev/null           # Duplicate?
             fi
         fi
-        #ip route add default dev $VPN_ID table 12$VPN_NUM 2>/dev/null      # v4.03
 
-        ip route add $(echo $LOCALIP | cut -d"." -f1-3).0/24 dev $VPN_ID  proto kernel  scope link  src $LOCALIP 2>/dev/null
-        [ "$USE_IPV6" == "Y" ] && ip -6 route add ::/0 dev $WG_IFACE 2>/dev/null
         ip route show table main dev $(nvram get lan_ifname) | while read ROUTE
             do
                 if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.09
-                    ip route add table 12$VPN_NUM $ROUTE dev $(nvram get lan_ifname) 2>/dev/null
+                    cmd ip route add table 12$VPN_NUM $ROUTE dev $(nvram get lan_ifname)
                 else
-                    ip route add table 120 $ROUTE dev $(nvram get lan_ifname) 2>/dev/null   # v4.10
+                    cmd ip route add table 120 $ROUTE dev $(nvram get lan_ifname)    # v4.10
                 fi
             done
 
-        # ip route show table main dev $VPN_ID | while read ROUTE
-            # do
-                # if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.10
-                    # ip route add table 12$VPN_NUM $ROUTE dev $VPN_ID 2>/dev/null
-                # else
-                    # ip route add table 120 $ROUTE dev $(nvram get lan_ifname) 2>/dev/null   # v4.10
-                # fi
-
-            # done
         if [ "$USE_IPV6" == "Y" ];then
 
-            ip -6 route add $(echo $LOCALIP | sed 's/::/|/' | cut -d"|" -f1)::0/64 dev $VPN_ID  proto kernel  scope link  src $LOCALIP 2>/dev/null      # v4.11
+            #cmd ip -6 route add $(echo $LOCALIP | sed 's/::/|/' | cut -d"|" -f1)::0/64 dev $VPN_ID  proto kernel  scope link  src $LOCALIP      # v4.11
             ip -6 route show table main dev $(nvram get lan_ifname) | while read ROUTE
                 do
                     if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.10
-                        ip -6 route add table 12$VPN_NUM $ROUTE dev $(nvram get lan_ifname) 2>/dev/null
+                        #cmd ip -6 route add table 12$VPN_NUM $ROUTE dev $(nvram get lan_ifname)
+                        :
                     else
-                        ip -6 route add table 120 dev $(nvram get lan_ifname) 2>/dev/null
+                        cmd ip -6 route add table 120 dev $(nvram get lan_ifname)
                     fi
                 done
 
@@ -631,33 +622,33 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh ] && { logger -t "wireguard-${MODE}${VPN_NAME}" "Executing Event:${VPN_ID}-up.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh; }   # v4.08
 
         if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -z "$(grep -E "^NOTCPMSS" /jffs/addons/wireguard/WireguardVPN.conf)" ];then    # v4.12
-            iptables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'"
-            iptables -t mangle -I FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'"
+            cmd iptables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'"
+            cmd iptables -t mangle -I FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'"
         else
             logger -t "wireguard-${MODE}${VPN_NAME}" "'NOTCPMSS' directive found ('WireguardVPN.conf') -t mangle FORWARD chain TCP '-j TCPMSS --clamp-mss-to-pmtu' NOT configured"    # v4.12
         fi
         if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -z "$(grep -E "^NOSETXMARK" /jffs/addons/wireguard/WireguardVPN.conf)" ];then    # v4.12
-            iptables -t mangle -I FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'"
-            iptables -t mangle -I PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'"
+            cmd iptables -t mangle -I FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'"
+            cmd iptables -t mangle -I PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'"
         else
             logger -t "wireguard-${MODE}${VPN_NAME}" "'NOSETXMARK' directive found ('WireguardVPN.conf') -t mangle FORWARD/PREROUTING chain'-j MARK --set-xmark 0x01/0x7' NOT configured"    # v4.12
         fi
 
         if [ $FIRMWARE -ge 38601 ]  && [ -n "$(brctl show | grep -E "\.50[1-2]")" ];then         # Allow Guest #1 SSID VLANs SNB @ZebMcKayhan
-            iptables -t filter -I FORWARD -i br1 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN"
-            iptables -t filter -I FORWARD -i br2 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN"
-            iptables -t nat -I POSTROUTING -s $(nvram get lan_ipaddr)/16 -o $VPN_ID -j MASQUERADE -m comment --comment "WireGuard 'client'"
+            cmd iptables -t filter -I FORWARD -i br1 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN"
+            cmd iptables -t filter -I FORWARD -i br2 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN"
+            cmd iptables -t nat -I POSTROUTING -s $(nvram get lan_ipaddr)/16 -o $VPN_ID -j MASQUERADE -m comment --comment "WireGuard 'client'"
         else
-            iptables -t nat -I POSTROUTING -s $(nvram get lan_ipaddr)/24 -o $VPN_ID -j MASQUERADE -m comment --comment "WireGuard 'client'"
+            cmd iptables -t nat -I POSTROUTING -s $(nvram get lan_ipaddr)/24 -o $VPN_ID -j MASQUERADE -m comment --comment "WireGuard 'client'"
         fi
 
         if [ -n "$PEER_DNS" ];then
             if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.10
-                iptables -t nat -I PREROUTING -p tcp -m tcp --dport 53 -j WGDNS${VPN_NUM} -m comment --comment "WireGuard 'client${VPN_NUM} DNS'"
-                iptables -t nat -I PREROUTING -p udp -m udp --dport 53 -j WGDNS${VPN_NUM} -m comment --comment "WireGuard 'client${VPN_NUM} DNS'"
+                cmd iptables -t nat -I PREROUTING -p tcp -m tcp --dport 53 -j WGDNS${VPN_NUM} -m comment --comment "WireGuard 'client${VPN_NUM} DNS'"
+                cmd iptables -t nat -I PREROUTING -p udp -m udp --dport 53 -j WGDNS${VPN_NUM} -m comment --comment "WireGuard 'client${VPN_NUM} DNS'"
             else
-                iptables -t nat -I PREROUTING -p tcp -m tcp --dport 53 -j WGDNS${WG_INTERFACE} -m comment --comment "WireGuard 'client${WG_INTERFACE} DNS'"
-                iptables -t nat -I PREROUTING -p udp -m udp --dport 53 -j WGDNS${WG_INTERFACE} -m comment --comment "WireGuard 'client${WG_INTERFACE} DNS'"
+                cmd iptables -t nat -I PREROUTING -p tcp -m tcp --dport 53 -j WGDNS${WG_INTERFACE} -m comment --comment "WireGuard 'client${WG_INTERFACE} DNS'"
+                cmd iptables -t nat -I PREROUTING -p udp -m udp --dport 53 -j WGDNS${WG_INTERFACE} -m comment --comment "WireGuard 'client${WG_INTERFACE} DNS'"
             fi
         fi
 
@@ -665,14 +656,14 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
 
         if [ "$USE_IPV6" == "Y" ];then
             if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -z "$(grep -E "^NOTCPMSS" /jffs/addons/wireguard/WireguardVPN.conf)" ];then    # v4.12
-                ip6tables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'"
-                ip6tables -t mangle -I FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'"
+                cmd ip6tables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'"
+                cmd ip6tables -t mangle -I FORWARD -i $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'client'"
             else
                 logger -t "wireguard-${MODE}${VPN_NAME}" "'NOTCPMSS' directive found ('WireguardVPN.conf') IPv6 -t mangle FORWARD chain TCP '-j TCPMSS --clamp-mss-to-pmtu' NOT configured"    # v4.12
             fi
             if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -z "$(grep -E "^NOSETXMARK" /jffs/addons/wireguard/WireguardVPN.conf)" ];then    # v4.12
-                ip6tables -t mangle -I FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'"
-                ip6tables -t mangle -I PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'"
+                cmd ip6tables -t mangle -I FORWARD -o $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'"
+                cmd ip6tables -t mangle -I PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'client'"
             else
                 logger -t "wireguard-${MODE}${VPN_NAME}" "'NOSETXMARK' directive found ('WireguardVPN.conf') IPv6 -t mangle FORWARD/PREROUTING chain'-j MARK --set-xmark 0x01/0x7' NOT configured"    # v4.12
             fi
@@ -680,12 +671,12 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
             #ip6tables -t filter -I FORWARD -i br0 -o $VPN_ID -j ACCEPT -m comment --comment "LAN to WireGuard 'client'"    # v4.14.6 @ZebMcKayhan
 
             if [ $FIRMWARE -ge 38601 ]  && [ -n "$(brctl show | grep -E "\.50[1-2]")" ];then         # Allow Guest #1 SSID VLANs SNB @ZebMcKayhan
-                ip6tables -t filter -I FORWARD -i br1 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN"
-                ip6tables -t filter -I FORWARD -i br2 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN"
-                [ -n "$(nvram get ipv6_rtr_addr)" ] && ip6tables -t nat -I POSTROUTING -s $(nvram get ipv6_rtr_addr)/64 -o $VPN_ID -j MASQUERADE -m comment --comment "WireGuard 'client'"
+                cmd ip6tables -t filter -I FORWARD -i br1 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN"
+                cmd ip6tables -t filter -I FORWARD -i br2 -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard Guest_VLAN"
+                [ -n "$(nvram get ipv6_rtr_addr)" ] && cmd ip6tables -t nat -I POSTROUTING -s $(nvram get ipv6_rtr_addr)/64 -o $VPN_ID -j MASQUERADE -m comment --comment "WireGuard 'client'"
             else
 
-                [ -n "$(nvram get ipv6_rtr_addr)" ] && ip6tables -t nat -I POSTROUTING -s $(nvram get ipv6_rtr_addr)/64 -o $VPN_ID -j MASQUERADE -m comment --comment "WireGuard 'client'"
+                [ -n "$(nvram get ipv6_rtr_addr)" ] && cmd ip6tables -t nat -I POSTROUTING -s $(nvram get ipv6_rtr_addr)/64 -o $VPN_ID -j MASQUERADE -m comment --comment "WireGuard 'client'"
             fi
 
         fi
@@ -701,6 +692,15 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         # v4.14 Process 'PostUp' commands
         Process_Pre_Post_Commands "PostUp"
 
+        MULLVAD=$(curl -m 5 -s "https://am.i.mullvad.net/connected")                        # v4.14
+
+        echo -en $cBGRE
+        if [ -z "$(echo "$MULLVAD" | grep -i "not connected to Mullvad")" ];then    # v4.14
+            echo -en $cBCYA"\t"
+            logger -st "wireguard-${MODE}${VPN_NAME}" $MULLVAD
+            #echo -en $cBGRE"\t"
+        fi
+
         echo -en $cBGRE"\t"
         logger -st "wireguard-${MODE}${VPN_NAME}" "Initialisation complete."
         echo -e $cRESET
@@ -710,6 +710,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
     fi
 else
 
+    [ -n "$(wg show | grep "$VPN_ID")" ] && TERMINATED_TXT="Terminated" || TERMINATED_TXT="Already Terminated; Cleaned-up anyway!"
     # v4.14 Process 'PreDown' commands
     Process_Pre_Post_Commands "PreDown"
 
@@ -719,13 +720,13 @@ else
     # If Policy mode, then there was no default route
     if [ -z "$POLICY_MODE" ];then                                   # v4.06
                                       # v4.08
-        ip route del 0.0.0.0/1   dev $VPN_ID   2>/dev/null
-        ip route del 128.0.0.0/1 dev $VPN_ID   2>/dev/null
+        ip route del 0.0.0.0/1   dev $VPN_ID  2>/dev/null
+        ip route del 128.0.0.0/1 dev $VPN_ID  2>/dev/null
         if [ "$USE_IPV6" == "Y" ];then
             #ip -6 route del ::/1     dev $VPN_ID   2>/dev/null      # v4.12
             #ip -6 route del 8000::/1 dev $VPN_ID   2>/dev/null      # v4.12
-            ip -6 route del ::/0 dev $VPN_ID 2>/dev/null
-            ip -6 rule del prio 999$VPN_NUM 2>/dev/null
+            cmd ip -6 route del ::/0 dev $VPN_ID 2>/dev/null
+            cmd ip -6 rule del prio 999$VPN_NUM 2>/dev/null
         fi
 
         for ALLOWIP in $(awk '/^AllowedIPs/ {$1="";$2="";print $0}' ${CONFIG_DIR}${VPN_ID}.conf | tr ',' ' ')   # v4.14
@@ -746,8 +747,8 @@ else
                     [ "$WG_IFACE" == "$WG_INTERFACE" ] && continue
                     if [ -n "$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${WG_IFACE}.conf | grep -oE "0.0.0.0/0|::0/0")" ];then   # v4.07
                         if [ "$(sqlite3 $SQL_DATABASE "SELECT auto FROM clients where peer='$WG_IFACE';")" != "P" ];then
-                            ip route add 0/1    dev $WG_IFACE  2>/dev/nul
-                            ip route add 128/1  dev $WG_IFACE  2>/dev/null
+                            ip route add 0/1    dev $WG_IFACE 2>/dev/null
+                            ip route add 128/1  dev $WG_IFACE 2>/dev/null
                             if [ "$USE_IPV6" == "Y" ];then
                                 #ip -6 route add ::/0 dev $WG_IFACE 2>/dev/null
                                 :
@@ -758,10 +759,9 @@ else
                 done
     fi
 
-                                          # v4.08
-    ip link del dev $VPN_ID 2>/dev/null
-    if [ "$USE_IPV6" == "Y" ];then
-        ip -6 link del dev $VPN_ID 2>/dev/null
+    if [ -n "$(wg show | grep "$VPN_ID" )" ];then
+        cmd ip link del dev $VPN_ID
+        [ "$USE_IPV6" == "Y" ] && cmd ip -6 link del dev $VPN_ID 2>/dev/null
     fi
 
     TIMESTAMP=$(date +%s)
@@ -772,9 +772,8 @@ else
 
     if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.10
         ip rule del from $(nvram get lan_ipaddr | cut -d"." -f1-3).0/24 table 12$VPN_NUM prio 992$VPN_NUM   2>/dev/null
-
         ip route flush table 12$VPN_NUM 2>/dev/null
-        ip rule del prio 992$VPN_NUM    2>/dev/null
+        ip rule del prio 992$VPN_NUM   2>/dev/null
 
         purge_client_list                                           # v4.09
 
@@ -786,8 +785,8 @@ else
             ip -6 rule del from $(nvram get ipv6_rtr_addr | sed 's/::/|/' | cut -d"|" -f1)::0/64 table 12$VPN_NUM prio 992$VPN_NUM   2>/dev/null # v4.11
 
             ip -6 route flush table 12$VPN_NUM 2>/dev/null
-            ip -6 rule del prio 992$VPN_NUM    2>/dev/null
-            ip -6 route flush cache
+            ip -6 rule del prio 992$VPN_NUM   2>/dev/null
+            ip -6 route flush cache 2>/dev/null
         fi
     fi
 
@@ -797,7 +796,7 @@ else
             DSTSRC=$(sqlite3 $SQL_DATABASE "SELECT dstsrc FROM ipset WHERE ipset='$IPSET' AND peer='${WG_INTERFACE}';")
             FWMARK=$(sqlite3 $SQL_DATABASE "SELECT fwmark FROM ipset WHERE ipset='$IPSET' AND peer='${WG_INTERFACE}';")
             TAG_MARK=$(sqlite3 /opt/etc/wireguard.d/WireGuard.db "select fwmark from fwmark where peer='${WG_INTERFACE}';") # v4.12                                                                                                             # v4.12
-            ip rule del from 0/0 fwmark $TAG_MARK"/"$TAG_MARK table 12$VPN_NUM prio 999$VPN_NUM 2>/dev/null                 # v4.12
+            ip rule del from 0/0 fwmark $TAG_MARK"/"$TAG_MARK table 12$VPN_NUM prio 999$VPN_NUM   2>/dev/null               # v4.12
 
             iptables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'" 2>/dev/null # v4.12
             if [ "$USE_IPV6" == "Y" ];then
@@ -819,8 +818,8 @@ else
             iptables -t nat -F WGDNS$VPN_NUM 2>/dev/null                # v4.05
             iptables -t nat -X WGDNS$VPN_NUM 2>/dev/null                # v4.05
             if [ "$USE_IPV6" == "Y" ];then
-                ip6tables -t nat -F WGDNS$VPN_NUM 2>/dev/null           # v4.13
-                ip6tables -t nat -X WGDNS$VPN_NUM 2>/dev/null           # v4.13
+                ip6tables -t nat -F WGDNS$VPN_NUM 2>/dev/null          # v4.13
+                ip6tables -t nat -X WGDNS$VPN_NUM  2>/dev/null          # v4.13
             fi
         fi
     # else
@@ -836,13 +835,11 @@ else
     # v4.14 Process 'PostDown' commands
     Process_Pre_Post_Commands "PostDown"
 
-    logger -t "wireguard-${MODE}${VPN_NAME}" "Wireguard VPN '$MODE' Peer ($VPN_ID) $TXT $SOCKET ($DESC) Terminated"
-    echo -e $cBGRE"\twireguard-${MODE}${VPN_NAME}: Wireguard VPN '$MODE' Peer (${cBMAG}$VPN_ID${cBGRE}) $TXT $SOCKET (${cBMAG}$DESC${cBGRE}) ${cBRED}Terminated"$cRESET
+    logger -t "wireguard-${MODE}${VPN_NAME}" "Wireguard VPN '$MODE' Peer ($VPN_ID) $TXT $SOCKET ($DESC) $TERMINATED_TXT"
+    echo -e $cBGRE"\twireguard-${MODE}${VPN_NAME}: Wireguard VPN '$MODE' Peer (${cBMAG}$VPN_ID${cBGRE}) $TXT $SOCKET (${cBMAG}$DESC${cBGRE}) ${cRED}$TERMINATED_TXT"${cRESET}
     echo -e $cRESET
 fi
 
-############################################################################EIC Hack 3 of 3####################################
 #) 2>&1 | logger -t $(basename $0)"[$$_***DEBUG]"
-###############################################################################################################################
 
 exit
