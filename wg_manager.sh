@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.14b8"
-#============================================================================================ © 2021-2022 Martineau v4.14b8
+VERSION="v4.14b9"
+#============================================================================================ © 2021-2022 Martineau v4.14b9
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.14b8"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 11-Jan-2022
+# Last Updated Date: 13-Jan-2022
 #
 # Description:
 #
@@ -448,25 +448,27 @@ Load_UserspaceTool() {
             read -r "ANS"
             if [ "$ANS" == "y" ];then
                 Download_Modules $HARDWARE_MODEL
-
             fi
     fi
 
     local ACTIVE_WG_INTERFACES=$(echo "$(wg show interfaces)" | tr " " "\n" | sort -r | tr "\n" " ")    # v4.13
 
-    STATUS=0
+    local STATUS=0
     if [ ! -f /usr/sbin/wg ] || [ "$USE_ENTWARE_KERNEL_MODULE" == "Y" ];then           # v4.12 Is the User Space Tools included in the firmware?
         echo -e $cBCYA"\n\tLoading WireGuard Kernel module and Userspace Tool for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
         if [ -n "$(ls /jffs/addons/wireguard/*.ipk 2>/dev/null)" ];then
+            [ -n "$ACTIVE_WG_INTERFACES" ] && Manage_Wireguard_Sessions "stop" "$ACTIVE_WG_INTERFACES"  # v4.14
             for MODULE in $(ls /jffs/addons/wireguard/*.ipk)
                 do
+                    local MODULE_NAME=$(echo "$(basename $MODULE)" | sed 's/_.*$//')
+                    SayT "Initialising WireGuard module '$MODULE_NAME'"
+                    echo -e $cBCYA"\tInitialising WireGuard module $cRESET'$MODULE_NAME'"
                     opkg install $MODULE
                     if [ $? -eq 0 ];then
-                        MODULE_NAME=$(echo "$(basename $MODULE)" | sed 's/_.*$//')
                         md5sum $MODULE > ${INSTALL_DIR}$MODULE_NAME".md5"
                         sed -i 's~/jffs/addons/wireguard/~~' ${INSTALL_DIR}$MODULE_NAME".md5"
                     else
-                        STATUS=0
+                        local STATUS=1
                     fi
                 done
         fi
@@ -476,10 +478,10 @@ Load_UserspaceTool() {
 
             echo -e $cBGRA"\t"$(dmesg | grep -a "WireGuard" | tail -n 1)
             echo -e $cBGRA"\t"$(dmesg | grep -a "wireguard: Copyright" | tail -n 1)"\n"$cRESET
-            return 0
+            local STATUS=0
         else
-            echo -e $cBRED"\a\n\t***ERROR: Unable to DOWNLOAD WireGuard Kernel and Userspace Tool modules\n"
-            return 1
+            echo -e $cBRED"\a\n\t***ERROR: Unable to LOAD Entware/3rd-party WireGuard Kernel and Userspace Tool modules\n"
+            local STATUS=1
         fi
     else
 
@@ -489,9 +491,11 @@ Load_UserspaceTool() {
             local FPATH=$(modprobe --show-depends wireguard | awk '{print $2}')
             local FVERSION=$(strings $FPATH | grep "^version" | cut -d'=' -f2)  # v4.12 @ZebMcKayhan
             echo -e $cBGRE"\n\t[✔]$cBWHT WireGuard Kernel module/User Space Tools included in Firmware"$cRED" ($FVERSION)\n"$cRESET
+            [ -n "$ACTIVE_WG_INTERFACES" ] && Manage_Wireguard_Sessions "stop" "$ACTIVE_WG_INTERFACES"  # v4.14
+            SayT "Initialising WireGuard Kernel module '$KERNEL_MODULE'"
+            echo -e $cBCYA"\tInitialising WireGuard Kernel module $cRESET'$KERNEL_MODULE'"
             rmmod  $KERNEL_MODULE 2>/dev/null                   # v4.12
             insmod $KERNEL_MODULE 2>/dev/null                   # v4.12
-            logger -t "wireguard-server${VPN_ID:3:1}" "Initialising WireGuard Kernel module '$KERNEL_MODULE'"
             echo -e $cBGRA"\t"$(dmesg | grep -a "WireGuard" | tail -n 1)
             echo -e $cBGRA"\t"$(dmesg | grep -a "wireguard: Copyright" | tail -n 1)"\n"$cRESET
 
@@ -501,11 +505,14 @@ Load_UserspaceTool() {
 
         else
             logger -t "wireguard-server${VPN_ID:3:1}" "***ERROR Failure to Initialise WireGuard Kernel module!"
-            return 1
+            local STATUS=1
         fi
     fi
 
     [ -n "$ACTIVE_WG_INTERFACES" ] && Manage_Wireguard_Sessions "start" "$ACTIVE_WG_INTERFACES" # v4.13
+
+    return $STATUS                                  # v4.14
+
 }
 Show_MD5() {
 
@@ -518,7 +525,8 @@ Show_MD5() {
             echo -e $cBCYA"\tMD5="$(awk '{print $0}' ${INSTALL_DIR}wireguard-kernel.md5)
             echo -e $cBCYA"\tMD5="$(awk '{print $0}' ${INSTALL_DIR}wireguard-tools.md5)
         else
-            echo -e $cBYEL"\a\n\t***ERROR: MD5= ???? - WireGuard exists in firmware for $ROUTER (v$BUILDNO)\n"$cRESET
+            #echo -e $cBYEL"\a\n\t***ERROR: MD5= ???? - WireGuard exists in firmware for $ROUTER (v$BUILDNO)\n"$cRESET
+            :
         fi
     fi
 }
@@ -592,7 +600,7 @@ Check_Module_Versions() {
 
             if [ "$ANS" == "y" ];then
                 Download_Modules $HARDWARE_MODEL
-                Load_UserspaceTool
+                #Load_UserspaceTool
             else
                 echo -e $cBWHT"\n\tUpdate skipped\n"$cRESET
             fi
@@ -1717,8 +1725,9 @@ Manage_Wireguard_Sessions() {
 
                 for PEER in $PEERS
                     do
-                        [ "$PEER" == "debug" ] && { local SHOWCMDS="debug"; continue; }             # v4.14
-                        [ "$PEER" == "policy" ] && { local FORCEPOLICY="forcepolicy"; continue; }   # v4.14
+                        [ "$PEER" == "debug" ] && { local SHOWCMDS="debug"; continue; }                 # v4.14
+                        [ "$PEER" == "policy" ] && { local FORCEPOLICY="forcepolicy"; local POLICY_MODE="Forced POLICY mode"; continue; }       # v4.14
+                        [ "$PEER" == "nopolicy" ] && { local FORCEPOLICY="forcedefault"; local POLICY_MODE="Override POLICY mode"; continue; }  # v4.14
                         # Category  list (CSV or space delimited) ?     # v3.04
                         if [ "${PEER:0:2}" != "wg" ];then
                             if [ -z "$(wg show $PEER 2>/dev/null)" ];then
@@ -1745,7 +1754,7 @@ Manage_Wireguard_Sessions() {
 
     WG_INTERFACE=$(echo "$WG_INTERFACE" | awk '{$1=$1};1')    # v4.13  strip leading/trailing spaces/tabs
 
-    [ -n "$WG_INTERFACE" ] && echo -e $cBWHT"\n\tRequesting WireGuard VPN Peer ${ACTION}$CATEGORY (${cBMAG}$WG_INTERFACE"$cRESET")"
+    [ -n "$WG_INTERFACE" ] && echo -e $cBWHT"\n\tRequesting WireGuard VPN Peer ${ACTION}$CATEGORY (${cBMAG}$WG_INTERFACE"$cRESET")" ${cWRED}${POLICY_MODE}$cRESET
 
     case "$ACTION" in
         start|restart)                                  # v1.09
@@ -1760,33 +1769,25 @@ Manage_Wireguard_Sessions() {
 
             for WG_INTERFACE in $WG_INTERFACE
                 do
-                    [ "$WG_INTERFACE" == "debug" ] && { local SHOWCMDS="debug"; continue; }             # v4.14
-                    [ "$WG_INTERFACE" == "policy" ] && { local FORCEPOLICY="forcepolicy"; continue; }   # v4.14
 
                     Mode=$(Server_or_Client "$WG_INTERFACE")
 
                     [ "$Mode" == "server" ] && local TABLE="servers" || local TABLE="clients"
 
-                    [ "$WG_INTERFACE" == "nopolicy" ] && continue                           # v2.02
-                    [ "$WG_INTERFACE" == "policy" ] && continue                           # v4.14
-
-                    LOOKAHEAD=$(echo "$LOOKAHEAD" | awk '{$1=""}1')
-                    if [ "$(echo "$LOOKAHEAD" | awk '{print $1}')" == "nopolicy" ];then     # v2.02
-                        Route="default"
-                        POLICY_MODE="Policy override ENFORCED"
-                    fi
-
                     if [ -z "$Route" ] || [ "$FORCEPOLICY" == "forcepolicy" ];then
                         if [ "$Mode" == "client" ];then
                             if [ "$(sqlite3 $SQL_DATABASE "SELECT auto FROM $TABLE WHERE peer='$WG_INTERFACE';")" == "P" ] || [ "$FORCEPOLICY" == "forcepolicy" ];then
-
-                                if [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$WG_INTERFACE';")" -gt 0 ] || \
-                                   [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM ipset WHERE peer='$WG_INTERFACE';")" -gt 0 ] || \
-                                   [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(client) FROM passthru WHERE client='$WG_INTERFACE';")" -gt 0 ];then # v4.12 v4.11 @ZebMcKayhan/@The Chief
-                                    Route="policy"
+                                if [ "$FORCEPOLICY" != "forcedefault" ];then
+                                    if [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$WG_INTERFACE';")" -gt 0 ] || \
+                                       [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM ipset WHERE peer='$WG_INTERFACE';")" -gt 0 ] || \
+                                       [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(client) FROM passthru WHERE client='$WG_INTERFACE';")" -gt 0 ];then # v4.12 v4.11 @ZebMcKayhan/@The Chief
+                                        Route="policy"
+                                    else
+                                        SayT "Warning: WireGuard '$Mode' Peer ('$WG_INTERFACE') defined as Policy mode but no RPDB Selective Routing/Passthru rules found?"
+                                        echo -e $cRED"\tWarning: WireGuard '$Mode' Peer (${cBWHT}$WG_INTERFACE${cBRED}) defined as Policy mode but no RPDB Selective Routing/Passthru rules found?\n"$cRESET 2>&1
+                                    fi
                                 else
-                                    SayT "Warning: WireGuard '$Mode' Peer ('$WG_INTERFACE') defined as Policy mode but no RPDB Selective Routing/Passthru rules found?"
-                                    echo -e $cRED"\tWarning: WireGuard '$Mode' Peer (${cBWHT}$WG_INTERFACE${cBRED}) defined as Policy mode but no RPDB Selective Routing/Passthru rules found?\n"$cRESET 2>&1
+                                    Route="default"
                                 fi
                             else
                                 Route="default"
@@ -1848,8 +1849,10 @@ Manage_Wireguard_Sessions() {
                             echo -e $cBRED"\a\n\t***ERROR: WireGuard ${TXT}Peer (${cBWHT}$WG_INTERFACE${cBRED}) config NOT found?....skipping $ACTION request\n"$cRESET   2>&1  # v1.09
                         fi
                     fi
-                    # Reset the Policy flag
+                    # Reset the Policy flags/text
                     Route=                                  # v2.02
+                    local FORCEPOLICY=                      # v4.14
+                    local POLICY_MODE=                      # v4.14
                 done
             WG_show
             ;;
@@ -4471,7 +4474,13 @@ Process_User_Choice() {
                 ;;
             install)
 
-                Install_WireGuard_Manager
+                if [ -z "$(grep -i "WireGuard" /jffs/scripts/post-mount)" ];then        # v4.14
+                    Install_WireGuard_Manager
+                else
+
+                    Download_Modules $HARDWARE_MODEL
+                    Load_UserspaceTool
+                fi
 
                 ;;
 
@@ -4531,8 +4540,9 @@ Process_User_Choice() {
             z|uninstall)
 
                 local ANS=
-
-                echo -e "\n\tPress$cBRED Y$cRESET to$cBRED Remove WireGuard $cRESET('${CONFIG_DIR}') or press$cBGRE [Enter] to cancel request." # v4.14
+                local WG_TXT="WireGuard/WireGuard Manager"
+                [ -f /usr/sbin/wg ] && local WG_TXT="WireGuard Manager"     # WireGuard's in firmware; can't be removed
+                echo -e "\n\tPress$cBRED Y$cRESET to$cBRED Remove $WG_TXT ${cRESET}or press$cBGRE [Enter] to cancel request." # v4.14  @ZebMcKayhan
                 read -r "ANS"
                 if [ "$ANS" == "Y" ];then       # v4.14 @ZebMcKayhan
                     Uninstall_WireGuard
@@ -4702,7 +4712,9 @@ Process_User_Choice() {
                             # Protect against curl download failures i.e. Github DOWN
                             cp $0 $0.u                                             # v3.03
                             Get_scripts "$DEV"
-                            [ -f ${INSTALL_DIR}$SCRIPT_NAME ] && { rm $0.u; sleep 3; exec "$0" "$@"; } || mv $0.u $0
+
+                            [ -f ${INSTALL_DIR}$SCRIPT_NAME ] && { rm $0.u; sleep 1; exec "$0"; } || mv $0.u $0     # v4.14
+
                             # Never get here!!!
                             echo -e $cRESET
                         fi
@@ -5497,7 +5509,7 @@ if [ "$1" != "install" ];then   # v2.01
 
                 # http://www.snbforums.com/threads/beta-wireguard-session-manager.70787/post-688282
                 if [ "$HARDWARE_MODEL" == "RT-AX86U" ];then
-                    local RC="$(Manage_FC "disable")"                           # v4.14
+                    RC="$(Manage_FC "disable")"                           # v4.14
                 fi
 
                 Manage_Wireguard_Sessions "start" "$PEER" "$NOPOLICY"
