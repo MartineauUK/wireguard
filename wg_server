@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.14.2"
-#============================================================================================ © 2021-2022 Martineau v4.14.2
+VERSION="v4.14.3"
+#============================================================================================ © 2021-2022 Martineau v4.14.3
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 11-Jan-2022
+# Last Updated Date: 13-Jan-2022
 #
 # Description:
 #
@@ -146,7 +146,6 @@ VPN_NUM=${VPN_ID#"${VPN_ID%?}"}                     # v4.02
 wgport=$(awk '/Listen/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)
 Subnet=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers where peer='$WG_INTERFACE';") # v1.09 @here1310
 
-SOCKET=$(nvram get wan_gateway)":"$wgport
 SOCKET=$(nvram get wan0_gateway)":"$wgport          # v4.04
 
 DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM servers where peer='$WG_INTERFACE';")
@@ -154,26 +153,26 @@ DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')
 
 [ -z "$DESC" ] && DESC="# Unidentified"
 
-    IPV6_SERVICE=$(nvram get ipv6_service)          # v4.14.1
-    if [ "$IPV6_SERVICE" != "disabled" ];then       # v4.1
-        case $IPV6_SERVICE in
-            native|ipv6pt|dhcp6)
-                # ip -6 addr | grep "scope global"
-                USE_IPV6="Y"; IPV6_TXT="(IPv6) "    # 4.08
-                LAN_SUBNET_IPV6=$(nvram get ipv6_prefix)        # v4.14.6
-                LAN_ADDR_IPV6=$(nvram get ipv6_rtr_addr)        # v4.14.6
-            ;;
-            6to4|6in4|6rd)
-                :
-            ;;
-            other)
-                :
-            ;;
-            spoof|simulate)
-                USE_IPV6="Y"; IPV6_TXT="(IPv6) Simulate "   # v4.14
-            ;;
-        esac
-    fi
+IPV6_SERVICE=$(nvram get ipv6_service)          # v4.14.1
+if [ "$IPV6_SERVICE" != "disabled" ];then       # v4.1
+    case $IPV6_SERVICE in
+        native|ipv6pt|dhcp6)
+            # ip -6 addr | grep "scope global"
+            USE_IPV6="Y"; IPV6_TXT="(IPv6) "    # 4.08
+            LAN_SUBNET_IPV6=$(nvram get ipv6_prefix)        # v4.14.6
+            LAN_ADDR_IPV6=$(nvram get ipv6_rtr_addr)        # v4.14.6
+        ;;
+        6to4|6in4|6rd)
+            :
+        ;;
+        other)
+            :
+        ;;
+        spoof|simulate)
+            USE_IPV6="Y"; IPV6_TXT="(IPv6) Simulate "   # v4.14
+        ;;
+    esac
+fi
 
 # Override IPv6 ?
 if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -n "$(grep -E "^NOIPV6" /jffs/addons/wireguard/WireguardVPN.conf)" ];then    # v4.12
@@ -331,11 +330,11 @@ else
 
     ip route flush table 2${VPN_NUM}"0" 2>/dev/null     # v4.03
     ip rule del prio 98${VPN_NUM}0      2>/dev/null     # v4.03
-    ip route flush cache                                # v4.03
+    ip route flush cache 2>/dev/null                    # v4.03
 
     ip -6 route flush table 2${VPN_NUM}"0" 2>/dev/null     # v4.03
     ip -6 rule del prio 98${VPN_NUM}0      2>/dev/null     # v4.03
-    ip -6 route flush cache                                # v4.03
+    ip -6 route flush cache 2>/dev/null                    # v4.03
 
     # User Exit @ZebMcKayhan
     [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh ] && { logger -t "wireguard-server${VPN_ID:3:1}" "Executing ${VPN_ID}-down.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh; }
@@ -349,6 +348,7 @@ else
 
     echo -e $cRESET
 fi
+
 
 
 #) 2>&1 | logger -t $(basename $0)"[$$_***DEBUG]"
