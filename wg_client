@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.14.8"
-#============================================================================================ © 2021-2022 Martineau v4.14.8
+VERSION="v4.14.9"
+#============================================================================================ © 2021-2022 Martineau v4.14.9
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 13-Jan-2022
+# Last Updated Date: 14-Jan-2022
 #
 # Description:
 #
@@ -207,7 +207,8 @@ purge_client_list(){
     do
         if [ "$PRIO" -ge "$START_PRIO" ] && [ "$PRIO" -le "$END_PRIO" ]
         then
-            ip rule del prio $PRIO
+            cmd ip rule del prio $PRIO
+            [ "$USE_IPV6" == "Y" ] && cmd ip -6 rule del prio $PRIO         # v4.14.8 @ZebMcKayhan
             #echo -en $cBCYA"\t"
             logger -t "wireguard-${MODE}${VPN_NAME}" "Removing Wireguard 'client' Peer rule $PRIO from routing policy"
             echo -en $cRESET
@@ -475,10 +476,11 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
 
         host="$(wg show $VPN_ID endpoints | sed -n 's/.*\t\(.*\):.*/\1/p')"
         if [ -n "$(echo "$host" | Is_IPv4)" ];then          # v4.08
-            cmd ip route add $(ip route get $host | sed '/ via [0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}/{s/^\(.* via [0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\).*/\1/}' | head -n 1)
+            #cmd ip route add $(ip route get $host | sed '/ via [0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}/{s/^\(.* via [0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\).*/\1/}' | head -n 1)
+            cmd ip route add $(ip -o route get $host  | awk '{print $1" "$2" "$3}')
         else
             hostipv6="$(wg show $VPN_ID endpoints | grep -oE "\[.*\]" | sed 's/\[//g' | sed 's/\]//g')"
-            #ip -6 route add ::/0 dev $VPN_ID 2>/dev/null
+            cmd ip -6 route add ::/0 dev wg88 table 12$VPN_NUM prio 999$VPN_NUM
         fi
 
         # If there is ALREADY an ACTIVE WireGuard VPN Client, then tough! - make this one the default!!!!
@@ -714,13 +716,32 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         # v4.14 Process 'PostUp' commands
         Process_Pre_Post_Commands "PostUp"
 
-        MULLVAD=$(curl -m 5 -s "https://am.i.mullvad.net/connected")                        # v4.14
+        if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -n "$(grep -E "^CHK_ENDPOINT" ${INSTALL_DIR}WireguardVPN.conf)" ];then    # v# v4.14
+            #   e.g. the following would use the curl command for ALL interfaces except 'wg14' (TorGuard)
+            #        CHK_ENDPOINT = curl -s https://am.i.mullvad.net/connected  , * wg14-
 
-        echo -en $cBGRE
-        if [ -z "$(echo "$MULLVAD" | grep -i "not connected to Mullvad")" ];then    # v4.14
-            echo -en $cBCYA"\t"
-            logger -st "wireguard-${MODE}${VPN_NAME}" $MULLVAD
-            #echo -en $cBGRE"\t"
+            CHK_ENDPOINT=$( awk "/^CHK_ENDPOINT=.*\*/" ${INSTALL_DIR}WireguardVPN.conf)             # v4.14
+            [ -z "$CHK_ENDPOINT" ] && CHK_ENDPOINT=$( awk "/^CHK_ENDPOINT=.*${WG_INTERFACE}/" ${INSTALL_DIR}WireguardVPN.conf)
+
+            if [ -n "$CHK_ENDPOINT" ];then              # v4.14
+                END_POINT_INTERFACES=$(echo "$CHK_ENDPOINT" | awk -F ',' '{print $2}')
+
+                CMD_ENDPOINT=$(echo "$CHK_ENDPOINT" | tr '=' ',' | awk -F ',' '{print $2}')
+
+                if [ -n "$(echo "$END_POINT_INTERFACES" | grep -F "*")" ] || [ -n "$(echo "$END_POINT_INTERFACES" | grep "$WG_INTERFACE")" ] ;then
+                    if [ -z "$(echo "$END_POINT_INTERFACES" | grep "${WG_INTERFACE}-")" ];then
+                        CHK_ENDPOINT="$($CMD_ENDPOINT)"                        # v4.14
+                        echo -en $cBGRE
+                        if [ -z "$(echo "$CHK_ENDPOINT" | grep -i "not connected")" ];then    # v4.14
+                            echo -en $cBCYA"\t"
+                            logger -st "wireguard-${MODE}${VPN_NAME}" $CHK_ENDPOINT
+                            #echo -en $cBGRE"\t"
+                        fi
+                    else
+                       CMD_ENDPOINT="Endpoint check SKIPPED...Exclusion for '${WG_INTERFACE}' - command='"$CMD_ENDPOINT"'"
+                    fi
+                fi
+            fi
         fi
 
         echo -en $cBGRE"\t"
@@ -781,7 +802,14 @@ else
                 done
     fi
 
-    if [ -n "$(wg show | grep "$VPN_ID" )" ];then
+    if [ -n "$(wg show | grep "$VPN_ID")" ];then
+        host="$(wg show $VPN_ID endpoints | sed -n 's/.*\t\(.*\):.*/\1/p')"
+        if [ -n "$(echo "$host" | Is_IPv4)" ];then          # v4.14
+            ip route del $host 2>/dev/null                  # v4.14
+        else
+            hostipv6="$(wg show $VPN_ID endpoints | grep -oE "\[.*\]" | sed 's/\[//g' | sed 's/\]//g')" # v4.14
+            #ip -6 route del $hostipv6 2>/dev/null                                                          # v4.14
+        fi
         cmd ip link del dev $VPN_ID
         [ "$USE_IPV6" == "Y" ] && cmd ip -6 link del dev $VPN_ID 2>/dev/null
     fi
