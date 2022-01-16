@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.14.10"
-#============================================================================================ © 2021-2022 Martineau v4.14.10
+VERSION="v4.14.11"
+#============================================================================================ © 2021-2022 Martineau v4.14.11
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 15-Jan-2022
+# Last Updated Date: 16-Jan-2022
 #
 # Description:
 #
@@ -570,7 +570,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
                                 cmd ip -6 rule add from ::/0 fwmark $TAG_MARK"/"$TAG_MARK table 12$VPN_NUM prio 999$VPN_NUM                      # v4.13
                             fi
 
-                            # Differentiate betwwn IPSETs containing IPv4 or IPv6 IPs
+                            # Differentiate between IPSETs containing IPv4 or IPv6 IPs
                             if [ "$IPSET_FAMILY" != "inet6" ];then      # IPv4
                                 iptables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'" 2>/dev/null # v4.12
                                 cmd iptables -t mangle -A PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'"             # v4.12
@@ -682,7 +682,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
             fi
 
             # v386.4 Firmware is missing 'ip6tables -I FORWARD -i br0 -j ACCEPT'  ?
-            POS=$(ip6tables --line -nvL FORWARD | grep -m 1 "DROP .*all.*state INVALID" | awk '{print $1}')                 # v4.14.10
+            POS=$(ip6tables --line -nvL FORWARD | grep -im 1 "drop .*all.*state INVALID" | awk '{print $1}')                 # v4.14.11 v4.14.10
             [ -z "$(ip6tables-save | grep "Fix LAN to ANY by Martineau")" ] && ip6tables -I FORWARD $((POS+1)) -i br0 -j ACCEPT  -m comment --comment "Fix LAN to ANY by Martineau"         # v4.14.10
             ip6tables -I FORWARD $((POS+1)) -i br0 -o $VPN_ID -j ACCEPT -m comment --comment "LAN to WireGuard 'client'"    # v4.14.10 @ZebMcKayhan
 
