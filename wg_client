@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.14.11"
-#============================================================================================ © 2021-2022 Martineau v4.14.11
+VERSION="v4.14.12"
+#============================================================================================ © 2021-2022 Martineau v4.14.12
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 16-Jan-2022
+# Last Updated Date: 18-Jan-2022
 #
 # Description:
 #
@@ -278,7 +278,7 @@ Process_Pre_Post_Commands() {
                 if [ -n "$CMD" ];then
                     if [ -n "$(echo "$CMDTYPE" | grep "Up")" ] || [ -n "$(wg show | grep "$WG_INTERFACE")" ] || [ -z "$(echo "$CMD" | grep "$WG_INTERFACE")" ];then
                         logger -t "wireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"
-                        [ "$SHOWCMDS" == "Y" ] && echo "[##] $CMD"
+                        [ "$SHOWCMDS" == "Y" ] && echo "[$CMDTYPE] $CMD" >&2        # v4.14.13
                         $CMD
                     else
                         logger -t "wireguard-${MODE}${VPN_NAME}" "Skipping $CMDTYPE: '$CMD'"
@@ -446,20 +446,21 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         cmd wg setconf $VPN_ID ${CONFIG_DIR}$VPN_ID.conf
         #  Suppress the message if a domain is supplied i.e.'Error: any valid prefix is expected rather than "'xxx.com"
 
-        # v4.12 Assign both IPv6 nd IPv6 IPs to interface as required
+        # v4.12 Assign both IPv4 and IPv6 IPs to interface as required
         LOCALIPS=$(echo "$LOCALIP" | tr ',' ' ')     # v4.11
         for LOCALIP in $LOCALIPS
             do
                 if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$LOCALIP" | grep -F ":")" ];then     # v4.12
-                    cmd ip -6 address add dev $VPN_ID $LOCALIP     # v4.02
-                    cmd ip -6 link set up dev $VPN_ID
+                    cmd ip -6 address add dev $VPN_ID $LOCALIP     # v4.02D
                 else
                     if [ -n "$(echo "$LOCALIP" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$LOCALIP" | Is_IPv4)" ];then
                         cmd ip address add dev $VPN_ID $LOCALIP  # v4.02
-                        cmd ip link set up dev $VPN_ID
                     fi
                 fi
             done
+
+        cmd ip link set up dev $VPN_ID                                  # v4.14.12
+        [ "$USE_IPV6" == "Y" ] && cmd ip -6 link set up dev $VPN_ID     # v4.14.12
 
         #ifconfig $VPN_ID mtu 1380
         cmd ifconfig $VPN_ID mtu $MTU                           # v4.09 v1.02
