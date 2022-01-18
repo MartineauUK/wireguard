@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.14b9"
-#============================================================================================ © 2021-2022 Martineau v4.14b9
+VERSION="v4.14bA"
+#============================================================================================ © 2021-2022 Martineau v4.14bA
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.14b9"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 13-Jan-2022
+# Last Updated Date: 18-Jan-2022
 #
 # Description:
 #
@@ -711,13 +711,26 @@ Create_Peer() {
     read -r "ANS"
     [ "$ANS" == "y" ] || return 1
 
-    # Create Server template
-    cat > ${CONFIG_DIR}${SERVER_PEER}.conf << EOF
-# $HARDWARE_MODEL 'server' Peer #1 ($SERVER_PEER)
+    echo -e $cBCYA"\tCreating WireGuard Private/Public key-pair for ${IPV6_TXT}'server' Peer ${cBMAG}${SERVER_PEER}${cBCYA} on $HARDWARE_MODEL (v$BUILDNO)"$cRESET
+    if [ -n "$(which wg)" ];then
+        wg genkey | tee ${CONFIG_DIR}${SERVER_PEER}_private.key | wg pubkey > ${CONFIG_DIR}${SERVER_PEER}_public.key
+        local PRI_KEY=$(cat ${CONFIG_DIR}${SERVER_PEER}_private.key)
+        local PRI_KEY=$(Convert_Key "$PRI_KEY")
+        local PUB_KEY=$(cat ${CONFIG_DIR}${SERVER_PEER}_public.key)
+        local PUB_KEY=$(Convert_Key "$PUB_KEY")                         # v4.14
+        #sed -i "/^PrivateKey/ s~[^ ]*[^ ]~$PRI_KEY~3" ${CONFIG_DIR}${SERVER_PEER}.conf
+
+        local ANNOTATE="# $HARDWARE_MODEL ${IPV6_TXT}Server $INDEX"
+
+        # Create Server template
+        cat > ${CONFIG_DIR}${SERVER_PEER}.conf << EOF
+$ANNOTATE
 [Interface]
-PrivateKey = Ha1rgO/plL4wCB+pRdc6Qh8bIAWNeNgPZ7L+HFBhoE4=
+PrivateKey = $PRI_KEY
+#Address = $VPN_POOL
 ListenPort = $LISTEN_PORT
 
+EOF
 # e.g. Accept a WireGuard connection from say YOUR mobile device to the router
 # see '${CONFIG_DIR}mobilephone_private.key'
 
@@ -727,18 +740,8 @@ ListenPort = $LISTEN_PORT
 #AllowedIPs = PEER.ip.xxx.xxx/32
 #PresharedKey = Replace_with_the_Pre-shared_Key_of_YOUR_mobile_device
 # Peer Example End
-EOF
 
-    echo -e $cBCYA"\tCreating WireGuard Private/Public key-pair for ${IPV6_TXT}'server' Peer ${cBMAG}${SERVER_PEER}${cBCYA} on $HARDWARE_MODEL (v$BUILDNO)"$cRESET
-    if [ -n "$(which wg)" ];then
-        wg genkey | tee ${CONFIG_DIR}${SERVER_PEER}_private.key | wg pubkey > ${CONFIG_DIR}${SERVER_PEER}_public.key
-        local PRI_KEY=$(cat ${CONFIG_DIR}${SERVER_PEER}_private.key)
-        local PRI_KEY=$(Convert_Key "$PRI_KEY")
-        local PUB_KEY=$(cat ${CONFIG_DIR}${SERVER_PEER}_public.key)
-        local PUB_KEY=$(Convert_Key "$PUB_KEY")                         # v4.14
-        sed -i "/^PrivateKey/ s~[^ ]*[^ ]~$PRI_KEY~3" ${CONFIG_DIR}${SERVER_PEER}.conf
 
-        local ANNOTATE="# $HARDWARE_MODEL ${IPV6_TXT}Server $INDEX"
         sqlite3 $SQL_DATABASE "INSERT INTO servers values('$SERVER_PEER','$AUTO','${VPN_POOL}','$LISTEN_PORT','$PUB_KEY','$PRI_KEY','$ANNOTATE');"
     fi
 
@@ -759,18 +762,25 @@ Delete_Peer() {
         do
 
             if [ -n "$FORCE" ] || [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then     # v3.05
-
                 if [ "$WG_INTERFACE" != "force" ];then
-                    [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ] && local Mode=$(Server_or_Client "$WG_INTERFACE") || local Mode="?"
+                    #[ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ] && local Mode=$(Server_or_Client "$WG_INTERFACE") || local Mode="?"
+                    local Mode=$(Server_or_Client "$WG_INTERFACE")
+                    [ "$Mode" == "**ERROR**" ] && local Mode="?"
                     local SQL_COL="peer"
-                    [ "$Mode" == "server" ] && local TABLE="servers" || TABLE="clients"
+                    if [ "$Mode" == "?" ];then                  # v4.14
+                        case $WG_INTERFACE in
+                            wg2*) local Mode="server";;
+                            wg1*) local Mode="client";;
+                        esac
+                    fi
+                    [ "$Mode" == "server" ] && local TABLE="servers" || local TABLE="clients"
                     #[  "${WG_INTERFACE:0:2}" != "wg" ] && { TABLE="devices"; local SQL_COL="name"; Mode="device"; }
 
                     echo -e $cBWHT"\n\tDeleting '$Mode' Peer (${cBMAG}${WG_INTERFACE}${cBWHT})\n"$cBRED
 
                     if [ "$Mode" == "server" ];then
                             # Check how many 'client' Peers exist
-                            local CNT=$(grep -cE "^AllowedIPs" ${CONFIG_DIR}${WG_INTERFACE}.conf )
+                            [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ] && local CNT=$(grep -cE "^AllowedIPs" ${CONFIG_DIR}${WG_INTERFACE}.conf ) || local CNT=0   # v4.14
                             if [ $CNT -gt 0 ];then
                                 echo -e $cBRED"\n\tWarning: 'server' Peer ${cBMAG}${WG_INTERFACE}${cBRED} has ${cBWHT}${CNT}${cBRED} 'client' Peer\n"$cBYEL
                                 grep -E -B 3 -A 1 "^AllowedIPs" ${CONFIG_DIR}${WG_INTERFACE}.conf
@@ -806,7 +816,8 @@ Delete_Peer() {
 
                                 # Scan for 'server' Peer that accepts this 'client' connection
                                 local MATCHTHIS="$(echo "$WG_INTERFACE" | sed 's/\"/\\\"/g')"
-                                SERVER_PEER=$(grep -HE "^#.*${MATCHTHIS} device" /opt/etc/wireguard.d/wg2*.conf | awk -F '[\/:\._]' '{print $6}')    # v4.11
+
+                                [ -n "$(ls /opt/etc/wireguard.d/wg2*.conf 2>/dev/null)" ] && local SERVER_PEER=$(grep -HE "^#.*${MATCHTHIS} device" /opt/etc/wireguard.d/wg2*.conf | awk -F '[\/:\._]' '{print $6}')    # v4.14 v4.11
 
                                 for SERVER_PEER in $SERVER_PEER
                                     do
@@ -906,32 +917,9 @@ Import_Peer() {
                 if [ -n "$(echo "$1" | grep -F "name=")" ];then
                     local RENAME="Y"
                     local NEW_NAME=$(echo "$1" | sed -n "s/^.*name=//p" | awk '{print $0}')
-                    if [ -z "$NEW_NAME" ] || [ "$NEW_NAME" == "?" ];then
-                        # Pick the next 'client' Peer name
-                        for I in 11 12 13 14 15 16 17 18 19 111 112 113 114 115
-                            do
-                                [ -f ${CONFIG_DIR}wg${I}.conf ] && continue
-                                local NEW_NAME="wg"$I
-                                break
-                            done
-                    else
-                        if [ -f ${CONFIG_DIR}${NEW_NAME}.conf ];then
-                            echo -e $cBRED"\a\n\t***ERROR: Peer (${cBWHT}$NEW_NAME${cBRED}) ALREADY exists!"$cRESET
-                            return 1
-                        fi
-                    fi
                 else
-                    # v4.12 By default if 'name=' not specified import .config into next free 'wg1x' slot
+                    # v4.12 By default if 'name=' not specified import .config into next free 'wgxx' slot; unless 'wgxx' supplied
                     if [ -z "$(echo "$WG_INTERFACE" | grep -E "^wg[1-2]")" ];then           # v4.12
-
-                        # Pick the next 'client' Peer name
-                        for I in 11 12 13 14 15 16 17 18 19 111 112 113 114 115             # v4.12
-                            do
-                                [ -f ${CONFIG_DIR}wg${I}.conf ] && continue
-                                local NEW_NAME="wg"$I
-                                break
-                            done
-
                         local RENAME="Y"
                     fi
                 fi
@@ -949,6 +937,29 @@ Import_Peer() {
 
     done
 
+    if [ "$RENAME" == "Y" ];then
+            if [ "$FORCE_TYPE" != "server" ];then
+                local CONFIGURED_IDS="11 12 13 14 15 16 17 18 19 111 112 113 114 115"   # v4.14
+            else
+                local CONFIGURED_IDS="21 22 23 24 25"                                   # v4.14
+            fi
+
+            if [ -z "$NEW_NAME" ] || [ "$NEW_NAME" == "?" ];then
+                # Pick the next Peer name
+                for I in $CONFIGURED_IDS                        # v4.14
+                    do
+                        [ -f ${CONFIG_DIR}wg${I}.conf ] && continue
+                        local NEW_NAME="wg"$I
+                        break
+                    done
+            else
+                if [ -f ${CONFIG_DIR}${NEW_NAME}.conf ];then
+                    echo -e $cBRED"\a\n\t***ERROR: Peer (${cBWHT}$NEW_NAME${cBRED}) ALREADY exists!"$cRESET
+                    return 1
+                fi
+            fi
+    fi
+
     for WG_INTERFACE in $WG_INTERFACE $@
         do
             [ "$WG_INTERFACE" = "comment" ] && break
@@ -963,10 +974,32 @@ Import_Peer() {
             fi
 
             if [ -f ${IMPORT_DIR}${WG_INTERFACE}.conf ];then
-                local MODE=$(Server_or_Client "$WG_INTERFACE" "$IMPORT_DIR")            # v4.12
-                [ -n "$FORCE_TYPE" ] && { MODE=$FORCE_TYPE; local FORCE_TYPE_TXT="(${cBRED}FORCED as 'client'${cRESET}) ${cBGRE}"; }                # v4.03
-                if [ "$MODE" != "server" ];then
-                    [ "$MODE" == "client" ] && { local TABLE="clients"; local AUTO="N"; local KEY="peer"; } || { TABLE="devices"; local AUTO="X"; local KEY="name"; }   # v4.09
+                [ -z "$FORCE_TYPE" ] && local MODE=$(Server_or_Client "$WG_INTERFACE" "$IMPORT_DIR")            # v4.14 v4.12
+                [ -n "$FORCE_TYPE" ] && { MODE=$FORCE_TYPE; local FORCE_TYPE_TXT="(${cBRED}FORCED as '$MODE'${cRESET}) ${cBGRE}"; }                # v4.03
+                #if [ "$MODE" != "server" ];then
+                    case $MODE in
+                        client)
+                            local TABLE="clients"
+                            local AUTO="N"
+                            local KEY="peer"
+                        ;;
+                        device)
+                            local TABLE="devices"
+                            local AUTO="X"
+                            local KEY="name"
+                        ;;
+                        server)
+                            local TABLE="servers"
+                            local AUTO="N"
+                            local KEY="peer"
+                        ;;
+                        *)
+                            SayT "***ERROR: WireGuard Peer TYPE ('$FORCE_TYPE') must be 'client'/'server' or 'device'....skipping import request"
+                            echo -e $cBRED"\a\n\t***ERROR: WireGuard Peer TYPE (${cBWHT}$FORCE_TYPE${cBRED}) must be 'client'/'server' or 'device'....skipping import Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
+                            return 1
+                        ;;
+                    esac
+
                     if [ -z "$(sqlite3 $SQL_DATABASE "SELECT $KEY FROM $TABLE WHERE $KEY='$WG_INTERFACE';")" ];then
                         if [ -z "$ANNOTATE" ];then
                             # Use comment line preceding the '[Interface]' directive
@@ -984,6 +1017,7 @@ Import_Peer() {
 
                                 PrivateKey) local PRI_KEY=${LINE##* };;
                                 PublicKey) local PUB_KEY=${LINE##* };;
+                                ListenPort) local LISTEN_PORT=${LINE##* } ;;    # v4.14
                                 AllowedIPs) local ALLOWIP=$(echo "$LINE" | sed 's/^AllowedIPs.*=//' | awk '{$1=$1};1')  # v4.12 strip leading/trailing spaces/tabs
                                 ;;
                                 Endpoint) local SOCKET=${LINE##* }
@@ -995,39 +1029,49 @@ Import_Peer() {
                                 "#"PreUp);;                                     # v4.14
                                 PreUp)                                          # v4.14
                                     # This must be commented out!
-                                    [ "$MODE" == "client" ] && COMMENT_OUT="Y"
+                                    if [ "$MODE" != "device" ];then
+                                        COMMENT_OUT="Y"
+                                    fi
                                 ;;
                                 "#"PostUp);;                                    # v4.14
                                 PostUp)                                         # v4.14
                                     # This must be commented out!
-                                    [ "$MODE" == "client" ] && COMMENT_OUT="Y"
+                                    if [ "$MODE" != "device" ];then
+                                        COMMENT_OUT="Y"
+                                    fi
                                 ;;
                                 "#"PreDown);;                                   # v4.14
                                 PreDown)                                        # v4.14
                                     # This must be commented out!
-                                    [ "$MODE" == "client" ] && COMMENT_OUT="Y"
+                                    if [ "$MODE" != "device" ];then
+                                        COMMENT_OUT="Y"
+                                    fi
                                 ;;
                                 "#"PostDown);;                                  # v4.14
                                 PostDown)                                       # v4.14
                                     # This must be commented out!
-                                    [ "$MODE" == "client" ] && COMMENT_OUT="Y"
+                                    if [ "$MODE" != "device" ];then
+                                        COMMENT_OUT="Y"
+                                    fi
                                 ;;
                                 "#"SaveConfig);;                                  # v4.14
                                 SaveConfig)                                       # v4.14
                                     # This must be commented out!
-                                    [ "$MODE" == "client" ] && COMMENT_OUT="Y"
-                                ;;
-                                ListenPort)                                     # v4.14
-                                    # This must be commented out!
-                                    [ "$MODE" == "client" ] && COMMENT_OUT="Y"
+                                    if [ "$MODE" != "device" ];then
+                                        COMMENT_OUT="Y"
+                                    fi
                                 ;;
                                 MTU) local MTU=${LINE##* }                      # v4.09
                                     # This must be commented out!
-                                    [ "$MODE" == "client" ] && COMMENT_OUT="Y"
+                                    if [ "$MODE" != "device" ];then
+                                        COMMENT_OUT="Y"
+                                    fi
                                 ;;
                                 DNS) local DNS=${LINE##* }
                                     # This must be commented out!
-                                    [ "$MODE" == "client" ] && COMMENT_OUT="Y"
+                                    if [ "$MODE" != "device" ];then
+                                        COMMENT_OUT="Y"
+                                    fi
                                 ;;
                                 Address) local SUBNET=${LINE##* }
                                         # local IP_LIST=$(echo "$LINE" | sed 's/^Address.*=//' | tr ',' ' ' | awk '{$1=$1};1')   # v4.12  strip leading/trailing spaces/tabs
@@ -1046,7 +1090,9 @@ Import_Peer() {
                                                 # fi
                                             # done
                                     # This must be commented out!
-                                    [ "$MODE" == "client" ] && COMMENT_OUT="Y"
+                                    if [ "$MODE" != "device" ];then
+                                        COMMENT_OUT="Y"
+                                    fi
                                 ;;
                             esac
                         done < ${IMPORT_DIR}${WG_INTERFACE}.conf
@@ -1057,13 +1103,20 @@ Import_Peer() {
                         [ -z "$SUBNET" ] && local SUBNET=$COMMENT_SUBNET       # v4.03
 
                         if [ -d ${CONFIG_DIR} ];then
-                            if [ "$MODE" = "client" ];then
+                            if [ "$MODE" != "device" ];then
                                 if [ "$RENAME" != "Y" ];then
-                                    sqlite3 $SQL_DATABASE "INSERT INTO $TABLE values('$WG_INTERFACE','$AUTO','$SUBNET','$SOCKET','$DNS','$MTU','$PUB_KEY','$PRI_KEY','$ANNOTATE');"     # v4.09
+                                    if [ "$MODE" == "client" ];then
+                                        sqlite3 $SQL_DATABASE "INSERT INTO $TABLE values('$WG_INTERFACE','$AUTO','$SUBNET','$SOCKET','$DNS','$MTU','$PUB_KEY','$PRI_KEY','$ANNOTATE');"     # v4.09
+                                    else
+                                        sqlite3 $SQL_DATABASE "INSERT INTO servers values('$WG_INTERFACE','$AUTO','${SUBNET}','$LISTEN_PORT','$PUB_KEY','$PRI_KEY','$ANNOTATE');"
+                                    fi
                                 else
-                                    sqlite3 $SQL_DATABASE "INSERT INTO $TABLE values('$NEW_NAME','$AUTO','$SUBNET','$SOCKET','$DNS','$MTU','$PUB_KEY','$PRI_KEY','$ANNOTATE');"         # v4.09
+                                    if [ "$MODE" == "client" ];then
+                                        sqlite3 $SQL_DATABASE "INSERT INTO $TABLE values('$NEW_NAME','$AUTO','$SUBNET','$SOCKET','$DNS','$MTU','$PUB_KEY','$PRI_KEY','$ANNOTATE');"         # v4.09
+                                    else
+                                        sqlite3 $SQL_DATABASE "INSERT INTO servers values('$NEW_NAME','$AUTO','${SUBNET}','$LISTEN_PORT','$PUB_KEY','$PRI_KEY','$ANNOTATE');"
+                                    fi
                                 fi
-                                #sqlite3 $SQL_DATABASE "INSERT INTO policy values('$WG_INTERFACE','<>');"
                             else
                                 sqlite3 $SQL_DATABASE "INSERT INTO $TABLE values('$WG_INTERFACE','$AUTO','$SUBNET','$DNS','$ALLOWIP','$PUB_KEY','$PRI_KEY','$ANNOTATE','');"
                             fi
@@ -1121,7 +1174,6 @@ Import_Peer() {
                             sed -i 's/^DNS/#DNS/' ${IMPORT_DIR}${WG_INTERFACE}.conf
                             sed -i 's/^Address/#Address/' ${IMPORT_DIR}${WG_INTERFACE}.conf
                             sed -i 's/^MTU/#MTU/' ${IMPORT_DIR}${WG_INTERFACE}.conf # v4.09
-                            sed -i 's/^ListenPort/#ListenPort/' ${IMPORT_DIR}${WG_INTERFACE}.conf   # v4.14
                             sed -i 's/^PreUp/#PreUp/g' ${IMPORT_DIR}${WG_INTERFACE}.conf            # v4.14
                             sed -i 's/^PostUp/#PostUp/g' ${IMPORT_DIR}${WG_INTERFACE}.conf          # v4.14
                             sed -i 's/^PreDown/#PreDown/g' ${IMPORT_DIR}${WG_INTERFACE}.conf        # v4.14
@@ -1145,10 +1197,17 @@ Import_Peer() {
                         #fi
                         # or to the End?
                         #sed -n '/^Endpoint/{h;$p;$b;:a;n;p;$!ba;x};p' ${IMPORT_DIR}${WG_INTERFACE}.conf
-
                         if [ -d "$CONFIG_DIR" ];then
                             [ "$IMPORT_DIR" != "$CONFIG_DIR" ] && cp ${IMPORT_DIR}${WG_INTERFACE}.conf ${CONFIG_DIR}${WG_INTERFACE}.conf
-                            [ "$RENAME" == "Y" ] && { mv ${CONFIG_DIR}${WG_INTERFACE}.conf ${CONFIG_DIR}${NEW_NAME}.conf; local AS_TXT="as ${cBMAG}$NEW_NAME "$cRESET; }
+                            if [ "$RENAME" == "Y" ];then
+                                mv ${CONFIG_DIR}${WG_INTERFACE}.conf ${CONFIG_DIR}${NEW_NAME}.conf
+                                local AS_TXT="as ${cBMAG}$NEW_NAME "$cRESET
+                                if [ "$MODE" == "server" ];then                                                         # v4.14
+                                    cp ${CONFIG_DIR}${WG_INTERFACE}_public.key ${CONFIG_DIR}${NEW_NAME}_public.key      # v4.14
+                                    cp ${CONFIG_DIR}${WG_INTERFACE}_private.key ${CONFIG_DIR}${NEW_NAME}_private.key    # v4.14
+                                fi
+
+                            fi
                         fi
 
                         if [ "$ASUS_NVRAM" == "Y" ] && [ "$(/bin/uname -o)" != "ASUSWRT-Merlin" ];then
@@ -1162,10 +1221,10 @@ Import_Peer() {
                         SayT "***ERROR: WireGuard VPN 'client' Peer ('$WG_INTERFACE') ALREADY exists in database?....skipping import request"
                         echo -e $cBRED"\a\n\t***ERROR: WireGuard 'client' Peer (${cBWHT}$WG_INTERFACE${cBRED}) ALREADY exists in database?....skipping import Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
                     fi
-                else
-                    SayT "***ERROR: WireGuard VPN Peer ('$WG_INTERFACE') must be 'client'....skipping import request"
-                    echo -e $cBRED"\a\n\t***ERROR: WireGuard Peer (${cBWHT}$WG_INTERFACE${cBRED}) must be 'client'....skipping import Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
-                fi
+                #else
+                    #SayT "***ERROR: WireGuard VPN Peer ('$WG_INTERFACE') must be 'client'....skipping import request"
+                    #echo -e $cBRED"\a\n\t***ERROR: WireGuard Peer (${cBWHT}$WG_INTERFACE${cBRED}) must be 'client'....skipping import Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
+                #fi
             else
                 SayT "***ERROR: WireGuard VPN 'client' Peer ('${IMPORT_DIR}$WG_INTERFACE.conf') configuration file NOT found?....skipping import request"   # v4.12
                 echo -e $cBRED"\a\n\t***ERROR: WireGuard 'client' Peer (${cBWHT}${IMPORT_DIR}$WG_INTERFACE.conf${cBRED}) configuration file NOT found?....skipping import Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1   # v4.12
@@ -1218,6 +1277,8 @@ Manage_Peer() {
 
     local ACTION=$1;shift
 
+    local ARGS="$@"
+
     WG_INTERFACE=$1;shift
     local CMD=$1
 
@@ -1226,7 +1287,13 @@ Manage_Peer() {
         WG_INTERFACE=
     fi
 
+    if [ "$WG_INTERFACE" == "del" ] || [ "$WG_INTERFACE" == "add" ] || [ "$WG_INTERFACE" == "rule" ];then
+        echo -e $cBRED"\a\n\t***ERROR Missing Peer argument!\n"$cRESET
+        return 1
+    fi
+
     [ "$WG_INTERFACE" == "help" ] && { CMD="help"; WG_INTERFACE=; }
+    [ "$WG_INTERFACE" == "import" ] && { CMD="import"; WG_INTERFACE=; }
 
     [ -z "$CMD" ] && CMD="list"
 
@@ -1258,6 +1325,9 @@ Manage_Peer() {
 
                     echo -e "\tpeer new [peer_name [options]]\t\t\t\t\t\t- Create new server Peer e.g. peer new wg27 ip=10.50.99.1/24 port=12345"
 
+                    echo -e "\tpeer import peer_conf [options]\t\t\t\t\t\t- Import '.conf' into SQL database e.g. import Mullvad_Dallas"
+                    echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t\t   e.g. import SiteA type=server"
+
                     echo -e "\tpeer peer_name [del|add] ipset {ipset_name[...]}\t\t\t- Selectively Route IPSets e.g. peer wg13 add ipset NetFlix Hulu"
 
                     echo -e "\tpeer peer_name [add] subnet {IPSubnet[...]}\t\t\t\t- Configure downstream subnets e.g. peer wg13 add subnet 192.168.5.0/24"
@@ -1269,6 +1339,7 @@ Manage_Peer() {
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru add wg11 SGS8"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru add wg15 all"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru add wg12 10.100.100.0/27"
+
 
                     return
                 fi
@@ -1387,7 +1458,7 @@ Manage_Peer() {
 
                             ;;
                             import*)
-                                Import_Peer "$WG_INTERFACE"
+                                Import_Peer $ARGS
                             ;;
                             rule*)
                                 Manage_RPDB_rules $menu1
@@ -2446,7 +2517,7 @@ Initialise_SQL() {
     local FORCE=$2
     local STATUS="Initialised"      # v4.14
 
-    #[ -n "$(which sqlite3)" ] && opkg install sqlite3-cli
+    [ "$(sqlite3 -version | awk 'BEGIN { FS = "." } {printf("%03d%02d",$1,$2)}')" -le 325 ] && opkg install sqlite3-cli # v4.14
 
     local TS=$(date +"%Y%m%d-%H%M%S")    # current date and time 'yyyymmdd-hhmmss'
 
@@ -2649,6 +2720,13 @@ STATS
 #     Use command 'vx' to edit this setting.
 #NOPG_UP
 
+# URL to check Endpoint Server; apply to ALL interfaces unless excluded, or named interfaces
+#     e.g. CHK_ENDPOINT = curl https://am.i.mullvad.net/connected  , wg14-
+#     Use command 'vx' to edit this setting.
+#CHK_ENDPOINT = curl -s https://am.i.mullvad.net/connected , * wg14-
+#CHK_ENDPOINT = curl -s https://am.i.mullvad.net/connected , wg11
+#CHK_ENDPOINT = curl -s https://Torguard, wg14
+
 EOF
     return 0
 }
@@ -2749,7 +2827,7 @@ Server_or_Client() {
                 ;;
             *)
                 if [ -f ${SOURCE_DIR}${WG_INTERFACE}.conf ];then                                # v4.12 v1.03
-                    if [ -n "$(grep -iE "^Endpoint" ${SOURCE_DIR}${WG_INTERFACE}.conf)" ];then  # v4.12 v1.03
+                    if  [ -n "$(grep -iE "^Endpoint" ${SOURCE_DIR}${WG_INTERFACE}.conf)" ];then  # v4.14 v4.12 v1.03
                         local PEER_TYPE="client"
                         if [ -n "$(nvram get ddns_hostname_x)" ];then                           # v4.05
                             [ -n "$(grep -iF "$(nvram get ddns_hostname_x)" ${SOURCE_DIR}${WG_INTERFACE}.conf)" ] && PEER_TYPE="device" # v4.12
@@ -2760,6 +2838,16 @@ Server_or_Client() {
                         fi
                     else
                         local PEER_TYPE="server"
+                    fi
+                else
+                    if [ "$PEER_TYPE" == "**ERROR**" ];then
+                        [ -n "$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers WHERE peer='$WG_INTERFACE';")" ] && local PEER_TYPE="server"
+                    fi
+                    if [ "$PEER_TYPE" == "**ERROR**" ];then
+                        [ -n "$(sqlite3 $SQL_DATABASE "SELECT peer FROM clients WHERE peer='$WG_INTERFACE';")" ] && local PEER_TYPE="client"
+                    fi
+                    if [ "$PEER_TYPE" == "**ERROR**" ];then
+                        [ -n "$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE name='$WG_INTERFACE';")" ] && local PEER_TYPE="device"
                     fi
                 fi
                 ;;
@@ -3089,6 +3177,8 @@ exit_message() {
 }
 Install_WireGuard_Manager() {
 
+    local NOPULL_SCRIPTS=$1
+
     echo -en $cBWHT"\n\tInstalling WireGuard Manager - Router$cBMAG $HARDWARE_MODEL (v$BUILDNO)"
     [ -f "$ENTWARE_INFO" ] && echo -e " $(grep -E "^arch" $ENTWARE_INFO)\n"$cRESET
 
@@ -3121,9 +3211,13 @@ Install_WireGuard_Manager() {
     fi
 
     # Scripts
-    if [ -d "${INSTALL_DIR}" ];then
-        Get_scripts "$2"
-        echo -e
+    if [ "$NOPULL_SCRIPTS" != "noscripts" ];then
+        if [ -d "${INSTALL_DIR}" ];then
+            Get_scripts "$2"
+            echo -e
+        fi
+    else
+        echo -e $cBRED"\tBypass GitHub script retrieval ('noscripts')\n"$cRESET
     fi
 
     echo -en $cBGRA
@@ -3159,24 +3253,6 @@ Install_WireGuard_Manager() {
 
         # Create Server template
         local PEER_LIST="1"
-        for I in $PEER_LIST                                            # v3.02
-            do
-                cat > ${CONFIG_DIR}wg2${I}.conf << EOF
-# $HARDWARE_MODEL 'server' Peer #1 (wg2$I)
-[Interface]
-PrivateKey = Ha1rgO/plL4wCB+pRdc6Qh8bIAWNeNgPZ7L+HFBhoE4=
-ListenPort = 51820
-
-# e.g. Accept a WireGuard connection from say YOUR mobile device to the router
-
-# DeviceExample
-#[Peer]
-#PublicKey = This_should_be_replaced_with_the_Public_Key_of_YOUR_mobile_device
-#AllowedIPs = 0.0.0.0/0 # All Access or [192.168.1.0/24,10.8.0.21/32] i.e. List of IP/Subnet/networks YOUR mobile device may access.
-# DeviceExample End
-EOF
-
-            done
 
         echo -e $cBCYA"\tCreating WireGuard Private/Public key-pairs for ${cBMAG}$HARDWARE_MODEL (v$BUILDNO)"$cRESET
         if [ -n "$(which wg)" ];then
@@ -3188,14 +3264,8 @@ EOF
                 do
                     wg genkey | tee ${CONFIG_DIR}wg2${I}_private.key | wg pubkey > ${CONFIG_DIR}wg2${I}_public.key
 
-                    # Update the Sample Peer templates with the router's real keys
-                    # PRIV_KEY=$(cat ${CONFIG_DIR}wg11_private.key)
-                    # PRIV_KEY=$(Convert_Key "$PRIV_KEY")
-                    # sed -i "/^PrivateKey/ s~[^ ]*[^ ]~$PRIV_KEY~3" ${CONFIG_DIR}wg11.conf
-
                     PRIV_KEY=$(cat ${CONFIG_DIR}wg2${I}_private.key)
                     PRIV_KEY=$(Convert_Key "$PRIV_KEY")
-                    sed -i "/^PrivateKey/ s~[^ ]*[^ ]~$PRIV_KEY~3" ${CONFIG_DIR}wg2${I}.conf
 
                     local WG_INTERFACE="wg2"${I}
                     local AUTO="Y"
@@ -3205,7 +3275,23 @@ EOF
                     local PUB_KEY=$(cat ${CONFIG_DIR}${WG_INTERFACE}_public.key)
                     local PRI_KEY=$(cat ${CONFIG_DIR}${WG_INTERFACE}_private.key)
 
-                    sqlite3 $SQL_DATABASE "INSERT INTO servers values('$WG_INTERFACE','$AUTO','$SUBNET','$PORT','$PUB_KEY','$PRI_KEY','$ANNOTATE');"
+                    cat > ${CONFIG_DIR}wg2${I}.conf << EOF
+# $HARDWARE_MODEL 'server' Peer #1 (wg2$I)
+[Interface]
+PrivateKey = $PRIV_KEY
+#Address = $SUBNET
+ListenPort = 51820
+
+EOF
+# e.g. Accept a WireGuard connection from say YOUR mobile device to the router
+
+# DeviceExample
+#[Peer]
+#PublicKey = This_should_be_replaced_with_the_Public_Key_of_YOUR_mobile_device
+#AllowedIPs = 0.0.0.0/0 # All Access or [192.168.1.0/24,10.8.0.21/32] i.e. List of IP/Subnet/networks YOUR mobile device may access.
+# DeviceExample End
+
+                    sqlite3 $SQL_DATABASE "INSERT INTO servers values('$WG_INTERFACE','$AUTO','$SUBNET','$PORT','$PUB_KEY','$PRIV_KEY','$ANNOTATE');"
                 done
         fi
 
@@ -3257,6 +3343,11 @@ EOF
         opkg install findutils          # v4.12
     fi
 
+    if [ ! -f /opt/bin/sqlite3 ];then   # Support SQL schema directive
+        echo -e $cBCYA"\tInstalling sqlite3 module"$cBGRA
+        opkg install sqlite3-cli        # v4.14
+    fi
+
     # Create a sample Road-Warrior device and QR code for import into WireGuard App on the say an iPhone
     echo -e $cBWHT"\tDo you want to create a 'device' Peer for 'server' Peer (${cBMAG}wg21${cBWHT}) ?\n\t${cBWHT}Press ${cBGRE}y$cRESET to ${cBWHT}create 'device' Peer ${cRESET}or press$cBGRE [Enter] to skip"
     read -r "ANS"
@@ -3275,8 +3366,9 @@ EOF
 
 }
 Uninstall_WireGuard() {
+
     echo -e $cBCYA"\n\tUninstalling WireGuard Session Manager"$cRESET
-    Manage_Wireguard_Sessions "stop"
+    [ -n "$(wg show interfaces)" ] && Manage_Wireguard_Sessions "stop"      # v4.14
     echo -en $cBRED
     [ -f ${INSTALL_DIR}WireguardVPN.conf ] && rm ${INSTALL_DIR}WireguardVPN.conf
         # legacy tidy-up!
@@ -3556,10 +3648,19 @@ Show_Peer_Status() {
                         if [ "$TYPE" == "server" ];then
                             local PUB_KEY=$(echo "$LINE" | awk '{print $2}')
                             local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM devices WHERE pubkey='$PUB_KEY';")
-                            [ -z "$DESC" ] && DESC="# Unidentified"
+                            if [ -z "$DESC" ];then
+                                # Site2Site maybe?                          # v4.14
+                                local MATCH_PEER=$(grep -F "$PUB_KEY" ${CONFIG_DIR}*_public.key | awk -F '[\/:\._]' '{print $6}')
+                                if [ -z "$MATCH_PEER" ];then
+                                    local DESC="# Unidentified"
+                                else
+                                    local DESC=$(grep -FB1 "[Interface]" ${CONFIG_DIR}${MATCH_PEER}.conf | grep -vF "[Interface]")  # v4.14
+                                    [ -z "$DESC" ] && DESC="# "$DESC
+                                fi
+                            fi
                             WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE pubkey='$PUB_KEY';")
 
-                            [ -z "$WG_INTERFACE" ] && WG_INTERFACE=$(grep -F "$PUB_KEY" /opt/etc/wireguard.d/*_public.key | awk -F '[\/:\._]' '{print $6}')
+                            [ -z "$WG_INTERFACE" ] && WG_INTERFACE=$(grep -F "$PUB_KEY" ${CONFIG_DIR}*_public.key | awk -F '[\/:\._]' '{print $6}')
 
                             [ -n "$WG_INTERFACE" ] && local VPN_ADDR=$(awk '/^Address/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf ) || local DESC=${cBRED}$DESC" owner of this Public key:"
 
@@ -3731,10 +3832,14 @@ Diag_Dump() {
     if [ "$TYPE" != "sql" ];then
         echo -e $cBWHT"\n\nUse command 'diag sql [ table_name ]' to see the SQL data (might be many lines!)\n"
         echo -e $cBWHT"       Valid SQL Database tables: "$cBCYA 2>&1
-        sqlite3 $SQL_DATABASE "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%';" | while read -r THIS; do
-                sqlite3 $SQL_DATABASE "SELECT sql FROM sqlite_schema WHERE name='$THIS';"
-                echo -e
-            done
+
+        # Requires opkg list sqlite3-cli
+        if [ "$(sqlite3 -version | awk 'BEGIN { FS = "." } {printf("%03d%02d",$1,$2)}')" -gt 325 ];then     # v4.14
+            sqlite3 $SQL_DATABASE "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%';" | while read -r THIS; do
+                    sqlite3 $SQL_DATABASE "SELECT sql FROM sqlite_schema WHERE name='$THIS';"
+                    echo -e
+                done
+        fi
 
         echo -e $cRESET
         echo -e "             e.g. ${cBGRE}diag sql traffic${cBWHT} will show the traffic stats SQL table"$cRESET
@@ -4311,6 +4416,160 @@ EOF
     #nano --unix $FN
     echo -e $cRESET"\t'$FN'$cBGRE modified for custom Subnet management"$cRESET
 }
+Create_Site2Site() {
+
+
+    shift
+
+    local NAME_ONE=$1
+    local NAME_TWO=$2
+
+    local SUBNET=$3             # VPN Tunnel Network
+    local LISTEN_PORT=$4
+
+    if [ -z "$1" ];then
+        local NAME_ONE="SiteA"
+        local NAME_TWO="SiteB"
+
+        local SUBNET="10.9.8.0"                 # VPN Tunnel Network
+        local LISTEN_PORT="61820"               # Site $NAME_ONE
+        local LAN_ADDR=$(nvram get lan_ipaddr)
+        local LAN_SUBNET=${LAN_ADDR%.*}
+        local SITE_ONE_LAN=$LAN_SUBNET".0/24"
+    fi
+
+    local SITE_ONE_IP=$(echo "$SUBNET" | grep -o '^.*\.')"1/32"
+    local SITE_TWO_IP=$(echo "$SUBNET" | grep -o '^.*\.')"2/32"
+
+    local SITE_TWO_THIRD_OCTET=$(($(echo "$SITE_ONE_LAN" | cut -d'.' -f3) + 1))
+    local SITE_TWO_LAN=$(echo "$SITE_ONE_LAN" | grep -oE '^(.{1,3}\.){2}')${SITE_TWO_THIRD_OCTET}.0/24
+
+    echo -e $cBCYA"\n\tCreating WireGuard Private/Public key-pair for Site-to-Site Peers ${cBMAG}${NAME_ONE}/${NAME_TWO}${cBCYA}"$cRESET
+
+    for SITE in $NAME_ONE $NAME_TWO
+        do
+            if [ -n "$(which wg)" ];then
+                wg genkey | tee ${CONFIG_DIR}${SITE}_private.key | wg pubkey > ${CONFIG_DIR}${SITE}_public.key
+            fi
+        done
+
+    local SITE_ONE_PRI_KEY=$(cat ${CONFIG_DIR}${NAME_ONE}_private.key)
+    local SITE_TWO_PRI_KEY=$(cat ${CONFIG_DIR}${NAME_TWO}_private.key)
+    local SITE_ONE_PUB_KEY=$(cat ${CONFIG_DIR}${NAME_ONE}_public.key)
+    local SITE_TWO_PUB_KEY=$(cat ${CONFIG_DIR}${NAME_TWO}_public.key)
+
+    echo -e $cRESET"\a\n\tEnter ${cBMAG}${NAME_TWO} ${cRESET}Endpoint remote IP, or ${cBMAG}${NAME_TWO}$cRESET DDNS name or press$cBGRE [Enter] to SKIP."
+    read -r "ANS"
+
+    [ -n "$ANS" ] && local DDNS=$ANS || local DDNS=$NAME_TWO".DDNS"
+
+    cat > ${CONFIG_DIR}${NAME_ONE}.conf << EOF
+# $NAME_ONE ($SITE_ONE_LAN)
+[Interface]
+PrivateKey = $SITE_ONE_PRI_KEY
+Address = $SITE_ONE_IP
+ListenPort = $LISTEN_PORT
+
+# $NAME_TWO LAN
+[Peer]
+PublicKey = $SITE_TWO_PUB_KEY
+AllowedIPs = $SITE_TWO_IP, $SITE_TWO_LAN
+##Endpoint = $DDNS:$((LISTEN_PORT+1))
+EOF
+
+    local ROUTER_DDNS=$(nvram get ddns_hostname_x)
+
+    # If no formal DDNS...ask what to do, so $NAME_TWO can connect to this $NAME_ONE router
+    if [ -z "$ROUTER_DDNS" ];then
+        echo -e $cRED"\n\a\tWarning: No DDNS is configured! to reach local ${cBMAG}${NAME_ONE}${cRED} Endpoint from remote ${cBMAG}$NAME_TWO"$cRESET
+        echo -e $cRESET"\tPress$cBRED y$cRESET to use the current ${cBRED}WAN IP ${cRESET}or enter ${cBMAG}$NAME_ONE${cRESET} Endpoint IP or DDNS name or press$cBGRE [Enter] to SKIP."
+        read -r "ANS"
+        if [ "$ANS" == "y" ];then
+            if [ -z "$(ip route show table main | grep -E "^0\.|^128\.")" ];then
+                local ROUTER_DDNS=$(curl -${SILENT} ipecho.net/plain)                     # v3.01
+            else
+                echo -e $cRED"\a\n\tWarning: VPN is ACTIVE...cannot determine public WAN IP address!!!"
+            fi
+            [ -z "$ROUTER_DDNS" ] && ROUTER_DDNS="${NAME_ONE}_DDNS_$HARDWARE_MODEL"
+        else
+            if [ -n "$ANS" ] && [ ${#ANS} -gt 1 ] && [ $(echo "$ANS" | tr -cd "." | wc -c ) -ge 1 ];then
+                local ROUTER_DDNS="$ANS"
+            fi
+        fi
+
+        [ -z "$ROUTER_DDNS" ] && local ROUTER_DDNS=$NAME_ONE".DDNS"
+
+    fi
+
+    cat > ${CONFIG_DIR}${NAME_TWO}.conf << EOF
+# $NAME_TWO ($SITE_TWO_LAN)
+[Interface]
+PrivateKey = $SITE_TWO_PRI_KEY
+Address = $SITE_TWO_IP
+ListenPort = $((LISTEN_PORT+1))
+
+# $NAME_ONE LAN
+[Peer]
+PublicKey = $SITE_ONE_PUB_KEY
+AllowedIPs = $SITE_ONE_IP, $SITE_ONE_LAN
+##Endpoint = $ROUTER_DDNS:$LISTEN_PORT
+EOF
+
+    echo -e "\n========== $NAME_ONE configuration =====================================================\n"$cRESET
+    cat ${CONFIG_DIR}${NAME_ONE}.conf
+
+    echo -e "\n========== $NAME_TWO configuration =====================================================\n"
+    cat ${CONFIG_DIR}${NAME_TWO}.conf
+
+    echo -e "\n=======================================================================================\n"
+
+    for FN in $NAME_ONE $NAME_TWO
+        do
+            LISTEN_PORT=$(awk '/^ListenPort/ {print $3}' /opt/etc/wireguard.d/$FN.conf)
+
+            #echo -e $cBCYA"\tAdding WireGuard Site-to-Site Peer ${cBMAG}${FN}.conf PreUP/PostDown ${cBCYA}"$cRESET
+            cat > /tmp/Site2Site.txt << EOF
+
+
+# WireGuard (%p - ListenPort ONLY recognised by Martineau's wg-quick2)
+PreUp = iptables -I INPUT -p udp --dport $LISTEN_PORT -j ACCEPT
+PreUp = iptables -I INPUT -i %i -j ACCEPT
+PreUp = iptables -t nat -I PREROUTING -p udp --dport $LISTEN_PORT -j ACCEPT
+PreUp = iptables -t nat -I POSTROUTING -s $SUBNET/24 -o br0 -j MASQUERADE
+PostDown = iptables -D INPUT -p udp --dport $LISTEN_PORT -j ACCEPT
+PostDown = iptables -D INPUT -i %i -j ACCEPT
+PostDown = iptables -t nat -D PREROUTING -p udp --dport $LISTEN_PORT -j ACCEPT
+PostDown = iptables -t nat -D POSTROUTING -s $SUBNET/24 -o br0 -j MASQUERADE
+
+# Firewall
+PreUp = iptables -I INPUT   -i %i -j ACCEPT
+PreUp = iptables -I FORWARD -i %i -j ACCEPT
+PreUp = iptables -I FORWARD -o %i -j ACCEPT
+PreUp = iptables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+PostDown = iptables -D INPUT   -i %i -j ACCEPT
+PostDown = iptables -D FORWARD -i %i -j ACCEPT
+PostDown = iptables -D FORWARD -o %i -j ACCEPT
+PostDown = iptables -D FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+EOF
+                sed -i '/^ListenPort/r /tmp/Site2Site.txt' /opt/etc/wireguard.d/$FN.conf
+        done
+
+    echo -e $cBGRE"\n\tWireGuard Site-to-Site Peers ${cBMAG}${NAME_ONE}/${NAME_TWO}${cBGRE} created\n"$cRESET
+
+    echo -e "\n\tCopy ${cBMAG}${NAME_TWO}${cRESET} files:\n"$cBCYA
+    #ls -l ${CONFIG_DIR}${$NAME_TWO}"*"
+    ls -l ${CONFIG_DIR} | grep $NAME_TWO
+    echo -e ${cBCYA}${cRESET}"\n\tto remote location\n"
+
+    echo -e $cRESET"\tPress$cBRED y$cRESET to import/start ${cBMAG}$NAME_ONE${cRESET} or press$cBGRE [Enter] to SKIP."
+    read -r "ANS"
+    if [ "$ANS" == "y" ];then
+        Import_Peer "import" $NAME_ONE "type=server"
+    fi
+
+}
 Build_Menu() {
     if [ -z "$SUPPRESSMENU" ];then
         # Generate dynamically context aware menu
@@ -4383,15 +4642,15 @@ Validate_User_Choice() {
     if [ "$EASYMENU" == "Y" ];then
         case "$menu1" in
             0) ;;
-            1|i)
-                [ -z "$(ls ${INSTALL_DIR}*.ipk 2>/dev/null)" ]  && menu1="install" || menu1="getmodules";;
+            1*|i)
+                [ -z "$(ls ${INSTALL_DIR}*.ipk 2>/dev/null)" ]  && menu1="install "$(echo "$menu1" | awk '{print $2}') || menu1="getmodules";;
             2|z|remove) menu1="uninstall";; # v4.14
             3*|list*|show*) menu1=$(echo "$menu1" | awk '{$1="list"}1');;
-            4*|start*) menu1=$(echo "$menu1" | awk '{$1="start"}1') ;;
-            5*|stop*) menu1=$(echo "$menu1" | awk '{$1="stop"}1') ;;
-            6*|restart*) menu1=$(echo "$menu1" | awk '{$1="restart"}1') ;;
+            4*|start|start" "*) menu1=$(echo "$menu1" | awk '{$1="start"}1') ;;
+            5*|stop|stop" "*) menu1=$(echo "$menu1" | awk '{$1="stop"}1') ;;
+            6*|restart|restart" "*) menu1=$(echo "$menu1" | awk '{$1="restart"}1') ;;
             7*|qrcode*) menu1=$(echo "$menu1" | awk '{$1="qrcode"}1') ;;
-            8*|peer*) menu1=$(echo "$menu1" | awk '{$1="peer"}1') ;;
+            8*|peer|peer" "*) menu1=$(echo "$menu1" | awk '{$1="peer"}1') ;;
             9*) menu1=$(echo "$menu1" | awk '{$1="create"}1') ;;
             10*|ipset*) menu1=$(echo "$menu1" | awk '{$1="ipset"}1') ;;
             11*|import*) menu1=$(echo "$menu1" | awk '{$1="import"}1') ;;
@@ -4422,6 +4681,7 @@ Validate_User_Choice() {
             useentware*|allowentware*);;    # v4.14
             fc*);;      # v4.14
             pgup*);;    # v4.14
+            site2site*);; # v4.14
             "") ;;
             e*) ;;
             *)
@@ -4472,10 +4732,11 @@ Process_User_Choice() {
                     echo -e
                 fi
                 ;;
-            install)
+            install*)                                               # ['noscript']
 
                 if [ -z "$(grep -i "WireGuard" /jffs/scripts/post-mount)" ];then        # v4.14
-                    Install_WireGuard_Manager
+                    local ACTION="$(echo "$menu1"| awk '{print $2}')"
+                    Install_WireGuard_Manager $ACTION                                   # v4.14
                 else
 
                     Download_Modules $HARDWARE_MODEL
@@ -4546,6 +4807,8 @@ Process_User_Choice() {
                 read -r "ANS"
                 if [ "$ANS" == "Y" ];then       # v4.14 @ZebMcKayhan
                     Uninstall_WireGuard
+                else
+                    echo -e $cBYEL"\n\a\tUninstall...request ABORTED (${cBRED}'Y'$cRESET response not confirmed.)"$RESET
                 fi
 
                 ;;
@@ -4751,12 +5014,12 @@ Process_User_Choice() {
                     fi
 
             ;;
-            peer*)                                           # peer [ 'list' | interface { [auto y|n|p ] 'del' | 'add' | 'comment' {'#'comment}'} ]  # v1.10
+            peer|peer" "*)                                           # peer [ 'list' | interface { [auto y|n|p ] 'del' | 'add' | 'comment' {'#'comment}'} ]  # v1.10
 
                 Manage_Peer $menu1
 
                 ;;
-            restart*|stop*|start*)                              # start [ Peer [policy] | [client|server]] ]
+            restart|restart" "*|stop|stop" "*|start|start" "*)       # start [ Peer [policy] | [client|server]] ]
 
                 Manage_Wireguard_Sessions $menu1
 
@@ -4988,6 +5251,10 @@ Process_User_Choice() {
                     echo -en $cRED"\a\n\t***ERROR: Invalid arg $cBWHT'"$ACTION"'$cBRED for 'Use Pg-Up key command retrieval - valid 'on' or 'off' only!\n"$cRESET
                 ;;
                 esac
+            ;;
+            site2site*)
+
+                Create_Site2Site $menu1
             ;;
             *)
                 printf '\n\a\t%bInvalid Option%b "%s"%b Please enter a valid option\n' "$cBRED" "$cRESET" "$menu1" "$cBRED"    # v4.03 v3.04 v1.09
