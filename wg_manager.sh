@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.14bA"
-#============================================================================================ © 2021-2022 Martineau v4.14bA
+VERSION="v4.14bB"
+#============================================================================================ © 2021-2022 Martineau v4.14bB
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.14bA"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 18-Jan-2022
+# Last Updated Date: 19-Jan-2022
 #
 # Description:
 #
@@ -128,7 +128,6 @@ Chain_exists() {
     fi
 }
 Get_WAN_IF_Name () {
-
     # echo $([ -n "$(nvram get wan0_pppoe_ifname)" ] && echo $(nvram get wan0_pppoe_ifname) || echo $(nvram get wan0_ifname))
     #   nvram get wan0_gw_ifname
     #   nvram get wan0_proto
@@ -485,7 +484,7 @@ Load_UserspaceTool() {
         fi
     else
 
-        local KERNEL_MODULE=$(find / -name "wireguard.ko" | tr '\n' ' ' | awk '{print $1}')       # v4.12
+        local KERNEL_MODULE=$(find /lib/modules -name "wireguard.ko" | tr '\n' ' ' | awk '{print $1}')       # v4.14 v4.12
 
         if [ -n "$KERNEL_MODULE" ];then
             local FPATH=$(modprobe --show-depends wireguard | awk '{print $2}')
@@ -1748,6 +1747,7 @@ Manage_Wireguard_Sessions() {
     local WG_INTERFACE=$1;shift
     local CATEGORY=
     local SHOWCMDS=         # v4.14
+    local WG_QUICK=
 
     # ALL Peers?
     if [ -z "$WG_INTERFACE" ];then
@@ -1797,6 +1797,8 @@ Manage_Wireguard_Sessions() {
                 for PEER in $PEERS
                     do
                         [ "$PEER" == "debug" ] && { local SHOWCMDS="debug"; continue; }                 # v4.14
+                        [ "$PEER" == "wg-quick" ] && { local WG_QUICK="wg-quick"; continue; }           # v4.14
+
                         [ "$PEER" == "policy" ] && { local FORCEPOLICY="forcepolicy"; local POLICY_MODE="Forced POLICY mode"; continue; }       # v4.14
                         [ "$PEER" == "nopolicy" ] && { local FORCEPOLICY="forcedefault"; local POLICY_MODE="Override POLICY mode"; continue; }  # v4.14
                         # Category  list (CSV or space delimited) ?     # v3.04
@@ -1871,7 +1873,7 @@ Manage_Wireguard_Sessions() {
                         if [ -n "$(ifconfig $WG_INTERFACE 2>/dev/null | grep inet)" ];then  # v1.09
                             echo -e $cBWHT"\tRestarting Wireguard '$Mode' Peer (${cBMAG}${WG_INTERFACE}${cBWHT})"$cRESET 2>&1
                             SayT "$VERSION Restarting Wireguard '$Mode' Peer ($WG_INTERFACE)"
-                            [ "$Mode" == "server" ] && /jffs/addons/wireguard/wg_server $WG_INTERFACE "disable" "$SHOWCMDS" || ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" "$SHOWCMDS"                 # v1.09
+                            [ "$Mode" == "server" ] && /jffs/addons/wireguard/wg_server $WG_INTERFACE "disable" "$SHOWCMDS" "$WG_QUICK" || ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" "$SHOWCMDS" "$WG_QUICK"                 # v1.09
                         fi
                     fi
 
@@ -1887,7 +1889,7 @@ Manage_Wireguard_Sessions() {
                                 local TS=$(date +%s)
                                 #sh ${INSTALL_DIR}wg_server $WG_INTERFACE   # v4.12 http://www.snbforums.com/threads/vpnclient1-up-down-scripts-openvpn-ac86u-help-needed.56500/post-489924
                                 chmod +x ${INSTALL_DIR}wg_server            # v4.12
-                                ${INSTALL_DIR}wg_server $WG_INTERFACE "$SHOWCMDS"       # v4.12
+                                ${INSTALL_DIR}wg_server $WG_INTERFACE "$SHOWCMDS" "$WG_QUICK"       # v4.14 v4.12
 
 #[ "$(wg show interfaces | tr ' ' '\n' | grep "wg2[1-9]" | wc -w)" -eq 1 ] && local UDP_MONITOR=$(Manage_UDP_Monitor "server" "enable")
 
@@ -1949,7 +1951,9 @@ Manage_Wireguard_Sessions() {
                 do
                    [ "$WG_INTERFACE" == "debug" ] && { local SHOWCMDS="debug"; continue; }      # v4.14
                    if [ -n "$(wg show $WG_INTERFACE 2>/dev/null)" ] || [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
-                        [ -z "$(grep -iE "^Endpoint" ${CONFIG_DIR}${WG_INTERFACE}.conf)" ] && { Mode="server"; TABLE="servers"; } || { Mode="client"; TABLE="clients"; }    # v4.11
+
+                       Mode=$(Server_or_Client "$WG_INTERFACE")         # v4.14
+                       [ "$Mode" == "server" ] && local TABLE="servers" || local TABLE="clients"   # v4.11
 
                         if [ -n "$(wg show $WG_INTERFACE 2>/dev/null | grep -F "interface:")" ] && [ ! -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then                                                  # v4.11
                             local FORCE="force"
@@ -1974,7 +1978,7 @@ Manage_Wireguard_Sessions() {
                                         sqlite3 $SQL_DATABASE "INSERT into session values('$DEVICE','End','$TIMESTAMP');"
                                     done
 
-                                sh ${INSTALL_DIR}wg_server $WG_INTERFACE "disable" "$SHOWCMDS"
+                                sh ${INSTALL_DIR}wg_server $WG_INTERFACE "disable" "$SHOWCMDS" "$WG_QUICK"
 
                                 # If there are no 'server' Peers ACTIVE then terminate UDP monitoring
                                 # Will require REBOOT to reinstate! or 'wgm init'
@@ -1984,9 +1988,9 @@ Manage_Wireguard_Sessions() {
                                 # Dump the stats
                                 Show_Peer_Status "generatestats" "$WG_INTERFACE"                # v4.04
                                 if [ "$Mode" == "client" ] && [ "$Route" != "policy" ] ; then
-                                    wg show $WG_INTERFACE >/dev/null 2>&1 && sh ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" "$FORCE" "$SHOWCMDS" || Say "WireGuard $Mode service ('$WG_INTERFACE') NOT running."
+                                    wg show $WG_INTERFACE >/dev/null 2>&1 && sh ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" "$FORCE" "$SHOWCMDS" "$WG_QUICK" || Say "WireGuard $Mode service ('$WG_INTERFACE') NOT running."
                                 else
-                                    wg show $WG_INTERFACE >/dev/null 2>&1 && sh ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" "policy" "$FORCE" "$SHOWCMDS" || Say "WireGuard $Mode (Policy) service ('$WG_INTERFACE') NOT running."
+                                    wg show $WG_INTERFACE >/dev/null 2>&1 && sh ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" "policy" "$FORCE" "$SHOWCMDS" "$WG_QUICK" || Say "WireGuard $Mode (Policy) service ('$WG_INTERFACE') NOT running."
                                 fi
                             fi
 
@@ -2826,8 +2830,10 @@ Server_or_Client() {
                 esac
                 ;;
             *)
+
                 if [ -f ${SOURCE_DIR}${WG_INTERFACE}.conf ];then                                # v4.12 v1.03
-                    if  [ -n "$(grep -iE "^Endpoint" ${SOURCE_DIR}${WG_INTERFACE}.conf)" ];then  # v4.14 v4.12 v1.03
+
+                    if [ -z "$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers WHERE peer='$WG_INTERFACE';")" ] && [ -n "$(grep -iE "^Endpoint" ${SOURCE_DIR}${WG_INTERFACE}.conf)" ];then  # v4.14 v4.12 v1.03
                         local PEER_TYPE="client"
                         if [ -n "$(nvram get ddns_hostname_x)" ];then                           # v4.05
                             [ -n "$(grep -iF "$(nvram get ddns_hostname_x)" ${SOURCE_DIR}${WG_INTERFACE}.conf)" ] && PEER_TYPE="device" # v4.12
@@ -3701,11 +3707,11 @@ Show_Peer_Config_Entry() {
 
     local WG_INTERFACE=$1
 
-    echo -e $cBWHT"\n\tPeers (Auto=P - Policy, Auto=X - External i.e. Cell/Mobile)"$cBCYA
-
     case ${WG_INTERFACE:0:3} in
 
         "")
+            echo -e $cBWHT"\n\tPeers (Auto=P - Policy, Auto=X - External i.e. Cell/Mobile)"$cBCYA
+
             COLUMN_TXT="Server,Auto,Subnet,Port,Annotate"
             sqlite3 $SQL_DATABASE "SELECT peer,auto,subnet,port,tag from servers;" | column -t  -s '|' --table-columns "$COLUMN_TXT"
             echo -e
@@ -3719,6 +3725,9 @@ Show_Peer_Config_Entry() {
         ;;
         *)
             local Mode=$(Server_or_Client "$WG_INTERFACE")
+
+            [ "$Mode" == "**ERROR**" ] && { echo -e $cBRED"\n\a\t***ERROR Invalid WireGuard Peer '$WG_INTERFACE'";return;  }    # v4.14
+
             case "$Mode" in
                 server)
                     local TABLE="servers"; local ID="peer"; local SQL_COL="server"
@@ -4421,11 +4430,34 @@ Create_Site2Site() {
 
     shift
 
-    local NAME_ONE=$1
-    local NAME_TWO=$2
+    local I=1
+    while [ $# -gt 0 ]; do
+        case "$1" in
+        full*)
+            local ALLRULES="Y"
+            ;;
+        *)
+            case $I in
+                1)
+                    NAME_ONE=$1
+                ;;
+                2)
+                    NAME_ONE=$1
+                ;;
+                3)
+                    SUBNET=$1       # VPN Tunnel Network
+                ;;
+                4)
+                    LISTEN_PORT=$1
+                ;;
+            esac
+            ;;
+        esac
 
-    local SUBNET=$3             # VPN Tunnel Network
-    local LISTEN_PORT=$4
+        shift
+
+        I=$((I+1))
+    done
 
     if [ -z "$1" ];then
         local NAME_ONE="SiteA"
@@ -4474,7 +4506,7 @@ ListenPort = $LISTEN_PORT
 [Peer]
 PublicKey = $SITE_TWO_PUB_KEY
 AllowedIPs = $SITE_TWO_IP, $SITE_TWO_LAN
-##Endpoint = $DDNS:$((LISTEN_PORT+1))
+Endpoint = $DDNS:$((LISTEN_PORT+1))
 EOF
 
     local ROUTER_DDNS=$(nvram get ddns_hostname_x)
@@ -4512,7 +4544,7 @@ ListenPort = $((LISTEN_PORT+1))
 [Peer]
 PublicKey = $SITE_ONE_PUB_KEY
 AllowedIPs = $SITE_ONE_IP, $SITE_ONE_LAN
-##Endpoint = $ROUTER_DDNS:$LISTEN_PORT
+Endpoint = $ROUTER_DDNS:$LISTEN_PORT
 EOF
 
     echo -e "\n========== $NAME_ONE configuration =====================================================\n"$cRESET
@@ -4528,8 +4560,18 @@ EOF
             LISTEN_PORT=$(awk '/^ListenPort/ {print $3}' /opt/etc/wireguard.d/$FN.conf)
 
             #echo -e $cBCYA"\tAdding WireGuard Site-to-Site Peer ${cBMAG}${FN}.conf PreUP/PostDown ${cBCYA}"$cRESET
+
             cat > /tmp/Site2Site.txt << EOF
 
+# WireGuard (%p - ListenPort ONLY recognised by Martineau's wg-quick2)
+
+PostUp =   iptables -I INPUT -p udp --dport %p -j ACCEPT; iptables -I FORWARD -i %i -j ACCEPT
+PostDown = iptables -D INPUT -p udp --dport %p -j ACCEPT; iptables -D FORWARD -i %i -j ACCEPT
+
+EOF
+
+            if [ "$ALLRULES" == "Y" ];then
+                cat > /tmp/Site2Site.txt << EOF
 
 # WireGuard (%p - ListenPort ONLY recognised by Martineau's wg-quick2)
 PreUp = iptables -I INPUT -p udp --dport $LISTEN_PORT -j ACCEPT
@@ -4553,7 +4595,10 @@ PostDown = iptables -D FORWARD -o %i -j ACCEPT
 PostDown = iptables -D FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
 
 EOF
-                sed -i '/^ListenPort/r /tmp/Site2Site.txt' /opt/etc/wireguard.d/$FN.conf
+            fi
+
+            sed -i '/^ListenPort/r /tmp/Site2Site.txt' /opt/etc/wireguard.d/$FN.conf
+
         done
 
     echo -e $cBGRE"\n\tWireGuard Site-to-Site Peers ${cBMAG}${NAME_ONE}/${NAME_TWO}${cBGRE} created\n"$cRESET
@@ -4563,7 +4608,7 @@ EOF
     ls -l ${CONFIG_DIR} | grep $NAME_TWO
     echo -e ${cBCYA}${cRESET}"\n\tto remote location\n"
 
-    echo -e $cRESET"\tPress$cBRED y$cRESET to import/start ${cBMAG}$NAME_ONE${cRESET} or press$cBGRE [Enter] to SKIP."
+    echo -e $cRESET"\tPress$cBRED y$cRESET to import ${cBMAG}$NAME_ONE${cRESET} or press$cBGRE [Enter] to SKIP."
     read -r "ANS"
     if [ "$ANS" == "y" ];then
         Import_Peer "import" $NAME_ONE "type=server"
