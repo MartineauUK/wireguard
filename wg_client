@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.14.12"
-#============================================================================================ © 2021-2022 Martineau v4.14.12
+VERSION="v4.14.13"
+#============================================================================================ © 2021-2022 Martineau v4.14.13
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 18-Jan-2022
+# Last Updated Date: 19-Jan-2022
 #
 # Description:
 #
@@ -443,7 +443,21 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         ip link del dev $VPN_ID 2>/dev/null
         cmd ip link add dev $VPN_ID type wireguard
 
-        cmd wg setconf $VPN_ID ${CONFIG_DIR}$VPN_ID.conf
+        [ "$SHOWCMDS" == "Y" ] && echo -e "[#] wg setconf $VPN_ID ${CONFIG_DIR}$VPN_ID.conf"    # v4.14.13
+        echo -e ${cWRED}                                                                        # v4.14.13
+        wg setconf $VPN_ID ${CONFIG_DIR}$VPN_ID.conf                                            # v4.14.13
+        if [ $? -ne 0 ];then
+            # Syntax ERROR?                                                                     # v4.14.13
+            # e.g. Endpoint DDNS not valid/resolved?
+            echo -e $cRESET
+            cmd ip link del dev $VPN_ID                                                         # v4.14.13
+            [ "$USE_IPV6" == "Y" ] && cmd ip -6 link del dev $VPN_ID
+            logger -t "wireguard-${MODE}${VPN_NAME}" "***ERROR Initialisation ABORTED"
+            echo -e ${cRESET}$cBRED"\a\t***ERROR Initialisation ABORTED - 'wg setconf $VPN_ID ${CONFIG_DIR}$VPN_ID.conf' FAILED\n"$cRESET
+
+            exit 1                                                                              # v4.14.13
+        fi
+
         #  Suppress the message if a domain is supplied i.e.'Error: any valid prefix is expected rather than "'xxx.com"
 
         # v4.12 Assign both IPv4 and IPv6 IPs to interface as required
