@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.14bB"
-#============================================================================================ © 2021-2022 Martineau v4.14bB
+VERSION="v4.14bC"
+#============================================================================================ © 2021-2022 Martineau v4.14bC
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,13 +24,13 @@ VERSION="v4.14bB"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 19-Jan-2022
+# Last Updated Date: 20-Jan-2022
 #
 # Description:
 #
 # Acknowledgement:
 #
-# Contributors: odkrys,Torson,ZebMcKayhan,jobhax,elorimer,Sh0cker54,here1310,defung,The Chief,abir1909
+# Contributors: odkrys,Torson,ZebMcKayhan,jobhax,elorimer,Sh0cker54,here1310,defung,The Chief,abir1909,JGrana
 
 GIT_REPO="wireguard"
 GITHUB_MARTINEAU="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/main"
@@ -3775,6 +3775,12 @@ Show_Peer_Config_Entry() {
                     ;;
             esac
 
+            if [ -n "$(grep -E "^#Pre|^#Post" ${CONFIG_DIR}${WG_INTERFACE}.conf )" ];then           # v4.14
+                echo -e $COLOR"\n\tConfiguration rules for Peer ${cBMAG}${WG_INTERFACE}\n"$cRESET   # v4.14
+                grep -E "^#Pre|#Post" ${CONFIG_DIR}${WG_INTERFACE}.conf | sed 's/^#//'              # v4.14
+                echo -e
+            fi
+
         ;;
     esac
 
@@ -4427,6 +4433,7 @@ EOF
 }
 Create_Site2Site() {
 
+    # [ [name1] [name2] ['ip='ip_for_name1] ['port='listen_port_for_name1] ['lan='siteb_subnet] ]
 
     shift
 
@@ -4436,19 +4443,29 @@ Create_Site2Site() {
         full*)
             local ALLRULES="Y"
             ;;
+        ip=*)                               # Tunnel VPN Pool SiteA e.g. 10.10.10.0 (SiteB will be assigned +1)
+            local VPN_POOL="$(echo "$1" | sed -n "s/^.*ip=//p" | awk '{print $1}')"
+            [ "$I" -ge 1 ] && local I=$((I-1))      # Retain Positional parameter
+            ;;
+        port*)                              # SiteA ListenPort (SiteB will be assigned +1)
+            local LISTEN_PORT="$(echo "$1" | sed -n "s/^.*port=//p" | awk '{print $1}')"
+            [ "$I" -ge 1 ] && local I=$((I-1))      # Retain Positional parameter
+            ;;
+        lan*)
+            local SITE_TWO_LAN="$(echo "$1" | sed -n "s/^.*lan=//p" | awk '{print $1}')"
+            [ "$I" -ge 1 ] && local I=$((I-1))      # Retain Positional parameter
+            ;;
+        allowips*)
+            local SITE_TWO_ALLOWIPS="$(echo "$1" | sed -n "s/^.*allowips=//p" | awk '{print $1}' | sed 's~,\([1-2]\)~, \1~')"
+            [ "$I" -ge 1 ] && local I=$((I-1))      # Retain Positional parameter
+            ;;
         *)
             case $I in
                 1)
                     NAME_ONE=$1
                 ;;
                 2)
-                    NAME_ONE=$1
-                ;;
-                3)
-                    SUBNET=$1       # VPN Tunnel Network
-                ;;
-                4)
-                    LISTEN_PORT=$1
+                    NAME_TWO=$1
                 ;;
             esac
             ;;
@@ -4459,22 +4476,49 @@ Create_Site2Site() {
         I=$((I+1))
     done
 
-    if [ -z "$1" ];then
-        local NAME_ONE="SiteA"
-        local NAME_TWO="SiteB"
+    [ -z "$NAME_ONE" ] && local NAME_ONE="SiteA"
+    [ -z "$NAME_TWO" ] && local NAME_TWO="SiteB"
 
-        local SUBNET="10.9.8.0"                 # VPN Tunnel Network
-        local LISTEN_PORT="61820"               # Site $NAME_ONE
-        local LAN_ADDR=$(nvram get lan_ipaddr)
-        local LAN_SUBNET=${LAN_ADDR%.*}
-        local SITE_ONE_LAN=$LAN_SUBNET".0/24"
+    [ -z "$VPN_POOL" ] && local VPN_POOL="10.9.8.0"                 # VPN Tunnel Network
+    [ -z "$LISTEN_PORT" ] && local LISTEN_PORT="61820"              # Site $NAME_ONE
+    local LAN_ADDR=$(nvram get lan_ipaddr)
+    local LAN_SUBNET=${LAN_ADDR%.*}
+    local SITE_ONE_LAN=$LAN_SUBNET".0/24"
+
+    if [ "$USE_IPV6" == "Y" ];then
+        [ -z "$(echo "$VPN_POOL" | sed 's~/.*$~~' | Is_Private_IPv6)" ] && { echo -e $cBRED"\a\n\t***ERROR: ipv6='$VPN_POOL6' must be Private IPv6 address"$cRESET; return 1; }
+    else
+        [ -z "$(echo "$VPN_POOL" | Is_IPv4)" ] && { echo -e $cBRED"\a\n\t***ERROR: '$VPN_POOL' must be IPv4 Address"$cRESET; return 1; }
     fi
 
-    local SITE_ONE_IP=$(echo "$SUBNET" | grep -o '^.*\.')"1/32"
-    local SITE_TWO_IP=$(echo "$SUBNET" | grep -o '^.*\.')"2/32"
+    local LAST_OCTET=${VPN_POOL##*.}
+    if [ "$LAST_OCTET" == "0" ];then
+        local SITE_ONE_IP=$(echo "$VPN_POOL" | grep -o '^.*\.')"1/32"
+        local SITE_TWO_IP=$(echo "$VPN_POOL" | grep -o '^.*\.')"2/32"
+    else
+        local SITE_ONE_IP=$VPN_POOL"/32"
+        local SITE_TWO_IP=$(echo "$VPN_POOL" | grep -o '^.*\.')$((LAST_OCTET+1))/32
+    fi
 
-    local SITE_TWO_THIRD_OCTET=$(($(echo "$SITE_ONE_LAN" | cut -d'.' -f3) + 1))
-    local SITE_TWO_LAN=$(echo "$SITE_ONE_LAN" | grep -oE '^(.{1,3}\.){2}')${SITE_TWO_THIRD_OCTET}.0/24
+    if [ -z "$SITE_TWO_LAN" ];then
+        local SITE_TWO_THIRD_OCTET=$(($(echo "$SITE_ONE_LAN" | cut -d'.' -f3) + 1))
+        local SITE_TWO_LAN=$(echo "$SITE_ONE_LAN" | grep -oE '^(.{1,3}\.){2}')${SITE_TWO_THIRD_OCTET}.0/24
+    else
+        if [ -n "$(echo "$SITE_TWO_LAN" | Is_IPv4)" ] || [ -n "$(echo "$SITE_TWO_LAN" | Is_IPv4_CIDR)" ];then
+            if [ -z "$(echo "$SITE_TWO_LAN" | Is_IPv4_CIDR)" ];then
+                local SITE_TWO_LAN=${SITE_TWO_LAN}/24
+            fi
+        else
+            echo -e $cBRED"\a\n\t***ERROR: '$SITE_TWO_LAN' must be IPv4 IP/IP CIDR"$cRESET
+            return 1
+        fi
+    fi
+
+    if [ -z "$SITE_TWO_ALLOWIPS" ];then
+        local SITE_TWO_ALLOWIPS="$SITE_TWO_IP, $SITE_TWO_LAN"
+    else
+        local SITE_TWO_ALLOWIPS="$SITE_TWO_IP, $SITE_TWO_ALLOWIPS"
+    fi
 
     echo -e $cBCYA"\n\tCreating WireGuard Private/Public key-pair for Site-to-Site Peers ${cBMAG}${NAME_ONE}/${NAME_TWO}${cBCYA}"$cRESET
 
@@ -4496,7 +4540,7 @@ Create_Site2Site() {
     [ -n "$ANS" ] && local DDNS=$ANS || local DDNS=$NAME_TWO".DDNS"
 
     cat > ${CONFIG_DIR}${NAME_ONE}.conf << EOF
-# $NAME_ONE ($SITE_ONE_LAN)
+# $NAME_ONE - $SITE_ONE_LAN
 [Interface]
 PrivateKey = $SITE_ONE_PRI_KEY
 Address = $SITE_ONE_IP
@@ -4505,7 +4549,7 @@ ListenPort = $LISTEN_PORT
 # $NAME_TWO LAN
 [Peer]
 PublicKey = $SITE_TWO_PUB_KEY
-AllowedIPs = $SITE_TWO_IP, $SITE_TWO_LAN
+AllowedIPs = $SITE_TWO_ALLOWIPS
 Endpoint = $DDNS:$((LISTEN_PORT+1))
 EOF
 
@@ -4534,7 +4578,7 @@ EOF
     fi
 
     cat > ${CONFIG_DIR}${NAME_TWO}.conf << EOF
-# $NAME_TWO ($SITE_TWO_LAN)
+# $NAME_TWO - $SITE_TWO_LAN
 [Interface]
 PrivateKey = $SITE_TWO_PRI_KEY
 Address = $SITE_TWO_IP
@@ -4563,17 +4607,17 @@ EOF
 
             cat > /tmp/Site2Site.txt << EOF
 
-# WireGuard (%p - ListenPort ONLY recognised by Martineau's wg-quick2)
+# WireGuard (%p - ListenPort ONLY recognised by Martineau's WireGuard Manager/wg-quick2)
 
-PostUp =   iptables -I INPUT -p udp --dport %p -j ACCEPT; iptables -I FORWARD -i %i -j ACCEPT
-PostDown = iptables -D INPUT -p udp --dport %p -j ACCEPT; iptables -D FORWARD -i %i -j ACCEPT
+PostUp =   iptables -I INPUT -p udp --dport %p -j ACCEPT; iptables -I INPUT -i %i -j ACCEPT; iptables -I FORWARD -i %i -j ACCEPT
+PostDown = iptables -D INPUT -p udp --dport %p -j ACCEPT; iptables -D INPUT -i %i -j ACCEPT; iptables -D FORWARD -i %i -j ACCEPT
 
 EOF
 
             if [ "$ALLRULES" == "Y" ];then
                 cat > /tmp/Site2Site.txt << EOF
 
-# WireGuard (%p - ListenPort ONLY recognised by Martineau's wg-quick2)
+# WireGuard (%p - ListenPort ONLY recognised by Martineau's WireGuard Manager/wg-quick2)
 PreUp = iptables -I INPUT -p udp --dport $LISTEN_PORT -j ACCEPT
 PreUp = iptables -I INPUT -i %i -j ACCEPT
 PreUp = iptables -t nat -I PREROUTING -p udp --dport $LISTEN_PORT -j ACCEPT
@@ -4601,11 +4645,10 @@ EOF
 
         done
 
-    echo -e $cBGRE"\n\tWireGuard Site-to-Site Peers ${cBMAG}${NAME_ONE}/${NAME_TWO}${cBGRE} created\n"$cRESET
+    echo -e $cBGRE"\n\tWireGuard Site-to-Site Peers ${cBMAG}${NAME_ONE} and ${NAME_TWO}${cBGRE} created\n"$cRESET
 
-    echo -e "\n\tCopy ${cBMAG}${NAME_TWO}${cRESET} files:\n"$cBCYA
-    #ls -l ${CONFIG_DIR}${$NAME_TWO}"*"
-    ls -l ${CONFIG_DIR} | grep $NAME_TWO
+    echo -e "\n\tCopy ${cBMAG}${NAME_TWO}/${NAME_ONE}${cRESET} files:\n"$cBCYA
+    ls -l ${CONFIG_DIR} | grep -E "$NAME_TWO|${NAME_ONE}_public"
     echo -e ${cBCYA}${cRESET}"\n\tto remote location\n"
 
     echo -e $cRESET"\tPress$cBRED y$cRESET to import ${cBMAG}$NAME_ONE${cRESET} or press$cBGRE [Enter] to SKIP."
