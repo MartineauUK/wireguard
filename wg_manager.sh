@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.14bC"
-#============================================================================================ © 2021-2022 Martineau v4.14bC
+VERSION="v4.14bD"
+#============================================================================================ © 2021-2022 Martineau v4.14bD
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.14bC"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 20-Jan-2022
+# Last Updated Date: 21-Jan-2022
 #
 # Description:
 #
@@ -4591,6 +4591,9 @@ AllowedIPs = $SITE_ONE_IP, $SITE_ONE_LAN
 Endpoint = $ROUTER_DDNS:$LISTEN_PORT
 EOF
 
+    # Create a 'device' for SiteB so the IP is recorded
+    sqlite3 $SQL_DATABASE "INSERT into devices values('$NAME_TWO','X','$SITE_TWO_IP','','$SITE_ONE_IP, $SITE_ONE_LAN','$SITE_TWO_PUB_KEY','$SITE_TWO_PRI_KEY','# $NAME_TWO Site-to-Site LAN $SITE_TWO_LAN','0');"
+
     echo -e "\n========== $NAME_ONE configuration =====================================================\n"$cRESET
     cat ${CONFIG_DIR}${NAME_ONE}.conf
 
@@ -5462,8 +5465,9 @@ Create_RoadWarrior_Device() {
     [ -z "$SERVER_PEER" ] && { echo -e $cBRED"\a\n\t***ERROR: no 'server' Peers specified or found (wg2*)"$cRESET; return 1; }
     for SERVER_PEER in $SERVER_PEER
         do
-            # Is it ACTUALLY a 'server' Peer?                           # v1.08
-            if [ -f ${CONFIG_DIR}${SERVER_PEER}.conf ] && [ -z "$(grep -iE "^Endpoint" ${CONFIG_DIR}${SERVER_PEER}.conf)" ];then
+            # Is it ACTUALLY a 'server' Peer?                       # v1.08
+            # A Site-to-Site 'server' Peer can have an Endpoint"    # v4.14
+            if [ -f ${CONFIG_DIR}${SERVER_PEER}.conf ];then         # v4.14
                 continue
             else
                 echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard 'server' Peer '$SERVER_PEER'\n"$cRESET
