@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.14bD"
-#============================================================================================ © 2021-2022 Martineau v4.14bD
+VERSION="v4.14bE"
+#============================================================================================ © 2021-2022 Martineau v4.14bE
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.14bD"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 21-Jan-2022
+# Last Updated Date: 22-Jan-2022
 #
 # Description:
 #
@@ -816,13 +816,19 @@ Delete_Peer() {
                                 # Scan for 'server' Peer that accepts this 'client' connection
                                 local MATCHTHIS="$(echo "$WG_INTERFACE" | sed 's/\"/\\\"/g')"
 
-                                [ -n "$(ls /opt/etc/wireguard.d/wg2*.conf 2>/dev/null)" ] && local SERVER_PEER=$(grep -HE "^#.*${MATCHTHIS} device" /opt/etc/wireguard.d/wg2*.conf | awk -F '[\/:\._]' '{print $6}')    # v4.14 v4.11
-
-                                for SERVER_PEER in $SERVER_PEER
+                                if [ -n "$(ls /opt/etc/wireguard.d/wg2*.conf 2>/dev/null)" ];then
+                                    local SERVER_PEER_LIST=$(grep -HE "^#.*${MATCHTHIS}.*device" ${CONFIG_DIR}*.conf | tr '\n' ' ')    # v4.14 v4.11
+                                fi
+                                for SERVER_PEER in $SERVER_PEER_LIST
                                     do
-                                        echo -e $cBGRE"\t'device' Peer ${cBMAG}${WG_INTERFACE}${cBGRE} removed from 'server' Peer (${cBMAG}${SERVER_PEER}${cBGRE})"     # 4.02
-                                        sed -i "/^# ${MATCHTHIS} device/,/^# $WG_INTERFACE End$/d" ${CONFIG_DIR}${SERVER_PEER}.conf
-                                        local RESTART_SERVERS=$RESTART_SERVERS" "$SERVER_PEER
+                                        SERVER_PEER=$(echo "$SERVER_PEER" | awk -F '[\/:\._]' '{print $6}')
+                                        if [ -n "$SERVER_PEER" ];then
+                                            if [ "$WG_INTERFACE" != "$SERVER_PEER" ];then
+                                                echo -e $cBGRE"\t'device' Peer ${cBMAG}${WG_INTERFACE}${cBGRE} removed from 'server' Peer (${cBMAG}${SERVER_PEER}${cBGRE})"     # 4.02
+                                                sed -i "/^# ${MATCHTHIS} device/,/^# $WG_INTERFACE End$/d" ${CONFIG_DIR}${SERVER_PEER}.conf
+                                                local RESTART_SERVERS=$RESTART_SERVERS" "$SERVER_PEER
+                                            fi
+                                        fi
                                     done
                             fi
                         fi
@@ -3651,6 +3657,7 @@ Show_Peer_Status() {
                     fi
 
                     if [ -n "$(echo "$LINE" | grep -iE "peer:" )" ];then
+
                         if [ "$TYPE" == "server" ];then
                             local PUB_KEY=$(echo "$LINE" | awk '{print $2}')
                             local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM devices WHERE pubkey='$PUB_KEY';")
@@ -5446,11 +5453,12 @@ Create_RoadWarrior_Device() {
             peer*)
                 local ALLOW_TUNNEL_PEERS="Y"        # v4.11
             ;;
-            site)
+            site*)
                 local SITE2SITE="Y"                 # v4.14
-                local PEER_TOPOLOGY="Site-to-Site"  # v4.14
+                local PEER_TOPOLOGY="device Multi Site-to-Site"  # v4.14
                 local TAG=$PEER_TOPOLOGY            # v4.14
                 local REMOTE_LISTEN_PORT="$(echo "$@" | sed -n "s/^.*port=//p" | awk '{print $0}')" # v4.14
+                local SITE_PEER="$(echo "$@" | sed -n "s/^.*site=//p" | awk '{print $0}')" # v4.14
             ;;
             *)
 
@@ -5656,17 +5664,15 @@ EOF
                 if [ -z "$SITE2SITE" ];then                                 # v4.14
                     Display_QRCode "${CONFIG_DIR}${DEVICE_NAME}.conf"
                 else
-                    cat > ${CONFIG_DIR}${DEVICE_NAME}_Site.conf << EOF  # v4.14
-# Remote 'server' Peer '${DEVICE_NAME}'
-[Interface]
-PrivateKey = $PRI_KEY
-ListenPort = $REMOTE_LISTEN_PORT
-
-
+                    local SITE_PEER_PUB_KEY=$(cat ${CONFIG_DIR}${SITE_PEER}_public.key)
+                    cat > /tmp/${DEVICE_NAME}${SITE_PEER}.conf << EOF  # v4.14
+# $DEVICE_NAME $PEER_TOPOLOGY
 [Peer]
-PublicKey = $PUB_SERVER_KEY
-Endpoint = $ROUTER_DDNS:$LISTEN_PORT
+PublicKey = $PUB_KEY
+AllowedIPs = $ALLOWED_IPS     ${SPLIT_TXT}
+#PresharedKey = $PRE_SHARED_KEY
 PersistentKeepalive = 25
+# $DEVICE_NAME End
 EOF
 
                 echo -e $cBGRE"\n\tWireGuard config for 'server' $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBGRE}' (created ${cBWHT}(Allowed IP's ${ALLOWED_IPS} ${SPLIT_TXT})\n"$cRESET
@@ -5706,14 +5712,28 @@ EOF
 
                     #tail -n 1 ${INSTALL_DIR}WireguardVPN.conf
 
+                    echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED ADD $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBRED}' ${cRESET}to remote 'server' Peer (${cBMAG}${SITE_PEER}${cRESET}) or press$cBGRE [Enter] to SKIP."
+                    read -r "ANS"
+                    if [ "$ANS" == "y" ];then
+                        cat /tmp/${DEVICE_NAME}${SITE_PEER}.conf >> ${CONFIG_DIR}${SITE_PEER}.conf
+                    fi
+
                     # Need to Restart the Peer (if it is UP) or Start it so it can listen for new 'client' Peer device/site-2-site
                     [ -n "$(wg show interfaces | grep "$SERVER_PEER")" ] && CMD="restart" ||  CMD="start"   # v1.08
                     echo -e $cBWHT"\a\n\tWireGuard 'server' Peer needs to be ${CMD}ed to listen for 'client' $PEER_TOPOLOGY Peer ${cBMAG}$DEVICE_NAME $TAG"
-                    echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer ($SERVER_PEER) or press$cBGRE [Enter] to SKIP."
+                    echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer ($SERVER_PEER) ${cRESET}or press$cBGRE [Enter] to SKIP."
                     read -r "ANS"
                     [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$SERVER_PEER"; Show_Peer_Status "show"; }  # v3.03
 
+                    if [ "$SITE2SITE" == "Y" ];then
+                        echo -e $cRESET"\n\tNow Copy ${cBMAG}${SITE_PEER}/${DEVICE_NAME}${cRESET} files:\n"$cBCYA
+                        ls -l ${CONFIG_DIR} | grep -E "${SITE_PEER}.conf|${DEVICE_NAME}_public"
+                        echo -e ${cBCYA}${cRESET}"\n\tto remote location\n\tNOTE: If ${cBMAG}${SITE_PEER}${cRESET} has already been imported at the remote site, then simply rename $cBCYA'${SITE_PEER}.conf'$cRESET to its 'wg2x' equivalent, then restart it"
+                    fi
                 fi
+
+
+
         else
             echo -e $cRED"\a\n\t***ERROR: Peer $PEER_TOPOLOGY '${cBMAG}${DEVICE_NAME}${cRED}' already EXISTS!"
         fi
