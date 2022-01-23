@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.14bE"
-#============================================================================================ © 2021-2022 Martineau v4.14bE
+VERSION="v4.14bF"
+#============================================================================================ © 2021-2022 Martineau v4.14bF
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.14bE"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 22-Jan-2022
+# Last Updated Date: 23-Jan-2022
 #
 # Description:
 #
@@ -5467,6 +5467,11 @@ Create_RoadWarrior_Device() {
         shift
     done
 
+    if [ "$SITE2SITE" == "Y" ];then
+        [ -z "$SITE_PEER" ] && SITE_PEER="SiteB"
+        [ ! -f ${CONFIG_DIR}${SITE_PEER}.conf ] && { echo -e $cBRED"\a\n\t***ERROR: $PEER_TOPOLOGY 'server' Peer $cRESET'$SITE_PEER'$cBRED NOT found!"$cRESET; return 1; }
+    fi
+
     # If user did not specify 'server' Peers, use the oldest 'server' Peer found ACTIVE or the first defined in the config
     [ -z "$SERVER_PEER" ] && SERVER_PEER=$(wg show interfaces | grep -vE "wg1" | grep -vE "wgs")    # v4.12
     [ -z "$SERVER_PEER" ] && SERVER_PEER=$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers order by peer;" | head -n 1)
@@ -5628,13 +5633,17 @@ Create_RoadWarrior_Device() {
 
                 # User specifed DNS ?
                 if [ -z "$DNS_RESOLVER" ];then                                                      # v3.04 Hotfix
-                    local DNS_RESOLVER=$(nvram get wan0_dns | awk '{print $1}')                     # v3.04 Hotfix @Sh0cker54 #v3.04 Hotfix
-                    if [ -z "$DNS_RESOLVER" ];then                                                  # v4.12 @underdose
-                        echo -e $cRED"\a\tWarning: No DNS (${cBWHT}nvram get wan0_dns${cRED}) is configured! - will use ${cBWHT}${VPN_POOL_SUBNET}.1"   # v4.12 @underdose
-                        local DNS_RESOLVER="${VPN_POOL_SUBNET}.1"                                   # v4.12 @underdose
+                    if [ "$SITE2SITE" != "Y" ];then
+                        local DNS_RESOLVER=$(nvram get wan0_dns | awk '{print $1}')                     # v3.04 Hotfix @Sh0cker54 #v3.04 Hotfix
+                        if [ -z "$DNS_RESOLVER" ];then                                                  # v4.12 @underdose
+                            echo -e $cRED"\a\tWarning: No DNS (${cBWHT}nvram get wan0_dns${cRED}) is configured! - will use ${cBWHT}${VPN_POOL_SUBNET}.1"   # v4.12 @underdose
+                            local DNS_RESOLVER="${VPN_POOL_SUBNET}.1"                                   # v4.12 @underdose
+                        fi
+                        [ "$USE_IPV6" == "Y" ] && DNS_RESOLVER=$DNS_RESOLVER","$(nvram get ipv6_dns1)   # v3.04 Hotfix
+                    else
+                        local DNS_RESOLVER="1.1.1.1"
+                        [ "$USE_IPV6" == "Y" ] && DNS_RESOLVER="2606:4700:4700::1111"
                     fi
-
-                    [ "$USE_IPV6" == "Y" ] && DNS_RESOLVER=$DNS_RESOLVER","$(nvram get ipv6_dns1)   # v3.04 Hotfix
                 fi
 
                 # NOTE: A Road-Warrior Peer .config may have multiple '[PEER]' clauses to connect to several 'server' Peers concurrently!
@@ -5645,7 +5654,7 @@ Create_RoadWarrior_Device() {
 [Interface]
 PrivateKey = $PRI_KEY
 Address = $VPN_POOL_IP
-DNS = $DNS_RESOLVER
+DNS = 1.1.1.1
 
 # $HARDWARE_MODEL ${IPV6_TXT}'server' ($SERVER_PEER)
 [Peer]
@@ -5664,7 +5673,7 @@ EOF
                 if [ -z "$SITE2SITE" ];then                                 # v4.14
                     Display_QRCode "${CONFIG_DIR}${DEVICE_NAME}.conf"
                 else
-                    local SITE_PEER_PUB_KEY=$(cat ${CONFIG_DIR}${SITE_PEER}_public.key)
+
                     cat > /tmp/${DEVICE_NAME}${SITE_PEER}.conf << EOF  # v4.14
 # $DEVICE_NAME $PEER_TOPOLOGY
 [Peer]
@@ -5716,6 +5725,23 @@ EOF
                     read -r "ANS"
                     if [ "$ANS" == "y" ];then
                         cat /tmp/${DEVICE_NAME}${SITE_PEER}.conf >> ${CONFIG_DIR}${SITE_PEER}.conf
+
+                        local SITE_PEER_PUB_KEY=$(cat ${CONFIG_DIR}${SITE_PEER}_public.key)
+                        local SITE_PEER_LISTENPORT=$(awk '/^ListenPort/ {print $3}' ${CONFIG_DIR}${SITE_PEER}.conf)
+                        local SITE_PEER_ENDPOINT=$(awk "/^Endpoint.*$SITE_PEER_LISTENPORT/ {print}" ${CONFIG_DIR}${SERVER_PEER}.conf)
+                        local SITE_PEER_TAG=$(sqlite3 $SQL_DATABASE "SELECT tag FROM devices WHERE name='$SITE_PEER';" | awk '{$1=""}1' | awk '{$1=$1}1')
+                        cat >> ${CONFIG_DIR}${DEVICE_NAME}.conf << EOF  # v4.14
+
+# $DEVICE_NAME $PEER_TOPOLOGY ($SITE_PEER_TAG)
+[Peer]
+PublicKey = $SITE_PEER_PUB_KEY
+AllowedIPs = $ALLOWED_IPS     ${SPLIT_TXT}
+$SITE_PEER_ENDPOINT
+#PresharedKey = $PRE_SHARED_KEY
+PersistentKeepalive = 25
+# $DEVICE_NAME End
+EOF
+
                     fi
 
                     # Need to Restart the Peer (if it is UP) or Start it so it can listen for new 'client' Peer device/site-2-site
