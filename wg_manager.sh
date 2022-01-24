@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.14bF"
-#============================================================================================ © 2021-2022 Martineau v4.14bF
+VERSION="v4.14"
+#============================================================================================ © 2021-2022 Martineau v4.14
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.14bF"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 23-Jan-2022
+# Last Updated Date: 24-Jan-2022
 #
 # Description:
 #
