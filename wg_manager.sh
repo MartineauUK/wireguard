@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.14"
-#============================================================================================ © 2021-2022 Martineau v4.14
+VERSION="v4.15b"
+#============================================================================================ © 2021-2022 Martineau v4.15b
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.14"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 24-Jan-2022
+# Last Updated Date: 26-Jan-2022
 #
 # Description:
 #
@@ -48,6 +48,7 @@ CMDLINE=                                           # Command line INPUT         
 CMD1=;CMD2=;CMD3=;CMD4=;CMD5=                      # Command recall push stack      # v2.03
 SQL_DATABASE="/opt/etc/wireguard.d/WireGuard.db"   # SQL                            # v3.05
 INSTALL_MIGRATE="N"                                # Migration from v3.0 to v4.0    # v4.01
+IMPORTED_PEER_NAME=                                # Global tacky!                  # v4.15
 
 Say() {
    echo -e $$ $@ | logger -st "($(basename $0))"
@@ -785,6 +786,12 @@ Delete_Peer() {
                                 grep -E -B 3 -A 1 "^AllowedIPs" ${CONFIG_DIR}${WG_INTERFACE}.conf
                                 echo -e $cBWHT"\n\tYou can manually reassign them to a different 'server' Peer by recreating the 'client' Peer then rescan the QR code on the device"
                             fi
+
+                            # Site-to-Site identify remote site peer
+                            # Extract '# Cabin LAN'
+                            if [ "$(sqlite3 $SQL_DATABASE "SELECT auto FROM servers WHERE peer='$WG_INTERFACE';")" == "S" ];then    # v4.15
+                                local SITE2SITE_PEER_LAN=$(awk '/^#.*LAN/ {print $2}' ${CONFIG_DIR}${WG_INTERFACE}.conf )           # v4.15
+                            fi
                     fi
 
                     echo -e $cBWHT"\tPress$cBRED y$cRESET to ${aBOLD}CONFIRM${cRESET}${cBRED} or press$cBGRE [Enter] to SKIP."
@@ -795,6 +802,11 @@ Delete_Peer() {
                         [ -n "$(wg show $WG_INTERFACE 2>/dev/null)" ] && Manage_Wireguard_Sessions "stop" "$WG_INTERFACE"
                         sqlite3 $SQL_DATABASE "DELETE FROM $TABLE WHERE $SQL_COL='$WG_INTERFACE';"
                         [ -n "$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE name='$WG_INTERFACE';")" ] && sqlite3 $SQL_DATABASE "DELETE FROM devices WHERE name='$WG_INTERFACE';"
+
+                        # Site-to-Site remove the remote Site from 'devices' table if it exists
+                        if [ -n "$SITE2SITE_PEER_LAN" ];then
+                            [ -n "$(sqlite3 $SQL_DATABASE "SELECT * FROM devices WHERE name='$SITE2SITE_PEER_LAN';")" ] && sqlite3 $SQL_DATABASE "DELETE FROM devices WHERE name='$SITE2SITE_PEER_LAN';"    # v4.15
+                        fi
 
                         # ... and delete associated RPDB Selective Routing rule
                         sqlite3 $SQL_DATABASE "DELETE FROM policy WHERE peer='$WG_INTERFACE';"
@@ -980,7 +992,7 @@ Import_Peer() {
 
             if [ -f ${IMPORT_DIR}${WG_INTERFACE}.conf ];then
                 [ -z "$FORCE_TYPE" ] && local MODE=$(Server_or_Client "$WG_INTERFACE" "$IMPORT_DIR")            # v4.14 v4.12
-                [ -n "$FORCE_TYPE" ] && { MODE=$FORCE_TYPE; local FORCE_TYPE_TXT="(${cBRED}FORCED as '$MODE'${cRESET}) ${cBGRE}"; }                # v4.03
+                [ -n "$FORCE_TYPE" ] && { MODE=$FORCE_TYPE; local FORCE_TYPE_TXT="(${cBRED}FORCED as '$MODE'${cRESET}) ${cBGRE}"; } # v4.03
                 #if [ "$MODE" != "server" ];then
                     case $MODE in
                         client)
@@ -997,6 +1009,7 @@ Import_Peer() {
                             local TABLE="servers"
                             local AUTO="N"
                             local KEY="peer"
+                            [ -n "$(grep -E "^Endpoint" ${IMPORT_DIR}${WG_INTERFACE}.conf)" ] && AUTO="S"   # v.4.15 Site-to-Site
                         ;;
                         *)
                             SayT "***ERROR: WireGuard Peer TYPE ('$FORCE_TYPE') must be 'client'/'server' or 'device'....skipping import request"
@@ -1110,12 +1123,14 @@ Import_Peer() {
                         if [ -d ${CONFIG_DIR} ];then
                             if [ "$MODE" != "device" ];then
                                 if [ "$RENAME" != "Y" ];then
+                                    IMPORTED_PEER_NAME=$WG_INTERFACE
                                     if [ "$MODE" == "client" ];then
                                         sqlite3 $SQL_DATABASE "INSERT INTO $TABLE values('$WG_INTERFACE','$AUTO','$SUBNET','$SOCKET','$DNS','$MTU','$PUB_KEY','$PRI_KEY','$ANNOTATE');"     # v4.09
                                     else
                                         sqlite3 $SQL_DATABASE "INSERT INTO servers values('$WG_INTERFACE','$AUTO','${SUBNET}','$LISTEN_PORT','$PUB_KEY','$PRI_KEY','$ANNOTATE');"
                                     fi
                                 else
+                                    IMPORTED_PEER_NAME=$NEW_NAME
                                     if [ "$MODE" == "client" ];then
                                         sqlite3 $SQL_DATABASE "INSERT INTO $TABLE values('$NEW_NAME','$AUTO','$SUBNET','$SOCKET','$DNS','$MTU','$PUB_KEY','$PRI_KEY','$ANNOTATE');"         # v4.09
                                     else
@@ -1123,6 +1138,7 @@ Import_Peer() {
                                     fi
                                 fi
                             else
+                                IMPORTED_PEER_NAME=$WG_INTERFACE
                                 sqlite3 $SQL_DATABASE "INSERT INTO $TABLE values('$WG_INTERFACE','$AUTO','$SUBNET','$DNS','$ALLOWIP','$PUB_KEY','$PRI_KEY','$ANNOTATE','');"
                             fi
                         fi
@@ -1219,6 +1235,7 @@ Import_Peer() {
                             [ -z "$AS_TXT" ] && local AS_TXT="as ${cBMAG}wgc${INDEX} "$cRESET || local AS_TXT="$AS_TXT, ${cBMAG}wgc${INDEX} "$cRESET
                         fi
 
+                        [ "$AUTO" == "S" ] && local FORCE_TYPE_TXT="Site-to-Site "$FORCE_TYPE_TXT   # v.4.15 Site-to-Site
                         echo -e $cBGRE"\n\t[✔] Config ${cBMAG}${WG_INTERFACE}${cBGRE} import ${AS_TXT}${FORCE_TYPE_TXT}success"$cRESET 2>&1
 
                         local COMMENTOUT=; local RENAME=; local AS_TXT=
@@ -1374,7 +1391,7 @@ Manage_Peer() {
 
                                 [ "$Mode" == "device" ] && { echo -e $cBRED"\a\n\t***ERROR 'device' Peer '$WG_INTERFACE' does not support $cBWHT'auto=$AUTO'\n"$cRESET; return ; }  # v4.11
 
-                                if [ "$(echo "$AUTO" | grep "^[yYnNpPZ]$" )" ];then
+                                if [ "$(echo "$AUTO" | grep "^[yYnNpPZWS]$" )" ];then       # v4.15
                                     FLAG=$(echo "$AUTO" | tr 'a-z' 'A-Z')
                                     if [ -z "$(echo "$CMD" | grep "autoX")" ];then
                                         # If Auto='P' then enforce existence of RPDB Selective Routing rules or IPSET fwmark for the 'client' Peer or Passthru gateway
@@ -1761,8 +1778,8 @@ Manage_Wireguard_Sessions() {
 
             # If no specific Peer specified, for Stop/Restart retrieve ACTIVE Peers otherwise for Start use Peer configuration
             if [ "$ACTION" == "start" ];then                  # v2.02 v1.09
-                WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM clients WHERE auto='Y' OR auto='P';" | tr '\n' ' ')
-                WG_INTERFACE=$WG_INTERFACE" "$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers WHERE auto='Y' OR auto='P';" | tr '\n' ' ')
+                WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM clients WHERE auto='Y' OR auto='P' OR auto='W';" | tr '\n' ' ')                  # v4.15
+                WG_INTERFACE=$WG_INTERFACE" "$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers WHERE auto='Y' OR auto='P' OR auto='W' OR auto='S';" | tr '\n' ' ')  # v4.15
                 if [ -z "$WG_INTERFACE" ];then
                     echo -e $cRED"\a\n\t***ERROR: No WireGuard Peers WHERE (${cBWHT}Auto='Y'${cBRED}) defined\n"$cRESET 2>&1
                     return 1
@@ -1777,7 +1794,7 @@ Manage_Wireguard_Sessions() {
         # Allow category
         case "$WG_INTERFACE" in
             clients)
-                WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM clients WHERE auto='Y' OR auto='P';" | tr '\n' ' ')
+                WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM clients WHERE auto='Y' OR auto='P' OR auto='W';" | tr '\n' ' ')  # v4.15
                 local CATEGORY=" for Category 'Clients'"
                 SayT "$VERSION Requesting WireGuard VPN Peer ${ACTION}$CATEGORY ($WG_INTERFACE)"
                 local TABLE="clients"
@@ -1787,7 +1804,7 @@ Manage_Wireguard_Sessions() {
                 fi
             ;;
             servers)
-                WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers WHERE auto='Y' OR auto='P';" | tr '\n' ' ')
+                WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers WHERE auto='Y' OR auto='P' OR auto='W' OR auto='S';" | tr '\n' ' ')  # v4.15
                 local CATEGORY=" for Category 'Servers'"
                 SayT "$VERSION Requesting WireGuard VPN Peer ${ACTION}$CATEGORY ($WG_INTERFACE)"
                 local TABLE="servers"
@@ -2731,7 +2748,8 @@ STATS
 #NOPG_UP
 
 # URL to check Endpoint Server; apply to ALL interfaces unless excluded, or named interfaces
-#     e.g. CHK_ENDPOINT = curl https://am.i.mullvad.net/connected  , wg14-
+#     FULL URL https://mullvad.net/en/check/ which checks DNS Leak etc.
+#     API CHK_ENDPOINT = curl https://am.i.mullvad.net/connected  , wg14-
 #     Use command 'vx' to edit this setting.
 #CHK_ENDPOINT = curl -s https://am.i.mullvad.net/connected , * wg14-
 #CHK_ENDPOINT = curl -s https://am.i.mullvad.net/connected , wg11
@@ -3717,14 +3735,14 @@ Show_Peer_Config_Entry() {
     case ${WG_INTERFACE:0:3} in
 
         "")
-            echo -e $cBWHT"\n\tPeers (Auto=P - Policy, Auto=X - External i.e. Cell/Mobile)"$cBCYA
+            echo -e $cBWHT"\n\tPeers (Auto start: Auto=P - Policy, Auto=S - Site-to-Site)"$cBCYA
 
             COLUMN_TXT="Server,Auto,Subnet,Port,Annotate"
             sqlite3 $SQL_DATABASE "SELECT peer,auto,subnet,port,tag from servers;" | column -t  -s '|' --table-columns "$COLUMN_TXT"
             echo -e
             COLUMN_TXT="Client,Auto,IP,Endpoint,DNS,MTU,Annotate"           # v4.09
             sqlite3 $SQL_DATABASE "SELECT peer,auto,subnet,socket,dns,mtu,tag from clients;" | column -t  -s '|' --table-columns "$COLUMN_TXT"
-            echo -e
+            echo -e $cBWHT"\n\tPeers (Auto=X - External i.e. Cell/Mobile/Site)"$cBCYA
             COLUMN_TXT="Device,Auto,IP,DNS,Allowed IPs,Annotate"            # v4.09
             sqlite3 $SQL_DATABASE "SELECT name,auto,ip,dns,allowedip,tag from devices ORDER BY ip ASC;" | column -t  -s '|' --table-columns "$COLUMN_TXT"   # v4.11
 
@@ -4658,13 +4676,14 @@ EOF
     echo -e $cBGRE"\n\tWireGuard Site-to-Site Peers ${cBMAG}${NAME_ONE} and ${NAME_TWO}${cBGRE} created\n"$cRESET
 
     echo -e "\n\tCopy ${cBMAG}${NAME_TWO}/${NAME_ONE}${cRESET} files:\n"$cBCYA
-    ls -l ${CONFIG_DIR} | grep -E "$NAME_TWO|${NAME_ONE}_public"
+    ls -l ${CONFIG_DIR} | grep -E "$NAME_TWO|$NAME_ONE.conf|${NAME_ONE}_public" # v4.15
     echo -e ${cBCYA}${cRESET}"\n\tto remote location\n"
 
     echo -e $cRESET"\tPress$cBRED y$cRESET to import ${cBMAG}$NAME_ONE${cRESET} or press$cBGRE [Enter] to SKIP."
     read -r "ANS"
     if [ "$ANS" == "y" ];then
         Import_Peer "import" $NAME_ONE "type=server"
+        sqlite3 $SQL_DATABASE "UPDATE servers SET auto='S' WHERE peer='$IMPORTED_PEER_NAME';"   # v4.15
     fi
 
 }
@@ -5438,6 +5457,7 @@ Create_RoadWarrior_Device() {
     local TAG="$(echo "$@" | sed -n "s/^.*tag=//p" | awk '{print $0}')"
     local ADD_ALLOWED_IPS="$(echo "$@" | sed -n "s/^.*ips=//p" | awk '{print $0}')"
     local DNS_RESOLVER="$(echo "$@" | sed -n "s/^.*dns=//p" | awk '{print $0}')"        # v3.04 Hotfix
+    local REMOTE_LISTEN_PORT="$(echo "$@" | sed -n "s/^.*port=//p" | awk '{print $0}')" # v4.14
 
     local SERVER_PEER=
     local PEER_TOPOLOGY="device"    # 4.14
@@ -5453,24 +5473,24 @@ Create_RoadWarrior_Device() {
             peer*)
                 local ALLOW_TUNNEL_PEERS="Y"        # v4.11
             ;;
-            site*)
-                local SITE2SITE="Y"                 # v4.14
-                local PEER_TOPOLOGY="device Multi Site-to-Site"  # v4.14
-                local TAG=$PEER_TOPOLOGY            # v4.14
-                local REMOTE_LISTEN_PORT="$(echo "$@" | sed -n "s/^.*port=//p" | awk '{print $0}')" # v4.14
-                local SITE_PEER="$(echo "$@" | sed -n "s/^.*site=//p" | awk '{print $0}')" # v4.14
-            ;;
-            *)
-
+            site=*)
+                local SITE2SITE="$(echo "$@" | sed -n "s/^.*site=//p" | awk '{print $0}')"  # v4.14
+                case $SITE2SITE in                                                          # v4.15
+                    [nN])
+                        local SITE2SITE=$(echo "$SITE2SITE" | tr 'a-z' 'A-Z')               # v4.15 disable device Multi Site-to-Site
+                    ;;
+                    remoteonly)
+                        local SITE2SITE_PEER_LAN=$SITE2SITE                                 # v4.15
+                    ;;
+                    *)
+                        echo -e $cBRED"\a\n\t***ERROR: Invalid 'site=$SITE2SITE' arg - 'n' or 'remoteonly' "$cRESET
+                        return 1
+                    ;;
+                esac
             ;;
         esac
         shift
     done
-
-    if [ "$SITE2SITE" == "Y" ];then
-        [ -z "$SITE_PEER" ] && SITE_PEER="SiteB"
-        [ ! -f ${CONFIG_DIR}${SITE_PEER}.conf ] && { echo -e $cBRED"\a\n\t***ERROR: $PEER_TOPOLOGY 'server' Peer $cRESET'$SITE_PEER'$cBRED NOT found!"$cRESET; return 1; }
-    fi
 
     # If user did not specify 'server' Peers, use the oldest 'server' Peer found ACTIVE or the first defined in the config
     [ -z "$SERVER_PEER" ] && SERVER_PEER=$(wg show interfaces | grep -vE "wg1" | grep -vE "wgs")    # v4.12
@@ -5488,6 +5508,18 @@ Create_RoadWarrior_Device() {
             fi
         done
 
+    if [ "$SITE2SITE" != "N" ] && [ "$(sqlite3 $SQL_DATABASE "SELECT auto FROM servers WHERE peer='$SERVER_PEER';")" == "S" ];then  # v4.15
+        local SITE2SITE="Y"                                 # v4.14
+        local PEER_TOPOLOGY="device Multi Site-to-Site"     # v4.14
+        local TAG=$PEER_TOPOLOGY
+        local SITE_PEER=$(awk '/^#.*LAN/ {print $2}' ${CONFIG_DIR}${SERVER_PEER}.conf )     # v4.15
+    fi
+
+    if [ "$SITE2SITE" == "Y" ];then
+        [ -z "$SITE_PEER" ] && SITE_PEER="SiteB"
+        [ ! -f ${CONFIG_DIR}${SITE_PEER}.conf ] && { echo -e $cBRED"\a\n\t***ERROR: $PEER_TOPOLOGY 'server' Peer $cRESET'$SITE_PEER'$cBRED NOT found!"$cRESET; return 1; }
+    fi
+
     # createsplit xxxxx 'peers'
     [ "$ACTION" == "createsplit" ] && SPLIT_TUNNEL="Y" || SPLIT_TUNNEL="Q. Split Tunnel"                       # v1.11 v1.06
 
@@ -5496,11 +5528,11 @@ Create_RoadWarrior_Device() {
         if [ ! -f ${CONFIG_DIR}${DEVICE_NAME} ] && [ -z "$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE name='$DEVICE_NAME';")" ];then
                 echo -e $cBCYA"\n\tCreating Wireguard Private/Public key pair for $PEER_TOPOLOGY '${cBMAG}${DEVICE_NAME}${cBCYA}'"$cBYEL
                 wg genkey | tee ${CONFIG_DIR}${DEVICE_NAME}_private.key | wg pubkey > ${CONFIG_DIR}${DEVICE_NAME}_public.key
-                echo -e $cBYEL"\t$PEER_TOPOLOGY '"$DEVICE_NAME"' Peer Public key="$(cat ${CONFIG_DIR}${DEVICE_NAME}_public.key)"\n"$cRESET
+                echo -e $cBYEL"\t$PEER_TOPOLOGY '"${cBMAG}${DEVICE_NAME}${cBYEL}"' Peer ${cBCYA}Public${cBYEL}     key="$(cat ${CONFIG_DIR}${DEVICE_NAME}_public.key)$cRESET
                 umask 077
                 wg genpsk > ${CONFIG_DIR}${DEVICE_NAME}_pre-shared.key                  # v4.12 or openssl rand -base64 32 > ${CONFIG_DIR}${SERVER_PEER}_pre-shared.key
                 local PRE_SHARED_KEY=$(cat ${CONFIG_DIR}${DEVICE_NAME}_pre-shared.key)  # v4.12
-                echo -e $cBYEL"\t$PEER_TOPOLOGY '"$DEVICE_NAME"' Peer Pre-shared key="$(cat ${CONFIG_DIR}${DEVICE_NAME}_pre-shared.key)"\n"$cRESET   # v4.14 v4.12
+                echo -e $cBYEL"\t$PEER_TOPOLOGY '"${cBMAG}${DEVICE_NAME}${cBYEL}"' Peer ${cBCYA}Pre-shared${cBYEL} key="$(cat ${CONFIG_DIR}${DEVICE_NAME}_pre-shared.key)$cRESET   # v4.14 v4.12
 
                 #local PRE_SHARED_KEY=$(Convert_Key "$PRE-SHARED_KEY")                  # v4.12
 
@@ -5511,9 +5543,8 @@ Create_RoadWarrior_Device() {
                 # Use the Public key of the designated 'server' Peer
                 # For instant testing the 'server' Peer needs to be restarted? # v1.06
                 if [ -n "$SERVER_PEER" ];then
-
                     local PUB_SERVER_KEY=$(cat ${CONFIG_DIR}${SERVER_PEER}_public.key)                  # v1.06
-                    echo -e $cBCYA"\tUsing Public key for 'server' Peer '"${cBMAG}${SERVER_PEER}${cBCYA}"'\n"
+                    [ "$SITE2SITE_PEER_LAN" != "remoteonly" ] && echo -e $cBCYA"\tUsing Public key for 'server' Peer '"${cBMAG}${SERVER_PEER}${cBCYA}
 
                     # Use the 'server' Peer LISTEN_PORT rather than default to 51820
                     local LISTEN_PORT=$(awk '/^ListenPort/ {print $3}' ${CONFIG_DIR}${SERVER_PEER}.conf)                # v3.04
@@ -5641,7 +5672,7 @@ Create_RoadWarrior_Device() {
                         fi
                         [ "$USE_IPV6" == "Y" ] && DNS_RESOLVER=$DNS_RESOLVER","$(nvram get ipv6_dns1)   # v3.04 Hotfix
                     else
-                        local DNS_RESOLVER="1.1.1.1"
+                        local DNS_RESOLVER=${VPN_POOL_IP%.*}".1,1.1.1.1"                # v4.15
                         [ "$USE_IPV6" == "Y" ] && DNS_RESOLVER="2606:4700:4700::1111"
                     fi
                 fi
@@ -5654,7 +5685,7 @@ Create_RoadWarrior_Device() {
 [Interface]
 PrivateKey = $PRI_KEY
 Address = $VPN_POOL_IP
-DNS = 1.1.1.1
+DNS = $DNS_RESOLVER
 
 # $HARDWARE_MODEL ${IPV6_TXT}'server' ($SERVER_PEER)
 [Peer]
@@ -5667,12 +5698,48 @@ PersistentKeepalive = 25
 # $DEVICE_NAME End
 EOF
 
-                echo -e $cBGRE"\n\tWireGuard config for $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBGRE}' (${cBWHT}${VPN_POOL_IP}${cBGRE}) created ${cBWHT}(Allowed IP's ${ALLOWED_IPS} ${SPLIT_TXT})\n"$cRESET
+                    # Add device IP address and identifier to config
+                    [ -z "$TAG" ] && TAG=$(echo -e "\"Device\"")                                   # v1.03
+                    LINE=$(echo "$DEVICE_NAME\tX\t\t$VPN_POOL_IP\t\t$PUB_KEY\t\t# $DEVICE_NAME $TAG")
+                    TAG=$(echo "$TAG" | sed "s/'/''/g")
+
+                    if [ "$SITE2SITE_PEER_LAN" != "remoteonly" ];then
+                        sqlite3 $SQL_DATABASE "INSERT into devices values('$DEVICE_NAME','X','$VPN_POOL_IP','$DNS_RESOLVER','$ALLOWED_IPS','$PUB_KEY','$PRI_KEY','# $DEVICE_NAME $TAG','0');"
+
+                        echo -e $cBGRE"\n\tWireGuard config for $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBGRE}' (${cBWHT}${VPN_POOL_IP}${cBGRE}) created ${cBWHT}(Allowed IP's ${ALLOWED_IPS} ${SPLIT_TXT})\n"$cRESET
+                    fi
+                fi
+                if [ "$SITE2SITE_PEER_LAN" != "remoteonly" ];then
+                    echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED ADD $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBRED}' ${cRESET}to 'server' Peer (${cBMAG}${SERVER_PEER}${cRESET}) or press$cBGRE [Enter] to SKIP."
+                    read -r "ANS"
+                    if [ "$ANS" == "y" ];then
+
+                        local PUB_KEY=$(Convert_Key "$PUB_KEY")
+                        sed -i -e :a -e '/^\n*$/{$d;N;};/\n$/ba' ${CONFIG_DIR}${SERVER_PEER}.conf       # v4.15 Delete all trailing blank lines from file
+                        echo -e >> ${CONFIG_DIR}${SERVER_PEER}.conf
+                        for SERVER_PEER in $SERVER_PEER                                         # v3.03
+                            do
+                                # Erase 'client' Peer device entry if it exists....
+                                [ -n "$(grep "$DEVICE_NAME" ${CONFIG_DIR}${SERVER_PEER}.conf)" ] && sed -i "/# $DEVICE_NAME/,/# $DEVICE_NAME End/d" ${CONFIG_DIR}${SERVER_PEER}.conf    # v1.08
+                            done
+                        cat >> ${CONFIG_DIR}${SERVER_PEER}.conf << EOF
+# $DEVICE_NAME $PEER_TOPOLOGY
+[Peer]
+PublicKey = $PUB_KEY
+AllowedIPs = $VPN_POOL_IP
+PresharedKey = $PRE_SHARED_KEY
+# $DEVICE_NAME End
+EOF
+                        for SERVER_PEER in $SERVER_PEER                                         # v3.03
+                            do
+                                 echo -e $cBCYA"\tAdded $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBCYA}' ${cBWHT}${VPN_POOL_IP}${cBCYA} to $HARDWARE_MODEL 'server' (${cBMAG}$SERVER_PEER${cBCYA}) and WireGuard config\n"
+                            done
+
+                        Display_QRCode "${CONFIG_DIR}${DEVICE_NAME}.conf"
+                    fi
                 fi
 
-                if [ -z "$SITE2SITE" ];then                                 # v4.14
-                    Display_QRCode "${CONFIG_DIR}${DEVICE_NAME}.conf"
-                else
+                if [ "$SITE2SITE" == "Y" ];then             # v4.15
 
                     cat > /tmp/${DEVICE_NAME}${SITE_PEER}.conf << EOF  # v4.14
 # $DEVICE_NAME $PEER_TOPOLOGY
@@ -5684,46 +5751,11 @@ PersistentKeepalive = 25
 # $DEVICE_NAME End
 EOF
 
-                echo -e $cBGRE"\n\tWireGuard config for 'server' $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBGRE}' (created ${cBWHT}(Allowed IP's ${ALLOWED_IPS} ${SPLIT_TXT})\n"$cRESET
-                fi
-
-                echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED ADD $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBRED}' ${cRESET}to 'server' Peer (${cBMAG}${SERVER_PEER}${cRESET}) or press$cBGRE [Enter] to SKIP."
-                read -r "ANS"
-                if [ "$ANS" == "y" ];then
-
-                    for SERVER_PEER in $SERVER_PEER                                         # v3.03
-                        do
-                            echo -e $cBCYA"\n\tAdding $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBCYA}' ${cBWHT}${VPN_POOL_IP}${cBCYA} to $HARDWARE_MODEL 'server' (${cBMAG}$SERVER_PEER${cBCYA}) and WireGuard config\n"
-
-                            # Erase 'client' Peer device entry if it exists....
-                            [ -n "$(grep "$DEVICE_NAME" ${CONFIG_DIR}${SERVER_PEER}.conf)" ] && sed -i "/# $DEVICE_NAME/,/# $DEVICE_NAME End/d" ${CONFIG_DIR}${SERVER_PEER}.conf    # v1.08
-                        done
-
-                    local PUB_KEY=$(Convert_Key "$PUB_KEY")
-
-                    echo -e >> ${CONFIG_DIR}${SERVER_PEER}.conf
-                    cat >> ${CONFIG_DIR}${SERVER_PEER}.conf << EOF
-# $DEVICE_NAME $PEER_TOPOLOGY
-[Peer]
-PublicKey = $PUB_KEY
-AllowedIPs = $VPN_POOL_IP
-PresharedKey = $PRE_SHARED_KEY
-# $DEVICE_NAME End
-EOF
-
-                    # Add device IP address and identifier to config
-                    [ -z "$TAG" ] && TAG=$(echo -e "\"Device\"")                                   # v1.03
-                    LINE=$(echo "$DEVICE_NAME\tX\t\t$VPN_POOL_IP\t\t$PUB_KEY\t\t# $DEVICE_NAME $TAG")
-                    #POS=$(awk '/^# Custom.*Peers/ {print NR}' ${INSTALL_DIR}WireguardVPN.conf)
-                    #[ -n "$POS" ] && sed -i "$POS a $LINE" ${INSTALL_DIR}WireguardVPN.conf
-                    TAG=$(echo "$TAG" | sed "s/'/''/g")
-                    sqlite3 $SQL_DATABASE "INSERT into devices values('$DEVICE_NAME','X','$VPN_POOL_IP','$DNS_RESOLVER','$ALLOWED_IPS','$PUB_KEY','$PRI_KEY','# $DEVICE_NAME $TAG','0');"
-
-                    #tail -n 1 ${INSTALL_DIR}WireguardVPN.conf
-
                     echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED ADD $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBRED}' ${cRESET}to remote 'server' Peer (${cBMAG}${SITE_PEER}${cRESET}) or press$cBGRE [Enter] to SKIP."
                     read -r "ANS"
                     if [ "$ANS" == "y" ];then
+                        sed -i -e :a -e '/^\n*$/{$d;N;};/\n$/ba' ${CONFIG_DIR}${SITE_PEER}.conf     # v4.15 Delete all trailing blank lines from file
+                        echo -e >> ${CONFIG_DIR}${SITE_PEER}.conf
                         cat /tmp/${DEVICE_NAME}${SITE_PEER}.conf >> ${CONFIG_DIR}${SITE_PEER}.conf
 
                         local SITE_PEER_PUB_KEY=$(cat ${CONFIG_DIR}${SITE_PEER}_public.key)
@@ -5744,21 +5776,22 @@ EOF
 
                     fi
 
+                fi
+
+                if [ "$SITE2SITE_PEER_LAN" != "remoteonly" ];then           # v4.15
                     # Need to Restart the Peer (if it is UP) or Start it so it can listen for new 'client' Peer device/site-2-site
                     [ -n "$(wg show interfaces | grep "$SERVER_PEER")" ] && CMD="restart" ||  CMD="start"   # v1.08
                     echo -e $cBWHT"\a\n\tWireGuard 'server' Peer needs to be ${CMD}ed to listen for 'client' $PEER_TOPOLOGY Peer ${cBMAG}$DEVICE_NAME $TAG"
-                    echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer ($SERVER_PEER) ${cRESET}or press$cBGRE [Enter] to SKIP."
+                    echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer (${cBMAG}${SERVER_PEER}${cRESET}) or press$cBGRE [Enter] to SKIP."
                     read -r "ANS"
                     [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$SERVER_PEER"; Show_Peer_Status "show"; }  # v3.03
-
-                    if [ "$SITE2SITE" == "Y" ];then
-                        echo -e $cRESET"\n\tNow Copy ${cBMAG}${SITE_PEER}/${DEVICE_NAME}${cRESET} files:\n"$cBCYA
-                        ls -l ${CONFIG_DIR} | grep -E "${SITE_PEER}.conf|${DEVICE_NAME}_public"
-                        echo -e ${cBCYA}${cRESET}"\n\tto remote location\n\tNOTE: If ${cBMAG}${SITE_PEER}${cRESET} has already been imported at the remote site, then simply rename $cBCYA'${SITE_PEER}.conf'$cRESET to its 'wg2x' equivalent, then restart it"
-                    fi
                 fi
 
-
+                if [ "$SITE2SITE" == "Y" ];then
+                    echo -e $cRESET"\n\tNow Copy ${cBMAG}${SITE_PEER}/${DEVICE_NAME}${cRESET} files:\n"$cBCYA
+                    ls -l ${CONFIG_DIR} | grep -E "${SITE_PEER}.conf|${DEVICE_NAME}"    # v4.15
+                    echo -e ${cBCYA}${cRESET}"\n\tto remote location\n\tNOTE: If ${cBMAG}${SITE_PEER}${cRESET} has already been imported at the remote site, then simply rename $cBCYA'${SITE_PEER}.conf'$cRESET to its 'wg2x' equivalent, then restart it"
+                fi
 
         else
             echo -e $cRED"\a\n\t***ERROR: Peer $PEER_TOPOLOGY '${cBMAG}${DEVICE_NAME}${cRED}' already EXISTS!"
