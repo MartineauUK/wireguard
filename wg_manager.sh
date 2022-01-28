@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.15b"
-#============================================================================================ © 2021-2022 Martineau v4.15b
+VERSION="v4.15b2"
+#============================================================================================ © 2021-2022 Martineau v4.15b2
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.15b"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 26-Jan-2022
+# Last Updated Date: 28-Jan-2022
 #
 # Description:
 #
@@ -1361,14 +1361,14 @@ Manage_Peer() {
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru add wg11 SGS8"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru add wg15 all"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru add wg12 10.100.100.0/27"
-
-
+                    echo -e "\tpeer serv_peer_name {bind device_peer}\t\t\t\t\t- Bind a Road Warrior 'device' Peer to a 'server' Peer e.g. peer wg21 bind SGS20"
+                    
                     return
                 fi
 
                 local FN=${INSTALL_DIR}WireguardVPN.confXXX
 
-                if [ "$WG_INTERFACE" == "new" ] || [ "$WG_INTERFACE" == "newC" ] || [ "$WG_INTERFACE" == "add" ] || [ "$WG_INTERFACE" == "new6" ] ;then
+                if [ "$WG_INTERFACE" == "new" ] || [ "$WG_INTERFACE" == "newC" ] || [ "$WG_INTERFACE" == "add" ] || [ "$WG_INTERFACE" == "new6" ] || [ "$WG_INTERFACE" == "bind" ];then     # v4.15
                     CMD=$WG_INTERFACE
                     shift
                     WG_INTERFACE=$1
@@ -1376,7 +1376,7 @@ Manage_Peer() {
 
                 if [ "$WG_INTERFACE" != "category" ];then                   # v3.04
 
-                    if [ "$CMD" == "import" ] || [ "$CMD" == "delX" ] || [ "$CMD" == "new" ] || [ "$CMD" == "add" ] || [ "$CMD" == "new6" ] || [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
+                    if [ "$CMD" == "import" ] || [ "$CMD" == "delX" ] || [ "$CMD" == "new" ] || [ "$CMD" == "add" ] || [ "$CMD" == "new6" ] || [ "$WG_INTERFACE" == "bind" ] || [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
                         case $CMD in
                             new*)
                                 # New 'server' Peer     [port=nnnnn] [ip=xxx.xxx.xxx.1/24] [auto={y|n}]
@@ -1418,15 +1418,21 @@ Manage_Peer() {
                                 [ "$CMD" == "delX" ] && Delete_Peer "$WG_INTERFACE" "force" || Delete_Peer "$WG_INTERFACE"  # v3.05
                             ;;
                             comment)
-                                #echo -e $cBCYA"\n\tPeer Comment (Before): $(grep -E "^$WG_INTERFACE[[:space:]]" $FN)"$cRESET
                                 shift 1
                                 COMMENT="$@"
                                 [ "${COMMENT:0:1}" != "#" ] && COMMENT="# "$COMMENT
                                 COMMENT=$(echo "$COMMENT" | sed "s/'/''/g")
-                                [ ${WG_INTERFACE:0:3} == "wg2" ] && local TABLE="servers" || TABLE="clients"
-                                sqlite3 $SQL_DATABASE "UPDATE $TABLE SET tag='$COMMENT' WHERE peer='$WG_INTERFACE';"
-                                #sed -i "/^$WG_INTERFACE/ s~\#.*$~$COMMENT~" ${INSTALL_DIR}WireguardVPN.conf
-                                #echo -e $cBGRE"\tPeer Comment (After) : $(grep -E "^$WG_INTERFACE[[:space:]]" $FN)\n"$cRESET
+                                local Mode=$(Server_or_Client "$WG_INTERFACE")      # v4.15
+                                local SQL_COL="peer"                                # v4.15
+                                case $Mode in                                       # v4.15
+                                    server) local TABLE="servers";;
+                                    client) local TABLE="clients";;
+                                    device) 
+                                        local TABLE="devices"
+                                        local SQL_COL="name"
+                                    ;;
+                                esac                                                # v4.15
+                                sqlite3 $SQL_DATABASE "UPDATE $TABLE SET tag='$COMMENT' WHERE $SQL_COL='$WG_INTERFACE';"    # v4.15
 
                                 echo -e $cBGRE"\n\t[✔] Updated Annotation tag "$COMMENT"\n"$cRESET
                             ;;
@@ -1688,7 +1694,7 @@ Manage_Peer() {
                                      echo -e $cBRED"\a\n\t***ERROR 'client' Peer '$WG_INTERFACE' cannot set Listen Port\n"$cRESET
                                 fi
                             ;;
-                            add*|ipset*)                            # peer wg13 [add|del|edit] ipset Netflix[.....]
+                            add*|ipset*)                            # peer wg1x [add|del|edit] ipset Netflix[.....]
 
                                 local ARGS=$@
                                 if [ "$SUBCMD" == "add" ] || [ "$SUBCMD" == "del" ] || [ "$SUBCMD" == "upd" ];then
@@ -1698,18 +1704,54 @@ Manage_Peer() {
                                     echo -e $cBRED"\a\n\t***ERROR Invalid command '$SUBCMD' e.g. [add | del | upd]\n"$cRESET
                                 fi
                             ;;
+                            bind*)                                  # peer wg2x bind SGS20 [new_allowed_IP]
+                                local ARGS=$@
+                                local SERVER_PEER=$WG_INTERFACE
+                                local Mode=$(Server_or_Client "$SERVER_PEER")
+                                if [ "$Mode" == "server" ];then
+                                    local DEVICE=$2
+                                    local NEW_ALLOWED_IP=$3
+                                    if [ -f ${CONFIG_DIR}${DEVICE}.conf ];then
+                                        local PUB_KEY=$(sqlite3 $SQL_DATABASE "SELECT pubkey FROM servers WHERE peer='$SERVER_PEER';")
+                                        sed -i "/^PublicKey/ s~[^ ]*[^ ]~$PUB_KEY~3" ${CONFIG_DIR}${DEVICE}.conf
+                                        sed -i "/^# ${DEVICE} device/,/^# $DEVICE End$/d" ${CONFIG_DIR}${SERVER_PEER}.conf
+                                        sed -i -e :a -e '/^\n*$/{$d;N;};/\n$/ba' ${CONFIG_DIR}${SERVER_PEER}.conf   # v4.15 Delete all trailing blank lines from file
+                                        echo -e >> ${CONFIG_DIR}${SERVER_PEER}.conf 
+                                        local PUB_KEY=$(cat ${CONFIG_DIR}${DEVICE}_public.key)
+                                        local ALLOWIPS=$(awk '/^Address/ {print $3}' ${CONFIG_DIR}${DEVICE}.conf)
+
+                                        if [ -n "$NEW_ALLOWED_IP" ];then
+                                            local SERVER_SUBNET=$(awk '/^#Address/ {print $3}' ${CONFIG_DIR}${SERVER_PEER}.conf | grep -o '^.*\.')      
+                                            if [ -n "$(echo "$NEW_ALLOWED_IP" | Is_IPv4_CIDR )" ];then
+                                                local ALLOWIPS=$NEW_ALLOWED_IP", "$ALLOWIPS
+                                            else
+                                                echo -e $cBRED"\a\n\t***ERROR NEW ${cRESET}'ALLOWED_IPS=$NEW_ALLOWED_IP'${cBRED} - must be a valid ${cRESET}IPv4/32${cBRED} e.g. ${cRESET}${SERVER_SUBNET}99/32$cRESET \n"$cRESET
+                                                return 1
+                                            fi
+                                        fi
+                                        
+                                        local PRE_SHARED_KEY=$(awk '/^PresharedKey/ {print $3}' ${CONFIG_DIR}${DEVICE}.conf)  
+                                        [ -n "$PRE_SHARED_KEY" ] && local PRE_SHARED_KEY="PresharedKey = "$PRE_SHARED_KEY || local PRE_SHARED_KEY="#PresharedKey = "
+                                        cat >> ${CONFIG_DIR}${SERVER_PEER}.conf << EOF
+# $DEVICE device bind on $(date +%F)
+[Peer]
+PublicKey = $PUB_KEY
+AllowedIPs = $ALLOWIPS
+$PRE_SHARED_KEY
+# $DEVICE End 
+EOF
+                    
+                                        echo -e $cBGRE"\n\t[✔] Device '${DEVICE}' bind to 'server' Peer '$SERVER_PEER' success\n"$cRESET
+                                    else
+                                        echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard 'device' Peer '$DEVICE'\n"$cRESET
+                                    fi
+                                else
+                                    echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard 'server' Peer '$SERVER_PEER'\n"$cRESET
+                                fi
+                            
+                            ;;
                             *)
-                                #echo -e $cBCYA"\n\tPeer Entry: $(grep -E "^$WG_INTERFACE[[:space:]]" $FN)\n"$cRESET
-                                local Mode=$(Server_or_Client "$WG_INTERFACE")
-                                case $Mode in
-                                    server) local TABLE="servers";;
-                                    client) local TABLE="clients";;
-                                esac
-
-                                [ "${WG_INTERFACE:0:2}" != "wg" ] && local TABLE="devices"
-
-                                echo -e $cBYEL"\tTable:$TABLE"$cBCYA 2>&1
-                                sqlite3 $SQL_DATABASE "SELECT * FROM $TABLE;"
+                                echo -e $cBRED"\a\n\t***ERROR Invalid command '$CMD' e.g. [add | del | upd | bind]\n"$cRESET    # v4.15
                             ;;
                         esac
                     else
@@ -1778,7 +1820,7 @@ Manage_Wireguard_Sessions() {
 
             # If no specific Peer specified, for Stop/Restart retrieve ACTIVE Peers otherwise for Start use Peer configuration
             if [ "$ACTION" == "start" ];then                  # v2.02 v1.09
-                WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM clients WHERE auto='Y' OR auto='P' OR auto='W';" | tr '\n' ' ')                  # v4.15
+                WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM clients WHERE auto='Y' OR auto='P' OR auto='W';" | tr '\n' ' ')                              # v4.15
                 WG_INTERFACE=$WG_INTERFACE" "$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers WHERE auto='Y' OR auto='P' OR auto='W' OR auto='S';" | tr '\n' ' ')  # v4.15
                 if [ -z "$WG_INTERFACE" ];then
                     echo -e $cRED"\a\n\t***ERROR: No WireGuard Peers WHERE (${cBWHT}Auto='Y'${cBRED}) defined\n"$cRESET 2>&1
@@ -1788,6 +1830,7 @@ Manage_Wireguard_Sessions() {
                 # Wot if there are Peers we don't control?
                 WG_INTERFACE=$(wg show interfaces)                # v1.09
             fi
+            WG_INTERFACE=$(echo "$WG_INTERFACE" | awk '{$1=$1};1')    # v4.15 Strip leading/trailing spaces/tabs
             SayT "$VERSION Requesting WireGuard VPN Peer $ACTION ($WG_INTERFACE)"
     else
         echo -en $cBCYA
@@ -1796,6 +1839,7 @@ Manage_Wireguard_Sessions() {
             clients)
                 WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM clients WHERE auto='Y' OR auto='P' OR auto='W';" | tr '\n' ' ')  # v4.15
                 local CATEGORY=" for Category 'Clients'"
+                WG_INTERFACE=$(echo "$WG_INTERFACE" | awk '{$1=$1};1')    # v4.15 Strip leading/trailing spaces/tabs
                 SayT "$VERSION Requesting WireGuard VPN Peer ${ACTION}$CATEGORY ($WG_INTERFACE)"
                 local TABLE="clients"
                 if [ -z "$WG_INTERFACE" ];then
@@ -1806,6 +1850,7 @@ Manage_Wireguard_Sessions() {
             servers)
                 WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers WHERE auto='Y' OR auto='P' OR auto='W' OR auto='S';" | tr '\n' ' ')  # v4.15
                 local CATEGORY=" for Category 'Servers'"
+                WG_INTERFACE=$(echo "$WG_INTERFACE" | awk '{$1=$1};1')    # v4.15 Strip leading/trailing spaces/tabs
                 SayT "$VERSION Requesting WireGuard VPN Peer ${ACTION}$CATEGORY ($WG_INTERFACE)"
                 local TABLE="servers"
                 if [ -z "$WG_INTERFACE" ];then
@@ -1845,9 +1890,20 @@ Manage_Wireguard_Sessions() {
 
     WG_INTERFACE=$(printf "%s" "$WG_INTERFACE" | sed 's/wgs[1-5]//g' | sed 's/wgc[1-5]//g' | sed 's/^[ \t]*//;s/[ \t]*$//')
 
-    # v4.12 Ensure 'server' peers are initialised before 'client' peers e.g. this order:  wg22 wg21 wg15 wg14 wg13 wg12 wg11
-    WG_INTERFACE=$(echo "$WG_INTERFACE" | tr " " "\n" | sort -r | tr "\n" " ")  # v4.12
+    # v4.12 Ensure 'server' peers are initialised before 'client' peers e.g. this order:  wg21 wg22 wg11 wg12 wg13 wg14 wg15
+    local TMP_SERVERS=
+    local TMP_CLIENTS=
+    for WGI in $WG_INTERFACE
+        do
+            case $WGI in
+                wg2*) [ -z "$(echo "$TMP_SERVERS" | grep -w "$WGI")" ] && TMP_SERVERS=$TMP_SERVERS" "$WGI;;
+                wg1*) [ -z "$(echo "$TMP_CLIENTS" | grep -w "$WGI")" ] && TMP_CLIENTS=$TMP_CLIENTS" "$WGI;;
+            esac
+        done
 
+    local TMP_SERVERS=$(echo "$TMP_SERVERS" | tr " " "\n" | sort | tr "\n" " ")
+    WG_INTERFACE=$TMP_SERVERS" "$TMP_CLIENTS
+    
     WG_INTERFACE=$(echo "$WG_INTERFACE" | awk '{$1=$1};1')    # v4.13  strip leading/trailing spaces/tabs
 
     [ -n "$WG_INTERFACE" ] && echo -e $cBWHT"\n\tRequesting WireGuard VPN Peer ${ACTION}$CATEGORY (${cBMAG}$WG_INTERFACE"$cRESET")" ${cWRED}${POLICY_MODE}$cRESET
@@ -3689,6 +3745,7 @@ Show_Peer_Status() {
                                     [ -z "$DESC" ] && DESC="# "$DESC
                                 fi
                             fi
+                            
                             WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE pubkey='$PUB_KEY';")
 
                             [ -z "$WG_INTERFACE" ] && WG_INTERFACE=$(grep -F "$PUB_KEY" ${CONFIG_DIR}*_public.key | awk -F '[\/:\._]' '{print $6}')
@@ -4676,8 +4733,9 @@ EOF
     echo -e $cBGRE"\n\tWireGuard Site-to-Site Peers ${cBMAG}${NAME_ONE} and ${NAME_TWO}${cBGRE} created\n"$cRESET
 
     echo -e "\n\tCopy ${cBMAG}${NAME_TWO}/${NAME_ONE}${cRESET} files:\n"$cBCYA
-    ls -l ${CONFIG_DIR} | grep -E "$NAME_TWO|$NAME_ONE.conf|${NAME_ONE}_public" # v4.15
+    ls -l ${CONFIG_DIR} | grep -E "$NAME_TWO|$NAME_ONE.conf|${NAME_ONE}" # v4.15
     echo -e ${cBCYA}${cRESET}"\n\tto remote location\n"
+    echo -e ${cBCYA}${cRESET}"\n\tImport ${cBMAG}${NAME_ONE}${cRESET} on remote site using 'import ${NAME_ONE} type=device'\n\n"    # v4.15
 
     echo -e $cRESET"\tPress$cBRED y$cRESET to import ${cBMAG}$NAME_ONE${cRESET} or press$cBGRE [Enter] to SKIP."
     read -r "ANS"
@@ -4799,6 +4857,7 @@ Validate_User_Choice() {
             fc*);;      # v4.14
             pgup*);;    # v4.14
             site2site*);; # v4.14
+            raw" "*|print" "*|config" "*);; # v4.15
             "") ;;
             e*) ;;
             *)
@@ -5369,9 +5428,26 @@ Process_User_Choice() {
                 ;;
                 esac
             ;;
-            site2site*)
+            site2site*)                     # v4.14
 
-                Create_Site2Site $menu1
+                Create_Site2Site $menu1     # [ [name1] [name2] ['ip='ip_for_name1] ['port='listen_port_for_name1] ['lan='siteb_subnet] ]
+            ;;
+            raw" "*|print" "*|config" "*)   # v4.15             {['raw' | 'print' | 'config']' peer} ['all']
+            
+                shift
+                local WG_INTERFACE=$1
+                local ACTION=$2
+            
+                if [ -n "ls ${CONFIG_DIR}${WG_INTERFACE}*" ];then
+                     
+                     [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ]        && { echo -e "\n\t================Config==============="; cat ${CONFIG_DIR}${WG_INTERFACE}.conf; }
+                     if [ -n "$ACTION" ];then
+                         [ -f ${CONFIG_DIR}${WG_INTERFACE}_public.key ]  && { echo -e "\n\t================Public==============="; cat ${CONFIG_DIR}${WG_INTERFACE}_public.key; }
+                         [ -f ${CONFIG_DIR}${WG_INTERFACE}_private.key ] && { echo -e "\n\t================Private=============="; cat ${CONFIG_DIR}${WG_INTERFACE}_private.key; }
+                     fi
+                else
+                    echo -en $cRED"\a\n\t***ERROR: ${cBMAG}${WG_INTERFACE}${cRED} not found\n"$cRESET
+                fi
             ;;
             *)
                 printf '\n\a\t%bInvalid Option%b "%s"%b Please enter a valid option\n' "$cBRED" "$cRESET" "$menu1" "$cBRED"    # v4.03 v3.04 v1.09
