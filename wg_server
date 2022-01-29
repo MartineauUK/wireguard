@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.14.5"
-#============================================================================================ © 2021-2022 Martineau v4.14.5
+VERSION="v4.15.1"
+#============================================================================================ © 2021-2022 Martineau v4.15.1
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 19-Jan-2022
+# Last Updated Date: 29-Jan-2022
 #
 # Description:
 #
@@ -278,7 +278,12 @@ if [ "$2" != "disable" ];then
 
     TIMESTAMP=$(date +%s)
     sqlite3 $SQL_DATABASE "INSERT into session values('$WG_INTERFACE','Start','$TIMESTAMP');"   # v1.13
-
+	# Site-to-Site identify remote site peer
+	# Extract '# Cabin LAN'
+	if [ "$(sqlite3 $SQL_DATABASE "SELECT auto FROM servers WHERE peer='$WG_INTERFACE';")" == "S" ];then    # v4.15.1
+		SITE2SITE_PEER=$(awk '/^#.*LAN/ {print $2}' ${CONFIG_DIR}${WG_INTERFACE}.conf )           			# v4.15.1
+		sqlite3 $SQL_DATABASE "INSERT into traffic values('$SITE2SITE_PEER','$TIMESTAMP','0','0','0','0');"	# v4.15.1
+	fi
     cmd ifconfig $VPN_ID txqueuelen 1000
 
     Firewall_delete
@@ -385,7 +390,12 @@ else
 
     TIMESTAMP=$(date +%s)
     sqlite3 $SQL_DATABASE "INSERT into session values('$WG_INTERFACE','End','$TIMESTAMP');" # v1.13
-
+	# Site-to-Site identify remote site peer
+	# Extract '# Cabin LAN'
+	if [ "$(sqlite3 $SQL_DATABASE "SELECT auto FROM servers WHERE peer='$WG_INTERFACE';")" == "S" ];then    # v4.15.1
+		SITE2SITE_PEER=$(awk '/^#.*LAN/ {print $2}' ${CONFIG_DIR}${WG_INTERFACE}.conf )           			# v4.15.1
+		sqlite3 $SQL_DATABASE "INSERT into traffic values('$SITE2SITE_PEER','$TIMESTAMP','*','*','*','*');"	# v4.15.1
+	fi
     Firewall_delete
 
     Manage_Passthru "del"
