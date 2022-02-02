@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.15.2"
-#============================================================================================ © 2021-2022 Martineau v4.15.2
+VERSION="v4.15.3"
+#============================================================================================ © 2021-2022 Martineau v4.15.3
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 30-Jan-2022
+# Last Updated Date: 02-Feb-2022
 #
 # Description:
 #
@@ -382,15 +382,16 @@ if [ "$2" != "disable" ];then
     fi
 
     for ALLOWIP in $(awk '/^AllowedIPs/ {$1="";$2="";print $0}' ${CONFIG_DIR}${VPN_ID}.conf | tr ',' ' ')   # v4.14.1
-    do
-        if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$ALLOWIP" | grep -F ":")" ];then
-            cmd ip -6 route add $ALLOWIP dev $VPN_ID
-        else
-            if [ -n "$(echo "$ALLOWIP" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$ALLOWIP" | Is_IPv4)" ];then
-                cmd ip route add $ALLOWIP dev $VPN_ID
+        do
+
+            if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$ALLOWIP" | grep -F ":")" ];then
+                cmd ip -6 route add $ALLOWIP dev $VPN_ID
+            else
+                if [ -n "$(echo "$ALLOWIP" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$ALLOWIP" | Is_IPv4)" ];then
+                    [ "$(echo "$ALLOWIP" | grep -o "^.*\.")" != "$(echo "$Subnet" | grep -o "^.*\.")" ] && cmd ip route add $ALLOWIP dev $VPN_ID        # v4.15.3
+                fi
             fi
-        fi
-    done
+        done
 
     # User Exit @ZebMcKayhan
     [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh ] && { logger -t "wireguard-server${VPN_ID:3:1}" "Executing ${VPN_ID}-up.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh; }
