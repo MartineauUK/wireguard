@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.15b2"
-#============================================================================================ © 2021-2022 Martineau v4.15b2
+VERSION="v4.15b3"
+#============================================================================================ © 2021-2022 Martineau v4.15b3
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.15b2"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 28-Jan-2022
+# Last Updated Date: 02-Feb-2022
 #
 # Description:
 #
@@ -656,43 +656,43 @@ Create_Peer() {
     [ -z "$AUTO" ] && local AUTO="N" || AUTO=$(echo "$AUTO" | tr 'a-z' 'A-Z')
 
     if [ -z "$SERVER_PEER" ];then
-
         # Use the last IPv4 server as the VPN POOL
         local SERVER_PEER=$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers WHERE subnet LIKE '%.%';" | sort | tail -n 1)
-        [ -n "$SERVER_PEER" ] && local AUTO_VPN_POOL=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers WHERE peer='$SERVER_PEER';") || local AUTO_VPN_POOL="10.50.0.1/24"
-        local SERVER_PEER=$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers;" | sort | tail -n 1)
-
-        # User specified VPN Tunnel subnet?
-        if [ -z "$VPN_POOL_USER" ];then
-            [ -z "$AUTO_VPN_POOL" ] && AUTO_VPN_POOL="10.50.1.1/24"
-            local ONE_OCTET=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f1)
-            local TWO_OCTET=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f2)
-            local THIRD_OCTET=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f3)
-            local REST=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f4-)
-            local NEW_THIRD_OCTET=$((THIRD_OCTET+1))
-            local SERVER_CNT=$(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM servers;")
-            [ $SERVER_CNT -ge $NEW_THIRD_OCTET ] && local NEW_THIRD_OCTET=$((SERVER_CNT+1))
-            local VPN_POOL=$(echo -e "$ONE_OCTET.$TWO_OCTET.$NEW_THIRD_OCTET.$REST")
-
-            if [ "$USE_IPV6" == "Y" ];then
-                [ -z "$TWO_OCTET" ] && local TWO_OCTET="50"
-                [ -z "$NEW_THIRD_OCTET" ] && local NEW_THIRD_OCTET="1"
-                local VPN_POOL="fc00:${TWO_OCTET}:${NEW_THIRD_OCTET}::1/64"
-            fi
-        fi
-
-        # Add the new 'server' Peer at the end of the list in the config
-        #POS=$(awk -v pattern="$SERVER_PEER" 'match($0,"^"pattern) {print NR":"$0}' ${INSTALL_DIR}WireguardVPN.conf | tail -n 1 | cut -d':' -f1)
-        #INDEX=$(echo "$SERVER_PEER" | sed 's/^wg2//')
+        local AUTO_VPN_POOL="10.50.0.1/24"
         local INDEX=$(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM servers;")
         local INDEX=$((INDEX+1))
         local SERVER_PEER="wg2"$INDEX
-
-        # User specified Listen Port?
-        [ -z "$LISTEN_PORT_USER" ] && LISTEN_PORT=$((LISTEN_PORT+INDEX))
     else
-        [ "${SERVER_PEER:0:3}" == "wg2" ] && INDEX=${SERVER_PEER:3:1} || { echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard 'server' Peer prefix (wg2*) '$SERVER_PEER'\n"$cRESET; return 1; }
+        if [ "${SERVER_PEER:0:3}" == "wg2" ];then
+            INDEX=${SERVER_PEER:3:1}
+            local AUTO_VPN_POOL="10.50.$((INDEX-1)).1/24"       # v4.15
+        else
+            echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard 'server' Peer prefix (wg2*) '$SERVER_PEER'\n"$cRESET
+            return 1
+        fi
     fi
+
+    # User specified VPN Tunnel subnet?
+    if [ -z "$VPN_POOL_USER" ];then
+        [ -z "$AUTO_VPN_POOL" ] && local AUTO_VPN_POOL="10.50.1.1/24"
+        local ONE_OCTET=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f1)
+        local TWO_OCTET=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f2)
+        local THIRD_OCTET=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f3)
+        local REST=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f4-)
+        local NEW_THIRD_OCTET=$((THIRD_OCTET+1))
+        local SERVER_CNT=$(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM servers;")
+        [ $SERVER_CNT -ge $NEW_THIRD_OCTET ] && local NEW_THIRD_OCTET=$((SERVER_CNT+1))
+        local VPN_POOL=$(echo -e "$ONE_OCTET.$TWO_OCTET.$NEW_THIRD_OCTET.$REST")
+
+        if [ "$USE_IPV6" == "Y" ];then
+            [ -z "$TWO_OCTET" ] && local TWO_OCTET="50"
+            [ -z "$NEW_THIRD_OCTET" ] && local NEW_THIRD_OCTET="1"
+            local VPN_POOL="fc00:${TWO_OCTET}:${NEW_THIRD_OCTET}::1/64"
+        fi
+    fi
+
+    # User specified Listen Port?
+    [ -z "$LISTEN_PORT_USER" ] && LISTEN_PORT=$((LISTEN_PORT+INDEX))
 
     if [ "$USE_IPV6" == "N" ];then
         [ -z "$(echo "$VPN_POOL" | Is_IPv4_CIDR)" ] && { echo -e $cBRED"\a\n\t***ERROR: '$VPN_POOL' must be IPv4 CIDR"$cRESET; return 1; }
@@ -1362,7 +1362,7 @@ Manage_Peer() {
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru add wg15 all"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru add wg12 10.100.100.0/27"
                     echo -e "\tpeer serv_peer_name {bind device_peer}\t\t\t\t\t- Bind a Road Warrior 'device' Peer to a 'server' Peer e.g. peer wg21 bind SGS20"
-                    
+
                     return
                 fi
 
@@ -1427,7 +1427,7 @@ Manage_Peer() {
                                 case $Mode in                                       # v4.15
                                     server) local TABLE="servers";;
                                     client) local TABLE="clients";;
-                                    device) 
+                                    device)
                                         local TABLE="devices"
                                         local SQL_COL="name"
                                     ;;
@@ -1716,12 +1716,12 @@ Manage_Peer() {
                                         sed -i "/^PublicKey/ s~[^ ]*[^ ]~$PUB_KEY~3" ${CONFIG_DIR}${DEVICE}.conf
                                         sed -i "/^# ${DEVICE} device/,/^# $DEVICE End$/d" ${CONFIG_DIR}${SERVER_PEER}.conf
                                         sed -i -e :a -e '/^\n*$/{$d;N;};/\n$/ba' ${CONFIG_DIR}${SERVER_PEER}.conf   # v4.15 Delete all trailing blank lines from file
-                                        echo -e >> ${CONFIG_DIR}${SERVER_PEER}.conf 
+                                        echo -e >> ${CONFIG_DIR}${SERVER_PEER}.conf
                                         local PUB_KEY=$(cat ${CONFIG_DIR}${DEVICE}_public.key)
                                         local ALLOWIPS=$(awk '/^Address/ {print $3}' ${CONFIG_DIR}${DEVICE}.conf)
 
                                         if [ -n "$NEW_ALLOWED_IP" ];then
-                                            local SERVER_SUBNET=$(awk '/^#Address/ {print $3}' ${CONFIG_DIR}${SERVER_PEER}.conf | grep -o '^.*\.')      
+                                            local SERVER_SUBNET=$(awk '/^#Address/ {print $3}' ${CONFIG_DIR}${SERVER_PEER}.conf | grep -o '^.*\.')
                                             if [ -n "$(echo "$NEW_ALLOWED_IP" | Is_IPv4_CIDR )" ];then
                                                 local ALLOWIPS=$NEW_ALLOWED_IP", "$ALLOWIPS
                                             else
@@ -1729,8 +1729,8 @@ Manage_Peer() {
                                                 return 1
                                             fi
                                         fi
-                                        
-                                        local PRE_SHARED_KEY=$(awk '/^PresharedKey/ {print $3}' ${CONFIG_DIR}${DEVICE}.conf)  
+
+                                        local PRE_SHARED_KEY=$(awk '/^PresharedKey/ {print $3}' ${CONFIG_DIR}${DEVICE}.conf)
                                         [ -n "$PRE_SHARED_KEY" ] && local PRE_SHARED_KEY="PresharedKey = "$PRE_SHARED_KEY || local PRE_SHARED_KEY="#PresharedKey = "
                                         cat >> ${CONFIG_DIR}${SERVER_PEER}.conf << EOF
 # $DEVICE device bind on $(date +%F)
@@ -1738,9 +1738,9 @@ Manage_Peer() {
 PublicKey = $PUB_KEY
 AllowedIPs = $ALLOWIPS
 $PRE_SHARED_KEY
-# $DEVICE End 
+# $DEVICE End
 EOF
-                    
+
                                         echo -e $cBGRE"\n\t[✔] Device '${DEVICE}' bind to 'server' Peer '$SERVER_PEER' success\n"$cRESET
                                     else
                                         echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard 'device' Peer '$DEVICE'\n"$cRESET
@@ -1748,7 +1748,7 @@ EOF
                                 else
                                     echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard 'server' Peer '$SERVER_PEER'\n"$cRESET
                                 fi
-                            
+
                             ;;
                             *)
                                 echo -e $cBRED"\a\n\t***ERROR Invalid command '$CMD' e.g. [add | del | upd | bind]\n"$cRESET    # v4.15
@@ -1903,7 +1903,7 @@ Manage_Wireguard_Sessions() {
 
     local TMP_SERVERS=$(echo "$TMP_SERVERS" | tr " " "\n" | sort | tr "\n" " ")
     WG_INTERFACE=$TMP_SERVERS" "$TMP_CLIENTS
-    
+
     WG_INTERFACE=$(echo "$WG_INTERFACE" | awk '{$1=$1};1')    # v4.13  strip leading/trailing spaces/tabs
 
     [ -n "$WG_INTERFACE" ] && echo -e $cBWHT"\n\tRequesting WireGuard VPN Peer ${ACTION}$CATEGORY (${cBMAG}$WG_INTERFACE"$cRESET")" ${cWRED}${POLICY_MODE}$cRESET
@@ -3629,6 +3629,7 @@ Show_Peer_Status() {
                                 local TYPE="client"
                                 local TABLE="clients"
                             else
+                                local TYPE="device"         # v4.15
                                 local TABLE="devices"
                             fi
 
@@ -3745,7 +3746,7 @@ Show_Peer_Status() {
                                     [ -z "$DESC" ] && DESC="# "$DESC
                                 fi
                             fi
-                            
+
                             WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE pubkey='$PUB_KEY';")
 
                             [ -z "$WG_INTERFACE" ] && WG_INTERFACE=$(grep -F "$PUB_KEY" ${CONFIG_DIR}*_public.key | awk -F '[\/:\._]' '{print $6}')
@@ -5433,13 +5434,13 @@ Process_User_Choice() {
                 Create_Site2Site $menu1     # [ [name1] [name2] ['ip='ip_for_name1] ['port='listen_port_for_name1] ['lan='siteb_subnet] ]
             ;;
             raw" "*|print" "*|config" "*)   # v4.15             {['raw' | 'print' | 'config']' peer} ['all']
-            
+
                 shift
                 local WG_INTERFACE=$1
                 local ACTION=$2
-            
+
                 if [ -n "ls ${CONFIG_DIR}${WG_INTERFACE}*" ];then
-                     
+
                      [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ]        && { echo -e "\n\t================Config==============="; cat ${CONFIG_DIR}${WG_INTERFACE}.conf; }
                      if [ -n "$ACTION" ];then
                          [ -f ${CONFIG_DIR}${WG_INTERFACE}_public.key ]  && { echo -e "\n\t================Public==============="; cat ${CONFIG_DIR}${WG_INTERFACE}_public.key; }
