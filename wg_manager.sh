@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.15b3"
-#============================================================================================ © 2021-2022 Martineau v4.15b3
+VERSION="v4.15b4"
+#============================================================================================ © 2021-2022 Martineau v4.15b4
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.15b3"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 02-Feb-2022
+# Last Updated Date: 03-Feb-2022
 #
 # Description:
 #
@@ -741,7 +741,7 @@ EOF
 #PresharedKey = Replace_with_the_Pre-shared_Key_of_YOUR_mobile_device
 # Peer Example End
 
-
+        chmod 600 ${CONFIG_DIR}${SERVER_PEER}.conf          # v4.15 Prevent wg-quick "Warning: '/opt/etc/wireguard.d/wg22.conf' is world accessible"
         sqlite3 $SQL_DATABASE "INSERT INTO servers values('$SERVER_PEER','$AUTO','${VPN_POOL}','$LISTEN_PORT','$PUB_KEY','$PRI_KEY','$ANNOTATE');"
     fi
 
@@ -1189,6 +1189,7 @@ Import_Peer() {
 
                         fi
 
+                        [ -f ${IMPORT_DIR}${WG_INTERFACE}.conf ] && chmod 600 ${IMPORT_DIR}${WG_INTERFACE}.conf     # v4.15 Prevent wg-quick "Warning: '/opt/etc/wireguard.d/wg11.conf' is world accessible"
                         [ -d $CONFIG_DIR ] && cp ${IMPORT_DIR}${WG_INTERFACE}.conf ${CONFIG_DIR}${WG_INTERFACE}.conf_imported
 
                         if [ "$COMMENT_OUT" == "Y" ];then
@@ -1220,8 +1221,10 @@ Import_Peer() {
                         #sed -n '/^Endpoint/{h;$p;$b;:a;n;p;$!ba;x};p' ${IMPORT_DIR}${WG_INTERFACE}.conf
                         if [ -d "$CONFIG_DIR" ];then
                             [ "$IMPORT_DIR" != "$CONFIG_DIR" ] && cp ${IMPORT_DIR}${WG_INTERFACE}.conf ${CONFIG_DIR}${WG_INTERFACE}.conf
+                            [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ] && chmod 600 ${CONFIG_DIR}${WG_INTERFACE}.conf     # v4.15 Prevent wg-quick "Warning: '/opt/etc/wireguard.d/wg11.conf' is world accessible"
                             if [ "$RENAME" == "Y" ];then
                                 mv ${CONFIG_DIR}${WG_INTERFACE}.conf ${CONFIG_DIR}${NEW_NAME}.conf
+                                [ -f ${CONFIG_DIR}${NEW_NAME}.conf ] && chmod 600 ${CONFIG_DIR}${NEW_NAME}.conf         # v4.15 Prevent wg-quick "Warning: '/opt/etc/wireguard.d/wg11.conf' is world accessible"
                                 local AS_TXT="as ${cBMAG}$NEW_NAME "$cRESET
                                 if [ "$MODE" == "server" ];then                                                         # v4.14
                                     cp ${CONFIG_DIR}${WG_INTERFACE}_public.key ${CONFIG_DIR}${NEW_NAME}_public.key      # v4.14
@@ -3377,6 +3380,7 @@ EOF
 #AllowedIPs = 0.0.0.0/0 # All Access or [192.168.1.0/24,10.8.0.21/32] i.e. List of IP/Subnet/networks YOUR mobile device may access.
 # DeviceExample End
 
+                    chmod 600 ${CONFIG_DIR}wg2${I}.conf         # v4.15 Prevent wg-quick "Warning: '/opt/etc/wireguard.d/wg21.conf' is world accessible"
                     sqlite3 $SQL_DATABASE "INSERT INTO servers values('$WG_INTERFACE','$AUTO','$SUBNET','$PORT','$PUB_KEY','$PRIV_KEY','$ANNOTATE');"
                 done
         fi
@@ -4636,6 +4640,7 @@ AllowedIPs = $SITE_TWO_ALLOWIPS
 Endpoint = $DDNS:$((LISTEN_PORT+1))
 EOF
 
+    chmod 600 ${CONFIG_DIR}${NAME_ONE}.conf         # v4.15 Prevent wg-quick "Warning: '/opt/etc/wireguard.d/Home.conf' is world accessible"
     local ROUTER_DDNS=$(nvram get ddns_hostname_x)
 
     # If no formal DDNS...ask what to do, so $NAME_TWO can connect to this $NAME_ONE router
@@ -4674,6 +4679,7 @@ AllowedIPs = $SITE_ONE_IP, $SITE_ONE_LAN
 Endpoint = $ROUTER_DDNS:$LISTEN_PORT
 EOF
 
+    chmod 600 ${CONFIG_DIR}${NAME_TWO}.conf         # v4.15 Prevent wg-quick "Warning: '/opt/etc/wireguard.d/Cabin.conf' is world accessible"
     # Create a 'device' for SiteB so the IP is recorded
     sqlite3 $SQL_DATABASE "INSERT into devices values('$NAME_TWO','X','$SITE_TWO_IP','','$SITE_ONE_IP, $SITE_ONE_LAN','$SITE_TWO_PUB_KEY','$SITE_TWO_PRI_KEY','# $NAME_TWO Site-to-Site LAN $SITE_TWO_LAN','0');"
 
