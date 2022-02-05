@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.15b4"
-#============================================================================================ © 2021-2022 Martineau v4.15b4
+VERSION="v4.15b5"
+#============================================================================================ © 2021-2022 Martineau v4.15b5
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.15b4"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 03-Feb-2022
+# Last Updated Date: 05-Feb-2022
 #
 # Description:
 #
@@ -5285,9 +5285,14 @@ Process_User_Choice() {
                 [ -z "$IP" ] && { echo -en $cRED"\a\n\t***ERROR: LAN Host name or LAN IP address required'\n"$cRESET ; return 1; }
 
                 if [ -z "$(echo "$IP" | Is_IPv4)" ] && [ -z "$(echo "$IP" | Is_Private_IPv4)" ];then
-                    IP=
+                    [ -f /etc/dnsmasq.conf ] && local IP=$(grep -i "$IP" /etc/dnsmasq.conf | awk -F',' '{print $4}')
                 else
-                    [ -f /etc/hosts.dnsmasq ] && local IP=$(grep -i "$IP" /etc/hosts.dnsmasq  | awk '{print $1}') || IP=
+                    [ -f /etc/hosts.dnsmasq ] && local IPX=$(grep -F "$IP" /etc/hosts.dnsmasq | awk '{print $1}')
+                    if [ -z "$IPX" ];then
+                        [ -f /etc/dnsmasq.conf ] && local IP=$(grep -F "$IP" /etc/dnsmasq.conf | awk -F',' '{print $4}')
+                    else
+                        IP=$IPX
+                    fi
                 fi
                 [ -z "$IP" ] && { echo -en $cRED"\a\n\t***ERROR: Invalid host IPv4 address!'\n"$cRESET ; return 1; }
 
