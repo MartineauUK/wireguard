@@ -2843,6 +2843,11 @@ STATS
 #        This setting basically ignores any IPv6 settings for the WireGuard interfaces.
 #NOIPV6
 
+# Global Menu Display Override
+#     Use command 'vx' to edit this setting.
+#     If using SSH shortcuts on iPhone/Android, the menu text with word wrap is annoying, and made worse with the ASCII escape sequeces
+#NOMENU
+
 # For Routers that include WireGuard Kernel/User Space tools, allow overriding with supported 3rd-Party/Entware versions
 #     Use command 'vx' to edit this setting.
 #USE_ENTWARE_KERNEL_MODULE
@@ -4930,9 +4935,10 @@ Validate_User_Choice() {
             "") ;;
             e*) ;;
             www*);;         # v4.15
+            menu*);;        # v4.15
             *)
                :
-               ;;
+            ;;
         esac
 
         echo "$menu1"
@@ -5126,6 +5132,10 @@ Process_User_Choice() {
                             fi
                         else
                             echo -e $cBRED"\t[✖]${cBWHT} firewall-start${cBRED} is NOT monitoring WireGuard Firewall rules - ${cBWHT}use 'firewallstart' to ENABLE\n"$cRESET
+                        fi
+
+                        if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOMENU" ${INSTALL_DIR}WireguardVPN.conf)" ];then     # v4.15
+                            echo -e $cBRED"\t[✖]${cBWHT} NOMENU specified\n"                                                                # v4.15
                         fi
 
                         if [ -f ${INSTALL_DIR}WireguardVPN.conf ];then
@@ -5585,6 +5595,19 @@ Process_User_Choice() {
                     ;;
                 esac
 
+            ;;
+            menu" "*|menu)
+
+                local ACTION=$2
+
+                case "$ACTION" in
+                    show|on)
+                        SUPPRESSMENU=
+                    ;;
+                    hide|off)
+                        SUPPRESSMENU="Suppress"
+                    ;;
+                esac
             ;;
             *)
                 printf '\n\a\t%bInvalid Option%b "%s"%b Please enter a valid option\n' "$cBRED" "$cRESET" "$menu1" "$cBRED"    # v4.03 v3.04 v1.09
@@ -6341,6 +6364,9 @@ if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOPG_UP" ${INSTAL
     READLINE=                                                                                                       # v4.14
 fi
 
+if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOMENU" ${INSTALL_DIR}WireguardVPN.conf)" ];then     # v4.15
+    SUPPRESSMENU="NOMENU - specified"                                                                               # v4.15
+fi
 clear
 
 Check_Lock "wg"
