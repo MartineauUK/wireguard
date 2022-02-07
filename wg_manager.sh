@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.15b5"
-#============================================================================================ © 2021-2022 Martineau v4.15b5
+VERSION="v4.15b6"
+#============================================================================================ © 2021-2022 Martineau v4.15b6
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.15b5"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 05-Feb-2022
+# Last Updated Date: 07-Feb-2022
 #
 # Description:
 #
@@ -49,6 +49,11 @@ CMD1=;CMD2=;CMD3=;CMD4=;CMD5=                      # Command recall push stack  
 SQL_DATABASE="/opt/etc/wireguard.d/WireGuard.db"   # SQL                            # v3.05
 INSTALL_MIGRATE="N"                                # Migration from v3.0 to v4.0    # v4.01
 IMPORTED_PEER_NAME=                                # Global tacky!                  # v4.15
+
+readonly SCRIPT_WEBPAGE_DIR="$(readlink /www/user)"
+readonly SCRIPT_WEB_DIR="$SCRIPT_WEBPAGE_DIR/wireguard.d"
+readonly SCRIPT_DIR="/jffs/addons/wireguard"
+installedMD5File="${INSTALL_DIR}www-installed.md5"  # Save md5 of last installed www ASP file so you can find it again later (in case of www ASP update)
 
 Say() {
    echo -e $$ $@ | logger -st "($(basename $0))"
@@ -847,26 +852,28 @@ Delete_Peer() {
 
                         if [ "${WG_INTERFACE:0:3}" == "wgc" ] || [ "${WG_INTERFACE:0:3}" == "wgs" ];then
                             # Shouldn't be used on a Router with WireGuard installed in firmware?
-                            if [ "$(which wg)" != "/usr/sbin/wg" ];then
-                                local INDEX="${WG_INTERFACE:3:1}"
+                            #if [ "$(which wg)" != "/usr/sbin/wg" ];then
 
-                                nvram unset ${WG_INTERFACE:0:4}_addr
-                                nvram unset ${WG_INTERFACE:0:4}_aips
-                                nvram unset ${WG_INTERFACE:0:4}_alive
-                                nvram unset ${WG_INTERFACE:0:4}_dns
-                                nvram unset ${WG_INTERFACE:0:4}_enable
-                                nvram unset ${WG_INTERFACE:0:4}_ep_addr
-                                nvram unset ${WG_INTERFACE:0:4}_ep_port
-                                nvram unset ${WG_INTERFACE:0:4}_nat
-                                nvram unset ${WG_INTERFACE:0:4}_ppub
-                                nvram unset ${WG_INTERFACE:0:4}_priv
+                                nvram unset ${WG_INTERFACE}_addr
+                                nvram unset ${WG_INTERFACE}_aips
+                                nvram unset ${WG_INTERFACE}_alive
+                                nvram unset ${WG_INTERFACE}_dns
+                                nvram unset ${WG_INTERFACE}_enable
+                                nvram unset ${WG_INTERFACE}_ep_addr
+                                nvram unset ${WG_INTERFACE}_ep_port
+                                nvram unset ${WG_INTERFACE}_nat
+                                nvram unset ${WG_INTERFACE}_ppub
+                                nvram unset ${WG_INTERFACE}_priv
 
-                                nvram unset vpnc_clientlist
+                                SayT "Debug: nvram_unset vpnc_clientlist="$(nvram get vpnc_clientlist)
+                                #nvram unset vpnc_clientlist
 
-                                nvram unset vpnc_pptp_options_x_list
+                                SayT "Debug: nvram_unset vpnc_pptp_options_x_list="$(nvram get vpnc_pptp_options_x_list)
+                                #nvram unset vpnc_pptp_options_x_list
 
-                                nvram unset wgc_unit
-                            fi
+                                SayT "Debug: nvram_unset wgc_unit="$(nvram get wgc_unit)
+                                #nvram unset wgc_unit
+                            #fi
                         fi
                         #echo -e $cBCYA"\tDeleting '${CONFIG_DIR}${WG_INTERFACE}*.*'"$cBRED
                         rm ${CONFIG_DIR}${WG_INTERFACE}* 2>/dev/null
@@ -1261,42 +1268,95 @@ Export_Peer(){
 
     local ACTION=$1;shift
     local WG_INTERFACE=$1
-    local FN="${WG_INTERFACE}.conf_exported"
 
     # Show ACTIVE GUI Peers (so we know they are valid)
+    # { export [? [wgm] |  wgs | wgcx | wg1x [nvram] }
     if [ "$1" == "?" ];then
-        local CONFIGS=$(wg show interfaces | grep -v "wg[1-2]" | sort )
-        echo -e $cBYEL"\n\t Available GUI Peer Configs for export:\n${cRESET}$CONFIGS"
-        return 0
+        if [ -z $2 ];then
+            local CONFIGS=$(wg show interfaces | grep -v "wg[1-2]" | sort )
+            echo -e $cBYEL"\n\t Available GUI Peer Configs for export:\n${cRESET}$CONFIGS"
+            return 0
+        else
+            local CONFIGS=$(wg show interfaces | grep -v "wg[cs]" | sort )
+            echo -e $cBYEL"\n\t Available Peer Configs for export:\n${cRESET}$CONFIGS"
+            return 0
+        fi
     fi
 
-    if [ -n "$(nvram get ${WG_INTERFACE}_addr)" ];then
-        # Allow export of any GUI Peer (if you know it exists!)
-        local TAG=$(nvram get vpnc_clientlist | sed "s/>>>//g" | sed 's/>>/|/g')
-        (
-        echo -e "# "$TAG
-        echo -en "[Interface]\nPrivateKey = "
-        echo -e "$(nvram get ${WG_INTERFACE}_priv)"
-        echo -en "#Address = "
-        echo -e "$(nvram get ${WG_INTERFACE}_addr)"
-        echo -en "#DNS = "
-        echo -e "$(nvram get ${WG_INTERFACE}_dns)"
-        echo -en "\n[Peer]\nPublicKey = "
-        echo -e "$(nvram get ${WG_INTERFACE}_ppub)"
-        echo -en "AllowedIPs = "
-        echo -e "$(nvram get ${WG_INTERFACE}_aips)"
-        echo -e "Endpoint = $(nvram get ${WG_INTERFACE}_ep_addr)":"$(nvram get ${WG_INTERFACE}_ep_port)\n"
-        echo -en "PersistentKeepalive = "
-        echo -e "$(nvram get ${WG_INTERFACE}_alive)"
+    case $WG_INTERFACE in
+        wg[cs]*)
+            if [ -n "$(nvram get ${WG_INTERFACE}_addr)" ];then
+
+                local FN="${WG_INTERFACE}.conf_exported"
+
+                # Allow export of any GUI Peer (if you know it exists!)
+                local TAG=$(nvram get vpnc_clientlist | sed "s/>>>//g" | sed 's/>>/|/g')
+                (
+                echo -e "# "$TAG
+                echo -en "[Interface]\nPrivateKey = "
+                echo -e "$(nvram get ${WG_INTERFACE}_priv)"
+                echo -en "#Address = "
+                echo -e "$(nvram get ${WG_INTERFACE}_addr)"
+                echo -en "#DNS = "
+                echo -e "$(nvram get ${WG_INTERFACE}_dns)"
+                echo -en "\n[Peer]\nPublicKey = "
+                echo -e "$(nvram get ${WG_INTERFACE}_ppub)"
+                echo -en "AllowedIPs = "
+                echo -e "$(nvram get ${WG_INTERFACE}_aips)"
+                echo -e "Endpoint = $(nvram get ${WG_INTERFACE}_ep_addr)":"$(nvram get ${WG_INTERFACE}_ep_port)\n"
+                echo -en "PersistentKeepalive = "
+                echo -e "$(nvram get ${WG_INTERFACE}_alive)"
 
 
-        ) > "${CONFIG_DIR}$FN"
+                ) > "${CONFIG_DIR}$FN"
 
-        echo -e $cBGRE"\n\t[✔] Config ${cBMAG}${WG_INTERFACE}${cBGRE} export '${cRESET}${CONFIG_DIR}${FN}${cBGRE}' success"$cRESET 2>&1
-    else
-        SayT "***ERROR: WireGuard VPN GI Peer ('${IMPORT_DIR}$WG_INTERFACE.conf') NVRAM configuration NOT found?....skipping export request"   # v4.12
-        echo -e $cBRED"\a\n\t***ERROR: WireGuard GUI Peer NVRAM configuration NOT found?....skipping export Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
-    fi
+                echo -e $cBGRE"\n\t[✔] Config ${cBMAG}${WG_INTERFACE}${cBGRE} export '${cRESET}${CONFIG_DIR}${FN}${cBGRE}' success"$cRESET 2>&1
+            else
+                SayT "***ERROR: WireGuard VPN GI Peer ('${IMPORT_DIR}$WG_INTERFACE.conf') NVRAM configuration NOT found?....skipping export request"   # v4.12
+                echo -e $cBRED"\a\n\t***ERROR: WireGuard GUI Peer NVRAM configuration NOT found?....skipping export Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
+            fi
+        ;;
+        wg[12]*)
+
+            [ "${WG_INTERFACE:2:1}" == "1" ] && local TYPE="c" || local TYPE="s"
+
+            local INDEX=${WG_INTERFACE:3:1}
+
+            local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM clients where peer='$WG_INTERFACE';")
+            [ -z "$DESC" ] && local DESC=$(grep -FB1 "[Interface]" ${CONFIG_DIR}${WG_INTERFACE}.conf | grep -vF "[Interface]")    # v4.14
+            local DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')
+            [ -z "$DESC" ] && local DESC="# Unidentified"
+            local SOCKET=$(sqlite3 $SQL_DATABASE "SELECT socket FROM clients where peer='$WG_INTERFACE';")
+            local SUBNET=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM clients where peer='$WG_INTERFACE';")
+            local DNS=$(sqlite3 $SQL_DATABASE "SELECT dns FROM clients where peer='$WG_INTERFACE';")
+            local PUB_KEY=$(sqlite3 $SQL_DATABASE "SELECT pubkey FROM clients where peer='$WG_INTERFACE';")
+            local PRI_KEY=$(sqlite3 $SQL_DATABASE "SELECT prikey FROM clients where peer='$WG_INTERFACE';")
+            local ALLOWIP=$(awk '/^Allow/ {$1="";$2="";print $0}' ${CONFIG_DIR}${WG_INTERFACE}.conf | awk '{$1=$1};1')
+
+
+            eval "nvram set wg${TYPE}${INDEX}_addr='$SUBNET'"
+            eval "nvram set wg${TYPE}${INDEX}_aips='$ALLOWIP'"
+            eval "nvram set wg${TYPE}${INDEX}_alive=25"
+            eval "nvram set wg${TYPE}${INDEX}_dns='$DNS'"
+            eval "nvram set wg${TYPE}${INDEX}_enable=0"
+            # Split  Endpoint 'ip:port' for separate GUI fields
+            local SOCKET_IP=${SOCKET%:*}        # Endpoint IP address
+            local SOCKET_PORT=${SOCKET##*:}     # Endpoint Port
+            eval "nvram set wg${TYPE}${INDEX}_ep_addr='$SOCKET_IP'"
+            eval "nvram set wg${TYPE}${INDEX}_ep_port='$SOCKET_PORT'"
+            eval "nvram set wg${TYPE}${INDEX}_nat=1"
+            eval "nvram set wg${TYPE}${INDEX}_ppub='$PUB_KEY'"
+            eval "nvram set wg${TYPE}${INDEX}_priv='$PRI_KEY'"
+
+            #vpnc_clientlist=Mullvad_USA_Los_Angeles>WireGuard>5>>>1>5>><Mullvad_Oz_Melbourne>WireGuard>4>>>1>6>>
+            local PREV=$(nvram get vpnc_clientlist)
+            local ANNOTATE=$(echo "$ANNOTATE" | sed 's/^# //' | sed 's/,/-/g')  # GUI doesn't allow certain characters in name
+
+            #nvram set vpnc_clientlist="${PREV}${ANNOTATE}>WireGuard>${INDEX}>>>0>${INDEX}>>"
+
+            local PREV=$(nvram get vpnc_pptp_options_x_list)
+            #nvram set vpnc_pptp_options_x_list="${PREV}<auto"
+    esac
 }
 Manage_Peer() {
 
@@ -2096,7 +2156,7 @@ Manage_alias() {
         del)
             echo -e $cBCYA"\tDeleted aliases for '$SCRIPT_NAME'"$cRESET
             sed -i "/$SCRIPT_NAME/d" /jffs/configs/profile.add
-            rm -rf "/opt/bin/unbound_manager" 2>/dev/null                                   # v2.01
+            rm -rf "/opt/bin/wg_manager" 2>/dev/null                                   # v4.15 v2.01
         ;;
         "?")
             echo -e $cRESET"\tAlias info\n"
@@ -3497,6 +3557,8 @@ Uninstall_WireGuard() {
 
     Edit_DNSMasq "del"                  # v1.12
 
+    Unmount_WebUI $SCRIPT_NAME".asp"    # v4.15
+
     echo -e $cBGRE"\n\tWireGuard Uninstall complete for $HARDWARE_MODEL (v$BUILDNO)\n"$cRESET
 
     exit 0
@@ -4867,6 +4929,7 @@ Validate_User_Choice() {
             raw" "*|print" "*|config" "*);; # v4.15
             "") ;;
             e*) ;;
+            www*);;         # v4.15
             *)
                :
                ;;
@@ -5284,17 +5347,25 @@ Process_User_Choice() {
 
                 [ -z "$IP" ] && { echo -en $cRED"\a\n\t***ERROR: LAN Host name or LAN IP address required'\n"$cRESET ; return 1; }
 
-                if [ -z "$(echo "$IP" | Is_IPv4)" ] && [ -z "$(echo "$IP" | Is_Private_IPv4)" ];then
-                    [ -f /etc/dnsmasq.conf ] && local IP=$(grep -i "$IP" /etc/dnsmasq.conf | awk -F',' '{print $4}')
+                if [ -z "$(echo "$IP" | Is_IPv4)" ] && [ -z "$(echo "$IP" | Is_IPv4_CIDR)" ];then
+                    # Assume Hostname... so does it have a DHCP Reserved LAN IP?
+                    [ -f /etc/dnsmasq.conf ] && local IP=$(grep -i "$IP" /etc/dnsmasq.conf | awk -F',' '{print $4}')    # v4.15
                 else
-                    [ -f /etc/hosts.dnsmasq ] && local IPX=$(grep -F "$IP" /etc/hosts.dnsmasq | awk '{print $1}')
-                    if [ -z "$IPX" ];then
-                        [ -f /etc/dnsmasq.conf ] && local IP=$(grep -F "$IP" /etc/dnsmasq.conf | awk -F',' '{print $4}')
+                    # Allow known IPs / CIDR
+                    local LAN_SUBNET=$(nvram get lan_ipaddr | grep -o '^.*\.')                          # v4.15
+                    local MATCH_SUBNET=$(echo "$IP" | grep -o '^.*\.')                                  # v4.15
+                    if [ "$MATCH_SUBNET" == "$LAN_SUBNET" ] || \
+                       [ "$(nvram get vpn_server1_sn | grep -o '^.*\.')" == "$MATCH_SUBNET" ] || \
+                       [ "$(nvram get vpn_server2_sn | grep -o '^.*\.')" == "$MATCH_SUBNET" ] || \
+                       [ -n "$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers WHERE subnet LIKE '$MATCH_SUBNET%';")" ] || \
+                       [ -n "$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE ip LIKE '$MATCH_SUBNET%';")" ];then        # v4.15 WireGuard
+                        :
                     else
-                        IP=$IPX
+                        IP=
                     fi
                 fi
-                [ -z "$IP" ] && { echo -en $cRED"\a\n\t***ERROR: Invalid host IPv4 address!'\n"$cRESET ; return 1; }
+
+                [ -z "$IP" ] && { echo -en $cRED"\a\n\t***ERROR: $cRESET'$1'$cBRED Invalid IPv4 address! - must be $cRESET'$LAN_SUBNET*'$cBRED or local VPN Server/client IP\n"$cRESET ; return 1; }
 
                 if [ "$LOCATION" != "@home" ] && [ "$LOCATION" != "*" ];then
                     local WG_INTERFACE=$LOCATION
@@ -5461,10 +5532,180 @@ Process_User_Choice() {
                     echo -en $cRED"\a\n\t***ERROR: ${cBMAG}${WG_INTERFACE}${cRED} not found\n"$cRESET
                 fi
             ;;
+            www" "*|www)                        # v4.15
+
+                local PAGE=$SCRIPT_NAME".asp"
+
+                local ACTION=$2
+                local PAGES=$3
+
+                [ -z "$ACTION" ] && local ACTION="debug"
+
+                [ "$PAGES" == "rom" ] && { local PAGES="Advanced_WireguardClient_Content.asp Advanced_WireguardServer_Content.asp Advanced_VPN_OpenVPN.asp"; local INTERNAL_PAGE="internal ROM"; }
+
+                case "$ACTION" in
+                    mount|on)
+                        echo -e $cBGRE
+                        if [ -z "$INTERNAL_PAGE" ];then
+                            Mount_WebUI "${PAGE}"
+                        else
+                            for PAGE in $PAGES
+                                do
+                                    echo -e $cBGRE"\tCustom $PAGE page mounted"$cRESET
+                                    SayT "Custom $PAGE page mounted"
+                                    umount /www/${PAGE} 2>/dev/null
+                                    echo -e $cBRED
+                                    mount -o bind ${INSTALL_DIR}${PAGE} /www/${PAGE}
+                                done
+                        fi
+                        echo -e $cRESET
+                    ;;
+                    unmount|off)
+                        echo -e $cBGRE
+                        if [ -z "$INTERNAL_PAGE" ];then
+                            Unmount_WebUI "${PAGE}"
+                        else
+                            for PAGE in $PAGES
+                                do
+                                    echo -e $cBGRE"\tCustom $PAGE page unmounted"$cRESET
+                                    SayT "Custom $PAGE page unmounted"
+                                    umount ${PAGE} 2>/dev/null
+                                done
+                        fi
+                        echo -e $cRESET
+                    ;;
+                    debug)
+                        echo -e $cRESET
+                        df
+                        echo -e $cBCYA
+                        ls -lah /tmp/var/wwwext | grep -TE "user[1-9]+.*";echo -en $cRESET;grep -TH . /tmp/var/wwwext/*.title;echo -e $cRESET;grep -THE "user[1-9]\." /tmp/menuTree.js | sort
+                    ;;
+                    *)
+                        echo -en $cRED"\a\n\t***ERROR: Invalid arg $cBWHT'"$ACTION"'$cBRED for GUI TAB - valid 'mount' or 'unmount' only!\n"$cRESET
+                    ;;
+                esac
+
+            ;;
             *)
                 printf '\n\a\t%bInvalid Option%b "%s"%b Please enter a valid option\n' "$cBRED" "$cRESET" "$menu1" "$cBRED"    # v4.03 v3.04 v1.09
             ;;
         esac
+
+}
+Get_WebUI_Installed() {
+    md5_installed="0"
+    if [ -f $installedMD5File ]; then
+        md5_installed="$(cat $installedMD5File)"
+    fi
+}
+
+Get_WebUI_Page() {
+    for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+        local page="$SCRIPT_WEBPAGE_DIR/user$i.asp"
+        if [ -f $page ];then
+            [ "$2" != "0" ] && local pagemd5=$(md5sum < "$page") || continue        # Martineau Hack
+        fi
+        if [ -z "$pagemd5" ] || [ "$2" = "$pagemd5" ]; then                     # Martineau Hack
+            MyPage="user$i.asp"
+            return
+        fi
+    done
+    MyPage="none"
+}
+Mount_WebUI(){
+    if nvram get rc_support | grep -qF "am_addons"; then
+
+        local PAGE=$1                                                       # Martineau Hack
+
+        ### locking mechanism code credit to Martineau (@MartineauUK) ###
+        LOCKFILE=/tmp/addonwebui.lock
+        FD=386
+        eval exec "$FD>$LOCKFILE"
+        flock -x "$FD"
+
+        Get_WebUI_Installed
+        Get_WebUI_Page "$SCRIPT_DIR/$PAGE" "$md5_installed"                         # Martineau Hack
+        if [ "$MyPage" = "none" ]; then
+            echo -e $cBRED"\aUnable to mount $SCRIPT_NAME WebUI page, exiting"$cRESET
+            flock -u "$FD"
+            exit 1
+        fi
+
+        echo -en $cBRED                                                             # Martineau Hack
+
+        cp -f "$SCRIPT_DIR/$PAGE" "$SCRIPT_WEBPAGE_DIR/$MyPage"                     # Martineau Hack
+        #echo "Saving MD5 of installed file $SCRIPT_DIR/$PAGE to $installedMD5File" # Martineau Hack
+        md5sum < "$SCRIPT_DIR/$PAGE" > $installedMD5File                            # Martineau Hack
+
+        if [ ! -f "/tmp/index_style.css" ]; then
+            cp -f "/www/index_style.css" "/tmp/"
+        fi
+
+        if ! grep -q '.menu_Addons' /tmp/index_style.css ; then
+            echo ".menu_Addons { background: url(ext/shared-jy/addons.png); }" >> /tmp/index_style.css
+        fi
+
+        umount /www/index_style.css 2>/dev/null
+        mount -o bind /tmp/index_style.css /www/index_style.css
+
+        if [ ! -f "/tmp/menuTree.js" ]; then
+            cp -f "/www/require/modules/menuTree.js" "/tmp/"
+        fi
+
+        sed -i "\\~$MyPage~d" /tmp/menuTree.js
+
+        if ! grep -q 'menuName: "Addons"' /tmp/menuTree.js ; then
+            lineinsbefore="$(( $(grep -n "exclude:" /tmp/menuTree.js | cut -f1 -d':') - 1))"
+            sed -i "$lineinsbefore"'i,\n{\nmenuName: "Addons",\nindex: "menu_Addons",\ntab: [\n{url: "ext/shared-jy/redirect.htm", tabName: "Help & Support"},\n{url: "NULL", tabName: "__INHERIT__"}\n]\n}' /tmp/menuTree.js
+        fi
+
+        if grep -q "javascript:window.open('/ext/shared-jy/redirect.htm'" /tmp/menuTree.js ; then
+            sed -i "s~javascript:window.open('/ext/shared-jy/redirect.htm','_blank')~javascript:var helpwindow=window.open('/ext/shared-jy/redirect.htm','_blank')~" /tmp/menuTree.js
+        fi
+        if ! grep -q "javascript:var helpwindow=window.open('/ext/shared-jy/redirect.htm'" /tmp/menuTree.js ; then
+            sed -i "s~ext/shared-jy/redirect.htm~javascript:var helpwindow=window.open('/ext/shared-jy/redirect.htm','_blank')~" /tmp/menuTree.js
+        fi
+        sed -i "/url: \"javascript:var helpwindow=window.open('\/ext\/shared-jy\/redirect.htm'/i {url: \"$MyPage\", tabName: \"WireGuard Manager\"}," /tmp/menuTree.js
+
+        umount /www/require/modules/menuTree.js 2>/dev/null
+        mount -o bind /tmp/menuTree.js /www/require/modules/menuTree.js
+
+        echo -e $cBGRE"\t$SCRIPT_NAME WebUI page mounted as $cRESET'"$MyPage"'"     # Martineau Hack
+        SayT "$SCRIPT_NAME WebUI page mounted as $cRESET'"$MyPage"'"                # Martineau Hack
+
+        flock -u "$FD"
+    fi
+}
+Unmount_WebUI(){
+
+    local PAGE=$1                                                       # Martineau Hack
+
+    ### locking mechanism code credit to Martineau (@MartineauUK) ###
+    LOCKFILE=/tmp/addonwebui.lock
+    FD=386
+    eval exec "$FD>$LOCKFILE"
+    flock -x "$FD"
+
+    Get_WebUI_Installed
+    Get_WebUI_Page "$SCRIPT_DIR/$PAGE" "$md5_installed"                 # Martineau Hack
+    if [ "$md5_installed" != "0" ];then                                 # Martineau Hack
+        #echo "$MyPage"                                                 # Martineau Hack
+        if [ -n "$MyPage" ] && [ "$MyPage" != "none" ] && [ -f "/tmp/menuTree.js" ]; then
+            sed -i "\\~$MyPage~d" /tmp/menuTree.js
+            umount /www/require/modules/menuTree.js
+            mount -o bind /tmp/menuTree.js /www/require/modules/menuTree.js
+            rm -rf "$SCRIPT_WEBPAGE_DIR/$MyPage"
+            rm -rf "$SCRIPT_WEB_DIR"
+            echo -e $cBGRE"\t$SCRIPT_NAME WebUI page $cRESET'"$MyPage"'${cBGRE} unmounted${cRESET}"     # Martineau Hack
+            SayT "$SCRIPT_NAME WebUI page $cRESET'"$MyPage"' unmounted" # Martineau Hack
+        fi
+    else
+        echo -e $cRED"\a\t$SCRIPT_NAME WebUI page not mounted! $cRESET" # Martineau Hack
+    fi
+
+    rm "$installedMD5File" 2>/dev/null                                  # Martineau Hack
+
+    flock -u "$FD"
 }
 Show_Main_Menu() {
 
