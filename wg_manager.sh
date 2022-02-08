@@ -24,7 +24,7 @@ VERSION="v4.15b6"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 07-Feb-2022
+# Last Updated Date: 08-Feb-2022
 #
 # Description:
 #
@@ -63,13 +63,32 @@ SayT() {
 }
 # shellcheck disable=SC2034
 ANSIColours () {
-    cRESET="\e[0m";cBLA="\e[30m";cRED="\e[31m";cGRE="\e[32m";cYEL="\e[33m";cBLU="\e[34m";cMAG="\e[35m";cCYA="\e[36m";cGRA="\e[37m";cFGRESET="\e[39m"
-    cBGRA="\e[90m";cBRED="\e[91m";cBGRE="\e[92m";cBYEL="\e[93m";cBBLU="\e[94m";cBMAG="\e[95m";cBCYA="\e[96m";cBWHT="\e[97m"
-    aBOLD="\e[1m";aDIM="\e[2m";aUNDER="\e[4m";aBLINK="\e[5m";aREVERSE="\e[7m"
-    aBOLDr="\e[21m";aDIMr="\e[22m";aUNDERr="\e[24m";aBLINKr="\e[25m";aREVERSEr="\e[27m"
-    cWRED="\e[41m";cWGRE="\e[42m";cWYEL="\e[43m";cWBLU="\e[44m";cWMAG="\e[45m";cWCYA="\e[46m";cWGRA="\e[47m"
-    cYBLU="\e[93;48;5;21m"
-    cRED_="\e[41m";cGRE_="\e[42m"
+
+    local ACTION=$1
+
+    cRESET=
+    aBOLD=;aDIM=;aUNDER=;aBLINK=;aREVERSE=
+    aBOLDr=;aDIMr=;aUNDERr=;aBLINKr=;aREVERSEr=
+
+    cBLA=;cRED=;cGRE=;cYEL=;cBLU=;cMAG=;cCYA=;cGRA=;cFGRESET=
+    cBGRA=;cBRED=;cBGRE=;cBYEL=;cBBLU=;cBMAG=;cBCYA=;cBWHT=
+    cWRED=;cWGRE=;cWYEL=;cWBLU=;cWMAG=;cWCYA=;cWGRA=
+    cYBLU=
+    cRED_=;cGRE_=
+
+    if [ "$ACTION" != "disable" ];then
+        cRESET="\e[0m";
+        aBOLD="\e[1m";aDIM="\e[2m";aUNDER="\e[4m";aBLINK="\e[5m";aREVERSE="\e[7m"
+        aBOLDr="\e[21m";aDIMr="\e[22m";aUNDERr="\e[24m";aBLINKr="\e[25m";aREVERSEr="\e[27m"
+        cBLA="\e[30m";cRED="\e[31m";cGRE="\e[32m";cYEL="\e[33m";cBLU="\e[34m";cMAG="\e[35m";cCYA="\e[36m";cGRA="\e[37m";cFGRESET="\e[39m"
+        cBGRA="\e[90m";cBRED="\e[91m";cBGRE="\e[92m";cBYEL="\e[93m";cBBLU="\e[94m";cBMAG="\e[95m";cBCYA="\e[96m";cBWHT="\e[97m"
+        aBOLD="\e[1m";aDIM="\e[2m";aUNDER="\e[4m";aBLINK="\e[5m";aREVERSE="\e[7m"
+
+        cWRED="\e[41m";cWGRE="\e[42m";cWYEL="\e[43m";cWBLU="\e[44m";cWMAG="\e[45m";cWCYA="\e[46m";cWGRA="\e[47m"
+        cYBLU="\e[93;48;5;21m"
+        cRED_="\e[41m";cGRE_="\e[42m"
+    fi
+
     xHOME="\e[H";xERASE="\e[2J";xERASEDOWN="\e[J";xERASEUP="\e[1J";xCSRPOS="\e[s";xPOSCSR="\e[u";xERASEEOL="\e[K";xQUERYCSRPOS="\e[6n"
     xGoto="\e[Line;Columnf"
 }
@@ -2848,6 +2867,13 @@ STATS
 #     If using SSH shortcuts on iPhone/Android, the menu text with word wrap is annoying, and made worse with the ASCII escape sequeces
 #NOMENU
 
+# Global ANSI/ASCII Display ATTRIB Override
+#     Use command 'vx' to edit this setting.
+#     Suppess ANSI/ASCII escape sequences
+#NOCOLOR
+#NOASCII
+
+
 # For Routers that include WireGuard Kernel/User Space tools, allow overriding with supported 3rd-Party/Entware versions
 #     Use command 'vx' to edit this setting.
 #USE_ENTWARE_KERNEL_MODULE
@@ -4936,6 +4962,7 @@ Validate_User_Choice() {
             e*) ;;
             www*);;         # v4.15
             menu*);;        # v4.15
+            color*|colour*);;        # v4.15
             *)
                :
             ;;
@@ -5542,7 +5569,7 @@ Process_User_Choice() {
                     echo -en $cRED"\a\n\t***ERROR: ${cBMAG}${WG_INTERFACE}${cRED} not found\n"$cRESET
                 fi
             ;;
-            www" "*|www)                        # v4.15
+            www" "*|www)                        # v4.15       www [ [ {on | off | mount | unmount} ] [rom] ]
 
                 local PAGE=$SCRIPT_NAME".asp"
 
@@ -5559,14 +5586,31 @@ Process_User_Choice() {
                         if [ -z "$INTERNAL_PAGE" ];then
                             Mount_WebUI "${PAGE}"
                         else
+
+                            LOCKFILE=/tmp/addonwebui.lock
+                            FD=386
+                            eval exec "$FD>$LOCKFILE"
+                            flock -x "$FD"
+
                             for PAGE in $PAGES
                                 do
-                                    echo -e $cBGRE"\tCustom $PAGE page mounted"$cRESET
-                                    SayT "Custom $PAGE page mounted"
                                     umount /www/${PAGE} 2>/dev/null
-                                    echo -e $cBRED
+                                    echo -en $cBRED
                                     mount -o bind ${INSTALL_DIR}${PAGE} /www/${PAGE}
+                                    if [ $? -eq 0 ];then
+                                        echo -e $cBGRE"\tCustom $PAGE page mounted"$cRESET
+                                        SayT "Custom $PAGE page mounted"
+                                    fi
                                 done
+
+                            # ************************************** Temporary *********************************************
+                            sed -i '/Advanced_WireguardClient_Content.asp/s/__INHERIT__/WireGuard© Client/' /tmp/menuTree.js
+                            sed -i '/Advanced_WireguardServer_Content.asp/s/__INHERIT__/WireGuard© Server/' /tmp/menuTree.js
+                            echo -e $cBRED"\tAdvancedWireGuard[Client|Server] /tmp/menuTree.js HACK!"$cRESET
+                            SayT "AdvancedWireGuard[Client|Server] /tmp/menuTree.js HACK!"
+                            # ************************************** Temporary *********************************************
+
+                            flock -u "$FD"
                         fi
                         echo -e $cRESET
                     ;;
@@ -5575,18 +5619,27 @@ Process_User_Choice() {
                         if [ -z "$INTERNAL_PAGE" ];then
                             Unmount_WebUI "${PAGE}"
                         else
+                            LOCKFILE=/tmp/addonwebui.lock
+                            FD=386
+                            eval exec "$FD>$LOCKFILE"
+                            flock -x "$FD"
+
                             for PAGE in $PAGES
                                 do
-                                    echo -e $cBGRE"\tCustom $PAGE page unmounted"$cRESET
-                                    SayT "Custom $PAGE page unmounted"
-                                    umount ${PAGE} 2>/dev/null
+                                    umount /www/${PAGE} 2>/dev/null
+                                    if [ $? -eq 0 ];then
+                                        echo -e $cBGRE"\tCustom $PAGE page unmounted"$cRESET
+                                        SayT "Custom $PAGE page unmounted"
+                                    fi
                                 done
+
+                            flock -u "$FD"
                         fi
                         echo -e $cRESET
                     ;;
                     debug)
                         echo -e $cRESET
-                        df
+                        df | grep -E "/www/|File"
                         echo -e $cBCYA
                         ls -lah /tmp/var/wwwext | grep -TE "user[1-9]+.*";echo -en $cRESET;grep -TH . /tmp/var/wwwext/*.title;echo -e $cRESET;grep -THE "user[1-9]\." /tmp/menuTree.js | sort
                     ;;
@@ -5596,7 +5649,7 @@ Process_User_Choice() {
                 esac
 
             ;;
-            menu" "*|menu)
+            menu" "*|menu)                          # v4.15         menu { show | hide | on | off }
 
                 local ACTION=$2
 
@@ -5606,6 +5659,25 @@ Process_User_Choice() {
                     ;;
                     hide|off)
                         SUPPRESSMENU="Suppress"
+                    ;;
+                esac
+            ;;
+            colour" "*|color" "*)                   # v4.15         { color | colour } { show | hide | on | off }
+
+                local ACTION=$2
+
+                case "$ACTION" in
+                    show|on)
+                        ANSIColours
+                        if [ -f ${INSTALL_DIR}WireguardVPN.conf ] &&  [ -n "$(grep -oE "^NOCOLOUR" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                            sed -i 's/^NOCOLOUR/#NOCOLOUR/' ${INSTALL_DIR}WireguardVPN.conf
+                        fi
+                    ;;
+                    hide|off)
+                        ANSIColours "disable"
+                        if [ -f ${INSTALL_DIR}WireguardVPN.conf ] &&  [ -n "$(grep -oE "^#NOCOLOUR" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                            sed -i 's/^#NOCOLOUR/NOCOLOUR/' ${INSTALL_DIR}WireguardVPN.conf
+                        fi
                     ;;
                 esac
             ;;
@@ -6160,7 +6232,9 @@ Main() { true; }            # Syntax that is Atom Shellchecker compatible!
 
 PATH=/opt/sbin:/opt/bin:/opt/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-ANSIColours
+if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -z "$(grep -E "^NOCOLOR|^NOCOLOUR" ${INSTALL_DIR}WireguardVPN.conf)" ];then     # v4.15
+    ANSIColours
+fi
 
 FIRMWARE=$(echo $(nvram get buildno) | awk 'BEGIN { FS = "." } {printf("%03d%02d",$1,$2)}')
 HARDWARE_MODEL=$(Get_Router_Model)
@@ -6349,6 +6423,28 @@ if [ "$1" != "install" ];then   # v2.01
                 fi
                 exit_message
             ;;
+            menu*)                                          # menu [ hide | show ]          # v4.15
+
+                ACTION=$2
+
+                case "$ACTION" in
+                    hide|off)
+                        if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^#NOMENU" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                            sed -i 's/^#NOMENU/NOMENU/' ${INSTALL_DIR}WireguardVPN.conf                                 # v4.15
+                            echo -e $cRED"\n\t[✖]${cBWHT} Menu display ${cBGRE} is ${cBRED}${ALERT}DISABLED"$cRESET
+                        fi
+                    ;;
+                    show|on)
+                        if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOMENU" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                            sed -i 's/^NOMENU/#NOMENU/' ${INSTALL_DIR}WireguardVPN.conf                                 # v4.15
+                            echo -e $cBGRE"\n\t[✔]${cBWHT} Menu display ${cBGRE}is ENABLED"$cRESET
+                        fi
+                    ;;
+                esac
+
+                echo -e $cRESET
+                exit_message
+            ;;
         esac
     else
         if [ "$1" != "init" ];then              # v4.11
@@ -6367,6 +6463,7 @@ fi
 if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOMENU" ${INSTALL_DIR}WireguardVPN.conf)" ];then     # v4.15
     SUPPRESSMENU="NOMENU - specified"                                                                               # v4.15
 fi
+
 clear
 
 Check_Lock "wg"
