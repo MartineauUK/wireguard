@@ -24,7 +24,7 @@ VERSION="v4.15b6"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 08-Feb-2022
+# Last Updated Date: 09-Feb-2022
 #
 # Description:
 #
@@ -2869,10 +2869,8 @@ STATS
 
 # Global ANSI/ASCII Display ATTRIB Override
 #     Use command 'vx' to edit this setting.
-#     Suppess ANSI/ASCII escape sequences
+#     Suppress ANSI/ASCII control sequences for display items such as highlighted/coloured Error messages or underline/reverse attibutes.
 #NOCOLOR
-#NOASCII
-
 
 # For Routers that include WireGuard Kernel/User Space tools, allow overriding with supported 3rd-Party/Entware versions
 #     Use command 'vx' to edit this setting.
@@ -5598,16 +5596,16 @@ Process_User_Choice() {
                                     echo -en $cBRED
                                     mount -o bind ${INSTALL_DIR}${PAGE} /www/${PAGE}
                                     if [ $? -eq 0 ];then
-                                        echo -e $cBGRE"\tCustom $PAGE page mounted"$cRESET
-                                        SayT "Custom $PAGE page mounted"
+                                        echo -e $cBGRE"\tCustom '$PAGE' mounted"$cRESET
+                                        SayT "Custom '${INSTALL_DIR}${PAGE}' page mounted"
                                     fi
                                 done
 
                             # ************************************** Temporary *********************************************
-                            sed -i '/Advanced_WireguardClient_Content.asp/s/__INHERIT__/WireGuard© Client/' /tmp/menuTree.js
-                            sed -i '/Advanced_WireguardServer_Content.asp/s/__INHERIT__/WireGuard© Server/' /tmp/menuTree.js
-                            echo -e $cBRED"\tAdvancedWireGuard[Client|Server] /tmp/menuTree.js HACK!"$cRESET
-                            SayT "AdvancedWireGuard[Client|Server] /tmp/menuTree.js HACK!"
+                            sed -i '/Advanced_WireguardClient_Content.asp/s~__INHERIT__.*$~WireGuard© Client"},\t/\*Martineau Hack\*/~' /tmp/menuTree.js
+                            sed -i '/Advanced_WireguardServer_Content.asp/s~__INHERIT__.*$~WireGuard© Server"},\t/\*Martineau Hack\*/~'  /tmp/menuTree.js
+                            echo -e $cBRED"\tAdvancedWireGuard[Client|Server] /tmp/menuTree.js Martineau Hack!"$cRESET
+                            SayT "AdvancedWireGuard[Client|Server] /tmp/menuTree.js Martineau Hack!"
                             # ************************************** Temporary *********************************************
 
                             flock -u "$FD"
@@ -5628,10 +5626,15 @@ Process_User_Choice() {
                                 do
                                     umount /www/${PAGE} 2>/dev/null
                                     if [ $? -eq 0 ];then
-                                        echo -e $cBGRE"\tCustom $PAGE page unmounted"$cRESET
-                                        SayT "Custom $PAGE page unmounted"
+                                        echo -e $cBGRE"\tCustom '$PAGE' page unmounted"$cRESET
+                                        SayT "Custom '${INSTALL_DIR}${PAGE}' page unmounted"
                                     fi
                                 done
+
+                            sed -i '/Advanced_WireguardClient_Content.asp/s/WireGuard© Client\"\},.*$/__INHERIT__\"},/' /tmp/menuTree.js
+                            sed -i '/Advanced_WireguardServer_Content.asp/s/WireGuard© Server\"\},.*$/__INHERIT__\"},/' /tmp/menuTree.js
+                            echo -e $cBGRE"\tAdvancedWireGuard[Client|Server] /tmp/menuTree.js Martineau Hack ${cBRED}DELETED!"$cRESET
+                            SayT "AdvancedWireGuard[Client|Server] /tmp/menuTree.js Martineau Hack DELETED"
 
                             flock -u "$FD"
                         fi
@@ -5641,7 +5644,7 @@ Process_User_Choice() {
                         echo -e $cRESET
                         df | grep -E "/www/|File"
                         echo -e $cBCYA
-                        ls -lah /tmp/var/wwwext | grep -TE "user[1-9]+.*";echo -en $cRESET;grep -TH . /tmp/var/wwwext/*.title;echo -e $cRESET;grep -THE "user[1-9]\." /tmp/menuTree.js | sort
+                        ls -lh /www/ext/user*.* | sort -k 8 ;echo -e $cRESET;grep -THE "user[1-9]\." /tmp/menuTree.js | sort -k 3
                     ;;
                     *)
                         echo -en $cRED"\a\n\t***ERROR: Invalid arg $cBWHT'"$ACTION"'$cBRED for GUI TAB - valid 'mount' or 'unmount' only!\n"$cRESET
@@ -5649,7 +5652,7 @@ Process_User_Choice() {
                 esac
 
             ;;
-            menu" "*|menu)                          # v4.15         menu { show | hide | on | off }
+            menu" "*|menu)                          # v4.15         menu { [show|on] | [hide|off] }
 
                 local ACTION=$2
 
@@ -5662,7 +5665,7 @@ Process_User_Choice() {
                     ;;
                 esac
             ;;
-            colour" "*|color" "*)                   # v4.15         { color | colour } { show | hide | on | off }
+            colour" "*|color" "*)                   # v4.15         {colour|color}  { [show|on] | [hide|off] }
 
                 local ACTION=$2
 
@@ -5694,18 +5697,17 @@ Get_WebUI_Installed() {
     fi
 }
 
-Get_WebUI_Page() {
+Get_WebUI_Page(){
+    MyPage="none"
     for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
-        local page="$SCRIPT_WEBPAGE_DIR/user$i.asp"
-        if [ -f $page ];then
-            [ "$2" != "0" ] && local pagemd5=$(md5sum < "$page") || continue        # Martineau Hack
-        fi
-        if [ -z "$pagemd5" ] || [ "$2" = "$pagemd5" ]; then                     # Martineau Hack
+        page="/www/user/user$i.asp"
+        if [ -f "$page" ] && [ "$(md5sum < "$1")" = "$(md5sum < "$page")" ]; then
             MyPage="user$i.asp"
             return
+        elif [ "$MyPage" = "none" ] && [ ! -f "$page" ]; then
+            MyPage="user$i.asp"
         fi
     done
-    MyPage="none"
 }
 Mount_WebUI(){
     if nvram get rc_support | grep -qF "am_addons"; then
@@ -5723,7 +5725,7 @@ Mount_WebUI(){
         if [ "$MyPage" = "none" ]; then
             echo -e $cBRED"\aUnable to mount $SCRIPT_NAME WebUI page, exiting"$cRESET
             flock -u "$FD"
-            exit 1
+            return 1                                                                # Martineau Hack
         fi
 
         echo -en $cBRED                                                             # Martineau Hack
@@ -6431,14 +6433,44 @@ if [ "$1" != "install" ];then   # v2.01
                     hide|off)
                         if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^#NOMENU" ${INSTALL_DIR}WireguardVPN.conf)" ];then
                             sed -i 's/^#NOMENU/NOMENU/' ${INSTALL_DIR}WireguardVPN.conf                                 # v4.15
-                            echo -e $cRED"\n\t[✖]${cBWHT} Menu display ${cBGRE} is ${cBRED}${ALERT}DISABLED"$cRESET
                         fi
+                            echo -e $cRED"\n\t[✖]${cBWHT} Menu display ${cBGRE}is ${cBRED}${ALERT}DISABLED"$cRESET
                     ;;
                     show|on)
                         if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOMENU" ${INSTALL_DIR}WireguardVPN.conf)" ];then
                             sed -i 's/^NOMENU/#NOMENU/' ${INSTALL_DIR}WireguardVPN.conf                                 # v4.15
-                            echo -e $cBGRE"\n\t[✔]${cBWHT} Menu display ${cBGRE}is ENABLED"$cRESET
                         fi
+                            echo -e $cBGRE"\n\t[✔]${cBWHT} Menu display ${cBGRE}is ENABLED"$cRESET
+                    ;;
+                    *)
+                        echo -en $cRED"\a\n\t***ERROR: Invalid arg $cBWHT'"$ACTION"'$cBRED for Menu dislay - valid 'off' or 'on' only!\n"$cRESET
+                    ;;
+                esac
+
+                echo -e $cRESET
+                exit_message
+            ;;
+            colour*|color*)                                          # colo[u]r [ off | on ]          # v4.15
+
+                ACTION=$2
+
+                case "$ACTION" in
+                    hide|off)
+                        if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^#NOCOLOUR|#NOCOLOR" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                            sed -i 's/^#NOCOLOR/NOCOLOR/' ${INSTALL_DIR}WireguardVPN.conf                                 # v4.15
+                            ANSIColours "disable"
+                        fi
+                        echo -e $cRED"\n\t[✖]${cBWHT} Display colour attributes ${cBGRE}is ${cBRED}${ALERT}DISABLED"$cRESET
+                    ;;
+                    show|on)
+                        if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOCOLOUR|NOCOLOR" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                            sed -i 's/^NOCOLOR/#NOCOLOR/' ${INSTALL_DIR}WireguardVPN.conf                                 # v4.15
+                            ANSIColours
+                        fi
+                        echo -e $cBGRE"\n\t[✔]${cBWHT} Display colour attributes ${cBGRE}is ENABLED"$cRESET
+                    ;;
+                    *)
+                        echo -en $cRED"\a\n\t***ERROR: Invalid arg $cBWHT'"$ACTION"'$cBRED for Display colour attributes - valid 'off' or 'on' only!\n"$cRESET
                     ;;
                 esac
 
