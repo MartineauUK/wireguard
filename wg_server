@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.15.4"
-#============================================================================================ © 2021-2022 Martineau v4.15.4
+VERSION="v4.15.5"
+#============================================================================================ © 2021-2022 Martineau v4.15.5
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 08-Feb-2022
+# Last Updated Date: 12-Feb-2022
 #
 # Description:
 #
@@ -414,7 +414,8 @@ if [ "$2" != "disable" ];then
                 cmd ip -6 route add $ALLOWIP dev $VPN_ID
             else
                 if [ -n "$(echo "$ALLOWIP" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$ALLOWIP" | Is_IPv4)" ];then
-                    [ "$(echo "$ALLOWIP" | grep -o "^.*\.")" != "$(echo "$Subnet" | grep -o "^.*\.")" ] && cmd ip route add $ALLOWIP dev $VPN_ID        # v4.15.3
+                    #[ "$(echo "$ALLOWIP" | grep -o "^.*\.")" != "$(echo "$Subnet" | grep -o "^.*\.")" ] && cmd ip route add $ALLOWIP dev $VPN_ID        # v4.15.3
+                    cmd ip route add $ALLOWIP dev $VPN_ID        # v4.15.5 v4.15.3
                 fi
             fi
         done
