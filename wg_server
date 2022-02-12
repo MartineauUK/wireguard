@@ -336,8 +336,13 @@ if [ "$2" != "disable" ];then
         cmd ip -6 link set up dev $VPN_ID
     fi
 
-    MTU=$(awk '/^MTU/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)                                          # v4.15.5
-    [ -z "$MTU" ] && cmd ifconfig $VPN_ID mtu 1420 || cmd ifconfig $VPN_ID mtu 1420                     # v4.15.5 v1.02
+    MTU=$(awk '/^MTU/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)  # v4.15.5
+    if [ -z "$MTU" ];then
+        cmd ifconfig $VPN_ID mtu 1420                           # v4.15.5
+    else
+        cmd ifconfig $VPN_ID mtu $MTU                           # v4.15.5 v1.02
+        sed -i 's/^MTU/#MTU/' ${CONFIG_DIR}${VPN_ID}.conf
+    fi
 
     TIMESTAMP=$(date +%s)
     sqlite3 $SQL_DATABASE "INSERT into session values('$WG_INTERFACE','Start','$TIMESTAMP');"   # v1.13
