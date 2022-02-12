@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.15.5"
-#============================================================================================ © 2021-2022 Martineau v4.15.5
+VERSION="v4.15.6"
+#============================================================================================ © 2021-2022 Martineau v4.15.6
 #
 
 # Maintainer: Martineau
@@ -10,7 +10,7 @@ VERSION="v4.15.5"
 #
 # Acknowledgement:
 #
-# Contributors: odkrys,ZebMcKayhan,Torson,chongnt
+# Contributors: odkrys,ZebMcKayhan,Torson,chongnt,Bearnet
 
 # shellcheck disable=SC2034
 ANSIColours () {
@@ -336,7 +336,7 @@ if [ "$2" != "disable" ];then
         cmd ip -6 link set up dev $VPN_ID
     fi
 
-    MTU=$(awk '/^MTU/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)  # v4.15.5
+    MTU=$(awk '/^#?MTU' ${CONFIG_DIR}${VPN_ID}.conf)            # v4.15.6
     if [ -z "$MTU" ];then
         cmd ifconfig $VPN_ID mtu 1420                           # v4.15.5
     else
