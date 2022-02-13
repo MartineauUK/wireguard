@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.15b6"
-#============================================================================================ © 2021-2022 Martineau v4.15b6
+VERSION="v4.15b7"
+#============================================================================================ © 2021-2022 Martineau v4.15b7
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.15b6"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 09-Feb-2022
+# Last Updated Date: 13-Feb-2022
 #
 # Description:
 #
@@ -35,7 +35,8 @@ VERSION="v4.15b6"
 GIT_REPO="wireguard"
 GITHUB_MARTINEAU="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/main"
 GITHUB_MARTINEAU_DEV="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/dev"
-GITHUB_ZEBMCKAYHAN="https://raw.githubusercontent.com/ZebMcKayhan/Wireguard/master" # v4.11
+GITHUB_ZEBMCKAYHAN="https://raw.githubusercontent.com/ZebMcKayhan/WireguardManager/main" # v4.15
+GITHUB_ZEBMCKAYHAN_DEV="https://raw.githubusercontent.com/ZebMcKayhan/WireguardManager/dev" # v4.15
 GITHUB_DIR=$GITHUB_MARTINEAU                       # default for script
 CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v2.03 @elorimer
 IMPORT_DIR=$CONFIG_DIR                             # Allow custom Peer .config import directory v4.01
@@ -323,6 +324,24 @@ Kill_Lock() {
             echo
         fi
 }
+Manage_Addon() {
+
+        # https://raw.githubusercontent.com/ZebMcKayhan/WireguardManager/main/wgmExpo.sh
+
+        FN="$1"
+        local BRANCH=$2
+
+        if [ "$2" != "remove" ] && [ "$2" != "del" ];then
+            [ -z "$BRANCH" ] && local BRANCH="main"
+            download_file ${INSTALL_DIR} $FN zebmckayhan $BRANCH dos2unix 777
+            chmod +x ${INSTALL_DIR}$FN
+            ln -s /jffs/addons/wireguard/$FN /opt/bin/${FN%.*} 2>/dev/null
+            md5sum ${INSTALL_DIR}$FN      > ${INSTALL_DIR}${FN%.*}.md5
+        else
+            rm ${INSTALL_DIR}$FN 2>/dev/null
+            rm /opt/bin/$FN 2>/dev/null
+        fi
+}
 download_file() {
 
         local DIR="$1"
@@ -336,6 +355,9 @@ download_file() {
         case $GITHUB in
             martineau)
                 [ "$GITHUB_BRANCH" != "dev" ] && GITHUB_DIR=$GITHUB_MARTINEAU || GITHUB_DIR=$GITHUB_MARTINEAU_DEV
+            ;;
+            zebmckayhan)
+                [ "$GITHUB_BRANCH" != "dev" ] && GITHUB_DIR=$GITHUB_ZEBMCKAYHAN || GITHUB_DIR=$GITHUB_ZEBMCKAYHAN_DEV
             ;;
         esac
 
@@ -351,10 +373,10 @@ download_file() {
             printf '\t%b%s%b downloaded successfully %b\n' "$cBGRE" "$FILE" "$cRESET" "$DEVTXT"
             [ -n "$CHMOD" ] && chmod $CHMOD "$DIR/$FILE"
         else
-            printf '\n%b%s%b download FAILED with curl error %s\n\n' "\n\t\a$cBMAG" "'$FILE'" "$cBRED" "$STATUS"
+            printf '\n%b%s%b download FAILED with curl error %s\n\n' "\n\t\a$cRESET" "'${GITHUB_DIR}/${FILE}'" "$cBRED" "$STATUS"
             echo -e $cRESET"\a\n"
 
-            exit 1
+            return 1
         fi
 }
 _Get_File() {
@@ -3392,6 +3414,7 @@ Install_WireGuard_Manager() {
     if [ "$NOPULL_SCRIPTS" != "noscripts" ];then
         if [ -d "${INSTALL_DIR}" ];then
             Get_scripts "$2"
+            Manage_Addon "wgmExpo.sh"       # v4.15 @ZeMcKayhan's Addon
             echo -e
         fi
     else
@@ -3567,6 +3590,8 @@ Uninstall_WireGuard() {
         Manage_Event_Scripts "backup"                           # v4.01
         [ -f ${INSTALL_DIR}WireguardVPN.conf ] && mv ${INSTALL_DIR}WireguardVPN.conf ${CONFIG_DIR}
     fi
+
+    Manage_Addon "wgmExpo.sh" "del"     # v4.15 @ZeMcKayhan's Addon
 
     rm -rf ${INSTALL_DIR}
 
@@ -4961,6 +4986,7 @@ Validate_User_Choice() {
             www*);;         # v4.15
             menu*);;        # v4.15
             color*|colour*);;        # v4.15
+            addon*);;        # v4.15
             *)
                :
             ;;
@@ -5683,6 +5709,32 @@ Process_User_Choice() {
                         fi
                     ;;
                 esac
+            ;;
+            addon|addon*)                           # v4.15         {script_name [ dev | remove | del ] }
+
+                shift
+
+                local FN=$1
+                local ACTION=$2;local BRANCH=$2
+
+                echo -e
+
+                case $ACTION in
+                    del|remove)
+
+                        if [ -f ${INSTALL_DIR}${FN} ];then
+                            Manage_Addon "$FN" "$ACTION"
+                            echo -e $cBGRE"\tAddon $cRESET'$FN'$cBGRE removed"$cRESET
+                            SayT "Addon '${INSTALL_DIR}${FN}' removed"
+                        else
+                            echo -en $cRED"\a\t***ERROR: Addon $cRESET'$FN'$cBRED NOT found!\n"$cRESET
+                        fi
+                    ;;
+                    *)
+                        Manage_Addon "$FN" "$BRANCH"        # v4.15
+                    ;;
+                esac
+
             ;;
             *)
                 printf '\n\a\t%bInvalid Option%b "%s"%b Please enter a valid option\n' "$cBRED" "$cRESET" "$menu1" "$cBRED"    # v4.03 v3.04 v1.09
