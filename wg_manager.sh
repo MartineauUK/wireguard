@@ -5283,6 +5283,8 @@ Process_User_Choice() {
                             cp $0 $0.u                                             # v3.03
                             Get_scripts "$DEV"
 
+                            Manage_Addon "wgmExpo.sh"       # v4.15 @ZeMcKayhan's Addon
+
                             [ -f ${INSTALL_DIR}$SCRIPT_NAME ] && { rm $0.u; sleep 1; exec "$0"; } || mv $0.u $0     # v4.14
 
                             # Never get here!!!
