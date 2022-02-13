@@ -336,7 +336,7 @@ if [ "$2" != "disable" ];then
         cmd ip -6 link set up dev $VPN_ID
     fi
 
-    MTU=$(awk '/^#?MTU' ${CONFIG_DIR}${VPN_ID}.conf)            # v4.15.6
+    MTU=$(awk '/^#?MTU/' ${CONFIG_DIR}${VPN_ID}.conf)            # v4.15.6
     if [ -z "$MTU" ];then
         cmd ifconfig $VPN_ID mtu 1420                           # v4.15.5
     else
