@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.15b7"
-#============================================================================================ © 2021-2022 Martineau v4.15b7
+VERSION="v4.15b8"
+#============================================================================================ © 2021-2022 Martineau v4.15b8
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.15b7"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 13-Feb-2022
+# Last Updated Date: 17-Feb-2022
 #
 # Description:
 #
@@ -3425,6 +3425,7 @@ Install_WireGuard_Manager() {
     modprobe xt_comment
     opkg install column                     # v2.02
     opkg install coreutils-mkfifo
+    opkg install p7zip                      # v4.15
 
     # Kernel module in firmware?
     if [ "$(which wg)" == "/usr/sbin/wg" ];then # v4.12
@@ -4682,6 +4683,16 @@ Create_Site2Site() {
     [ -z "$NAME_ONE" ] && local NAME_ONE="SiteA"
     [ -z "$NAME_TWO" ] && local NAME_TWO="SiteB"
 
+    if [ -n "$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE name='$NAME_ONE';")" ];then    # v4.15
+        echo -e $cBRED"\a\n\t***ERROR: '$NAME_ONE' Peer already exists"$cRESET
+        return 1
+    fi
+
+    if [ -n "$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE name='$NAME_TWO';")" ];then    # v4.15
+        echo -e $cBRED"\a\n\t***ERROR: '$NAME_TWO' remote 'device' Peer already exists"$cRESET
+        return 1
+    fi
+
     [ -z "$VPN_POOL" ] && local VPN_POOL="10.9.8.0"                 # VPN Tunnel Network
     [ -z "$LISTEN_PORT" ] && local LISTEN_PORT="61820"              # Site $NAME_ONE
     local LAN_ADDR=$(nvram get lan_ipaddr)
@@ -4796,8 +4807,6 @@ Endpoint = $ROUTER_DDNS:$LISTEN_PORT
 EOF
 
     chmod 600 ${CONFIG_DIR}${NAME_TWO}.conf         # v4.15 Prevent wg-quick "Warning: '/opt/etc/wireguard.d/Cabin.conf' is world accessible"
-    # Create a 'device' for SiteB so the IP is recorded
-    sqlite3 $SQL_DATABASE "INSERT into devices values('$NAME_TWO','X','$SITE_TWO_IP','','$SITE_ONE_IP, $SITE_ONE_LAN','$SITE_TWO_PUB_KEY','$SITE_TWO_PRI_KEY','# $NAME_TWO Site-to-Site LAN $SITE_TWO_LAN','0');"
 
     echo -e "\n========== $NAME_ONE configuration =====================================================\n"$cRESET
     cat ${CONFIG_DIR}${NAME_ONE}.conf
@@ -4855,16 +4864,36 @@ EOF
 
     echo -e $cBGRE"\n\tWireGuard Site-to-Site Peers ${cBMAG}${NAME_ONE} and ${NAME_TWO}${cBGRE} created\n"$cRESET
 
-    echo -e "\n\tCopy ${cBMAG}${NAME_TWO}/${NAME_ONE}${cRESET} files:\n"$cBCYA
-    ls -l ${CONFIG_DIR} | grep -E "$NAME_TWO|$NAME_ONE.conf|${NAME_ONE}" # v4.15
+    echo -en "\n\tCopy ${cBMAG}${NAME_TWO}/${NAME_ONE}${cRESET} files: "$cBCYA
+
+    if [ -n "$(which 7z)" ];then                                                                        # v4.15
+        cd ${CONFIG_DIR}
+        rm ${CONFIG_DIR}WireGuard_${NAME_TWO}.7z 2>/dev/null
+        local FILES=$(ls ${CONFIG_DIR} | grep -E "${NAME_TWO}*\.*|${NAME_ONE}*\.*" | tr '\n' ' ')
+
+        for FILE in $FILES
+            do
+                7z a -bso0 ${CONFIG_DIR}WireGuard_$NAME_TWO "$FILE"                                     # v4.15
+            done
+
+        echo -e "${cRESET}(included in ZIP ${cBMAG}'"${CONFIG_DIR}WireGuard_${NAME_TWO}.7z"')\n"        # v4.15
+        7z l ${CONFIG_DIR}WireGuard_${NAME_TWO}.7z | grep -F "....A"
+        #echo -e "\t\t$cBMAG"$FILES "${cRESET}included in ZIP $cBMAG '"${CONFIG_DIR}WireGuard_${NAME_TWO}.7z"'"
+    else
+        echo -e $cBMAG"\n"
+        ls -l ${CONFIG_DIR} | grep -v "7z" | grep -E "${NAME_TWO}*\.*|${NAME_ONE}*\.*"                  # v4.15
+    fi
+
     echo -e ${cBCYA}${cRESET}"\n\tto remote location\n"
-    echo -e ${cBCYA}${cRESET}"\n\tImport ${cBMAG}${NAME_ONE}${cRESET} on remote site using 'import ${NAME_ONE} type=device'\n\n"    # v4.15
+    echo -e ${cBCYA}${cRESET}"\n\tImport ${cBMAG}${NAME_ONE}.conf${cRESET} on remote site using 'import ${NAME_ONE} type=device'\n\n"    # v4.15
 
     echo -e $cRESET"\tPress$cBRED y$cRESET to import ${cBMAG}$NAME_ONE${cRESET} or press$cBGRE [Enter] to SKIP."
     read -r "ANS"
     if [ "$ANS" == "y" ];then
         Import_Peer "import" $NAME_ONE "type=server"
         sqlite3 $SQL_DATABASE "UPDATE servers SET auto='S' WHERE peer='$IMPORTED_PEER_NAME';"   # v4.15
+        # Create a 'device' for SiteB so the IP is recorded
+        sqlite3 $SQL_DATABASE "INSERT into devices values('$NAME_TWO','X','$SITE_TWO_IP','','$SITE_ONE_IP, $SITE_ONE_LAN','$SITE_TWO_PUB_KEY','$SITE_TWO_PRI_KEY','# $NAME_TWO Site-to-Site LAN $SITE_TWO_LAN','0');"
     fi
 
 }
@@ -4987,6 +5016,7 @@ Validate_User_Choice() {
             menu*);;        # v4.15
             color*|colour*);;        # v4.15
             addon*);;        # v4.15
+            zip|zipinstall);;        # v4.15
             *)
                :
             ;;
@@ -5738,6 +5768,10 @@ Process_User_Choice() {
                 esac
 
             ;;
+            zip|zip" "install)
+                echo -e "\n\t"$cBGRA
+                opkg install p7zip      # v4.15
+            ;;
             *)
                 printf '\n\a\t%bInvalid Option%b "%s"%b Please enter a valid option\n' "$cBRED" "$cRESET" "$menu1" "$cBRED"    # v4.03 v3.04 v1.09
             ;;
@@ -6343,6 +6377,7 @@ if [ "$1" == "-h" ] || [ "$1" == "help" ];then
     exit 0
 fi
 
+# Enable debugging ?
 if [ "$1" == "debug" ] || [ "$1" == "debugall" ];then
     if [ "$1" == "debug" ];then
         DEBUGMODE="$(echo -e ${cRESET}$cWRED"Debug mode enabled"$cRESET)"
@@ -6353,9 +6388,16 @@ fi
 
 [ ! -L "/opt/bin/wg_manager" ] && Manage_alias "create"
 
-NOCHK=
 NOCHK="Martineau Disabled hack"
 [ -n "$(echo "$@" | grep -w "nochk")" ] & NOCHK="Y"
+
+# Remove WireGuard Manager ?
+if [ "$1" == "uninstall" ];then         # v4.15
+    NOCHK="Y"                           # v4.15
+    Uninstall_WireGuard                 # v4.15
+    echo -e $cRESET                     # v4.15
+    exit 0                              # v4.15
+fi
 
 # Retain commandline compatibility
 if [ "$1" != "install" ];then   # v2.01
