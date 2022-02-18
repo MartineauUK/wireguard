@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.15b8"
-#============================================================================================ © 2021-2022 Martineau v4.15b8
+VERSION="v4.15b9"
+#============================================================================================ © 2021-2022 Martineau v4.15b9
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.15b8"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 17-Feb-2022
+# Last Updated Date: 18-Feb-2022
 #
 # Description:
 #
@@ -3156,16 +3156,19 @@ Get_scripts() {
     download_file ${INSTALL_DIR} wg_client martineau $BRANCH dos2unix 777
     download_file ${INSTALL_DIR} wg_server martineau $BRANCH dos2unix 777
     download_file ${INSTALL_DIR} UDP_Updater.sh martineau $BRANCH dos2unix 777
+    download_file ${INSTALL_DIR} wg_ChkEndpointDDNS.sh martineau $BRANCH dos2unix 777           # v4.15
 
     chmod +x ${INSTALL_DIR}wg_manager.sh
     chmod +x ${INSTALL_DIR}wg_client
     chmod +x ${INSTALL_DIR}wg_server
     chmod +x ${INSTALL_DIR}UDP_Updater.sh                                               # v4.01
+    chmod +x ${INSTALL_DIR}wg_ChkEndpointDDNS.sh                                                # v4.15
 
     md5sum ${INSTALL_DIR}wg_manager.sh      > ${INSTALL_DIR}"wg_manager.md5"
     md5sum ${INSTALL_DIR}wg_client          > ${INSTALL_DIR}"wg_client.md5"
     md5sum ${INSTALL_DIR}wg_server          > ${INSTALL_DIR}"wg_server.md5"
     md5sum ${INSTALL_DIR}UDP_Updater.sh     > ${INSTALL_DIR}"UDP_Updater.md5"          # v4.01
+    md5sum ${INSTALL_DIR}wg_ChkEndpointDDNS.sh     > ${INSTALL_DIR}"wg_ChkEndpointDDNS.md5"     # v4.15
 }
 Read_INPUT() {
 
@@ -6490,7 +6493,7 @@ if [ "$1" != "install" ];then   # v2.01
                 echo -e $cRESET
                 exit_message
             ;;
-            show)
+            show|list)
                 Show_Peer_Status "full"                        # Force verbose detail
                 echo -e $cRESET
                 exit_message
