@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.15.2"
-#============================================================================================ © 2021-2022 Martineau v4.15.2
+VERSION="v4.15.3"
+#============================================================================================ © 2021-2022 Martineau v4.15.3
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 08-Feb-2022
+# Last Updated Date: 18-Feb-2022
 #
 # Description:
 #
@@ -816,6 +816,34 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
             fi
         fi
 
+        # What if the Endpoint Peer acquires a new IP address after the initial handshake?
+        #      (NOTE: Mullvad Endpoints seem to ALWAYS be an IPv4 address rather than DDNS name)
+        # Need a monitor that refreshes the Endpoint DDNS IP if the handshake is dormant.
+        # Use
+        #      "wg show WG_INTERFACE latest-handshakes"
+        #      if [ latest handshake is > than say 135 ]; then force DDNS resolution of DDNS name to current IP Address
+        #         "wg set WG_INTERFACE peer $PUB_KEY endpoint Peer_DDNS:nnnnn"
+        #      fi
+        #
+        # see /jffs/addons/wireguard/wg_ChkEndpointDDNS.sh
+        ENDPOINTS=$(awk '/^Endpoint/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf | tr '\n' ' ')           # v4.15.3
+        DDNS_FOUND=0
+        for ENDPOINT in $ENDPOINTS
+            do
+                [ $(echo "$ENDPOINT" | tr ":" " " | wc -w) -gt 2 ] && continue                              # v4.15.3
+                # So not IPv6...
+                DDNS=$(echo "$ENDPOINT" | awk -F ":" '{print $1}')                                          # v4.15.3
+                if [ -z "$(echo "$DDNS" | Is_IPv4_CIDR)" ] && [ -z "$(echo "$DDNS" | Is_IPv4)" ];then       # v4.15.3
+                    DDNS_FOUND=1    # NOT IPv4 so must be DDNS so monitor it                                # v4.15.3
+                    break
+                fi
+            done
+
+        if [ $DDNS_FOUND -eq 1 ];then                                                                       # v4.15.3
+            cru a WireGuard_ChkDDNS${WG_INTERFACE} "*/5 * * * * ${INSTALL_DIR}wg_ChkEndpointDDNS.sh $WG_INTERFACE"                      # v4.15.3
+            logger -t "wireguard-${MODE}${VPN_NAME}" "Endpoint DDNS refresh monitor started - cru #WireGuard_ChkDDNS${WG_INTERFACE}#."  # v4.15.3
+        fi
+
         echo -en $cBGRE"\t"
         logger -st "wireguard-${MODE}${VPN_NAME}" "Initialisation complete."
         echo -e $cRESET
@@ -828,6 +856,8 @@ else
     [ -n "$(wg show | grep "$VPN_ID")" ] && TERMINATED_TXT="Terminated" || TERMINATED_TXT="Already Terminated; Cleaned-up anyway!"
     # v4.14 Process 'PreDown' commands
     Process_Pre_Post_Commands "PreDown"
+
+    cru d WireGuard_ChkDDNS${WG_INTERFACE}  # v4.15.3
 
     # User Exit @Torson
     [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-route-down.sh ] && { logger -t "wireguard-${MODE}${VPN_NAME}" "Executing Event:${VPN_ID}-route-down.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-route-down.sh; }
