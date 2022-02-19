@@ -3,14 +3,14 @@
 #
 # Copyright (C) 2015-2019 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
 
-# v2.00 Hacked and renamed from 'reresolv-dns.sh'to 'wg_ChkEndpointDDNS.sh' by Martineau to convert from BASH etc.
+# v2.01 Hacked and renamed from 'reresolv-dns.sh'to 'wg_ChkEndpointDDNS.sh' by Martineau to convert from BASH etc.
 #
 #   Usage:  cru a WireGuard_ChkDDNS${WG_INTERFACE} "*/5 * * * * ${INSTALL_DIR}wg_ChkEndpointDDNS.sh $WG_INTERFACE"
 
 # set -e                    # Martineau Hack
 # shopt -s nocasematch      # Martineau Hack
 # shopt -s extglob          # Martineau Hack
-# export LC_ALL=C           # Martineau Hack
+# export LC_ALL=C
 
 #=========================================================================================== Martineau Hack
 Say() {
@@ -54,13 +54,32 @@ process_peer() {
     fi                                                                                                  # Martineau Hack
     #[[ $(wg show "$INTERFACE" latest-handshakes) =~ ${PUBLIC_KEY//+/\\+}\  ([0-9]+) ]] || return 0     # Martineau Hack
     if [ -n "$( wg show interfaces | grep -ow "$INTERFACE")" ];then                                     # Martineau Hack
-        PREVIOUS=$(wg show "$INTERFACE" latest-handshakes 2>/dev/null | grep -F "$PUBLIC_KEY" | awk '{print $2}')   # Martineau Hack
+        local PREVIOUS=$(wg show "$INTERFACE" latest-handshakes 2>/dev/null | grep -F "$PUBLIC_KEY" | awk '{print $2}')   # Martineau Hack
         #(( ($(date +%s) - ${BASH_REMATCH[1]}) > 135 )) || return 0                                     # Martineau Hack
-        [ $(( ($(date +%s) - PREVIOUS) > 135 )) ]  || return 0                                          # Martineau Hack
+        [ $(( $(date +%s) - PREVIOUS )) -gt 135 ] || return 0                                           # Martineau Hack
         wg set "$INTERFACE" peer "$PUBLIC_KEY" endpoint "$ENDPOINT"
-        SayT "DDNS Endpoint $ENDPOINT re-Resolved for '$INTERFACE' Public Key '$PUBLIC_KEY'"            # Martineau Hack
+#=======================================================================================================# MArtineau Hack
+        if [ "${INTERFACE:0:3}" == "wg2" ];then
+            local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM devices WHERE pubkey='$PUBLIC_KEY';")
+        fi
+
+        if [ -z "$DESC" ];then
+            # Site2Site maybe?                          # v4.14
+            local MATCH_PEER=$(grep -F "$PUBLIC_KEY" ${CONFIG_DIR}*_public.key | awk -F '[\/:\._]' '{print $6}')
+            if [ -z "$MATCH_PEER" ];then
+                local DESC="# Unidentified"
+            else
+                local DESC=$(grep -FB1 "[Peer]" ${CONFIG_DIR}${MATCH_PEER}.conf | grep -vF "[Peer]")
+                [ -z "$DESC" ] && local DESC=$(grep -FB1 "[Interface]" ${CONFIG_DIR}${MATCH_PEER}.conf | grep -vF "[Interface]")
+                [ -z "$DESC" ] && local DESC="# "$DESC
+            fi
+        fi
+        #SayT "DDNS Endpoint $ENDPOINT re-Resolved for '$INTERFACE' Public Key '$PUBLIC_KEY'"            # Martineau Hack
+        SayT "DDNS Endpoint $ENDPOINT re-Resolved for '$INTERFACE' ('$DESC')"            # Martineau Hack
     fi
 
+    local DESC=
+#=======================================================================================================================
     reset_peer_section
 }
 reset_peer_section() {
@@ -68,8 +87,11 @@ reset_peer_section() {
     PUBLIC_KEY=""
     ENDPOINT=""
 }
-#=========================================================================================== Martineau Hack
+#=======================================================================================================#Martineau Hack
 Main() { true; }            # Syntax that is Atom Shellchecker compatible!
+
+SQL_DATABASE="/opt/etc/wireguard.d/WireGuard.db"
+#=======================================================================================================================
 
 CONFIG_FILE="$1"
 #[[ $CONFIG_FILE =~ ^[a-zA-Z0-9_=+.-]{1,15}$ ]] && CONFIG_FILE="/etc/wireguard/$CONFIG_FILE.conf"       # Martineau Hack
