@@ -1,9 +1,9 @@
-VERSION="v4.15.8"
-#============================================================================================ © 2021-2022 Martineau v4.15.8
+VERSION="v4.15.9"
+#============================================================================================ © 2021-2022 Martineau v4.15.9
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 18-Feb-2022
+# Last Updated Date: 27-Feb-2022
 #
 # Description:
 #
@@ -493,7 +493,7 @@ else
     # Extract '# Cabin LAN'
     if [ "$(sqlite3 $SQL_DATABASE "SELECT auto FROM servers WHERE peer='$WG_INTERFACE';")" == "S" ];then    # v4.15.1
         SITE2SITE_PEER=$(awk '/^#.*LAN/ {print $2}' ${CONFIG_DIR}${WG_INTERFACE}.conf )                     # v4.15.1
-        sqlite3 $SQL_DATABASE "INSERT into traffic values('$SITE2SITE_PEER','$TIMESTAMP','*','*','*','*');" # v4.15.1
+        #sqlite3 $SQL_DATABASE "INSERT into traffic values('$SITE2SITE_PEER','$TIMESTAMP','*','*','*','*');" # v4.15.9 v4.15.1
     fi
 
     Firewall_delete
