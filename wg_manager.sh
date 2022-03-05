@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.15bA"
-#============================================================================================ © 2021-2022 Martineau v4.15bA
+VERSION="v4.15bB"
+#============================================================================================ © 2021-2022 Martineau v4.15bB
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.15bA"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 04-Mar-2022
+# Last Updated Date: 05-Mar-2022
 #
 # Description:
 #
@@ -683,8 +683,8 @@ Create_Peer() {
             local IPV6_TXT="(IPv6) "
             local SERVER_PEER=
 
-            local VPN_POOL="$(echo "$@" | sed -n "s/^.*ipv6=//p" | awk '{print $1}')"
-            if [ "${1:0:5}" == "ipv6=" ] && [ -n "$VPN_POOL" ];then
+            local VPN_POOL6="$(echo "$@" | sed -n "s/^.*ipv6=//p" | awk '{print $1}')"
+            if [ "${1:0:5}" == "ipv6=" ] && [ -n "$VPN_POOL6" ];then
                 local VPN_POOL_USER="Y"
             fi
             ;;
@@ -746,6 +746,11 @@ Create_Peer() {
             [ -z "$TWO_OCTET" ] && local TWO_OCTET="50"
             [ -z "$NEW_THIRD_OCTET" ] && local NEW_THIRD_OCTET="1"
             local VPN_POOL6="fc00:${TWO_OCTET}:${NEW_THIRD_OCTET}::1/64"
+        fi
+    fi
+
+    if [ -n "$VPN_POOL6" ];then                         # v4.15
+        if [ -n "$VPN_POOL" ];then
             local VPN_POOL=$VPN_POOL","$VPN_POOL6
             local IPV6_TXT="(IPv4/IPv6) "               # v4.15
         fi
@@ -754,6 +759,7 @@ Create_Peer() {
     if [ "$USE_IPV4" == "N" ];then                      # v4.15
         if [ -n "$VPN_POOL6" ];then                     # v4.15
             local VPN_POOL=$VPN_POOL6                   # v4.15
+            local IPV6_TXT="(IPv6) "                    # v4.15
         else
             echo -e $cBRED"\a\n\t***ERROR Create new WireGuard ${IPV6_TXT}'server' Peer has missing ${cRESET}IPv6 Private subnet${cBRED} - use $cRESET'ipv6[=]'$cBRED arg\n"$cRESET
             return 1
@@ -779,7 +785,7 @@ Create_Peer() {
 
     local WANIPADDR=$(nvram get wan0_ipaddr)
     [ -n "$(echo "$WANIPADDR" | Is_Private_IPv4)" ] && echo -e ${cRESET}${cBRED}${aBOLD}"\a\n\t*** Ensure Upstream router Port Foward entry for port:${cBMAG}${LISTEN_PORT}${cRESET}${cBRED}${aBOLD} ***"$cRESET
-    echo -e $cBWHT"\n\tPress$cBGRE y$cRESET to$cBGRE Create ${cRESET}${IPV6_TXT}${cBGRE}'server' Peer (${cBMAG}${SERVER_PEER}) ${cBWHT}${VPN_POOL}${cRESET}:${LISTEN_PORT}${cBGRE} or press$cBGRE [Enter] to SKIP." # v4.15
+    echo -e $cBWHT"\n\tPress$cBGRE y$cRESET to$cBGRE Create ${cBCYA}${IPV6_TXT}${cBGRE}'server' Peer (${cBMAG}${SERVER_PEER}${cBGRE}) ${cBCYA}${VPN_POOL}:${LISTEN_PORT}${cRESET} or press$cBGRE [Enter] to SKIP." # v4.15
     read -r "ANS"
     [ "$ANS" == "y" ] || return 1
 
@@ -817,7 +823,7 @@ EOF
         sqlite3 $SQL_DATABASE "INSERT INTO servers values('$SERVER_PEER','$AUTO','${VPN_POOL}','$LISTEN_PORT','$PUB_KEY','$PRI_KEY','$ANNOTATE');"
     fi
 
-    echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED Start ${IPV6_TXT}'server' Peer ($SERVER_PEER) or press$cBGRE [Enter] to SKIP."
+    echo -e $cBWHT"\tPress$cBGRE y$cRESET to$cBGRE Start ${cBCYA}${IPV6_TXT}${cBGRE}'server' Peer (${cBMAG}${SERVER_PEER}$cBGRE)$cRESET or press $cBGRE[Enter] to SKIP."
     read -r "ANS"
     [ "$ANS" == "y" ] && Manage_Wireguard_Sessions "start" "$SERVER_PEER"
     Show_Peer_Status "show" # v3.03
