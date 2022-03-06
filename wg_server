@@ -1,9 +1,9 @@
-VERSION="v4.15.9"
-#============================================================================================ © 2021-2022 Martineau v4.15.9
+VERSION="v4.15.10"
+#============================================================================================ © 2021-2022 Martineau v4.15.10
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 04-Mar-2022
+# Last Updated Date: 06-Mar-2022
 #
 # Description:
 #
@@ -332,12 +332,23 @@ if [ "$2" != "disable" ];then
     # v4.14 Process 'PreUp' commands
     Process_Pre_Post_Commands "PreUp"   # v4.14.1
 
-    cmd ip address add dev $VPN_ID $Subnet
     cmd ip link set up dev $VPN_ID
     if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$Subnet" | grep ":")" ];then         # v4.05
-        cmd ip -6 address add dev $VPN_ID $Subnet
         cmd ip -6 link set up dev $VPN_ID
     fi
+
+    # v4.12 Assign both IPv4 and IPv6 IPs to interface as required
+    LOCALIPS=$(echo "$Subnet" | tr ',' ' ')                                                 # v4.10
+    for LOCALIP in $LOCALIPS                                                                # v4.10
+        do
+            if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$LOCALIP" | grep -F ":")" ];then     # v4.10
+                cmd ip -6 address add dev $VPN_ID $LOCALIP                                  # v4.10
+            else
+                if [ -n "$(echo "$LOCALIP" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$LOCALIP" | Is_IPv4)" ];then
+                    cmd ip address add dev $VPN_ID $LOCALIP                                 # v4.10
+                fi
+            fi
+        done
 
     MTU=$(awk '/^#?MTU/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)            # v4.15.7 @Bearnet
     if [ -z "$MTU" ];then
@@ -414,11 +425,19 @@ if [ "$2" != "disable" ];then
 
         cmd iptables -I INPUT -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'"
         cmd iptables -I INPUT -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
-        cmd iptables -I FORWARD -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
-        cmd iptables -I FORWARD -i br0 -o $VPN_ID -j ACCEPT -m comment --comment "LAN to WireGuard 'server clients'"    # v4.14.1 @ZebMcKayhan
+        #cmd iptables -I FORWARD -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
+        cmd iptables -I FORWARD -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"      # v4.15.10 @ZebMcKayhan
+        cmd iptables -I FORWARD -i br0 -o $VPN_ID -j ACCEPT -m comment --comment "LAN to WireGuard 'server clients'"    # v4.14.1
+
         cmd iptables -I OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
         cmd iptables -t nat -I PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'"
-        cmd iptables -t nat -I POSTROUTING -s $Subnet -o br0 -j MASQUERADE -m comment --comment "WireGuard 'server clients to LAN'" # v4.14.2
+
+        for THIS in $(echo "$Subnet" | tr ',' ' ')                  # v4.15.10
+            do
+                if [ -z "$(echo "$THIS" | grep -F ":" )" ];then     # v4.15.10
+                    cmd iptables -t nat -I POSTROUTING -s $THIS -o br0 -j MASQUERADE -m comment --comment "WireGuard 'server clients to LAN'" # v4.14.2
+                fi
+            done
 
         if [ "$USE_IPV6" == "Y" ];then                          # v4.05
             if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -z "$(grep -E "^NOTCPMSS" /jffs/addons/wireguard/WireguardVPN.conf)" ];then    # v4.12
@@ -437,7 +456,7 @@ if [ "$2" != "disable" ];then
             cmd ip6tables -I INPUT -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'"
             cmd ip6tables -I INPUT -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
             cmd ip6tables -I FORWARD -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
-            cmd ip6tables -I FORWARD -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
+            #cmd ip6tables -I FORWARD -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
             cmd ip6tables -I FORWARD -i br0 -o $VPN_ID -j ACCEPT -m comment --comment "LAN to WireGuard 'server clients'"   # v4.14.1 @ZebMcKayhan
             cmd ip6tables -I OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
         fi
