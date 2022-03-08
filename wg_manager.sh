@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.15bB"
-#============================================================================================ © 2021-2022 Martineau v4.15bB
+VERSION="v4.15bC"
+#============================================================================================ © 2021-2022 Martineau v4.15bC
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,8 @@ VERSION="v4.15bB"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 05-Mar-2022
+# Last Updated Date: 08-Mar-2022
+
 #
 # Description:
 #
@@ -93,8 +94,8 @@ cRESET=
     xHOME="\e[H";xERASE="\e[2J";xERASEDOWN="\e[J";xERASEUP="\e[1J";xCSRPOS="\e[s";xPOSCSR="\e[u";xERASEEOL="\e[K";xQUERYCSRPOS="\e[6n"
     xGoto="\e[Line;Columnf"
 }
-# Print between line beginning with'#==' to first blank line inclusive
 ShowHelp() {
+    # Print between line beginning with'#==' to first blank line inclusive
     echo -en $cBWHT >&2
     awk '/^#==/{f=1} f{print; if (!NF) exit}' $0
     echo -en $cRESET >&2
@@ -201,6 +202,89 @@ Is_Private_IPv4() {
 }
 Is_Private_IPv6() {
     grep -oE "(::1$)|([fF][cCdD])"
+}
+Hex2Dec(){
+    # Convert Hex to Dec (portable version) (see https://github.com/chmduquesne/wg-ip/blob/master/wg-ip)
+    for I in $(echo "$@"); do
+        printf "%d\n" "$(( 0x$I ))"
+    done
+}
+Expand_IPv6() {
+    # Returns an expanded IPv6 128-bit address under the form recommended by RFC5952 (see https://github.com/chmduquesne/wg-ip/blob/master/wg-ip)
+    # Martineau see https://iplocation.io/ipv6-expand
+    local ip=$1
+
+    # Prepend 0 if we start with :
+    echo $ip | grep -qs "^:" && local ip="0${ip}"
+
+    # Expand ::
+    if echo $ip | grep -qs "::"; then
+        local colons=$(echo $ip | sed 's/[^:]//g')
+        local missing=$(echo ":::::::::" | sed "s/$colons//")
+        local expanded=$(echo $missing | sed 's/:/:0/g')
+        local ip=$(echo $ip | sed "s/::/$expanded/")
+    fi
+
+    local blocks=$(echo $ip | grep -o "[0-9a-f]\+")
+    set $blocks
+
+    printf "%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x\n" $(Hex2Dec $@)
+
+}
+Compress_IPv6() {
+# Returns a compressed IPv6 128-bit address under the form recommended by RFC5952 (see https://github.com/chmduquesne/wg-IP/blob/master/wg-IP)
+# Martineau see https://iplocation.io/ipv6-compress
+    local ip=$1
+
+    local blocks=$(echo $ip | grep -o "[0-9a-f]\+")
+    set $blocks
+
+    # Compress leading zeros
+    #local ip=$(printf "%x:%x:%x:%x:%x:%x:%x:%x\n" $(Hex2Dec $@))       # Martineau HACK!
+    [ $# -eq 8 ] && local ip=$(printf "%x:%x:%x:%x:%x:%x:%x:%x\n" $(Hex2Dec $@)) || local ip=$(printf "%x:%x:%x:%x:%x:%x:%x\n" $(Hex2Dec $@))
+
+    # Prepend : for easier matching
+    local ip=:$ip
+
+    # :: must compress the longest chain
+    # Martineau Hacked
+    for pattern in :0:0:0:0:0:0:0:0 \
+            :0:0:0:0:0:0:0 \
+            :0:0:0:0:0:0 \
+            :0:0:0:0:0 \
+            :0:0:0:0 \
+            :0:0:0 \
+            :0:0; do
+        if echo $ip | grep -qs $pattern; then
+            local ip=$(echo $ip | sed "s/$pattern/::/")
+            # if the substitution occured before the end, we have :::
+            local ip=$(echo $ip | sed 's/:::/::/')
+            break # only one substitution
+        fi
+    done
+
+    # Remove prepending : if necessary
+    echo $ip | grep -qs "^:[^:]" && local ip=$(echo $ip | sed 's/://')
+
+    echo $ip
+
+}
+IPv6_RFC() {
+
+    local IPV6=$1                                                               # v4.15
+
+    local IPV6_IP=${IPV6%/*}
+    if [ -n "$(echo "$IPV6" | grep -F "/")" ];then
+        local IPV6_IP_MASK=${IPV6##*/}
+    fi
+    local IPV6_SUBNET=${IPV6_IP%:*}
+    local IPV6_IP_EXPANDED=$(Expand_IPv6 "$IPV6_IP")
+    local IPV6_IP_COMPRESSED=$(Compress_IPv6 "$IPV6_IP_EXPANDED")
+
+    [ -n "$IPV6_IP_MASK" ] && local IPV6=${IPV6_IP_COMPRESSED}"/"$IPV6_IP_MASK || local IPV6=${IPV6_IP_COMPRESSED}
+
+    echo $IPV6
+
 }
 Convert_1024KMG() {
 
@@ -660,6 +744,7 @@ Create_Peer() {
     # Default subnet IPv4 only, but IPv4,IPv6 if applicable/specified or just IPv6
 
     # peer new                                  # IPv4 only
+
     # peer new ipv6[=[private_ipv6 subnet]]     # Multi IPv4 and IPv6
     # peer new ipv6 noipv4                      # no IPv4
 
@@ -678,18 +763,20 @@ Create_Peer() {
             local LISTEN_PORT="$(echo "$@" | sed -n "s/^.*port=//p" | awk '{print $1}')"
             local LISTEN_PORT_USER="Y"
             ;;
-        ipv6*)
+        ipv6|ipv6=*)
             local USE_IPV6="Y"
             local IPV6_TXT="(IPv6) "
             local SERVER_PEER=
 
             local VPN_POOL6="$(echo "$@" | sed -n "s/^.*ipv6=//p" | awk '{print $1}')"
             if [ "${1:0:5}" == "ipv6=" ] && [ -n "$VPN_POOL6" ];then
+                # Ensure IPv6 address is in standard compressed format
+                VPN_POOL6="$(IPv6_RFC "$VPN_POOL6")"        # v4.15
                 local VPN_POOL_USER="Y"
             fi
             ;;
         ip=*)
-            local VPN_POOL="$(echo "$@" | sed -n "s/^.*ip=//p" | awk '{print $1}')"
+            local VPN_POOL4="$(echo "$@" | sed -n "s/^.*ip=//p" | awk '{print $1}')"
             local VPN_POOL_USER="Y"
             ;;
         noipv4|noIPv4)
@@ -731,7 +818,7 @@ Create_Peer() {
     fi
 
     # User specified VPN Tunnel subnet?
-    if [ -z "$VPN_POOL_USER" ];then
+    if [ -z "$VPN_POOL4" ] || [ -z "$VPN_POOL6" ];then
         [ -z "$AUTO_VPN_POOL" ] && local AUTO_VPN_POOL="10.50.1.1/24"
         local ONE_OCTET=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f1)
         local TWO_OCTET=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f2)
@@ -740,20 +827,20 @@ Create_Peer() {
         local NEW_THIRD_OCTET=$((THIRD_OCTET+1))
         local SERVER_CNT=$(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM servers;")
         [ $SERVER_CNT -ge $NEW_THIRD_OCTET ] && local NEW_THIRD_OCTET=$((SERVER_CNT+1))
-        local VPN_POOL=$(echo -e "$ONE_OCTET.$TWO_OCTET.$NEW_THIRD_OCTET.$REST")
+        [ "$USE_IPV4" == "Y" ] && local VPN_POOL4=$(echo -e "$ONE_OCTET.$TWO_OCTET.$NEW_THIRD_OCTET.$REST")
 
-        if [ "$USE_IPV6" == "Y" ];then
+        if [ "$USE_IPV6" == "Y" ] && [ -z "$VPN_POOL6" ];then
             [ -z "$TWO_OCTET" ] && local TWO_OCTET="50"
             [ -z "$NEW_THIRD_OCTET" ] && local NEW_THIRD_OCTET="1"
             local VPN_POOL6="fc00:${TWO_OCTET}:${NEW_THIRD_OCTET}::1/64"
         fi
     fi
 
-    if [ -n "$VPN_POOL6" ];then                         # v4.15
-        if [ -n "$VPN_POOL" ];then
-            local VPN_POOL=$VPN_POOL","$VPN_POOL6
+    [ -n "$VPN_POOL4" ] && local VPN_POOL=$VPN_POOL4    # v4.15
+
+    if [ -n "$VPN_POOL4" ] && [ -n "$VPN_POOL6" ];then  # v4.15
+            local VPN_POOL=$VPN_POOL4","$VPN_POOL6
             local IPV6_TXT="(IPv4/IPv6) "               # v4.15
-        fi
     fi
 
     if [ "$USE_IPV4" == "N" ];then                      # v4.15
@@ -1038,7 +1125,7 @@ Import_Peer() {
             if [ "$FORCE_TYPE" != "server" ];then
                 local CONFIGURED_IDS="11 12 13 14 15 16 17 18 19 111 112 113 114 115"   # v4.14
             else
-                local CONFIGURED_IDS="21 22 23 24 25"                                   # v4.14
+                local CONFIGURED_IDS="21 22 23 24 25 26 27 28 29"                       # v4.15 v4.14
             fi
 
             if [ -z "$NEW_NAME" ] || [ "$NEW_NAME" == "?" ];then
@@ -2984,9 +3071,8 @@ Display_QRCode() {
         [ "$ANS" == "y" ] && { clear; qrencode -t ANSIUTF8 < $FN; }             # v1.05
     fi
 }
-# v4.11 'nat'-start references changed to 'firewall'-start
 Edit_firewall_start() {
-
+# v4.11 'nat'-start references changed to 'firewall'-start
     if [ "$1" != "del" ];then
 
         [ ! -f /jffs/scripts/firewall-start ] && { echo -e "#!/bin/sh\n\n"    > /jffs/scripts/firewall-start; chmod +x /jffs/scripts/firewall-start; }
@@ -3521,7 +3607,10 @@ Show_Info() {
 
     echo -e $cBGRE"\n\t[ℹ ] Speedtest quick link${cBYEL} https://fast.com/en/gb/ \n"$cRESET       # v4.12
 
+    echo -e $cBGRE"\t[ℹ ] ${cRESET}WireGuard© Official Site ${cBYEL}https://www.wireguard.com/ \n"$cRESET   # v4.15
+
     echo -e $cBGRE"\t[ℹ ] ${cRESET}@ZebMcKayhan's$cBGRE Hint's and Tips Guide${cBYEL} https://github.com/ZebMcKayhan/WireguardManager/blob/main/README.md#table-of-content \n"$cRESET   # v4.13
+
 
 }
 exit_message() {
@@ -4818,6 +4907,8 @@ Create_Site2Site() {
 
     # [ [name1] [name2] ['ip='ip_for_name1] ['port='listen_port_for_name1] ['lan='siteb_subnet] ]
 
+    # [ add wgxx name2 ['lan='siteC_subnet] ]
+
     shift
 
     local I=1
@@ -4827,8 +4918,19 @@ Create_Site2Site() {
             local ALLRULES="Y"
             ;;
         ip=*)                               # Tunnel VPN Pool SiteA e.g. 10.10.10.0 (SiteB will be assigned +1)
-            local VPN_POOL="$(echo "$1" | sed -n "s/^.*ip=//p" | awk '{print $1}')"
+            local VPN_POOL4="$(echo "$1" | sed -n "s/^.*ip=//p" | awk '{print $1}')"
             [ "$I" -ge 1 ] && local I=$((I-1))      # Retain Positional parameter
+            ;;
+        ipv6|ipv6=*)
+            local VPN_POOL6="$(echo "$1" | sed -n "s/^.*ipv6=//p" | awk '{print $1}')"
+            # Ensure IPv6 address is in standard compressed format
+            [ -n "$VPN_POOL6" ] && VPN_POOL6="$(IPv6_RFC "$VPN_POOL6")" # v4.15
+            USE_IPV6="Y"                                                # v4.15
+            [ "$I" -ge 1 ] && local I=$((I-1))      # Retain Positional parameter
+            ;;
+        noipv4|noIPv4)
+            local USE_IPV4="N"                  # v4.15
+            local IPV6_TXT="(IPv6 Only) "       # v4.15
             ;;
         port*)                              # SiteA ListenPort (SiteB will be assigned +1)
             local LISTEN_PORT="$(echo "$1" | sed -n "s/^.*port=//p" | awk '{print $1}')"
@@ -4838,9 +4940,19 @@ Create_Site2Site() {
             local SITE_TWO_LAN="$(echo "$1" | sed -n "s/^.*lan=//p" | awk '{print $1}')"
             [ "$I" -ge 1 ] && local I=$((I-1))      # Retain Positional parameter
             ;;
+        lanipv6*)
+            local SITE_TWO_LAN6="$(echo "$1" | sed -n "s/^.*lanipv6=//p" | awk '{print $1}')"
+            # Ensure IPv6 address is in standard compressed format
+            SITE_TWO_LAN6="$(IPv6_RFC "$SITE_TWO_LAN6")"    # v4.15
+            USE_IPV6="Y"                                    # v4.15
+            [ "$I" -ge 1 ] && local I=$((I-1))              # Retain Positional parameter
+            ;;
         allowips*)
             local SITE_TWO_ALLOWIPS="$(echo "$1" | sed -n "s/^.*allowips=//p" | awk '{print $1}' | sed 's~,\([1-2]\)~, \1~')"
             [ "$I" -ge 1 ] && local I=$((I-1))      # Retain Positional parameter
+            ;;
+        add)
+            local ADD_SITE="Y"
             ;;
         *)
             case $I in
@@ -4859,12 +4971,17 @@ Create_Site2Site() {
         I=$((I+1))
     done
 
-    [ -z "$NAME_ONE" ] && local NAME_ONE="SiteA"
-    [ -z "$NAME_TWO" ] && local NAME_TWO="SiteB"
+    if [ -z "$ADD_SITE" ];then
+        [ -z "$NAME_ONE" ] && local NAME_ONE="SiteA"
+        [ -z "$NAME_TWO" ] && local NAME_TWO="SiteB"
 
-    if [ -n "$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE name='$NAME_ONE';")" ];then    # v4.15
-        echo -e $cBRED"\a\n\t***ERROR: '$NAME_ONE' Peer already exists"$cRESET
-        return 1
+        if [ -n "$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE name='$NAME_ONE';")" ];then    # v4.15
+            echo -e $cBRED"\a\n\t***ERROR: '$NAME_ONE' Peer already exists"$cRESET
+            return 1
+        fi
+    else
+        local NAME_ONE=
+        [ -z "$NAME_TWO" ] && local NAME_TWO="SiteC"
     fi
 
     if [ -n "$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE name='$NAME_TWO';")" ];then    # v4.15
@@ -4872,30 +4989,97 @@ Create_Site2Site() {
         return 1
     fi
 
-    [ -z "$VPN_POOL" ] && local VPN_POOL="10.9.8.0"                 # VPN Tunnel Network
-    [ -z "$LISTEN_PORT" ] && local LISTEN_PORT="61820"              # Site $NAME_ONE
-    local LAN_ADDR=$(nvram get lan_ipaddr)
-    local LAN_SUBNET=${LAN_ADDR%.*}
-    local SITE_ONE_LAN=$LAN_SUBNET".0/24"
+    if [ -z "$ADD_SITE" ];then
+        [ -z "$VPN_POOL4" ] && local VPN_POOL4="10.9.8.0"                 # VPN Tunnel Network
+        local TWO_OCTET=$(echo "$VPN_POOL4" | cut -d'.' -f2)
+        local THIRD_OCTET=$(echo "$VPN_POOL4" | cut -d'.' -f3)
+        local IPV6_TXT=
+        [ -z "$LISTEN_PORT" ] && local LISTEN_PORT="61820"              # Site $NAME_ONE
+        local LAN_ADDR=$(nvram get lan_ipaddr)
+        local LAN_SUBNET=${LAN_ADDR%.*}
+        local SITE_ONE_LAN=$LAN_SUBNET".0/24"
 
-    if [ "$USE_IPV6" == "Y" ];then
-        [ -z "$(echo "$VPN_POOL" | sed 's~/.*$~~' | Is_Private_IPv6)" ] && { echo -e $cBRED"\a\n\t***ERROR: ipv6='$VPN_POOL6' must be Private IPv6 address"$cRESET; return 1; }
-    else
-        [ -z "$(echo "$VPN_POOL" | Is_IPv4)" ] && { echo -e $cBRED"\a\n\t***ERROR: '$VPN_POOL' must be IPv4 Address"$cRESET; return 1; }
+        if [ "$USE_IPV6" == "Y" ] && [ -z "$VPN_POOL6" ];then
+            [ -z "$TWO_OCTET" ] && local TWO_OCTET="9"
+            [ -z "$NEW_THIRD_OCTET" ] && local NEW_THIRD_OCTET="8"
+            local VPN_POOL6="fc10:${TWO_OCTET}:${NEW_THIRD_OCTET}::1"
+            local IPV6_TXT="(IPv4/IPv6) "
+        fi
     fi
 
-    local LAST_OCTET=${VPN_POOL##*.}
-    if [ "$LAST_OCTET" == "0" ];then
-        local SITE_ONE_IP=$(echo "$VPN_POOL" | grep -o '^.*\.')"1/32"
-        local SITE_TWO_IP=$(echo "$VPN_POOL" | grep -o '^.*\.')"2/32"
-    else
-        local SITE_ONE_IP=$VPN_POOL"/32"
-        local SITE_TWO_IP=$(echo "$VPN_POOL" | grep -o '^.*\.')$((LAST_OCTET+1))/32
+    [ -n "$VPN_POOL4" ] && local VPN_POOL=$VPN_POOL4    # v4.15
+
+    if [ -n "$VPN_POOL4" ] && [ -n "$VPN_POOL6" ];then  # v4.15
+            local VPN_POOL=$VPN_POOL4","$VPN_POOL6
+            local IPV6_TXT="(IPv4/IPv6) "               # v4.15
+    fi
+
+    if [ "$USE_IPV4" == "N" ];then                      # v4.15
+        if [ -n "$VPN_POOL6" ];then                     # v4.15
+            local VPN_POOL=$VPN_POOL6                   # v4.15
+            local IPV6_TXT="(IPv6) "                    # v4.15
+        else
+            echo -e $cBRED"\a\n\t***ERROR Create new WireGuard ${IPV6_TXT}'server' Peer has missing ${cRESET}IPv6 Private subnet${cBRED} - use $cRESET'ipv6[=]'$cBRED arg\n"$cRESET
+            return 1
+        fi
+    fi
+
+    for THIS in $(echo "$VPN_POOL" | tr ',' ' ')        # v4.15
+        do
+            if [ -z "$(echo "$THIS" | grep -F ":")" ];then
+                [ -z "$(echo "$THIS" | Is_IPv4)" ] && { echo -e $cBRED"\a\n\t***ERROR: '$THIS' must be IPv4 "$cRESET; return 1; }                                  # v4.15
+            else
+                [ -z "$(echo "$THIS" | sed 's~/.*$~~' | Is_Private_IPv6)" ] && { echo -e $cBRED"\a\n\t***ERROR: '$THIS' must be Private IPv6 address"$cRESET; return 1; }   # v4.15
+            fi
+        done
+
+    if [ -z "$ADD_SITE" ];then
+        local LAST_OCTET=${VPN_POOL4##*.}
+        if [ "$LAST_OCTET" == "0" ];then
+            local SITE_ONE_IP=$(echo "$VPN_POOL4" | grep -o '^.*\.')"1/32"
+            local SITE_TWO_IP=$(echo "$VPN_POOL4" | grep -o '^.*\.')"2/32"
+        else
+            local SITE_ONE_IP=$VPN_POOL"/32"
+            local SITE_TWO_IP=$(echo "$VPN_POOL4" | grep -o '^.*\.')$((LAST_OCTET+1))/32
+        fi
+        if [ "$USE_IPV6" == "Y" ] && [ -n "$VPN_POOL6" ];then
+            local SITE_ONE_IP=$SITE_ONE_IP", "$VPN_POOL6"/128"
+        fi
     fi
 
     if [ -z "$SITE_TWO_LAN" ];then
         local SITE_TWO_THIRD_OCTET=$(($(echo "$SITE_ONE_LAN" | cut -d'.' -f3) + 1))
         local SITE_TWO_LAN=$(echo "$SITE_ONE_LAN" | grep -oE '^(.{1,3}\.){2}')${SITE_TWO_THIRD_OCTET}.0/24
+        if [ "$USE_IPV6" == "Y" ];then
+            [ -z "$SITE_TWO_LAN6" ] && local SITE_TWO_LAN6="fc10:${TWO_OCTET}:${SITE_TWO_THIRD_OCTET}::1/64"
+            local VPN_POOL_IP=${SITE_TWO_LAN6%/*}
+            local VPN_POOL_MASK=${SITE_TWO_LAN6##*/}                    # v4.15
+            local VPN_SUBNET=${VPN_POOL_IP%:*}
+            local VPN_IP_EXPANDED=$(Expand_IPv6 "${VPN_POOL_IP%/*}")    # v4.15
+            local VPN_IP_COMPRESSED=$(Compress_IPv6 "${VPN_IP_EXPANDED}")
+            local VPN_POOL_PREFIX_EXPANDED=${VPN_IP_EXPANDED%:*}        # v4.15
+            local VPN_POOL_PREFIX_COMPRESSED=$(Compress_IPv6 "${VPN_POOL_PREFIX_EXPANDED}")
+
+            local IP=2
+
+            while true
+                do
+                    local MATCH="$(sqlite3 $SQL_DATABASE "SELECT ip FROM devices WHERE ip LIKE '%${VPN_POOL_PREFIX_COMPRESSED}${IP}/128%';" | tr ',' ' ')"  # v4.15 v4.11 v4.02
+                    local DUPLICATE=$(echo "$MATCH" | grep -ow "${VPN_POOL_PREFIX_COMPRESSED}${IP}/128")
+                    [ -z "$DUPLICATE" ] && break || local IP=$((IP+1))
+
+                    if [ $IP -ge 255 ];then
+                        echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) IPv6 subnet MAX 254 imposed!'"
+                        exit 98
+                    fi
+
+                    [ -z "$MATCH" ] && break
+
+                done
+
+            #local SITE_TWO_LAN=$SITE_TWO_LAN", "${VPN_POOL_PREFIX_COMPRESSED}$IP"/128"
+        fi
+
     else
         if [ -n "$(echo "$SITE_TWO_LAN" | Is_IPv4)" ] || [ -n "$(echo "$SITE_TWO_LAN" | Is_IPv4_CIDR)" ];then
             if [ -z "$(echo "$SITE_TWO_LAN" | Is_IPv4_CIDR)" ];then
@@ -4913,7 +5097,8 @@ Create_Site2Site() {
         local SITE_TWO_ALLOWIPS="$SITE_TWO_IP, $SITE_TWO_ALLOWIPS"
     fi
 
-    echo -e $cBCYA"\n\tCreating WireGuard Private/Public key-pair for Site-to-Site Peers ${cBMAG}${NAME_ONE}/${NAME_TWO}${cBCYA}"$cRESET
+    [ -n "$NAME_ONE" ] && local SLASH="/" || local SLASH=
+    echo -e $cBCYA"\n\tCreating WireGuard Private/Public key-pair for Site-to-Site ${IPV6_TXT}Peers ${cBMAG}${NAME_ONE}/${NAME_TWO}${cBCYA}"$cRESET
 
     for SITE in $NAME_ONE $NAME_TWO
         do
@@ -4932,7 +5117,8 @@ Create_Site2Site() {
 
     [ -n "$ANS" ] && local DDNS=$ANS || local DDNS=$NAME_TWO".DDNS"
 
-    cat > ${CONFIG_DIR}${NAME_ONE}.conf << EOF
+    if [ -z "$ADD_SITE" ];then
+        cat > ${CONFIG_DIR}${NAME_ONE}.conf << EOF
 # $NAME_ONE - $SITE_ONE_LAN
 [Interface]
 PrivateKey = $SITE_ONE_PRI_KEY
@@ -4946,10 +5132,34 @@ AllowedIPs = $SITE_TWO_ALLOWIPS
 Endpoint = $DDNS:$((LISTEN_PORT+1))
 EOF
 
-    chmod 600 ${CONFIG_DIR}${NAME_ONE}.conf         # v4.15 Prevent wg-quick "Warning: '/opt/etc/wireguard.d/Home.conf' is world accessible"
-    local ROUTER_DDNS=$(nvram get ddns_hostname_x)
+        chmod 600 ${CONFIG_DIR}${NAME_ONE}.conf         # v4.15 Prevent wg-quick "Warning: '/opt/etc/wireguard.d/Home.conf' is world accessible"
+    fi
+
+    if [ -n "$ADD_SITE" ];then
+        # Determine WG interface if user doesn't explicitly specify the 'server' Peer
+        echo -e $cRESET"\tEnter the name of interface or descriptive name e.g. ${cBMAG}'Home'${cRESET} to bind site '${cBMAG}${NAME_TWO}${cRESET}' or press$cBGRE [Enter] to SKIP."
+        read -r "ANS"
+        if [ -n "$ANS" ];then
+            if [ "${ANS:0:3}" == "wg2" ];then
+                local WG_INTERFACE=$ANS
+            else
+                local MATCHTHIS="$ANS"
+                if [ -n "$(ls /opt/etc/wireguard.d/wg2*.conf 2>/dev/null)" ];then
+                    local SERVER_PEER_LIST=$(grep -HEi "^#.*${MATCHTHIS} " ${CONFIG_DIR}*.conf | grep "wg2" | tr '\n' ' ')    # v4.15
+                fi
+                [ -n "$SERVER_PEER_LIST" ] && local WG_INTERFACE=$(echo "$SERVER_PEER_LIST" | grep -Eo "wg2[1-9]")
+            fi
+        fi
+        if [ -n "$SERVER_PEER_LIST" ];then
+            NAME_ONE=$MATCHTHIS
+            SITE_ONE_IP=$(awk '/^[#]*Address/ {print $3}' /opt/etc/wireguard.d/$WG_INTERFACE.conf)
+            SITE_ONE_LAN=$('NR==1{print $NF}' /opt/etc/wireguard.d/$WG_INTERFACE.conf)
+            LISTEN_PORT=$(awk '/^ListenPort/ {print $3}' /opt/etc/wireguard.d/$WG_INTERFACE.conf)
+        fi
+    fi
 
     # If no formal DDNS...ask what to do, so $NAME_TWO can connect to this $NAME_ONE router
+    local ROUTER_DDNS=$(nvram get ddns_hostname_x)
     if [ -z "$ROUTER_DDNS" ];then
         echo -e $cRED"\n\a\tWarning: No DDNS is configured! to reach local ${cBMAG}${NAME_ONE}${cRED} Endpoint from remote ${cBMAG}$NAME_TWO"$cRESET
         echo -e $cRESET"\tPress$cBRED y$cRESET to use the current ${cBRED}WAN IP ${cRESET}or enter ${cBMAG}$NAME_ONE${cRESET} Endpoint IP or DDNS name or press$cBGRE [Enter] to SKIP."
@@ -4987,6 +5197,11 @@ EOF
 
     chmod 600 ${CONFIG_DIR}${NAME_TWO}.conf         # v4.15 Prevent wg-quick "Warning: '/opt/etc/wireguard.d/Cabin.conf' is world accessible"
 
+    if [ -n "$ADD_SITE" ];then
+        # Bind the remote site to the host
+        [ -n "$WG_INTERFACE" ] && Manage_Peer "peer" "$WG_INTERFACE" "bind" "$NAME_TWO"
+    fi
+
     echo -e "\n========== $NAME_ONE configuration =====================================================\n"$cRESET
     cat ${CONFIG_DIR}${NAME_ONE}.conf
 
@@ -4994,6 +5209,8 @@ EOF
     cat ${CONFIG_DIR}${NAME_TWO}.conf
 
     echo -e "\n=======================================================================================\n"
+
+    [ -n "$ADD_SITE" ] && local NAME_ONE=
 
     for FN in $NAME_ONE $NAME_TWO
         do
@@ -5041,7 +5258,8 @@ EOF
 
         done
 
-    echo -e $cBGRE"\n\tWireGuard Site-to-Site Peers ${cBMAG}${NAME_ONE} and ${NAME_TWO}${cBGRE} created\n"$cRESET
+    [ -n "$NAME_ONE" ] && local JOIN_TXT=" and " || JOIN_TXT=
+    echo -e $cBGRE"\n\tWireGuard Site-to-Site Peers ${cBMAG}${NAME_ONE}${JOIN_TXT}${NAME_TWO}${cBGRE} created\n"$cRESET
 
     echo -en "\n\tCopy ${cBMAG}${NAME_TWO}/${NAME_ONE}${cRESET} files: "$cBCYA
 
@@ -5196,6 +5414,7 @@ Validate_User_Choice() {
             color*|colour*);;        # v4.15
             addon*);;        # v4.15
             zip|zipinstall);;        # v4.15
+            trimdb*);;        # v4.15
             *)
                :
             ;;
@@ -5419,7 +5638,7 @@ Process_User_Choice() {
                     fi
 
             ;;
-            peer|peer" "*)                                           # peer [ 'list' | interface { [auto y|n|p ] 'del' | 'add' | 'comment' {'#'comment}'} ]  # v1.10
+            peer|peer" "*)                                           # peer [ 'list' | interface { [auto y|n|p ] 'del' | 'add' | 'comment' {'#'comment}'} | 'bind' {peer} ]  # v1.10
 
                 Manage_Peer $menu1
 
@@ -5838,10 +6057,66 @@ Process_User_Choice() {
                 echo -e "\n\t"$cBGRA
                 opkg install p7zip      # v4.15
             ;;
+            trimdb*)                                                # trimdb {days [ 'traffic' | 'sessions']]} [auto]
+                Purge_Database $menu1   # v4.15
+            ;;
             *)
                 printf '\n\a\t%bInvalid Option%b "%s"%b Please enter a valid option\n' "$cBRED" "$cRESET" "$menu1" "$cBRED"    # v4.03 v3.04 v1.09
             ;;
         esac
+
+}
+Purge_Database() {
+
+    local ANS=
+    [ -n "$(echo "$@" | grep -io "auto")" ] && local AUTOREPLY="Y"
+
+    local DAYS=$2
+
+    local TABLES_TXT="(traffic and sessions)"
+
+    local TABLE=$3
+    [ "$TABLE" == "auto" ] && TABLE=
+
+    [ -z "$TABLE" ] && TABLE="All"
+
+    if [ -n "$DAYS" ] && [ -n "$(echo "$DAYS" | grep -E "[[:digit:]]*")" ];then
+        case $TABLE in
+            traffic|session|All)
+                local TABLES_TXT="($TABLE)"
+
+                local NOW=$(date "+%s")
+                local EPOCH_SECS=$((DAYS*86400))
+                local OLDEST_EPOCH_SECS=$((NOW-EPOCH_SECS))
+
+                echo -e "\n\t$TABLES_TXT statistics Records older than "${cBCYA}$(date -d @"$OLDEST_EPOCH_SECS" "+%c")${cRESET}" will be erased from SQL database"
+                [ "$TABLE" == "All" ] && TABLE="traffic session"
+
+                if [ -z "$AUTOREPLY" ];then
+                    echo -e "\tPress$cBRED y$cRESET to$cBRED DELETE database records${cRESET} or press$cBGRE [Enter] to SKIP."
+                    read -r "ANS"
+                else
+                    local ANS="y"
+                fi
+
+                if [ "$ANS" == "y" ];then
+                    echo -e
+                    for THIS in $TABLE
+                        do
+                            local OCNT=$(sqlite3 $SQL_DATABASE "SELECT Count(*) FROM $THIS;")
+                            sqlite3 $SQL_DATABASE "DELETE FROM $THIS WHERE timestamp <='$OLDEST_EPOCH_SECS';"
+                            local NCNT=$(sqlite3 $SQL_DATABASE "SELECT Count(*) FROM $THIS;")
+                            [ $OCNT -eq $NCNT ] && echo -e "$cRED\t $((OCNT-NCNT)) $THIS records deleted" || echo -e "$cBGRE\t $((OCNT-NCNT)) $THIS records deleted"
+                        done
+                fi
+            ;;
+            *)
+             echo -e $cBRED"\a\n\t***ERROR: SQL database table $cRESET'$TABLE'$cBRED NOT found! - use 'traffic' or 'session'\n"$cRESET
+            ;;
+        esac
+    else
+        echo -en $cBRED"\a\n\t***ERROR: Numbers of days $cRESET'$DAYS'$cBRED invalid!\n"$cRESET
+    fi
 
 }
 Get_WebUI_Installed() {
@@ -5850,7 +6125,6 @@ Get_WebUI_Installed() {
         md5_installed="$(cat $installedMD5File)"
     fi
 }
-
 Get_WebUI_Page(){
     MyPage="none"
     for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
@@ -6161,31 +6435,34 @@ Create_RoadWarrior_Device() {
                     [ "$ANS" != "y" ] && CREATE_DEVICE_CONFIG="N"
                 fi
 
-                [ -z "$VPN_POOL_IP" ] && local VPN_POOLS=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers WHERE peer='$SERVER_PEER';")
+                #[ -z "$VPN_POOL_IP" ] && local VPN_POOLS=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers WHERE peer='$SERVER_PEER';")
+                local VPN_POOLS=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers WHERE peer='$SERVER_PEER';")
 
                 for VPN_POOL in $(echo "$VPN_POOLS" | tr ',' ' ')       # v4.15
                     do
-                        if [ -z "$(echo "$VPN_POOL" | grep -F "::")" ];then
-                            local VPN_POOL_PREFIX=$(echo "$VPN_POOL" | sed 's/\:\:.*$//')
-                            if [ -z "$VPN_POOL_IP" ];then
+                        if [ -z "$(echo "$VPN_POOL" | grep -F ":")" ];then      # v4.15 Hotfix @ZebMcKayhan
+                            #local VPN_POOL_PREFIX=$(echo "$VPN_POOL" | sed 's/\:\:.*$//')
+                            #if [ -z "$VPN_POOL_IP" ];then
                                 if [ -n "$VPN_POOL" ];then
                                     local VPN_POOL_SUBNET=${VPN_POOL%.*}
-                                    #local VPN_POOL_IP=$(grep -F "$VPN_POOL_SUBNET." ${INSTALL_DIR}WireguardVPN.conf | grep -Ev "^#" | grep -v "$SERVER_PEER" | awk '{print $2}' | sed 's~/32.*$~~g' | sort -n -t . -k 1,1 -k 2,2 -k 3,3 -k 4,4 | tail -n 1)
-                                    local IP=$(sqlite3 $SQL_DATABASE "SELECT COUNT(ip) FROM devices WHERE ip LIKE '${VPN_POOL_SUBNET}.%';") # v4.01 Hotfix
-                                    #local IP=${VPN_POOL_IP##*.}        # 4th octet
-                                    #local IP=$((IP+2))
-                                    #[ $IP -eq 1 ] && local IP=2 ||     # .1 is the 'server' Peer! # v4.02
                                     local IP=2                          # v4.11
 
                                     while true
                                         do
-                                            local DUPLICATE=$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE ip='${VPN_POOL_SUBNET}.${IP}/32';") # v4.11 v4.02
-                                            [ -z "$DUPLICATE" ] && break || local IP=$((IP+1))
+                                            local MATCHES="$(sqlite3 $SQL_DATABASE "SELECT ip FROM devices WHERE ip LIKE '%${VPN_POOL_SUBNET}.${IP}/32%';" | tr '\n' ' ')"  # v4.15 v4.11 v4.02
+                                            for MATCH in $MATCHES
+                                                do
+                                                    MATCH=$(echo "$MATCH" | tr ',' ' ')
+                                                    local DUPLICATE=$(echo "$MATCH" | grep -ow "${VPN_POOL_SUBNET}.${IP}/32")
+                                                    [ -z "$DUPLICATE" ] && break || local IP=$((IP+1))
+                                                done
 
                                             if [ $IP -ge 255 ];then
                                                 echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) subnet MAX 254 reached '${INSTALL_DIR}WireguardVPN.conf'"
                                                 exit 97
                                             fi
+
+                                            [ -z "$MATCHES" ] && break
                                         done
 
                                         local VPN_POOL_IP4=$VPN_POOL_SUBNET"."$IP"/32"  # v4.15
@@ -6193,26 +6470,36 @@ Create_RoadWarrior_Device() {
                                     echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) subnet NOT defined 'device' Peers?"
                                     return 1
                                 fi
-                            fi
+                            #fi
                         else
                             local USE_IPV6="Y"
-                            local VPN_POOL_PREFIX=${VPN_POOL%/*}
-                            local VPN_POOL_PREFIX=$(echo "$VPN_POOL_PREFIX" | awk -F '[:/]' '{print $1":"$2":"$3"::"}')
-                            local IP=$(sqlite3 $SQL_DATABASE "SELECT COUNT(ip) FROM devices WHERE ip LIKE '${VPN_POOL_PREFIX}.%';")
-                            local IP=$((IP+2))
+                            local VPN_POOL_IP=${VPN_POOL%/*}
+                            local VPN_POOL_MASK=${VPN_POOL##*/}                     # v4.15
+                            local VPN_SUBNET=${VPN_POOL_IP%:*}
+                            local VPN_IP_EXPANDED=$(Expand_IPv6 "${VPN_POOL%/*}")   # v4.15
+                            local VPN_IP_COMPRESSED=$(Compress_IPv6 "${VPN_IP_EXPANDED}")
+                            local VPN_POOL_PREFIX_EXPANDED=${VPN_IP_EXPANDED%:*}    # v4.15
+                            local VPN_POOL_PREFIX_COMPRESSED=$(Compress_IPv6 "${VPN_POOL_PREFIX_EXPANDED}")
+
+                            local IP=2
 
                             while true
                                 do
-                                    local DUPLICATE=$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE  ip LIKE '${VPN_POOL_PREFIX}.%';") # v4.02
+                                    local MATCH="$(sqlite3 $SQL_DATABASE "SELECT ip FROM devices WHERE ip LIKE '%${VPN_POOL_PREFIX_COMPRESSED}${IP}/128%';" | tr ',' ' ')"  # v4.15 v4.11 v4.02
+                                    local DUPLICATE=$(echo "$MATCH" | grep -ow "${VPN_POOL_PREFIX_COMPRESSED}${IP}/128")
                                     [ -z "$DUPLICATE" ] && break || local IP=$((IP+1))
 
                                     if [ $IP -ge 255 ];then
-                                        echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) subnet MAX 254 reached '${INSTALL_DIR}WireguardVPN.conf'"
+                                        echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) IPv6 subnet MAX 254 imposed!'"
                                         exit 98
                                     fi
+
+                                    [ -z "$MATCH" ] && break
+
                                 done
 
-                            local VPN_POOL_IP6=${VPN_POOL_PREFIX}$IP"/128"      # v4.15
+                            local VPN_POOL_IP6=${VPN_POOL_PREFIX_COMPRESSED}$IP"/128"   # v4.15
+
                         fi
                     done
 
@@ -6476,6 +6763,13 @@ NOCHK="Martineau Disabled hack"
 if [ "$1" == "uninstall" ];then         # v4.15
     NOCHK="Y"                           # v4.15
     Uninstall_WireGuard                 # v4.15
+    echo -e $cRESET                     # v4.15
+    exit 0                              # v4.15
+fi
+
+# Purge old traffic/session database records        # trimdb {days [ 'traffic' | 'session' ] [auto]}
+if [ "$1" == "trimdb" ];then            # v4.15
+    Purge_Database "$@" "auto"          # v4.15
     echo -e $cRESET                     # v4.15
     exit 0                              # v4.15
 fi
