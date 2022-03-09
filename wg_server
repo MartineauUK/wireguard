@@ -1,26 +1,56 @@
-#!/bin/sh
-VERSION="v4.14.5"
-#============================================================================================ © 2021-2022 Martineau v4.14.5
+VERSION="v4.15.11"
+#============================================================================================ © 2021-2022 Martineau v4.15.11
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 19-Jan-2022
+# Last Updated Date: 09-Mar-2022
 #
 # Description:
 #
 # Acknowledgement:
 #
-# Contributors: odkrys,ZebMcKayhan,Torson,chongnt
+# Contributors: odkrys,ZebMcKayhan,Torson,chongnt,Bearnet
 
 # shellcheck disable=SC2034
-ANSIColours() {
-    cRESET="\e[0m";cBLA="\e[30m";cRED="\e[31m";cGRE="\e[32m";cYEL="\e[33m";cBLU="\e[34m";cMAG="\e[35m";cCYA="\e[36m";cGRA="\e[37m"
-    cBGRA="\e[90m";cBRED="\e[91m";cBGRE="\e[92m";cBYEL="\e[93m";cBBLU="\e[94m";cBMAG="\e[95m";cBCYA="\e[96m";cBWHT="\e[97m"
-    aBOLD="\e[1m";aDIM="\e[2m";aUNDER="\e[4m";aBLINK="\e[5m";aREVERSE="\e[7m"
-    cWRED="\e[41m";cWGRE="\e[42m";cWYEL="\e[43m";cWBLU="\e[44m";cWMAG="\e[45m";cWCYA="\e[46m";cWGRA="\e[47m"
+ANSIColours () {
+
+    local ACTION=$1
+
+    cRESET=
+    aBOLD=;aDIM=;aUNDER=;aBLINK=;aREVERSE=
+    aBOLDr=;aDIMr=;aUNDERr=;aBLINKr=;aREVERSEr=
+
+    cBLA=;cRED=;cGRE=;cYEL=;cBLU=;cMAG=;cCYA=;cGRA=;cFGRESET=
+    cBGRA=;cBRED=;cBGRE=;cBYEL=;cBBLU=;cBMAG=;cBCYA=;cBWHT=
+    cWRED=;cWGRE=;cWYEL=;cWBLU=;cWMAG=;cWCYA=;cWGRA=
+    cYBLU=
+    cRED_=;cGRE_=
+
+    if [ "$ACTION" != "disable" ];then
+        cRESET="\e[0m";
+        aBOLD="\e[1m";aDIM="\e[2m";aUNDER="\e[4m";aBLINK="\e[5m";aREVERSE="\e[7m"
+        aBOLDr="\e[21m";aDIMr="\e[22m";aUNDERr="\e[24m";aBLINKr="\e[25m";aREVERSEr="\e[27m"
+        cBLA="\e[30m";cRED="\e[31m";cGRE="\e[32m";cYEL="\e[33m";cBLU="\e[34m";cMAG="\e[35m";cCYA="\e[36m";cGRA="\e[37m";cFGRESET="\e[39m"
+        cBGRA="\e[90m";cBRED="\e[91m";cBGRE="\e[92m";cBYEL="\e[93m";cBBLU="\e[94m";cBMAG="\e[95m";cBCYA="\e[96m";cBWHT="\e[97m"
+        aBOLD="\e[1m";aDIM="\e[2m";aUNDER="\e[4m";aBLINK="\e[5m";aREVERSE="\e[7m"
+
+        cWRED="\e[41m";cWGRE="\e[42m";cWYEL="\e[43m";cWBLU="\e[44m";cWMAG="\e[45m";cWCYA="\e[46m";cWGRA="\e[47m"
+        cYBLU="\e[93;48;5;21m"
+        cRED_="\e[41m";cGRE_="\e[42m"
+    fi
+
+    xHOME="\e[H";xERASE="\e[2J";xERASEDOWN="\e[J";xERASEUP="\e[1J";xCSRPOS="\e[s";xPOSCSR="\e[u";xERASEEOL="\e[K";xQUERYCSRPOS="\e[6n"
+    xGoto="\e[Line;Columnf"
+}
+Is_IPv4() {
+        grep -oE '^([0-9]{1,3}\.){3}[0-9]{1,3}$'                    # IPv4 format
 }
 Is_IPv4_CIDR () {
         grep -oE '^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$'         # IPv4 CIDR range notation
+}
+Is_IPv6() {
+    # Note this matches compression anywhere in the address, though it won't match the loopback address ::1
+    grep -oE '([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4}'       # IPv6 format -very crude
 }
 Is_Private_IPv6 () {
     grep -oE "(::1$)|([fF][cCdD])"
@@ -60,8 +90,15 @@ Firewall_delete() {
     iptables -D FORWARD -i br0 -o $VPN_ID -j ACCEPT -m comment --comment "LAN to WireGuard 'server clients'" 2>/dev/null
     iptables -D OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
     iptables -t nat -D PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
-    iptables -t nat -D POSTROUTING -s $Subnet -o wg1+ -j MASQUERADE -m comment --comment "WireGuard 'server'"  2>/dev/null  # v1.11
-    iptables -t nat -D POSTROUTING -s $Subnet -o br0 -j MASQUERADE -m comment --comment "WireGuard 'server clients to LAN'" 2>/dev/null # v4.14.2
+
+    local LOCALIPS=$(echo "$Subnet" | tr ',' ' ')               # v4.11
+    for THIS in $LOCALIPS                                       # v4.11
+        do                                                      # v4.11
+            if [ -z "$(echo "$THIS" | grep -F ":")" ] ;then     # v4.11
+                iptables -t nat -D POSTROUTING -s $THIS -o wg1+ -j MASQUERADE -m comment --comment "WireGuard 'server'"  2>/dev/null  # v1.11
+                iptables -t nat -D POSTROUTING -s $THIS -o br0 -j MASQUERADE -m comment --comment "WireGuard 'server clients to LAN'" 2>/dev/null # v4.14.2
+            fi
+        done
 
     if [ "$(nvram get ipv6_service)" != "disabled" ];then
         ip6tables -t mangle -D PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'server'" 2>/dev/null
@@ -76,15 +113,18 @@ Firewall_delete() {
         ip6tables -D FORWARD -i br0 -o $VPN_ID -j ACCEPT -m comment --comment "LAN to WireGuard 'server clients'" 2>/dev/null
         ip6tables -D OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
         ip6tables -t nat -D PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null   # v4.14.1
-        ip6tables -t nat -D POSTROUTING -s $Subnet -o wg1+ -j MASQUERADE -m comment --comment "WireGuard 'server'"  2>/dev/null # v4.14.1
-        ip6tables -t nat -D POSTROUTING -s $Subnet -o br0 -j MASQUERADE -m comment --comment "WireGuard 'server'"  2>/dev/null  # v4.14.1
+
+        local LOCALIPS=$(echo "$Subnet" | tr ',' ' ')               # v4.11
+        for THIS in $LOCALIPS                                       # v4.11
+            do                                                      # v4.11
+                if [ -n "$(echo "$THIS" | grep -F ":")" ] ;then     # v4.11
+                    ip6tables -t nat -D POSTROUTING -s $THIS -o wg1+ -j MASQUERADE -m comment --comment "WireGuard 'server'"  2>/dev/null # v4.14.1
+                    ip6tables -t nat -D POSTROUTING -s $THIS -o br0 -j MASQUERADE -m comment --comment "WireGuard 'server clients to LAN'"  2>/dev/null  # v4.14.1
+                fi
+            done
     fi
 }
-cmd() {
-    [ "$SHOWCMDS" == "Y" ] && echo "[#] $*" >&2     # v4.14.7
-    "$@"
-}
-Manage_Passthru(){
+Manage_Passthru() {
 
     local PASSTHRU_CLIENTS=$(sqlite3 /opt/etc/wireguard.d/WireGuard.db "SELECT client FROM passthru where server='$WG_INTERFACE';" | sort | uniq | tr '\n' ' ')
     local VPN_ID=           # v4.13 Fix @chongnt
@@ -127,11 +167,10 @@ Process_Pre_Post_Commands() {
             CMD="$(echo "$LINE" | sed "s/\%i/$WG_INTERFACE/g;s/\%w/$WAN_IF/g;s/\%p/$LISTEN_PORT/g")"    # v4.14.4 v4.14.1
             if [ -n "$CMD" ];then
                 logger -t "wireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"
-                [ "$SHOWCMDS" == "Y" ] && echo "[$CMDTYPE] $CMD" >&2       # v4.4.4
-                if [ -n "$(echo "$CMDTYPE" | grep "Up")" ];then            # v4.4.4
-                    $CMD
+                if [ -n "$(echo "$CMDTYPE" | grep "Up")" ];then             # v4.4.4
+                    cmd $CMD
                 else
-                    $CMD 2>/dev/null                                       # v4.4.4
+                    $CMD 2>/dev/null                                        # v4.4.4
                 fi
 
             fi
@@ -140,18 +179,60 @@ $(grep -E "^#${1}" ${CONFIG_DIR}${WG_INTERFACE}.conf | tr ';' '\n' | sed 's/^#.*
 EOR
 
 }
+Firewall_Rule_Exists() {
 
+    local CMD="$@"
+    local RULE_EXISTS="N"
+
+    local CHECK_DUPLICATE=$(echo "$CMD" | sed 's/-[IA]/-C/')
+    if [ -z "$(echo "$CMD" | grep -Fo "comment" )" ];then
+        $CHECK_DUPLICATE -m comment --comment "WireGuard 'server'" 2>/dev/null
+        RC=$?
+        [ $RC -eq 0 ] && local RULE_EXISTS="Y"
+    fi
+    if [ "$RULE_EXISTS" == "N" ];then
+        $CHECK_DUPLICATE 2>/dev/null
+        RC=$?
+        [ $RC -eq 0 ] && local RULE_EXISTS="Y"
+    fi
+
+    echo "$RULE_EXISTS"
+}
+cmd() {
+
+    local CMD=$(echo "$@" | awk '{print $1}')
+
+    [ "$SHOWCMDS" == "Y" ] && echo "[#] $*" >&2     # v4.15.1
+
+    case $CMD in
+        *tables*)
+            if [ "$(Firewall_Rule_Exists "$@")" == "Y" ];then
+                logger -t "wireguard-${MODE}${VPN_NAME}" "..........duplicate; skipped!"
+                return
+            fi
+        ;;
+    esac
+
+    "$@"
+}
 #For verbose debugging, uncomment the following two lines, and uncomment the last line of this script
 #set -x
 #(
 
 Main() { true; }            # Syntax that is Atom Shellchecker compatible!
 
-ANSIColours
+if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -z "$(grep -E "^NOCOLOR|^NOCOLOUR" ${INSTALL_DIR}WireguardVPN.conf)" ];then     # v4.15.4
+    ANSIColours
+fi
 
 SQL_DATABASE="/opt/etc/wireguard.d/WireGuard.db"        # v1.13
 CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v1.08 @elorimer
 INSTALL_DIR="/jffs/addons/wireguard/"
+
+VPN_ID=$1
+[ -z "$1" ] && VPN_ID="wg21"
+
+VPN_NAME=$VPN_ID
 
 modprobe xt_set
 modprobe xt_comment                                                                 # v1.13 Hotfix
@@ -169,9 +250,7 @@ else
     fi
 fi
 
-VPN_ID=$1
-[ -z "$1" ] && VPN_ID="wg21"
-#logger -st "wireguard-server${VPN_ID:2:1}" "Configuring Wireguard VPN Server ($VPN_ID) on Port:"$wgport
+
 
 [ -n "$(echo "$@" | grep "debug")" ] && SHOWCMDS="Y"                        # v4.14.4
 
@@ -267,17 +346,68 @@ if [ "$2" != "disable" ];then
     # v4.14 Process 'PreUp' commands
     Process_Pre_Post_Commands "PreUp"   # v4.14.1
 
-    cmd ip address add dev $VPN_ID $Subnet
     cmd ip link set up dev $VPN_ID
     if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$Subnet" | grep ":")" ];then         # v4.05
-        cmd ip -6 address add dev $VPN_ID $Subnet
         cmd ip -6 link set up dev $VPN_ID
     fi
 
-    cmd ifconfig $VPN_ID mtu 1420                       # v1.02
+    # v4.12 Assign both IPv4 and IPv6 IPs to interface as required
+    LOCALIPS=$(echo "$Subnet" | tr ',' ' ')                                                 # v4.10
+    for LOCALIP in $LOCALIPS                                                                # v4.10
+        do
+            if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$LOCALIP" | grep -F ":")" ];then     # v4.10
+                cmd ip -6 address add dev $VPN_ID $LOCALIP                                  # v4.10
+            else
+                if [ -n "$(echo "$LOCALIP" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$LOCALIP" | Is_IPv4)" ];then
+                    cmd ip address add dev $VPN_ID $LOCALIP                                 # v4.10
+                fi
+            fi
+        done
+
+    MTU=$(awk '/^#?MTU/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)            # v4.15.7 @Bearnet
+    if [ -z "$MTU" ];then
+        cmd ifconfig $VPN_ID mtu 1420                           # v4.15.5
+    else
+        cmd ifconfig $VPN_ID mtu $MTU                           # v4.15.5 v1.02
+        sed -i 's/^MTU/#MTU/' ${CONFIG_DIR}${VPN_ID}.conf
+    fi
 
     TIMESTAMP=$(date +%s)
     sqlite3 $SQL_DATABASE "INSERT into session values('$WG_INTERFACE','Start','$TIMESTAMP');"   # v1.13
+    # Site-to-Site identify remote site peer
+    # Extract '# Cabin LAN'
+    if [ "$(sqlite3 $SQL_DATABASE "SELECT auto FROM servers WHERE peer='$WG_INTERFACE';")" == "S" ];then    # v4.15.1
+        SITE2SITE_PEER=$(awk '/^#.*LAN/ {print $2}' ${CONFIG_DIR}${WG_INTERFACE}.conf )                     # v4.15.1
+        sqlite3 $SQL_DATABASE "INSERT into traffic values('$SITE2SITE_PEER','$TIMESTAMP','*','*','*','*');" # v4.15.1
+
+        # What if the Remote Site-to-Site Peer acquires a new IP address after the initial handshake?
+        # (NOTE: Mullvad Endpoints seem to be IPv4 address rather than DDNS name)
+        # Need a monitor that refreshes the Remote DDNS IP if the handshake is dormant.
+        # Use
+        #      "wg show WG_INTERFACE latest-handshakes"
+        #      if [ latest handshake is > than say 135 ]; then force resolution of DDNS name to it's current IP Address
+        #         "wg set WG_INTERFACE peer $PUB_KEY endpoint SiteA_DDNS:51820"
+        #      fi
+        #
+        # see /jffs/addons/wireguard/wg_ChkEndpointDDNS.sh
+        ENDPOINTS=$(awk '/^Endpoint/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf | tr '\n' ' ')           # v4.15.8
+        DDNS_FOUND=0
+        for ENDPOINT in $ENDPOINTS
+            do
+                [ $(echo "$ENDPOINT" | tr ":" " " | wc -w) -gt 2 ] && continue                              # v4.15.8
+                # So not IPv6...
+                DDNS=$(echo "$ENDPOINT" | awk -F ":" '{print $1}')                                          # v4.15.8
+                if [ -z "$(echo "$DDNS" | Is_IPv4_CIDR)" ] && [ -z "$(echo "$DDNS" | Is_IPv4)" ];then       # v4.15.8
+                    DDNS_FOUND=1    # NOT IPv4 so must be DDNS so monitor it                                # v4.15.8
+                    break
+                fi
+            done
+
+        if [ $DDNS_FOUND -eq 1 ];then                                                                       # v4.15.3
+            cru a WireGuard_ChkDDNS${WG_INTERFACE} "*/5 * * * * ${INSTALL_DIR}wg_ChkEndpointDDNS.sh $WG_INTERFACE"  # v4.15.3
+            logger -t "wireguard-server${VPN_ID:3:1}" "Endpoint DDNS refresh monitor started - cru #WireGuard_ChkDDNS${WG_INTERFACE}#."
+        fi
+    fi
 
     cmd ifconfig $VPN_ID txqueuelen 1000
 
@@ -309,12 +439,21 @@ if [ "$2" != "disable" ];then
 
         cmd iptables -I INPUT -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'"
         cmd iptables -I INPUT -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
-        cmd iptables -I FORWARD -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
-        cmd iptables -I FORWARD -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
-        cmd iptables -I FORWARD -i br0 -o $VPN_ID -j ACCEPT -m comment --comment "LAN to WireGuard 'server clients'"    # v4.14.1 @ZebMcKayhan
+        #cmd iptables -I FORWARD -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
+        cmd iptables -I FORWARD -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"      # v4.15.10 @ZebMcKayhan
+        cmd iptables -I FORWARD -i br0 -o $VPN_ID -j ACCEPT -m comment --comment "LAN to WireGuard 'server clients'"    # v4.14.1
+
         cmd iptables -I OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
         cmd iptables -t nat -I PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'"
-        cmd iptables -t nat -I POSTROUTING -s $Subnet -o br0 -j MASQUERADE -m comment --comment "WireGuard 'server clients to LAN'" # v4.14.2
+
+        for THIS in $(echo "$Subnet" | tr ',' ' ')                  # v4.15.10
+            do
+                if [ -z "$(echo "$THIS" | grep -F ":" )" ];then     # v4.15.10
+                    cmd iptables -t nat -I POSTROUTING -s $THIS -o br0 -j MASQUERADE -m comment --comment "WireGuard 'server clients to LAN'" # v4.14.2
+                else
+                    cmd ip6tables -t nat -I POSTROUTING -s $THIS -o br0 -j MASQUERADE -m comment --comment "WireGuard 'server clients to LAN'"  # v4.15.11 @ZebMcKayhan
+                fi
+            done
 
         if [ "$USE_IPV6" == "Y" ];then                          # v4.05
             if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -z "$(grep -E "^NOTCPMSS" /jffs/addons/wireguard/WireguardVPN.conf)" ];then    # v4.12
@@ -333,24 +472,25 @@ if [ "$2" != "disable" ];then
             cmd ip6tables -I INPUT -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'"
             cmd ip6tables -I INPUT -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
             cmd ip6tables -I FORWARD -i $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
-            cmd ip6tables -I FORWARD -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
+            #cmd ip6tables -I FORWARD -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
             cmd ip6tables -I FORWARD -i br0 -o $VPN_ID -j ACCEPT -m comment --comment "LAN to WireGuard 'server clients'"   # v4.14.1 @ZebMcKayhan
             cmd ip6tables -I OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
         fi
 
-
     fi
 
     for ALLOWIP in $(awk '/^AllowedIPs/ {$1="";$2="";print $0}' ${CONFIG_DIR}${VPN_ID}.conf | tr ',' ' ')   # v4.14.1
-    do
-        if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$ALLOWIP" | grep -F ":")" ];then
-            cmd ip -6 route add $ALLOWIP dev $VPN_ID
-        else
-            if [ -n "$(echo "$ALLOWIP" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$ALLOWIP" | Is_IPv4)" ];then
-                cmd ip route add $ALLOWIP dev $VPN_ID
+        do
+
+            if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$ALLOWIP" | grep -F ":")" ];then
+                cmd ip -6 route add $ALLOWIP dev $VPN_ID
+            else
+                if [ -n "$(echo "$ALLOWIP" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$ALLOWIP" | Is_IPv4)" ];then
+                    #[ "$(echo "$ALLOWIP" | grep -o "^.*\.")" != "$(echo "$Subnet" | grep -o "^.*\.")" ] && cmd ip route add $ALLOWIP dev $VPN_ID        # v4.15.3
+                    cmd ip route add $ALLOWIP dev $VPN_ID        # v4.15.5 v4.15.3
+                fi
             fi
-        fi
-    done
+        done
 
     # User Exit @ZebMcKayhan
     [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh ] && { logger -t "wireguard-server${VPN_ID:3:1}" "Executing ${VPN_ID}-up.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh; }
@@ -358,17 +498,16 @@ if [ "$2" != "disable" ];then
     # v4.14 Process 'PostUp' commands
     Process_Pre_Post_Commands "PostUp"  # v4.14.1
 
-    ###############################################################EIC Hack 5 of 5##############################
-    #logger -st "($(basename $0))" "Configuring Wireguard to VPN Client (pass-thru)"
-    #[ -n "$(wg show interfaces | grep -E "wg[0-1]")" ] && iptables -I POSTROUTING -t nat -s $Subnet -o wg1+ -j MASQUERADE -m comment --comment "WireGuard 'server'"
     echo -en $cBGRE"\t"
     logger -st "wireguard-server${VPN_ID:3:1}" "Initialisation complete."
     echo -e $cRESET
-    ############################################################################################################
+
 else
 
     # v4.14 Process 'PreDown' commands
     Process_Pre_Post_Commands "PreDown" # v4.14.1
+
+    cru d WireGuard_ChkDDNS${WG_INTERFACE}  # v4.18.8
 
     for ALLOWIP in $(awk '/^AllowedIPs/ {$1="";$2="";print $0}' ${CONFIG_DIR}${VPN_ID}.conf | tr ',' ' ')   # v4.14.1
         do
@@ -385,6 +524,12 @@ else
 
     TIMESTAMP=$(date +%s)
     sqlite3 $SQL_DATABASE "INSERT into session values('$WG_INTERFACE','End','$TIMESTAMP');" # v1.13
+    # Site-to-Site identify remote site peer
+    # Extract '# Cabin LAN'
+    if [ "$(sqlite3 $SQL_DATABASE "SELECT auto FROM servers WHERE peer='$WG_INTERFACE';")" == "S" ];then    # v4.15.1
+        SITE2SITE_PEER=$(awk '/^#.*LAN/ {print $2}' ${CONFIG_DIR}${WG_INTERFACE}.conf )                     # v4.15.1
+        #sqlite3 $SQL_DATABASE "INSERT into traffic values('$SITE2SITE_PEER','$TIMESTAMP','*','*','*','*');" # v4.15.9 v4.15.1
+    fi
 
     Firewall_delete
 
@@ -414,3 +559,4 @@ fi
 
 
 #) 2>&1 | logger -t $(basename $0)"[$$_***DEBUG]"
+
