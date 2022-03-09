@@ -1,5 +1,5 @@
-VERSION="v4.15.10"
-#============================================================================================ © 2021-2022 Martineau v4.15.10
+VERSION="v4.15.11"
+#============================================================================================ © 2021-2022 Martineau v4.15.11
 #
 
 # Maintainer: Martineau
@@ -90,8 +90,15 @@ Firewall_delete() {
     iptables -D FORWARD -i br0 -o $VPN_ID -j ACCEPT -m comment --comment "LAN to WireGuard 'server clients'" 2>/dev/null
     iptables -D OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
     iptables -t nat -D PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
-    iptables -t nat -D POSTROUTING -s $Subnet -o wg1+ -j MASQUERADE -m comment --comment "WireGuard 'server'"  2>/dev/null  # v1.11
-    iptables -t nat -D POSTROUTING -s $Subnet -o br0 -j MASQUERADE -m comment --comment "WireGuard 'server clients to LAN'" 2>/dev/null # v4.14.2
+
+    local LOCALIPS=$(echo "$Subnet" | tr ',' ' ')               # v4.11
+    for THIS in $LOCALIPS                                       # v4.11
+        do                                                      # v4.11
+            if [ -z "$(echo "$THIS" | grep -F ":")" ] ;then     # v4.11
+                iptables -t nat -D POSTROUTING -s $THIS -o wg1+ -j MASQUERADE -m comment --comment "WireGuard 'server'"  2>/dev/null  # v1.11
+                iptables -t nat -D POSTROUTING -s $THIS -o br0 -j MASQUERADE -m comment --comment "WireGuard 'server clients to LAN'" 2>/dev/null # v4.14.2
+            fi
+        done
 
     if [ "$(nvram get ipv6_service)" != "disabled" ];then
         ip6tables -t mangle -D PREROUTING -i $VPN_ID -j MARK --set-xmark 0x01/0x7 -m comment --comment "WireGuard 'server'" 2>/dev/null
@@ -106,8 +113,15 @@ Firewall_delete() {
         ip6tables -D FORWARD -i br0 -o $VPN_ID -j ACCEPT -m comment --comment "LAN to WireGuard 'server clients'" 2>/dev/null
         ip6tables -D OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
         ip6tables -t nat -D PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null   # v4.14.1
-        ip6tables -t nat -D POSTROUTING -s $Subnet -o wg1+ -j MASQUERADE -m comment --comment "WireGuard 'server'"  2>/dev/null # v4.14.1
-        ip6tables -t nat -D POSTROUTING -s $Subnet -o br0 -j MASQUERADE -m comment --comment "WireGuard 'server'"  2>/dev/null  # v4.14.1
+
+        local LOCALIPS=$(echo "$Subnet" | tr ',' ' ')               # v4.11
+        for THIS in $LOCALIPS                                       # v4.11
+            do                                                      # v4.11
+                if [ -n "$(echo "$THIS" | grep -F ":")" ] ;then     # v4.11
+                    ip6tables -t nat -D POSTROUTING -s $THIS -o wg1+ -j MASQUERADE -m comment --comment "WireGuard 'server'"  2>/dev/null # v4.14.1
+                    ip6tables -t nat -D POSTROUTING -s $THIS -o br0 -j MASQUERADE -m comment --comment "WireGuard 'server clients to LAN'"  2>/dev/null  # v4.14.1
+                fi
+            done
     fi
 }
 Manage_Passthru() {
@@ -436,6 +450,8 @@ if [ "$2" != "disable" ];then
             do
                 if [ -z "$(echo "$THIS" | grep -F ":" )" ];then     # v4.15.10
                     cmd iptables -t nat -I POSTROUTING -s $THIS -o br0 -j MASQUERADE -m comment --comment "WireGuard 'server clients to LAN'" # v4.14.2
+                else
+                    cmd ip6tables -t nat -I POSTROUTING -s $THIS -o br0 -j MASQUERADE -m comment --comment "WireGuard 'server clients to LAN'"  # v4.15.11 @ZebMcKayhan
                 fi
             done
 
