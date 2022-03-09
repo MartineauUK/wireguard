@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.14.13"
-#============================================================================================ © 2021-2022 Martineau v4.14.13
+VERSION="v4.15.3"
+#============================================================================================ © 2021-2022 Martineau v4.15.3
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 19-Jan-2022
+# Last Updated Date: 09-Mar-2022
 #
 # Description:
 #
@@ -27,13 +27,35 @@ $TEXT
 EOF
 }
 # shellcheck disable=SC2034
-ANSIColours() {
+ANSIColours () {
 
-    cRESET="\e[0m";cBLA="\e[30m";cRED="\e[31m";cGRE="\e[32m";cYEL="\e[33m";cBLU="\e[34m";cMAG="\e[35m";cCYA="\e[36m";cGRA="\e[37m"
-    cBGRA="\e[90m";cBRED="\e[91m";cBGRE="\e[92m";cBYEL="\e[93m";cBBLU="\e[94m";cBMAG="\e[95m";cBCYA="\e[96m";cBWHT="\e[97m"
-    aBOLD="\e[1m";aDIM="\e[2m";aUNDER="\e[4m";aBLINK="\e[5m";aREVERSE="\e[7m"
-    cRED_="\e[41m";cGRE_="\e[42m"
+    local ACTION=$1
 
+    cRESET=
+    aBOLD=;aDIM=;aUNDER=;aBLINK=;aREVERSE=
+    aBOLDr=;aDIMr=;aUNDERr=;aBLINKr=;aREVERSEr=
+
+    cBLA=;cRED=;cGRE=;cYEL=;cBLU=;cMAG=;cCYA=;cGRA=;cFGRESET=
+    cBGRA=;cBRED=;cBGRE=;cBYEL=;cBBLU=;cBMAG=;cBCYA=;cBWHT=
+    cWRED=;cWGRE=;cWYEL=;cWBLU=;cWMAG=;cWCYA=;cWGRA=
+    cYBLU=
+    cRED_=;cGRE_=
+
+    if [ "$ACTION" != "disable" ];then
+        cRESET="\e[0m";
+        aBOLD="\e[1m";aDIM="\e[2m";aUNDER="\e[4m";aBLINK="\e[5m";aREVERSE="\e[7m"
+        aBOLDr="\e[21m";aDIMr="\e[22m";aUNDERr="\e[24m";aBLINKr="\e[25m";aREVERSEr="\e[27m"
+        cBLA="\e[30m";cRED="\e[31m";cGRE="\e[32m";cYEL="\e[33m";cBLU="\e[34m";cMAG="\e[35m";cCYA="\e[36m";cGRA="\e[37m";cFGRESET="\e[39m"
+        cBGRA="\e[90m";cBRED="\e[91m";cBGRE="\e[92m";cBYEL="\e[93m";cBBLU="\e[94m";cBMAG="\e[95m";cBCYA="\e[96m";cBWHT="\e[97m"
+        aBOLD="\e[1m";aDIM="\e[2m";aUNDER="\e[4m";aBLINK="\e[5m";aREVERSE="\e[7m"
+
+        cWRED="\e[41m";cWGRE="\e[42m";cWYEL="\e[43m";cWBLU="\e[44m";cWMAG="\e[45m";cWCYA="\e[46m";cWGRA="\e[47m"
+        cYBLU="\e[93;48;5;21m"
+        cRED_="\e[41m";cGRE_="\e[42m"
+    fi
+
+    xHOME="\e[H";xERASE="\e[2J";xERASEDOWN="\e[J";xERASEUP="\e[1J";xCSRPOS="\e[s";xPOSCSR="\e[u";xERASEEOL="\e[K";xQUERYCSRPOS="\e[6n"
+    xGoto="\e[Line;Columnf"
 }
 Is_HND() {
     # Use the following at the command line otherwise 'return X' makes the SSH session terminate!
@@ -270,27 +292,58 @@ EOR
     fi
 }
 Process_Pre_Post_Commands() {
-
+    # v4.14.1
     while read LINE; do
-            if [ -n "$LINE" ];then
-                local CMDTYPE=$1
-                local CMD="$(echo "$LINE" | sed "s/\%i/$WG_INTERFACE/g" | sed "s/\%w/$WAN_IF/g")"  # v4.14.6
-                if [ -n "$CMD" ];then
-                    if [ -n "$(echo "$CMDTYPE" | grep "Up")" ] || [ -n "$(wg show | grep "$WG_INTERFACE")" ] || [ -z "$(echo "$CMD" | grep "$WG_INTERFACE")" ];then
-                        logger -t "wireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"
-                        [ "$SHOWCMDS" == "Y" ] && echo "[$CMDTYPE] $CMD" >&2        # v4.14.13
-                        $CMD
-                    else
-                        logger -t "wireguard-${MODE}${VPN_NAME}" "Skipping $CMDTYPE: '$CMD'"
-                    fi
+            CMDTYPE=$1
+            CMD="$(echo "$LINE" | sed "s/\%i/$WG_INTERFACE/g;s/\%w/$WAN_IF/g;s/\%p/$LISTEN_PORT/g")"    # v4.14.4 v4.14.1
+            if [ -n "$CMD" ];then
+                logger -t "wireguard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"
+                if [ -n "$(echo "$CMDTYPE" | grep "Up")" ];then             # v4.4.4
+                    cmd $CMD                                                # v4.15.2
+                else
+                    $CMD 2>/dev/null                                        # v4.4.4
                 fi
+
             fi
     done << EOR
 $(grep -E "^#${1}" ${CONFIG_DIR}${WG_INTERFACE}.conf | tr ';' '\n' | sed 's/^#.*=//')
 EOR
+
+}
+Firewall_Rule_Exists() {
+    # v4.15.3
+    local CMD="$@"
+    local RULE_EXISTS="N"
+
+    local CHECK_DUPLICATE=$(echo "$CMD" | sed 's/-[IA]/-C/')
+    if [ -z "$(echo "$CMD" | grep -Fo "comment" )" ];then
+        $CHECK_DUPLICATE -m comment --comment "WireGuard 'client'" 2>/dev/null      # v4.15.2
+        RC=$?
+        [ $RC -eq 0 ] && local RULE_EXISTS="Y"
+    fi
+    if [ "$RULE_EXISTS" == "N" ];then
+        $CHECK_DUPLICATE 2>/dev/null                                                # v4.15.2
+        RC=$?
+        [ $RC -eq 0 ] && local RULE_EXISTS="Y"
+    fi
+
+    echo "$RULE_EXISTS"
 }
 cmd() {
-    [ "$SHOWCMDS" == "Y" ] && echo "[#] $*" >&2     # v4.14.7
+
+    local CMD=$(echo "$@" | awk '{print $1}')
+
+    [ "$SHOWCMDS" == "Y" ] && echo "[#] $*" >&2     # v4.15.1
+
+    case $CMD in                                                # v4.15.2
+        *tables*)                                               # v4.15.2
+            if [ "$(Firewall_Rule_Exists "$@")" == "Y" ];then   # v4.15.2
+                logger -t "wireguard-${MODE}${VPN_NAME}" "..........duplicate; skipped!"
+                return
+            fi
+        ;;
+    esac
+
     "$@"
 }
 #=============================================Main=============================================================
@@ -302,7 +355,9 @@ cmd() {
 # shellcheck disable=SC2068
 Main() { true; } # Syntax that is Atom Shellchecker compatible!
 
-ANSIColours
+if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -z "$(grep -E "^NOCOLOR|^NOCOLOUR" ${INSTALL_DIR}WireguardVPN.conf)" ];then     # v4.15.3
+    ANSIColours
+fi
 
 CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v1.05 @elorimer
 INSTALL_DIR="/jffs/addons/wireguard/"
@@ -735,6 +790,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -n "$(grep -E "^CHK_ENDPOINT" ${INSTALL_DIR}WireguardVPN.conf)" ];then    # v# v4.14
             #   e.g. the following would use the curl command for ALL interfaces except 'wg14' (TorGuard)
             #        CHK_ENDPOINT = curl -s https://am.i.mullvad.net/connected  , * wg14-
+            #        Full feature URL check https://mullvad.net/en/check/  (e.g. Mullvad hijacks DNS requests see https://schnerring.net/blog/use-custom-dns-servers-with-mullvad-and-any-wireguard-client/)
 
             CHK_ENDPOINT=$( awk "/^CHK_ENDPOINT=.*\*/" ${INSTALL_DIR}WireguardVPN.conf)             # v4.14
             [ -z "$CHK_ENDPOINT" ] && CHK_ENDPOINT=$( awk "/^CHK_ENDPOINT=.*${WG_INTERFACE}/" ${INSTALL_DIR}WireguardVPN.conf)
@@ -760,6 +816,34 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
             fi
         fi
 
+        # What if the Endpoint Peer acquires a new IP address after the initial handshake?
+        #      (NOTE: Mullvad Endpoints seem to ALWAYS be an IPv4 address rather than DDNS name)
+        # Need a monitor that refreshes the Endpoint DDNS IP if the handshake is dormant.
+        # Use
+        #      "wg show WG_INTERFACE latest-handshakes"
+        #      if [ latest handshake is > than say 135 ]; then force DDNS resolution of DDNS name to current IP Address
+        #         "wg set WG_INTERFACE peer $PUB_KEY endpoint Peer_DDNS:nnnnn"
+        #      fi
+        #
+        # see /jffs/addons/wireguard/wg_ChkEndpointDDNS.sh
+        ENDPOINTS=$(awk '/^Endpoint/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf | tr '\n' ' ')           # v4.15.3
+        DDNS_FOUND=0
+        for ENDPOINT in $ENDPOINTS
+            do
+                [ $(echo "$ENDPOINT" | tr ":" " " | wc -w) -gt 2 ] && continue                              # v4.15.3
+                # So not IPv6...
+                DDNS=$(echo "$ENDPOINT" | awk -F ":" '{print $1}')                                          # v4.15.3
+                if [ -z "$(echo "$DDNS" | Is_IPv4_CIDR)" ] && [ -z "$(echo "$DDNS" | Is_IPv4)" ];then       # v4.15.3
+                    DDNS_FOUND=1    # NOT IPv4 so must be DDNS so monitor it                                # v4.15.3
+                    break
+                fi
+            done
+
+        if [ $DDNS_FOUND -eq 1 ];then                                                                       # v4.15.3
+            cru a WireGuard_ChkDDNS${WG_INTERFACE} "*/5 * * * * ${INSTALL_DIR}wg_ChkEndpointDDNS.sh $WG_INTERFACE"                      # v4.15.3
+            logger -t "wireguard-${MODE}${VPN_NAME}" "Endpoint DDNS refresh monitor started - cru #WireGuard_ChkDDNS${WG_INTERFACE}#."  # v4.15.3
+        fi
+
         echo -en $cBGRE"\t"
         logger -st "wireguard-${MODE}${VPN_NAME}" "Initialisation complete."
         echo -e $cRESET
@@ -772,6 +856,8 @@ else
     [ -n "$(wg show | grep "$VPN_ID")" ] && TERMINATED_TXT="Terminated" || TERMINATED_TXT="Already Terminated; Cleaned-up anyway!"
     # v4.14 Process 'PreDown' commands
     Process_Pre_Post_Commands "PreDown"
+
+    cru d WireGuard_ChkDDNS${WG_INTERFACE}  # v4.15.3
 
     # User Exit @Torson
     [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-route-down.sh ] && { logger -t "wireguard-${MODE}${VPN_NAME}" "Executing Event:${VPN_ID}-route-down.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-route-down.sh; }
