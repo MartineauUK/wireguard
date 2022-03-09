@@ -24,7 +24,7 @@ VERSION="v4.15bC"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 08-Mar-2022
+# Last Updated Date: 09-Mar-2022
 
 #
 # Description:
@@ -6057,7 +6057,7 @@ Process_User_Choice() {
                 echo -e "\n\t"$cBGRA
                 opkg install p7zip      # v4.15
             ;;
-            trimdb*)                                                # trimdb {days [ 'traffic' | 'sessions']]} [auto]
+            trimdb*)                                                # trimdb { '?' | days [ 'traffic' | 'sessions'] ['auto']  }
                 Purge_Database $menu1   # v4.15
             ;;
             *)
@@ -6067,6 +6067,8 @@ Process_User_Choice() {
 
 }
 Purge_Database() {
+
+    # trimdb { '?' | days [ 'traffic' | 'sessions'] ['auto']  }
 
     local ANS=
     [ -n "$(echo "$@" | grep -io "auto")" ] && local AUTOREPLY="Y"
@@ -6080,40 +6082,61 @@ Purge_Database() {
 
     [ -z "$TABLE" ] && TABLE="All"
 
-    if [ -n "$DAYS" ] && [ -n "$(echo "$DAYS" | grep -E "[[:digit:]]*")" ];then
-        case $TABLE in
-            traffic|session|All)
-                local TABLES_TXT="($TABLE)"
+    case $TABLE in
+        traffic|session|All)
+        :
+        ;;
+        *)
+         echo -e $cBRED"\a\n\t***ERROR: SQL database table $cRESET'$TABLE'$cBRED NOT found! - use 'traffic' or 'session'\n"$cRESET
+         return 1
+        ;;
+    esac
 
-                local NOW=$(date "+%s")
-                local EPOCH_SECS=$((DAYS*86400))
-                local OLDEST_EPOCH_SECS=$((NOW-EPOCH_SECS))
+    if [ "$DAYS" == "?" ];then
 
-                echo -e "\n\t$TABLES_TXT statistics Records older than "${cBCYA}$(date -d @"$OLDEST_EPOCH_SECS" "+%c")${cRESET}" will be erased from SQL database"
-                [ "$TABLE" == "All" ] && TABLE="traffic session"
+        [ "$TABLE" == "All" ] && TABLE="traffic session"
 
-                if [ -z "$AUTOREPLY" ];then
-                    echo -e "\tPress$cBRED y$cRESET to$cBRED DELETE database records${cRESET} or press$cBGRE [Enter] to SKIP."
-                    read -r "ANS"
-                else
-                    local ANS="y"
-                fi
+        echo -e
 
-                if [ "$ANS" == "y" ];then
-                    echo -e
-                    for THIS in $TABLE
-                        do
-                            local OCNT=$(sqlite3 $SQL_DATABASE "SELECT Count(*) FROM $THIS;")
-                            sqlite3 $SQL_DATABASE "DELETE FROM $THIS WHERE timestamp <='$OLDEST_EPOCH_SECS';"
-                            local NCNT=$(sqlite3 $SQL_DATABASE "SELECT Count(*) FROM $THIS;")
-                            [ $OCNT -eq $NCNT ] && echo -e "$cRED\t $((OCNT-NCNT)) $THIS records deleted" || echo -e "$cBGRE\t $((OCNT-NCNT)) $THIS records deleted"
-                        done
-                fi
-            ;;
-            *)
-             echo -e $cBRED"\a\n\t***ERROR: SQL database table $cRESET'$TABLE'$cBRED NOT found! - use 'traffic' or 'session'\n"$cRESET
-            ;;
-        esac
+        for THIS in $TABLE
+
+            do
+                local OCNT=$(sqlite3 $SQL_DATABASE "SELECT Count(*) FROM $THIS;")
+                local OLDEST_EPOCH_SECS=$(sqlite3 $SQL_DATABASE "SELECT timestamp FROM $THIS order by timestamp limit 1;")
+                echo -e $cRESET"\tTable ${cBCYA}${THIS}$cRESET: oldest "${cBCYA}$(date -d @"$OLDEST_EPOCH_SECS" "+%c")$cRESET" records ${cBCYA}${OCNT}${cRESET}"
+            done
+
+        return
+    fi
+
+    if [ -n "$DAYS" ] && [ -n "$(echo "$DAYS" | grep -Eo "[[:digit:]]*")" ];then
+
+        local TABLES_TXT="($TABLE)"
+
+        local NOW=$(date "+%s")
+        local EPOCH_SECS=$((DAYS*86400))
+        local OLDEST_EPOCH_SECS=$((NOW-EPOCH_SECS))
+
+        echo -e "\n\t$TABLES_TXT statistics Records older than "${cBCYA}$(date -d @"$OLDEST_EPOCH_SECS" "+%c")${cRESET}" will be erased from SQL database"
+        [ "$TABLE" == "All" ] && TABLE="traffic session"
+
+        if [ -z "$AUTOREPLY" ];then
+            echo -e "\tPress$cBRED y$cRESET to$cBRED DELETE database records${cRESET} or press$cBGRE [Enter] to SKIP."
+            read -r "ANS"
+        else
+            local ANS="y"
+        fi
+
+        if [ "$ANS" == "y" ];then
+            echo -e
+            for THIS in $TABLE
+                do
+                    local OCNT=$(sqlite3 $SQL_DATABASE "SELECT Count(*) FROM $THIS;")
+                    sqlite3 $SQL_DATABASE "DELETE FROM $THIS WHERE timestamp <='$OLDEST_EPOCH_SECS';"
+                    local NCNT=$(sqlite3 $SQL_DATABASE "SELECT Count(*) FROM $THIS;")
+                    [ $OCNT -eq $NCNT ] && echo -e "$cRED\t $((OCNT-NCNT)) $THIS records deleted" || echo -e "$cBGRE\t $((OCNT-NCNT)) $THIS records deleted"
+                done
+        fi
     else
         echo -en $cBRED"\a\n\t***ERROR: Numbers of days $cRESET'$DAYS'$cBRED invalid!\n"$cRESET
     fi
