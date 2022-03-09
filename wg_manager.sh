@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.15bD"
-#============================================================================================ © 2021-2022 Martineau v4.15bD
+VERSION="v4.16b"
+#============================================================================================ © 2021-2022 Martineau v4.16b
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.15bD"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: xx-Mar-2022
+# Last Updated Date: 09-Mar-2022
 
 #
 # Description:
@@ -3018,11 +3018,6 @@ STATS
 # For Routers that include WireGuard Kernel/User Space tools, allow overriding with supported 3rd-Party/Entware versions
 #     Use command 'vx' to edit this setting.
 #USE_ENTWARE_KERNEL_MODULE
-
-# Override setting of the TCP MSS clamping of -t mangle FORWARD chain '-p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu'
-#     Use command 'vx' to edit this setting.
-#     https://www.linuxtopia.org/Linux_Firewall_iptables/x4700.html
-#NOTCPMSS
 
 # Override setting of the -t mangle FORWARD/PREROUTING '-j MARK --set-xmark 0x01/0x7' fwmarks
 # (NOT the user Selective Routing fwmarks for Ports/IPSETs etc.)
