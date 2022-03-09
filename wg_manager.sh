@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.15bC"
-#============================================================================================ © 2021-2022 Martineau v4.15bC
+VERSION="v4.15bD"
+#============================================================================================ © 2021-2022 Martineau v4.15bD
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.15bC"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 09-Mar-2022
+# Last Updated Date: xx-Mar-2022
 
 #
 # Description:
@@ -3255,10 +3255,10 @@ Manage_Stats() {
     esac
 
     if [ -n "$(cru l | grep "WireGuard")" ];then
-        local TXT="${cBGRE}\t[✔] Statistics gathering is ENABLED"$cRESET
+        local TXT="${cBGRE}\t[✔] ${cBWHT}Statistics gathering is ${cBGRE}ENABLED"$cRESET
         STATUS=1
     else
-        local TXT="${cBRED}\t[✖] ${cBGRE}Statistics gathering is ${cRED}DISABLED"$cRESET
+        local TXT="${cBRED}\t[✖] ${cBWHT}Statistics gathering is ${cRED}DISABLED"$cRESET
     fi
 
     echo -e "$TXT"
@@ -3574,7 +3574,7 @@ Show_Info() {
     local WAN_IF=$(Get_WAN_IF_Name)                                             # v4.11
     local VAL=$(cat /proc/sys/net/ipv4/conf/$WAN_IF/rp_filter)                  # v4.11
     [ "$VAL" == "1" ] && STATE="ENABLED" || STATE="${cBRED}DISABLED${cBGRE}"    # v4.11
-    echo -e $cBGRE"\n\t[ℹ ] Reverse Path Filtering $STATE\n"$cRESET            # v4.11
+    echo -e $cBGRE"\n\t[ℹ ] ${cBWHT}Reverse Path Filtering${cBGRE} $STATE\n"$cRESET            # v4.11
 
     if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOTCPMSS" ${INSTALL_DIR}WireguardVPN.conf)" ];then   # v4.12 v4.11
         echo -e $cBRED"\t[✖]${cBWHT} 'NOTCPMSS' specified, TCP clamping to PMTU (-t mangle '--tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu')$cBRED DISABLED$cRESET" # v4.12
@@ -3601,11 +3601,11 @@ Show_Info() {
 
     [ $(cru l | grep ChkDDNS | wc -l) -gt 0 ] && echo -e $cBGRE"\t[✔] ${cRESET}Endpoint DDNS$cBGRE re-fresh monitor ACTIVE\n$cRESET"        # v4.15
 
-    [ "$READLINE" == "ReadLine" ] && echo -e $cBGRE"\t[✔] Use of '${cRESET}Pg-Up${cBGRE}' Key for command retrieval is ENABLED\n$cRESET" || echo -e $cBRED"\t[✖]${cBWHT} Use of 'Pg-Up' Key for command retrieval is ${cBRED}DISABLED\n$cRESET" # v4.14
+    [ "$READLINE" == "ReadLine" ] && echo -e $cBGRE"\t[✔]$cBWHT Use of 'Pg-Up' Key ${cBGRE}for command retrieval is ENABLED\n$cRESET" || echo -e $cBRED"\t[✖]${cBWHT} Use of 'Pg-Up' Key for command retrieval is ${cBRED}DISABLED\n$cRESET" # v4.14
 
     Manage_Stats
 
-    echo -e $cBGRE"\n\t[ℹ ] Speedtest quick link${cBYEL} https://fast.com/en/gb/ \n"$cRESET       # v4.12
+    echo -e $cBGRE"\n\t[ℹ ] ${cRESET}Speedtest quick link${cBYEL} https://fast.com/en/gb/ \n"$cRESET       # v4.12
 
     echo -e $cBGRE"\t[ℹ ] ${cRESET}WireGuard© Official Site ${cBYEL}https://www.wireguard.com/ \n"$cRESET   # v4.15
 
