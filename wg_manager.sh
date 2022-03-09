@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.14"
-#============================================================================================ © 2021-2022 Martineau v4.14
+VERSION="v4.15"
+#============================================================================================ © 2021-2022 Martineau v4.15
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,8 @@ VERSION="v4.14"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 24-Jan-2022
+# Last Updated Date: 09-Mar-2022
+
 #
 # Description:
 #
@@ -35,7 +36,8 @@ VERSION="v4.14"
 GIT_REPO="wireguard"
 GITHUB_MARTINEAU="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/main"
 GITHUB_MARTINEAU_DEV="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/dev"
-GITHUB_ZEBMCKAYHAN="https://raw.githubusercontent.com/ZebMcKayhan/Wireguard/master" # v4.11
+GITHUB_ZEBMCKAYHAN="https://raw.githubusercontent.com/ZebMcKayhan/WireguardManager/main" # v4.15
+GITHUB_ZEBMCKAYHAN_DEV="https://raw.githubusercontent.com/ZebMcKayhan/WireguardManager/dev" # v4.15
 GITHUB_DIR=$GITHUB_MARTINEAU                       # default for script
 CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v2.03 @elorimer
 IMPORT_DIR=$CONFIG_DIR                             # Allow custom Peer .config import directory v4.01
@@ -48,6 +50,12 @@ CMDLINE=                                           # Command line INPUT         
 CMD1=;CMD2=;CMD3=;CMD4=;CMD5=                      # Command recall push stack      # v2.03
 SQL_DATABASE="/opt/etc/wireguard.d/WireGuard.db"   # SQL                            # v3.05
 INSTALL_MIGRATE="N"                                # Migration from v3.0 to v4.0    # v4.01
+IMPORTED_PEER_NAME=                                # Global tacky!                  # v4.15
+
+readonly SCRIPT_WEBPAGE_DIR="$(readlink /www/user)"
+readonly SCRIPT_WEB_DIR="$SCRIPT_WEBPAGE_DIR/wireguard.d"
+readonly SCRIPT_DIR="/jffs/addons/wireguard"
+installedMD5File="${INSTALL_DIR}www-installed.md5"  # Save md5 of last installed www ASP file so you can find it again later (in case of www ASP update)
 
 Say() {
    echo -e $$ $@ | logger -st "($(basename $0))"
@@ -57,18 +65,37 @@ SayT() {
 }
 # shellcheck disable=SC2034
 ANSIColours () {
-    cRESET="\e[0m";cBLA="\e[30m";cRED="\e[31m";cGRE="\e[32m";cYEL="\e[33m";cBLU="\e[34m";cMAG="\e[35m";cCYA="\e[36m";cGRA="\e[37m";cFGRESET="\e[39m"
-    cBGRA="\e[90m";cBRED="\e[91m";cBGRE="\e[92m";cBYEL="\e[93m";cBBLU="\e[94m";cBMAG="\e[95m";cBCYA="\e[96m";cBWHT="\e[97m"
-    aBOLD="\e[1m";aDIM="\e[2m";aUNDER="\e[4m";aBLINK="\e[5m";aREVERSE="\e[7m"
-    aBOLDr="\e[21m";aDIMr="\e[22m";aUNDERr="\e[24m";aBLINKr="\e[25m";aREVERSEr="\e[27m"
-    cWRED="\e[41m";cWGRE="\e[42m";cWYEL="\e[43m";cWBLU="\e[44m";cWMAG="\e[45m";cWCYA="\e[46m";cWGRA="\e[47m"
-    cYBLU="\e[93;48;5;21m"
-    cRED_="\e[41m";cGRE_="\e[42m"
+
+    local ACTION=$1
+
+cRESET=
+    aBOLD=;aDIM=;aUNDER=;aBLINK=;aREVERSE=
+    aBOLDr=;aDIMr=;aUNDERr=;aBLINKr=;aREVERSEr=
+
+    cBLA=;cRED=;cGRE=;cYEL=;cBLU=;cMAG=;cCYA=;cGRA=;cFGRESET=
+    cBGRA=;cBRED=;cBGRE=;cBYEL=;cBBLU=;cBMAG=;cBCYA=;cBWHT=
+    cWRED=;cWGRE=;cWYEL=;cWBLU=;cWMAG=;cWCYA=;cWGRA=
+    cYBLU=
+    cRED_=;cGRE_=
+
+    if [ "$ACTION" != "disable" ];then
+        cRESET="\e[0m";
+        aBOLD="\e[1m";aDIM="\e[2m";aUNDER="\e[4m";aBLINK="\e[5m";aREVERSE="\e[7m"
+        aBOLDr="\e[21m";aDIMr="\e[22m";aUNDERr="\e[24m";aBLINKr="\e[25m";aREVERSEr="\e[27m"
+        cBLA="\e[30m";cRED="\e[31m";cGRE="\e[32m";cYEL="\e[33m";cBLU="\e[34m";cMAG="\e[35m";cCYA="\e[36m";cGRA="\e[37m";cFGRESET="\e[39m"
+        cBGRA="\e[90m";cBRED="\e[91m";cBGRE="\e[92m";cBYEL="\e[93m";cBBLU="\e[94m";cBMAG="\e[95m";cBCYA="\e[96m";cBWHT="\e[97m"
+        aBOLD="\e[1m";aDIM="\e[2m";aUNDER="\e[4m";aBLINK="\e[5m";aREVERSE="\e[7m"
+
+        cWRED="\e[41m";cWGRE="\e[42m";cWYEL="\e[43m";cWBLU="\e[44m";cWMAG="\e[45m";cWCYA="\e[46m";cWGRA="\e[47m"
+        cYBLU="\e[93;48;5;21m"
+        cRED_="\e[41m";cGRE_="\e[42m"
+    fi
+
     xHOME="\e[H";xERASE="\e[2J";xERASEDOWN="\e[J";xERASEUP="\e[1J";xCSRPOS="\e[s";xPOSCSR="\e[u";xERASEEOL="\e[K";xQUERYCSRPOS="\e[6n"
     xGoto="\e[Line;Columnf"
 }
-# Print between line beginning with'#==' to first blank line inclusive
 ShowHelp() {
+    # Print between line beginning with'#==' to first blank line inclusive
     echo -en $cBWHT >&2
     awk '/^#==/{f=1} f{print; if (!NF) exit}' $0
     echo -en $cRESET >&2
@@ -78,7 +105,7 @@ Parse() {
     #   Parse       "Word1,Word2|Word3" ",|" VAR1 VAR2 REST
     #               (Effectivley executes VAR1="Word1";VAR2="Word2";REST="Word3")
 
-    local TEXT IFS
+local TEXT IFS
 
     TEXT="$1"
     IFS="$2"
@@ -175,6 +202,89 @@ Is_Private_IPv4() {
 }
 Is_Private_IPv6() {
     grep -oE "(::1$)|([fF][cCdD])"
+}
+Hex2Dec(){
+    # Convert Hex to Dec (portable version) (see https://github.com/chmduquesne/wg-ip/blob/master/wg-ip)
+    for I in $(echo "$@"); do
+        printf "%d\n" "$(( 0x$I ))"
+    done
+}
+Expand_IPv6() {
+    # Returns an expanded IPv6 128-bit address under the form recommended by RFC5952 (see https://github.com/chmduquesne/wg-ip/blob/master/wg-ip)
+    # Martineau see https://iplocation.io/ipv6-expand
+    local ip=$1
+
+    # Prepend 0 if we start with :
+    echo $ip | grep -qs "^:" && local ip="0${ip}"
+
+    # Expand ::
+    if echo $ip | grep -qs "::"; then
+        local colons=$(echo $ip | sed 's/[^:]//g')
+        local missing=$(echo ":::::::::" | sed "s/$colons//")
+        local expanded=$(echo $missing | sed 's/:/:0/g')
+        local ip=$(echo $ip | sed "s/::/$expanded/")
+    fi
+
+    local blocks=$(echo $ip | grep -o "[0-9a-f]\+")
+    set $blocks
+
+    printf "%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x\n" $(Hex2Dec $@)
+
+}
+Compress_IPv6() {
+# Returns a compressed IPv6 128-bit address under the form recommended by RFC5952 (see https://github.com/chmduquesne/wg-IP/blob/master/wg-IP)
+# Martineau see https://iplocation.io/ipv6-compress
+    local ip=$1
+
+    local blocks=$(echo $ip | grep -o "[0-9a-f]\+")
+    set $blocks
+
+    # Compress leading zeros
+    #local ip=$(printf "%x:%x:%x:%x:%x:%x:%x:%x\n" $(Hex2Dec $@))       # Martineau HACK!
+    [ $# -eq 8 ] && local ip=$(printf "%x:%x:%x:%x:%x:%x:%x:%x\n" $(Hex2Dec $@)) || local ip=$(printf "%x:%x:%x:%x:%x:%x:%x\n" $(Hex2Dec $@))
+
+    # Prepend : for easier matching
+    local ip=:$ip
+
+    # :: must compress the longest chain
+    # Martineau Hacked
+    for pattern in :0:0:0:0:0:0:0:0 \
+            :0:0:0:0:0:0:0 \
+            :0:0:0:0:0:0 \
+            :0:0:0:0:0 \
+            :0:0:0:0 \
+            :0:0:0 \
+            :0:0; do
+        if echo $ip | grep -qs $pattern; then
+            local ip=$(echo $ip | sed "s/$pattern/::/")
+            # if the substitution occured before the end, we have :::
+            local ip=$(echo $ip | sed 's/:::/::/')
+            break # only one substitution
+        fi
+    done
+
+    # Remove prepending : if necessary
+    echo $ip | grep -qs "^:[^:]" && local ip=$(echo $ip | sed 's/://')
+
+    echo $ip
+
+}
+IPv6_RFC() {
+
+    local IPV6=$1                                                               # v4.15
+
+    local IPV6_IP=${IPV6%/*}
+    if [ -n "$(echo "$IPV6" | grep -F "/")" ];then
+        local IPV6_IP_MASK=${IPV6##*/}
+    fi
+    local IPV6_SUBNET=${IPV6_IP%:*}
+    local IPV6_IP_EXPANDED=$(Expand_IPv6 "$IPV6_IP")
+    local IPV6_IP_COMPRESSED=$(Compress_IPv6 "$IPV6_IP_EXPANDED")
+
+    [ -n "$IPV6_IP_MASK" ] && local IPV6=${IPV6_IP_COMPRESSED}"/"$IPV6_IP_MASK || local IPV6=${IPV6_IP_COMPRESSED}
+
+    echo $IPV6
+
 }
 Convert_1024KMG() {
 
@@ -298,6 +408,24 @@ Kill_Lock() {
             echo
         fi
 }
+Manage_Addon() {
+
+        # https://raw.githubusercontent.com/ZebMcKayhan/WireguardManager/main/wgmExpo.sh
+
+        FN="$1"
+        local BRANCH=$2
+
+        if [ "$2" != "remove" ] && [ "$2" != "del" ];then
+            [ -z "$BRANCH" ] && local BRANCH="main"
+            download_file ${INSTALL_DIR} $FN zebmckayhan $BRANCH dos2unix 777
+            chmod +x ${INSTALL_DIR}$FN
+            ln -s /jffs/addons/wireguard/$FN /opt/bin/${FN%.*} 2>/dev/null
+            md5sum ${INSTALL_DIR}$FN      > ${INSTALL_DIR}${FN%.*}.md5
+        else
+            rm ${INSTALL_DIR}$FN 2>/dev/null
+            rm /opt/bin/$FN 2>/dev/null
+        fi
+}
 download_file() {
 
         local DIR="$1"
@@ -311,6 +439,9 @@ download_file() {
         case $GITHUB in
             martineau)
                 [ "$GITHUB_BRANCH" != "dev" ] && GITHUB_DIR=$GITHUB_MARTINEAU || GITHUB_DIR=$GITHUB_MARTINEAU_DEV
+            ;;
+            zebmckayhan)
+                [ "$GITHUB_BRANCH" != "dev" ] && GITHUB_DIR=$GITHUB_ZEBMCKAYHAN || GITHUB_DIR=$GITHUB_ZEBMCKAYHAN_DEV
             ;;
         esac
 
@@ -326,10 +457,10 @@ download_file() {
             printf '\t%b%s%b downloaded successfully %b\n' "$cBGRE" "$FILE" "$cRESET" "$DEVTXT"
             [ -n "$CHMOD" ] && chmod $CHMOD "$DIR/$FILE"
         else
-            printf '\n%b%s%b download FAILED with curl error %s\n\n' "\n\t\a$cBMAG" "'$FILE'" "$cBRED" "$STATUS"
+            printf '\n%b%s%b download FAILED with curl error %s\n\n' "\n\t\a$cRESET" "'${GITHUB_DIR}/${FILE}'" "$cBRED" "$STATUS"
             echo -e $cRESET"\a\n"
 
-            exit 1
+            return 1
         fi
 }
 _Get_File() {
@@ -610,9 +741,18 @@ Check_Module_Versions() {
 }
 Create_Peer() {
 
+    # Default subnet IPv4 only, but IPv4,IPv6 if applicable/specified or just IPv6
+
+    # peer new                                  # IPv4 only
+
+    # peer new ipv6[=[private_ipv6 subnet]]     # Multi IPv4 and IPv6
+    # peer new ipv6 noipv4                      # no IPv4
+
     local ACTION=$1;shift
 
+    local USE_IPV4="Y"              # v4.15
     local USE_IPV6="N"
+    local VPN_POOL6=                # v4.15
 
     while [ $# -gt 0 ]; do          # v3.02
         case "$1" in
@@ -623,19 +763,25 @@ Create_Peer() {
             local LISTEN_PORT="$(echo "$@" | sed -n "s/^.*port=//p" | awk '{print $1}')"
             local LISTEN_PORT_USER="Y"
             ;;
-        ipv6*)
+        ipv6|ipv6=*)
             local USE_IPV6="Y"
             local IPV6_TXT="(IPv6) "
             local SERVER_PEER=
 
-            local VPN_POOL="$(echo "$@" | sed -n "s/^.*ipv6=//p" | awk '{print $1}')"
-            if [ "${1:0:5}" == "ipv6=" ] && [ -n "$VPN_POOL" ];then
+            local VPN_POOL6="$(echo "$@" | sed -n "s/^.*ipv6=//p" | awk '{print $1}')"
+            if [ "${1:0:5}" == "ipv6=" ] && [ -n "$VPN_POOL6" ];then
+                # Ensure IPv6 address is in standard compressed format
+                VPN_POOL6="$(IPv6_RFC "$VPN_POOL6")"        # v4.15
                 local VPN_POOL_USER="Y"
             fi
             ;;
         ip=*)
-            local VPN_POOL="$(echo "$@" | sed -n "s/^.*ip=//p" | awk '{print $1}')"
+            local VPN_POOL4="$(echo "$@" | sed -n "s/^.*ip=//p" | awk '{print $1}')"
             local VPN_POOL_USER="Y"
+            ;;
+        noipv4|noIPv4)
+            local USE_IPV4="N"                  # v4.15
+            local IPV6_TXT="(IPv6 Only) "       # v4.15
             ;;
         *)
             local SERVER_PEER=$1
@@ -655,49 +801,69 @@ Create_Peer() {
     [ -z "$AUTO" ] && local AUTO="N" || AUTO=$(echo "$AUTO" | tr 'a-z' 'A-Z')
 
     if [ -z "$SERVER_PEER" ];then
-
         # Use the last IPv4 server as the VPN POOL
         local SERVER_PEER=$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers WHERE subnet LIKE '%.%';" | sort | tail -n 1)
-        [ -n "$SERVER_PEER" ] && local AUTO_VPN_POOL=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers WHERE peer='$SERVER_PEER';") || local AUTO_VPN_POOL="10.50.0.1/24"
-        local SERVER_PEER=$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers;" | sort | tail -n 1)
-
-        # User specified VPN Tunnel subnet?
-        if [ -z "$VPN_POOL_USER" ];then
-            [ -z "$AUTO_VPN_POOL" ] && AUTO_VPN_POOL="10.50.1.1/24"
-            local ONE_OCTET=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f1)
-            local TWO_OCTET=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f2)
-            local THIRD_OCTET=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f3)
-            local REST=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f4-)
-            local NEW_THIRD_OCTET=$((THIRD_OCTET+1))
-            local SERVER_CNT=$(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM servers;")
-            [ $SERVER_CNT -ge $NEW_THIRD_OCTET ] && local NEW_THIRD_OCTET=$((SERVER_CNT+1))
-            local VPN_POOL=$(echo -e "$ONE_OCTET.$TWO_OCTET.$NEW_THIRD_OCTET.$REST")
-
-            if [ "$USE_IPV6" == "Y" ];then
-                [ -z "$TWO_OCTET" ] && local TWO_OCTET="50"
-                [ -z "$NEW_THIRD_OCTET" ] && local NEW_THIRD_OCTET="1"
-                local VPN_POOL="fc00:${TWO_OCTET}:${NEW_THIRD_OCTET}::1/64"
-            fi
-        fi
-
-        # Add the new 'server' Peer at the end of the list in the config
-        #POS=$(awk -v pattern="$SERVER_PEER" 'match($0,"^"pattern) {print NR":"$0}' ${INSTALL_DIR}WireguardVPN.conf | tail -n 1 | cut -d':' -f1)
-        #INDEX=$(echo "$SERVER_PEER" | sed 's/^wg2//')
+        local AUTO_VPN_POOL="10.50.0.1/24"
         local INDEX=$(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM servers;")
         local INDEX=$((INDEX+1))
         local SERVER_PEER="wg2"$INDEX
-
-        # User specified Listen Port?
-        [ -z "$LISTEN_PORT_USER" ] && LISTEN_PORT=$((LISTEN_PORT+INDEX))
     else
-        [ "${SERVER_PEER:0:3}" == "wg2" ] && INDEX=${SERVER_PEER:3:1} || { echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard 'server' Peer prefix (wg2*) '$SERVER_PEER'\n"$cRESET; return 1; }
+        if [ "${SERVER_PEER:0:3}" == "wg2" ];then
+            INDEX=${SERVER_PEER:3:1}
+            local AUTO_VPN_POOL="10.50.$((INDEX-1)).1/24"       # v4.15
+        else
+            echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard 'server' Peer prefix (wg2*) '$SERVER_PEER'\n"$cRESET
+            return 1
+        fi
     fi
 
-    if [ "$USE_IPV6" == "N" ];then
-        [ -z "$(echo "$VPN_POOL" | Is_IPv4_CIDR)" ] && { echo -e $cBRED"\a\n\t***ERROR: '$VPN_POOL' must be IPv4 CIDR"$cRESET; return 1; }
-    else
-        [ -z "$(echo "$VPN_POOL" | sed 's~/.*$~~' | Is_Private_IPv6)" ] && { echo -e $cBRED"\a\n\t***ERROR: ipv6='$VPN_POOL6' must be Private IPv6 address"$cRESET; return 1; }
+    # User specified VPN Tunnel subnet?
+    if [ -z "$VPN_POOL4" ] || [ -z "$VPN_POOL6" ];then
+        [ -z "$AUTO_VPN_POOL" ] && local AUTO_VPN_POOL="10.50.1.1/24"
+        local ONE_OCTET=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f1)
+        local TWO_OCTET=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f2)
+        local THIRD_OCTET=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f3)
+        local REST=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f4-)
+        local NEW_THIRD_OCTET=$((THIRD_OCTET+1))
+        local SERVER_CNT=$(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM servers;")
+        [ $SERVER_CNT -ge $NEW_THIRD_OCTET ] && local NEW_THIRD_OCTET=$((SERVER_CNT+1))
+        [ "$USE_IPV4" == "Y" ] && local VPN_POOL4=$(echo -e "$ONE_OCTET.$TWO_OCTET.$NEW_THIRD_OCTET.$REST")
+
+        if [ "$USE_IPV6" == "Y" ] && [ -z "$VPN_POOL6" ];then
+            [ -z "$TWO_OCTET" ] && local TWO_OCTET="50"
+            [ -z "$NEW_THIRD_OCTET" ] && local NEW_THIRD_OCTET="1"
+            local VPN_POOL6="fc00:${TWO_OCTET}:${NEW_THIRD_OCTET}::1/64"
+        fi
     fi
+
+    [ -n "$VPN_POOL4" ] && local VPN_POOL=$VPN_POOL4    # v4.15
+
+    if [ -n "$VPN_POOL4" ] && [ -n "$VPN_POOL6" ];then  # v4.15
+            local VPN_POOL=$VPN_POOL4","$VPN_POOL6
+            local IPV6_TXT="(IPv4/IPv6) "               # v4.15
+    fi
+
+    if [ "$USE_IPV4" == "N" ];then                      # v4.15
+        if [ -n "$VPN_POOL6" ];then                     # v4.15
+            local VPN_POOL=$VPN_POOL6                   # v4.15
+            local IPV6_TXT="(IPv6) "                    # v4.15
+        else
+            echo -e $cBRED"\a\n\t***ERROR Create new WireGuard ${IPV6_TXT}'server' Peer has missing ${cRESET}IPv6 Private subnet${cBRED} - use $cRESET'ipv6[=]'$cBRED arg\n"$cRESET
+            return 1
+        fi
+    fi
+
+    # User specified Listen Port?
+    [ -z "$LISTEN_PORT_USER" ] && LISTEN_PORT=$((LISTEN_PORT+INDEX))
+
+    for THIS in $(echo "$VPN_POOL" | tr ',' ' ')        # v4.15
+        do
+            if [ -z "$(echo "$THIS" | grep -F ":")" ];then
+                [ -z "$(echo "$THIS" | Is_IPv4_CIDR)" ] && { echo -e $cBRED"\a\n\t***ERROR: '$THIS' must be IPv4 CIDR"$cRESET; return 1; }                                  # v4.15
+            else
+                [ -z "$(echo "$THIS" | sed 's~/.*$~~' | Is_Private_IPv6)" ] && { echo -e $cBRED"\a\n\t***ERROR: '$THIS' must be Private IPv6 address"$cRESET; return 1; }   # v4.15
+            fi
+        done
 
     if [ -f ${CONFIG_DIR}${SERVER_PEER}.conf ] || [ -n "$(grep -E "^$SERVER_PEER" ${INSTALL_DIR}WireguardVPN.conf)" ];then
         echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard 'server' Peer '$SERVER_PEER' already exists\n"$cRESET
@@ -706,7 +872,7 @@ Create_Peer() {
 
     local WANIPADDR=$(nvram get wan0_ipaddr)
     [ -n "$(echo "$WANIPADDR" | Is_Private_IPv4)" ] && echo -e ${cRESET}${cBRED}${aBOLD}"\a\n\t*** Ensure Upstream router Port Foward entry for port:${cBMAG}${LISTEN_PORT}${cRESET}${cBRED}${aBOLD} ***"$cRESET
-    echo -e $cBWHT"\n\tPress$cBRED y$cRESET to$cBRED Create ${IPV6_TXT}'server' Peer (${cBMAG}${SERVER_PEER}) ${cBWHT}${VPN_POOL}${cRESET}:${LISTEN_PORT}${cBWHT} or press$cBGRE [Enter] to SKIP."
+    echo -e $cBWHT"\n\tPress$cBGRE y$cRESET to$cBGRE Create ${cBCYA}${IPV6_TXT}${cBGRE}'server' Peer (${cBMAG}${SERVER_PEER}${cBGRE}) ${cBCYA}${VPN_POOL}:${LISTEN_PORT}${cRESET} or press$cBGRE [Enter] to SKIP." # v4.15
     read -r "ANS"
     [ "$ANS" == "y" ] || return 1
 
@@ -740,11 +906,11 @@ EOF
 #PresharedKey = Replace_with_the_Pre-shared_Key_of_YOUR_mobile_device
 # Peer Example End
 
-
+        chmod 600 ${CONFIG_DIR}${SERVER_PEER}.conf          # v4.15 Prevent wg-quick "Warning: '/opt/etc/wireguard.d/wg22.conf' is world accessible"
         sqlite3 $SQL_DATABASE "INSERT INTO servers values('$SERVER_PEER','$AUTO','${VPN_POOL}','$LISTEN_PORT','$PUB_KEY','$PRI_KEY','$ANNOTATE');"
     fi
 
-    echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED Start ${IPV6_TXT}'server' Peer ($SERVER_PEER) or press$cBGRE [Enter] to SKIP."
+    echo -e $cBWHT"\tPress$cBGRE y$cRESET to$cBGRE Start ${cBCYA}${IPV6_TXT}${cBGRE}'server' Peer (${cBMAG}${SERVER_PEER}$cBGRE)$cRESET or press $cBGRE[Enter] to SKIP."
     read -r "ANS"
     [ "$ANS" == "y" ] && Manage_Wireguard_Sessions "start" "$SERVER_PEER"
     Show_Peer_Status "show" # v3.03
@@ -785,6 +951,12 @@ Delete_Peer() {
                                 grep -E -B 3 -A 1 "^AllowedIPs" ${CONFIG_DIR}${WG_INTERFACE}.conf
                                 echo -e $cBWHT"\n\tYou can manually reassign them to a different 'server' Peer by recreating the 'client' Peer then rescan the QR code on the device"
                             fi
+
+                            # Site-to-Site identify remote site peer
+                            # Extract '# Cabin LAN'
+                            if [ "$(sqlite3 $SQL_DATABASE "SELECT auto FROM servers WHERE peer='$WG_INTERFACE';")" == "S" ];then    # v4.15
+                                local SITE2SITE_PEER_LAN=$(awk '/^#.*LAN/ {print $2}' ${CONFIG_DIR}${WG_INTERFACE}.conf )           # v4.15
+                            fi
                     fi
 
                     echo -e $cBWHT"\tPress$cBRED y$cRESET to ${aBOLD}CONFIRM${cRESET}${cBRED} or press$cBGRE [Enter] to SKIP."
@@ -795,6 +967,11 @@ Delete_Peer() {
                         [ -n "$(wg show $WG_INTERFACE 2>/dev/null)" ] && Manage_Wireguard_Sessions "stop" "$WG_INTERFACE"
                         sqlite3 $SQL_DATABASE "DELETE FROM $TABLE WHERE $SQL_COL='$WG_INTERFACE';"
                         [ -n "$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE name='$WG_INTERFACE';")" ] && sqlite3 $SQL_DATABASE "DELETE FROM devices WHERE name='$WG_INTERFACE';"
+
+                        # Site-to-Site remove the remote Site from 'devices' table if it exists
+                        if [ -n "$SITE2SITE_PEER_LAN" ];then
+                            [ -n "$(sqlite3 $SQL_DATABASE "SELECT * FROM devices WHERE name='$SITE2SITE_PEER_LAN';")" ] && sqlite3 $SQL_DATABASE "DELETE FROM devices WHERE name='$SITE2SITE_PEER_LAN';"    # v4.15
+                        fi
 
                         # ... and delete associated RPDB Selective Routing rule
                         sqlite3 $SQL_DATABASE "DELETE FROM policy WHERE peer='$WG_INTERFACE';"
@@ -835,26 +1012,28 @@ Delete_Peer() {
 
                         if [ "${WG_INTERFACE:0:3}" == "wgc" ] || [ "${WG_INTERFACE:0:3}" == "wgs" ];then
                             # Shouldn't be used on a Router with WireGuard installed in firmware?
-                            if [ "$(which wg)" != "/usr/sbin/wg" ];then
-                                local INDEX="${WG_INTERFACE:3:1}"
+                            #if [ "$(which wg)" != "/usr/sbin/wg" ];then
 
-                                nvram unset ${WG_INTERFACE:0:4}_addr
-                                nvram unset ${WG_INTERFACE:0:4}_aips
-                                nvram unset ${WG_INTERFACE:0:4}_alive
-                                nvram unset ${WG_INTERFACE:0:4}_dns
-                                nvram unset ${WG_INTERFACE:0:4}_enable
-                                nvram unset ${WG_INTERFACE:0:4}_ep_addr
-                                nvram unset ${WG_INTERFACE:0:4}_ep_port
-                                nvram unset ${WG_INTERFACE:0:4}_nat
-                                nvram unset ${WG_INTERFACE:0:4}_ppub
-                                nvram unset ${WG_INTERFACE:0:4}_priv
+                                nvram unset ${WG_INTERFACE}_addr
+                                nvram unset ${WG_INTERFACE}_aips
+                                nvram unset ${WG_INTERFACE}_alive
+                                nvram unset ${WG_INTERFACE}_dns
+                                nvram unset ${WG_INTERFACE}_enable
+                                nvram unset ${WG_INTERFACE}_ep_addr
+                                nvram unset ${WG_INTERFACE}_ep_port
+                                nvram unset ${WG_INTERFACE}_nat
+                                nvram unset ${WG_INTERFACE}_ppub
+                                nvram unset ${WG_INTERFACE}_priv
 
-                                nvram unset vpnc_clientlist
+                                SayT "Debug: nvram_unset vpnc_clientlist="$(nvram get vpnc_clientlist)
+                                #nvram unset vpnc_clientlist
 
-                                nvram unset vpnc_pptp_options_x_list
+                                SayT "Debug: nvram_unset vpnc_pptp_options_x_list="$(nvram get vpnc_pptp_options_x_list)
+                                #nvram unset vpnc_pptp_options_x_list
 
-                                nvram unset wgc_unit
-                            fi
+                                SayT "Debug: nvram_unset wgc_unit="$(nvram get wgc_unit)
+                                #nvram unset wgc_unit
+                            #fi
                         fi
                         #echo -e $cBCYA"\tDeleting '${CONFIG_DIR}${WG_INTERFACE}*.*'"$cBRED
                         rm ${CONFIG_DIR}${WG_INTERFACE}* 2>/dev/null
@@ -946,7 +1125,7 @@ Import_Peer() {
             if [ "$FORCE_TYPE" != "server" ];then
                 local CONFIGURED_IDS="11 12 13 14 15 16 17 18 19 111 112 113 114 115"   # v4.14
             else
-                local CONFIGURED_IDS="21 22 23 24 25"                                   # v4.14
+                local CONFIGURED_IDS="21 22 23 24 25 26 27 28 29"                       # v4.15 v4.14
             fi
 
             if [ -z "$NEW_NAME" ] || [ "$NEW_NAME" == "?" ];then
@@ -980,7 +1159,7 @@ Import_Peer() {
 
             if [ -f ${IMPORT_DIR}${WG_INTERFACE}.conf ];then
                 [ -z "$FORCE_TYPE" ] && local MODE=$(Server_or_Client "$WG_INTERFACE" "$IMPORT_DIR")            # v4.14 v4.12
-                [ -n "$FORCE_TYPE" ] && { MODE=$FORCE_TYPE; local FORCE_TYPE_TXT="(${cBRED}FORCED as '$MODE'${cRESET}) ${cBGRE}"; }                # v4.03
+                [ -n "$FORCE_TYPE" ] && { MODE=$FORCE_TYPE; local FORCE_TYPE_TXT="(${cBRED}FORCED as '$MODE'${cRESET}) ${cBGRE}"; } # v4.03
                 #if [ "$MODE" != "server" ];then
                     case $MODE in
                         client)
@@ -997,6 +1176,7 @@ Import_Peer() {
                             local TABLE="servers"
                             local AUTO="N"
                             local KEY="peer"
+                            [ -n "$(grep -E "^Endpoint" ${IMPORT_DIR}${WG_INTERFACE}.conf)" ] && AUTO="S"   # v.4.15 Site-to-Site
                         ;;
                         *)
                             SayT "***ERROR: WireGuard Peer TYPE ('$FORCE_TYPE') must be 'client'/'server' or 'device'....skipping import request"
@@ -1110,12 +1290,14 @@ Import_Peer() {
                         if [ -d ${CONFIG_DIR} ];then
                             if [ "$MODE" != "device" ];then
                                 if [ "$RENAME" != "Y" ];then
+                                    IMPORTED_PEER_NAME=$WG_INTERFACE
                                     if [ "$MODE" == "client" ];then
                                         sqlite3 $SQL_DATABASE "INSERT INTO $TABLE values('$WG_INTERFACE','$AUTO','$SUBNET','$SOCKET','$DNS','$MTU','$PUB_KEY','$PRI_KEY','$ANNOTATE');"     # v4.09
                                     else
                                         sqlite3 $SQL_DATABASE "INSERT INTO servers values('$WG_INTERFACE','$AUTO','${SUBNET}','$LISTEN_PORT','$PUB_KEY','$PRI_KEY','$ANNOTATE');"
                                     fi
                                 else
+                                    IMPORTED_PEER_NAME=$NEW_NAME
                                     if [ "$MODE" == "client" ];then
                                         sqlite3 $SQL_DATABASE "INSERT INTO $TABLE values('$NEW_NAME','$AUTO','$SUBNET','$SOCKET','$DNS','$MTU','$PUB_KEY','$PRI_KEY','$ANNOTATE');"         # v4.09
                                     else
@@ -1123,6 +1305,7 @@ Import_Peer() {
                                     fi
                                 fi
                             else
+                                IMPORTED_PEER_NAME=$WG_INTERFACE
                                 sqlite3 $SQL_DATABASE "INSERT INTO $TABLE values('$WG_INTERFACE','$AUTO','$SUBNET','$DNS','$ALLOWIP','$PUB_KEY','$PRI_KEY','$ANNOTATE','');"
                             fi
                         fi
@@ -1173,6 +1356,7 @@ Import_Peer() {
 
                         fi
 
+                        [ -f ${IMPORT_DIR}${WG_INTERFACE}.conf ] && chmod 600 ${IMPORT_DIR}${WG_INTERFACE}.conf     # v4.15 Prevent wg-quick "Warning: '/opt/etc/wireguard.d/wg11.conf' is world accessible"
                         [ -d $CONFIG_DIR ] && cp ${IMPORT_DIR}${WG_INTERFACE}.conf ${CONFIG_DIR}${WG_INTERFACE}.conf_imported
 
                         if [ "$COMMENT_OUT" == "Y" ];then
@@ -1204,8 +1388,10 @@ Import_Peer() {
                         #sed -n '/^Endpoint/{h;$p;$b;:a;n;p;$!ba;x};p' ${IMPORT_DIR}${WG_INTERFACE}.conf
                         if [ -d "$CONFIG_DIR" ];then
                             [ "$IMPORT_DIR" != "$CONFIG_DIR" ] && cp ${IMPORT_DIR}${WG_INTERFACE}.conf ${CONFIG_DIR}${WG_INTERFACE}.conf
+                            [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ] && chmod 600 ${CONFIG_DIR}${WG_INTERFACE}.conf     # v4.15 Prevent wg-quick "Warning: '/opt/etc/wireguard.d/wg11.conf' is world accessible"
                             if [ "$RENAME" == "Y" ];then
                                 mv ${CONFIG_DIR}${WG_INTERFACE}.conf ${CONFIG_DIR}${NEW_NAME}.conf
+                                [ -f ${CONFIG_DIR}${NEW_NAME}.conf ] && chmod 600 ${CONFIG_DIR}${NEW_NAME}.conf         # v4.15 Prevent wg-quick "Warning: '/opt/etc/wireguard.d/wg11.conf' is world accessible"
                                 local AS_TXT="as ${cBMAG}$NEW_NAME "$cRESET
                                 if [ "$MODE" == "server" ];then                                                         # v4.14
                                     cp ${CONFIG_DIR}${WG_INTERFACE}_public.key ${CONFIG_DIR}${NEW_NAME}_public.key      # v4.14
@@ -1219,6 +1405,7 @@ Import_Peer() {
                             [ -z "$AS_TXT" ] && local AS_TXT="as ${cBMAG}wgc${INDEX} "$cRESET || local AS_TXT="$AS_TXT, ${cBMAG}wgc${INDEX} "$cRESET
                         fi
 
+                        [ "$AUTO" == "S" ] && local FORCE_TYPE_TXT="Site-to-Site "$FORCE_TYPE_TXT   # v.4.15 Site-to-Site
                         echo -e $cBGRE"\n\t[✔] Config ${cBMAG}${WG_INTERFACE}${cBGRE} import ${AS_TXT}${FORCE_TYPE_TXT}success"$cRESET 2>&1
 
                         local COMMENTOUT=; local RENAME=; local AS_TXT=
@@ -1241,42 +1428,95 @@ Export_Peer(){
 
     local ACTION=$1;shift
     local WG_INTERFACE=$1
-    local FN="${WG_INTERFACE}.conf_exported"
 
     # Show ACTIVE GUI Peers (so we know they are valid)
+    # { export [? [wgm] |  wgs | wgcx | wg1x [nvram] }
     if [ "$1" == "?" ];then
-        local CONFIGS=$(wg show interfaces | grep -v "wg[1-2]" | sort )
-        echo -e $cBYEL"\n\t Available GUI Peer Configs for export:\n${cRESET}$CONFIGS"
-        return 0
+        if [ -z $2 ];then
+            local CONFIGS=$(wg show interfaces | grep -v "wg[1-2]" | sort )
+            echo -e $cBYEL"\n\t Available GUI Peer Configs for export:\n${cRESET}$CONFIGS"
+            return 0
+        else
+            local CONFIGS=$(wg show interfaces | grep -v "wg[cs]" | sort )
+            echo -e $cBYEL"\n\t Available Peer Configs for export:\n${cRESET}$CONFIGS"
+            return 0
+        fi
     fi
 
-    if [ -n "$(nvram get ${WG_INTERFACE}_addr)" ];then
-        # Allow export of any GUI Peer (if you know it exists!)
-        local TAG=$(nvram get vpnc_clientlist | sed "s/>>>//g" | sed 's/>>/|/g')
-        (
-        echo -e "# "$TAG
-        echo -en "[Interface]\nPrivateKey = "
-        echo -e "$(nvram get ${WG_INTERFACE}_priv)"
-        echo -en "#Address = "
-        echo -e "$(nvram get ${WG_INTERFACE}_addr)"
-        echo -en "#DNS = "
-        echo -e "$(nvram get ${WG_INTERFACE}_dns)"
-        echo -en "\n[Peer]\nPublicKey = "
-        echo -e "$(nvram get ${WG_INTERFACE}_ppub)"
-        echo -en "AllowedIPs = "
-        echo -e "$(nvram get ${WG_INTERFACE}_aips)"
-        echo -e "Endpoint = $(nvram get ${WG_INTERFACE}_ep_addr)":"$(nvram get ${WG_INTERFACE}_ep_port)\n"
-        echo -en "PersistentKeepalive = "
-        echo -e "$(nvram get ${WG_INTERFACE}_alive)"
+    case $WG_INTERFACE in
+        wg[cs]*)
+            if [ -n "$(nvram get ${WG_INTERFACE}_addr)" ];then
+
+                local FN="${WG_INTERFACE}.conf_exported"
+
+                # Allow export of any GUI Peer (if you know it exists!)
+                local TAG=$(nvram get vpnc_clientlist | sed "s/>>>//g" | sed 's/>>/|/g')
+                (
+                echo -e "# "$TAG
+                echo -en "[Interface]\nPrivateKey = "
+                echo -e "$(nvram get ${WG_INTERFACE}_priv)"
+                echo -en "#Address = "
+                echo -e "$(nvram get ${WG_INTERFACE}_addr)"
+                echo -en "#DNS = "
+                echo -e "$(nvram get ${WG_INTERFACE}_dns)"
+                echo -en "\n[Peer]\nPublicKey = "
+                echo -e "$(nvram get ${WG_INTERFACE}_ppub)"
+                echo -en "AllowedIPs = "
+                echo -e "$(nvram get ${WG_INTERFACE}_aips)"
+                echo -e "Endpoint = $(nvram get ${WG_INTERFACE}_ep_addr)":"$(nvram get ${WG_INTERFACE}_ep_port)\n"
+                echo -en "PersistentKeepalive = "
+                echo -e "$(nvram get ${WG_INTERFACE}_alive)"
 
 
-        ) > "${CONFIG_DIR}$FN"
+                ) > "${CONFIG_DIR}$FN"
 
-        echo -e $cBGRE"\n\t[✔] Config ${cBMAG}${WG_INTERFACE}${cBGRE} export '${cRESET}${CONFIG_DIR}${FN}${cBGRE}' success"$cRESET 2>&1
-    else
-        SayT "***ERROR: WireGuard VPN GI Peer ('${IMPORT_DIR}$WG_INTERFACE.conf') NVRAM configuration NOT found?....skipping export request"   # v4.12
-        echo -e $cBRED"\a\n\t***ERROR: WireGuard GUI Peer NVRAM configuration NOT found?....skipping export Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
-    fi
+                echo -e $cBGRE"\n\t[✔] Config ${cBMAG}${WG_INTERFACE}${cBGRE} export '${cRESET}${CONFIG_DIR}${FN}${cBGRE}' success"$cRESET 2>&1
+            else
+                SayT "***ERROR: WireGuard VPN GI Peer ('${IMPORT_DIR}$WG_INTERFACE.conf') NVRAM configuration NOT found?....skipping export request"   # v4.12
+                echo -e $cBRED"\a\n\t***ERROR: WireGuard GUI Peer NVRAM configuration NOT found?....skipping export Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
+            fi
+        ;;
+        wg[12]*)
+
+            [ "${WG_INTERFACE:2:1}" == "1" ] && local TYPE="c" || local TYPE="s"
+
+            local INDEX=${WG_INTERFACE:3:1}
+
+            local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM clients where peer='$WG_INTERFACE';")
+            [ -z "$DESC" ] && local DESC=$(grep -FB1 "[Interface]" ${CONFIG_DIR}${WG_INTERFACE}.conf | grep -vF "[Interface]")    # v4.14
+            local DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')
+            [ -z "$DESC" ] && local DESC="# Unidentified"
+            local SOCKET=$(sqlite3 $SQL_DATABASE "SELECT socket FROM clients where peer='$WG_INTERFACE';")
+            local SUBNET=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM clients where peer='$WG_INTERFACE';")
+            local DNS=$(sqlite3 $SQL_DATABASE "SELECT dns FROM clients where peer='$WG_INTERFACE';")
+            local PUB_KEY=$(sqlite3 $SQL_DATABASE "SELECT pubkey FROM clients where peer='$WG_INTERFACE';")
+            local PRI_KEY=$(sqlite3 $SQL_DATABASE "SELECT prikey FROM clients where peer='$WG_INTERFACE';")
+            local ALLOWIP=$(awk '/^Allow/ {$1="";$2="";print $0}' ${CONFIG_DIR}${WG_INTERFACE}.conf | awk '{$1=$1};1')
+
+
+            eval "nvram set wg${TYPE}${INDEX}_addr='$SUBNET'"
+            eval "nvram set wg${TYPE}${INDEX}_aips='$ALLOWIP'"
+            eval "nvram set wg${TYPE}${INDEX}_alive=25"
+            eval "nvram set wg${TYPE}${INDEX}_dns='$DNS'"
+            eval "nvram set wg${TYPE}${INDEX}_enable=0"
+            # Split  Endpoint 'ip:port' for separate GUI fields
+            local SOCKET_IP=${SOCKET%:*}        # Endpoint IP address
+            local SOCKET_PORT=${SOCKET##*:}     # Endpoint Port
+            eval "nvram set wg${TYPE}${INDEX}_ep_addr='$SOCKET_IP'"
+            eval "nvram set wg${TYPE}${INDEX}_ep_port='$SOCKET_PORT'"
+            eval "nvram set wg${TYPE}${INDEX}_nat=1"
+            eval "nvram set wg${TYPE}${INDEX}_ppub='$PUB_KEY'"
+            eval "nvram set wg${TYPE}${INDEX}_priv='$PRI_KEY'"
+
+            #vpnc_clientlist=Mullvad_USA_Los_Angeles>WireGuard>5>>>1>5>><Mullvad_Oz_Melbourne>WireGuard>4>>>1>6>>
+            local PREV=$(nvram get vpnc_clientlist)
+            local ANNOTATE=$(echo "$ANNOTATE" | sed 's/^# //' | sed 's/,/-/g')  # GUI doesn't allow certain characters in name
+
+            #nvram set vpnc_clientlist="${PREV}${ANNOTATE}>WireGuard>${INDEX}>>>0>${INDEX}>>"
+
+            local PREV=$(nvram get vpnc_pptp_options_x_list)
+            #nvram set vpnc_pptp_options_x_list="${PREV}<auto"
+    esac
 }
 Manage_Peer() {
 
@@ -1328,7 +1568,9 @@ Manage_Peer() {
                     echo -e "\tpeer category\t\t\t\t\t\t\t\t- Show Peer categories in database"
                     echo -e "\tpeer peer_name category [category_name {del | add peer_name[...]} ]\t- Create a new category with 3 Peers e.g. peer category GroupA add wg17 wg99 wg11"
 
-                    echo -e "\tpeer new [peer_name [options]]\t\t\t\t\t\t- Create new server Peer e.g. peer new wg27 ip=10.50.99.1/24 port=12345"
+                    echo -e "\tpeer new [peer_name [options]]\t\t\t\t\t\t- Create new server Peer             e.g. peer new wg27 ip=10.50.99.1/24 port=12345"
+                    echo -e "\tpeer new [peer_name] {ipv6}\t\t\t\t\t\t- Create new Dual-stack server Peer  e.g. peer new ipv6"
+                    echo -e "\tpeer new [peer_name] {ipv6 noipv4}\t\t\t\t\t- Create new IPv6 Only server Peer   e.g. peer new ipv6 noipv4"
 
                     echo -e "\tpeer import peer_conf [options]\t\t\t\t\t\t- Import '.conf' into SQL database e.g. import Mullvad_Dallas"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t\t   e.g. import SiteA type=server"
@@ -1344,14 +1586,14 @@ Manage_Peer() {
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru add wg11 SGS8"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru add wg15 all"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru add wg12 10.100.100.0/27"
-
+                    echo -e "\tpeer serv_peer_name {bind device_peer}\t\t\t\t\t- Bind a Road Warrior 'device' Peer to a 'server' Peer e.g. peer wg21 bind SGS20"
 
                     return
                 fi
 
                 local FN=${INSTALL_DIR}WireguardVPN.confXXX
 
-                if [ "$WG_INTERFACE" == "new" ] || [ "$WG_INTERFACE" == "newC" ] || [ "$WG_INTERFACE" == "add" ] || [ "$WG_INTERFACE" == "new6" ] ;then
+                if [ "$WG_INTERFACE" == "new" ] || [ "$WG_INTERFACE" == "newC" ] || [ "$WG_INTERFACE" == "add" ] || [ "$WG_INTERFACE" == "new6" ] || [ "$WG_INTERFACE" == "bind" ];then     # v4.15
                     CMD=$WG_INTERFACE
                     shift
                     WG_INTERFACE=$1
@@ -1359,7 +1601,7 @@ Manage_Peer() {
 
                 if [ "$WG_INTERFACE" != "category" ];then                   # v3.04
 
-                    if [ "$CMD" == "import" ] || [ "$CMD" == "delX" ] || [ "$CMD" == "new" ] || [ "$CMD" == "add" ] || [ "$CMD" == "new6" ] || [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
+                    if [ "$CMD" == "import" ] || [ "$CMD" == "delX" ] || [ "$CMD" == "new" ] || [ "$CMD" == "add" ] || [ "$CMD" == "new6" ] || [ "$WG_INTERFACE" == "bind" ] || [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
                         case $CMD in
                             new*)
                                 # New 'server' Peer     [port=nnnnn] [ip=xxx.xxx.xxx.1/24] [auto={y|n}]
@@ -1374,7 +1616,7 @@ Manage_Peer() {
 
                                 [ "$Mode" == "device" ] && { echo -e $cBRED"\a\n\t***ERROR 'device' Peer '$WG_INTERFACE' does not support $cBWHT'auto=$AUTO'\n"$cRESET; return ; }  # v4.11
 
-                                if [ "$(echo "$AUTO" | grep "^[yYnNpPZ]$" )" ];then
+                                if [ "$(echo "$AUTO" | grep "^[yYnNpPZWS]$" )" ];then       # v4.15
                                     FLAG=$(echo "$AUTO" | tr 'a-z' 'A-Z')
                                     if [ -z "$(echo "$CMD" | grep "autoX")" ];then
                                         # If Auto='P' then enforce existence of RPDB Selective Routing rules or IPSET fwmark for the 'client' Peer or Passthru gateway
@@ -1401,15 +1643,21 @@ Manage_Peer() {
                                 [ "$CMD" == "delX" ] && Delete_Peer "$WG_INTERFACE" "force" || Delete_Peer "$WG_INTERFACE"  # v3.05
                             ;;
                             comment)
-                                #echo -e $cBCYA"\n\tPeer Comment (Before): $(grep -E "^$WG_INTERFACE[[:space:]]" $FN)"$cRESET
                                 shift 1
                                 COMMENT="$@"
                                 [ "${COMMENT:0:1}" != "#" ] && COMMENT="# "$COMMENT
                                 COMMENT=$(echo "$COMMENT" | sed "s/'/''/g")
-                                [ ${WG_INTERFACE:0:3} == "wg2" ] && local TABLE="servers" || TABLE="clients"
-                                sqlite3 $SQL_DATABASE "UPDATE $TABLE SET tag='$COMMENT' WHERE peer='$WG_INTERFACE';"
-                                #sed -i "/^$WG_INTERFACE/ s~\#.*$~$COMMENT~" ${INSTALL_DIR}WireguardVPN.conf
-                                #echo -e $cBGRE"\tPeer Comment (After) : $(grep -E "^$WG_INTERFACE[[:space:]]" $FN)\n"$cRESET
+                                local Mode=$(Server_or_Client "$WG_INTERFACE")      # v4.15
+                                local SQL_COL="peer"                                # v4.15
+                                case $Mode in                                       # v4.15
+                                    server) local TABLE="servers";;
+                                    client) local TABLE="clients";;
+                                    device)
+                                        local TABLE="devices"
+                                        local SQL_COL="name"
+                                    ;;
+                                esac                                                # v4.15
+                                sqlite3 $SQL_DATABASE "UPDATE $TABLE SET tag='$COMMENT' WHERE $SQL_COL='$WG_INTERFACE';"    # v4.15
 
                                 echo -e $cBGRE"\n\t[✔] Updated Annotation tag "$COMMENT"\n"$cRESET
                             ;;
@@ -1671,7 +1919,7 @@ Manage_Peer() {
                                      echo -e $cBRED"\a\n\t***ERROR 'client' Peer '$WG_INTERFACE' cannot set Listen Port\n"$cRESET
                                 fi
                             ;;
-                            add*|ipset*)                            # peer wg13 [add|del|edit] ipset Netflix[.....]
+                            add*|ipset*)                            # peer wg1x [add|del|edit] ipset Netflix[.....]
 
                                 local ARGS=$@
                                 if [ "$SUBCMD" == "add" ] || [ "$SUBCMD" == "del" ] || [ "$SUBCMD" == "upd" ];then
@@ -1681,18 +1929,54 @@ Manage_Peer() {
                                     echo -e $cBRED"\a\n\t***ERROR Invalid command '$SUBCMD' e.g. [add | del | upd]\n"$cRESET
                                 fi
                             ;;
+                            bind*)                                  # peer wg2x bind SGS20 [new_allowed_IP]
+                                local ARGS=$@
+                                local SERVER_PEER=$WG_INTERFACE
+                                local Mode=$(Server_or_Client "$SERVER_PEER")
+                                if [ "$Mode" == "server" ];then
+                                    local DEVICE=$2
+                                    local NEW_ALLOWED_IP=$3
+                                    if [ -f ${CONFIG_DIR}${DEVICE}.conf ];then
+                                        local PUB_KEY=$(sqlite3 $SQL_DATABASE "SELECT pubkey FROM servers WHERE peer='$SERVER_PEER';")
+                                        sed -i "/^PublicKey/ s~[^ ]*[^ ]~$PUB_KEY~3" ${CONFIG_DIR}${DEVICE}.conf
+                                        sed -i "/^# ${DEVICE} device/,/^# $DEVICE End$/d" ${CONFIG_DIR}${SERVER_PEER}.conf
+                                        sed -i -e :a -e '/^\n*$/{$d;N;};/\n$/ba' ${CONFIG_DIR}${SERVER_PEER}.conf   # v4.15 Delete all trailing blank lines from file
+                                        echo -e >> ${CONFIG_DIR}${SERVER_PEER}.conf
+                                        local PUB_KEY=$(cat ${CONFIG_DIR}${DEVICE}_public.key)
+                                        local ALLOWIPS=$(awk '/^Address/ {print $3}' ${CONFIG_DIR}${DEVICE}.conf)
+
+                                        if [ -n "$NEW_ALLOWED_IP" ];then
+                                            local SERVER_SUBNET=$(awk '/^#Address/ {print $3}' ${CONFIG_DIR}${SERVER_PEER}.conf | grep -o '^.*\.')
+                                            if [ -n "$(echo "$NEW_ALLOWED_IP" | Is_IPv4_CIDR )" ];then
+                                                local ALLOWIPS=$NEW_ALLOWED_IP", "$ALLOWIPS
+                                            else
+                                                echo -e $cBRED"\a\n\t***ERROR NEW ${cRESET}'ALLOWED_IPS=$NEW_ALLOWED_IP'${cBRED} - must be a valid ${cRESET}IPv4/32${cBRED} e.g. ${cRESET}${SERVER_SUBNET}99/32$cRESET \n"$cRESET
+                                                return 1
+                                            fi
+                                        fi
+
+                                        local PRE_SHARED_KEY=$(awk '/^PresharedKey/ {print $3}' ${CONFIG_DIR}${DEVICE}.conf)
+                                        [ -n "$PRE_SHARED_KEY" ] && local PRE_SHARED_KEY="PresharedKey = "$PRE_SHARED_KEY || local PRE_SHARED_KEY="#PresharedKey = "
+                                        cat >> ${CONFIG_DIR}${SERVER_PEER}.conf << EOF
+# $DEVICE device bind on $(date +%F)
+[Peer]
+PublicKey = $PUB_KEY
+AllowedIPs = $ALLOWIPS
+$PRE_SHARED_KEY
+# $DEVICE End
+EOF
+
+                                        echo -e $cBGRE"\n\t[✔] Device '${DEVICE}' bind to 'server' Peer '$SERVER_PEER' success\n"$cRESET
+                                    else
+                                        echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard 'device' Peer '$DEVICE'\n"$cRESET
+                                    fi
+                                else
+                                    echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard 'server' Peer '$SERVER_PEER'\n"$cRESET
+                                fi
+
+                            ;;
                             *)
-                                #echo -e $cBCYA"\n\tPeer Entry: $(grep -E "^$WG_INTERFACE[[:space:]]" $FN)\n"$cRESET
-                                local Mode=$(Server_or_Client "$WG_INTERFACE")
-                                case $Mode in
-                                    server) local TABLE="servers";;
-                                    client) local TABLE="clients";;
-                                esac
-
-                                [ "${WG_INTERFACE:0:2}" != "wg" ] && local TABLE="devices"
-
-                                echo -e $cBYEL"\tTable:$TABLE"$cBCYA 2>&1
-                                sqlite3 $SQL_DATABASE "SELECT * FROM $TABLE;"
+                                echo -e $cBRED"\a\n\t***ERROR Invalid command '$CMD' e.g. [add | del | upd | bind]\n"$cRESET    # v4.15
                             ;;
                         esac
                     else
@@ -1761,8 +2045,8 @@ Manage_Wireguard_Sessions() {
 
             # If no specific Peer specified, for Stop/Restart retrieve ACTIVE Peers otherwise for Start use Peer configuration
             if [ "$ACTION" == "start" ];then                  # v2.02 v1.09
-                WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM clients WHERE auto='Y' OR auto='P';" | tr '\n' ' ')
-                WG_INTERFACE=$WG_INTERFACE" "$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers WHERE auto='Y' OR auto='P';" | tr '\n' ' ')
+                WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM clients WHERE auto='Y' OR auto='P' OR auto='W';" | tr '\n' ' ')                              # v4.15
+                WG_INTERFACE=$WG_INTERFACE" "$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers WHERE auto='Y' OR auto='P' OR auto='W' OR auto='S';" | tr '\n' ' ')  # v4.15
                 if [ -z "$WG_INTERFACE" ];then
                     echo -e $cRED"\a\n\t***ERROR: No WireGuard Peers WHERE (${cBWHT}Auto='Y'${cBRED}) defined\n"$cRESET 2>&1
                     return 1
@@ -1771,14 +2055,16 @@ Manage_Wireguard_Sessions() {
                 # Wot if there are Peers we don't control?
                 WG_INTERFACE=$(wg show interfaces)                # v1.09
             fi
+            WG_INTERFACE=$(echo "$WG_INTERFACE" | awk '{$1=$1};1')    # v4.15 Strip leading/trailing spaces/tabs
             SayT "$VERSION Requesting WireGuard VPN Peer $ACTION ($WG_INTERFACE)"
     else
         echo -en $cBCYA
         # Allow category
         case "$WG_INTERFACE" in
             clients)
-                WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM clients WHERE auto='Y' OR auto='P';" | tr '\n' ' ')
+                WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM clients WHERE auto='Y' OR auto='P' OR auto='W';" | tr '\n' ' ')  # v4.15
                 local CATEGORY=" for Category 'Clients'"
+                WG_INTERFACE=$(echo "$WG_INTERFACE" | awk '{$1=$1};1')    # v4.15 Strip leading/trailing spaces/tabs
                 SayT "$VERSION Requesting WireGuard VPN Peer ${ACTION}$CATEGORY ($WG_INTERFACE)"
                 local TABLE="clients"
                 if [ -z "$WG_INTERFACE" ];then
@@ -1787,8 +2073,9 @@ Manage_Wireguard_Sessions() {
                 fi
             ;;
             servers)
-                WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers WHERE auto='Y' OR auto='P';" | tr '\n' ' ')
+                WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers WHERE auto='Y' OR auto='P' OR auto='W' OR auto='S';" | tr '\n' ' ')  # v4.15
                 local CATEGORY=" for Category 'Servers'"
+                WG_INTERFACE=$(echo "$WG_INTERFACE" | awk '{$1=$1};1')    # v4.15 Strip leading/trailing spaces/tabs
                 SayT "$VERSION Requesting WireGuard VPN Peer ${ACTION}$CATEGORY ($WG_INTERFACE)"
                 local TABLE="servers"
                 if [ -z "$WG_INTERFACE" ];then
@@ -1828,8 +2115,19 @@ Manage_Wireguard_Sessions() {
 
     WG_INTERFACE=$(printf "%s" "$WG_INTERFACE" | sed 's/wgs[1-5]//g' | sed 's/wgc[1-5]//g' | sed 's/^[ \t]*//;s/[ \t]*$//')
 
-    # v4.12 Ensure 'server' peers are initialised before 'client' peers e.g. this order:  wg22 wg21 wg15 wg14 wg13 wg12 wg11
-    WG_INTERFACE=$(echo "$WG_INTERFACE" | tr " " "\n" | sort -r | tr "\n" " ")  # v4.12
+    # v4.12 Ensure 'server' peers are initialised before 'client' peers e.g. this order:  wg21 wg22 wg11 wg12 wg13 wg14 wg15
+    local TMP_SERVERS=
+    local TMP_CLIENTS=
+    for WGI in $WG_INTERFACE
+        do
+            case $WGI in
+                wg2*) [ -z "$(echo "$TMP_SERVERS" | grep -w "$WGI")" ] && TMP_SERVERS=$TMP_SERVERS" "$WGI;;
+                wg1*) [ -z "$(echo "$TMP_CLIENTS" | grep -w "$WGI")" ] && TMP_CLIENTS=$TMP_CLIENTS" "$WGI;;
+            esac
+        done
+
+    local TMP_SERVERS=$(echo "$TMP_SERVERS" | tr " " "\n" | sort | tr "\n" " ")
+    WG_INTERFACE=$TMP_SERVERS" "$TMP_CLIENTS
 
     WG_INTERFACE=$(echo "$WG_INTERFACE" | awk '{$1=$1};1')    # v4.13  strip leading/trailing spaces/tabs
 
@@ -2020,7 +2318,7 @@ Manage_alias() {
         del)
             echo -e $cBCYA"\tDeleted aliases for '$SCRIPT_NAME'"$cRESET
             sed -i "/$SCRIPT_NAME/d" /jffs/configs/profile.add
-            rm -rf "/opt/bin/unbound_manager" 2>/dev/null                                   # v2.01
+            rm -rf "/opt/bin/wg_manager" 2>/dev/null                                   # v4.15 v2.01
         ;;
         "?")
             echo -e $cRESET"\tAlias info\n"
@@ -2707,6 +3005,16 @@ STATS
 #        This setting basically ignores any IPv6 settings for the WireGuard interfaces.
 #NOIPV6
 
+# Global Menu Display Override
+#     Use command 'vx' to edit this setting.
+#     If using SSH shortcuts on iPhone/Android, the menu text with word wrap is annoying, and made worse with the ASCII escape sequeces
+#NOMENU
+
+# Global ANSI/ASCII Display ATTRIB Override
+#     Use command 'vx' to edit this setting.
+#     Suppress ANSI/ASCII control sequences for display items such as highlighted/coloured Error messages or underline/reverse attibutes.
+#NOCOLOR
+
 # For Routers that include WireGuard Kernel/User Space tools, allow overriding with supported 3rd-Party/Entware versions
 #     Use command 'vx' to edit this setting.
 #USE_ENTWARE_KERNEL_MODULE
@@ -2731,7 +3039,8 @@ STATS
 #NOPG_UP
 
 # URL to check Endpoint Server; apply to ALL interfaces unless excluded, or named interfaces
-#     e.g. CHK_ENDPOINT = curl https://am.i.mullvad.net/connected  , wg14-
+#     FULL URL https://mullvad.net/en/check/ which checks DNS Leak etc.
+#     API CHK_ENDPOINT = curl https://am.i.mullvad.net/connected  , wg14-
 #     Use command 'vx' to edit this setting.
 #CHK_ENDPOINT = curl -s https://am.i.mullvad.net/connected , * wg14-
 #CHK_ENDPOINT = curl -s https://am.i.mullvad.net/connected , wg11
@@ -2762,9 +3071,8 @@ Display_QRCode() {
         [ "$ANS" == "y" ] && { clear; qrencode -t ANSIUTF8 < $FN; }             # v1.05
     fi
 }
-# v4.11 'nat'-start references changed to 'firewall'-start
 Edit_firewall_start() {
-
+# v4.11 'nat'-start references changed to 'firewall'-start
     if [ "$1" != "del" ];then
 
         [ ! -f /jffs/scripts/firewall-start ] && { echo -e "#!/bin/sh\n\n"    > /jffs/scripts/firewall-start; chmod +x /jffs/scripts/firewall-start; }
@@ -2947,10 +3255,10 @@ Manage_Stats() {
     esac
 
     if [ -n "$(cru l | grep "WireGuard")" ];then
-        local TXT="${cBGRE}\t[✔] Statistics gathering is ENABLED"$cRESET
+        local TXT="${cBGRE}\t[✔] ${cBWHT}Statistics gathering is ${cBGRE}ENABLED"$cRESET
         STATUS=1
     else
-        local TXT="${cBRED}\t[✖] ${cBGRE}Statistics gathering is ${cRED}DISABLED"$cRESET
+        local TXT="${cBRED}\t[✖] ${cBWHT}Statistics gathering is ${cRED}DISABLED"$cRESET
     fi
 
     echo -e "$TXT"
@@ -2968,16 +3276,19 @@ Get_scripts() {
     download_file ${INSTALL_DIR} wg_client martineau $BRANCH dos2unix 777
     download_file ${INSTALL_DIR} wg_server martineau $BRANCH dos2unix 777
     download_file ${INSTALL_DIR} UDP_Updater.sh martineau $BRANCH dos2unix 777
+    download_file ${INSTALL_DIR} wg_ChkEndpointDDNS.sh martineau $BRANCH dos2unix 777           # v4.15
 
     chmod +x ${INSTALL_DIR}wg_manager.sh
     chmod +x ${INSTALL_DIR}wg_client
     chmod +x ${INSTALL_DIR}wg_server
     chmod +x ${INSTALL_DIR}UDP_Updater.sh                                               # v4.01
+    chmod +x ${INSTALL_DIR}wg_ChkEndpointDDNS.sh                                                # v4.15
 
     md5sum ${INSTALL_DIR}wg_manager.sh      > ${INSTALL_DIR}"wg_manager.md5"
     md5sum ${INSTALL_DIR}wg_client          > ${INSTALL_DIR}"wg_client.md5"
     md5sum ${INSTALL_DIR}wg_server          > ${INSTALL_DIR}"wg_server.md5"
     md5sum ${INSTALL_DIR}UDP_Updater.sh     > ${INSTALL_DIR}"UDP_Updater.md5"          # v4.01
+    md5sum ${INSTALL_DIR}wg_ChkEndpointDDNS.sh     > ${INSTALL_DIR}"wg_ChkEndpointDDNS.md5"     # v4.15
 }
 Read_INPUT() {
 
@@ -3173,6 +3484,135 @@ Show_credits() {
     printf '|                      Version %b%s%b by Martineau%b' "$cBMAG" "$VERSION" "${cRESET}" "${BLANKS}|\n"    # v3.22
     printf '|                                                                      |\n'
 }
+Show_Info_HDR() {
+
+    local ACTION="$(echo "$menu1"| awk '{print $1}')"
+
+    local CHANGELOG="$cRESET(${cBCYA}Change Log: ${cBYEL}https://github.com/MartineauUK/wireguard/commits/main/wg_manager.sh$cRESET)"   #v2.01
+    [ -n "$(echo $VERSION | grep "b")" ] && local CHANGELOG="$cRESET(${cBCYA}Change Log: ${cBYEL}https://github.com/MartineauUK/wireguard/commits/dev/wg_manager.sh$cRESET)" #v2.01
+
+    echo -e $cBWHT"\n\tRouter$cBMAG $HARDWARE_MODEL ${cBRESET}Firmware ${cBMAG}(v$BUILDNO)"             # v4.12
+    if [ -f "$ENTWARE_INFO" ] || [ -f /opt/etc/opkg.conf ];then
+        if [ -f "$ENTWARE_INFO" ];then
+            echo -e $cBGRE"\n\t[✔]${cBWHT} Entware Architecture${cBMAG} $(grep -E "^arch" $ENTWARE_INFO)\n"$cRESET     # v4.01 @Torson
+        else
+            echo -e $cBGRE"\n\t[✔]${cBWHT} Entware Architecture${cBMAG} $(grep -E "^arch.*\." /opt/etc/opkg.conf)\n"$cRESET
+        fi
+    else
+        echo -e $cBRED"\n\t[✖] Entware Architecture unknown!\n"$cRESET
+    fi
+
+    echo -e $cBMAG"\n\t${VERSION}$cBWHT WireGuard Session Manager" ${CHANGELOG}$cRESET  # v2.01
+
+    [ -d ${INSTALL_DIR} ] && Show_MD5 "script"
+
+}
+Show_Info() {
+
+    if [ -f /usr/sbin/wg ];then             # v4.12
+        local FPATH=$(modprobe --show-depends wireguard | awk '{print $2}')
+        local FVERSION=$(strings $FPATH | grep "^version" | cut -d'=' -f2)  # v4.12 @ZebMcKayhan
+        if [ "$(which wg)" != "/opt/bin/wg" ];then
+            echo -e $cBGRE"\n\t[✔]$cBWHT WireGuard Kernel module/User Space Tools included in Firmware"$cRED" ($FVERSION)\n"$cRESET    # v4.12
+        else
+            echo -e $cBGRE"\n\t[ℹ ]$cBGRA WireGuard Kernel module/User Space Tools included in Firmware"$cBWHT" ($FVERSION)${cBGRA} but 3rd-Party modules installed...\n"$cRESET    # v4.12
+        fi
+    fi
+
+    [ "$(which wg)" == "/opt/bin/wg" ] && Check_Module_Versions "report"
+
+    echo -e $cRESET
+    DNSmasq_Listening_WireGuard_Status
+
+    if [ -f /jffs/scripts/firewall-start ];then
+        if [ -z "$(grep -i "wireguard" /jffs/scripts/firewall-start)" ];then     # v1.11
+            echo -e $cBRED"\t[✖]${cBWHT} firewall-start$${cBRED} is NOT monitoring WireGuard Firewall rules - ${cBWHT}use 'firewallstart' to ENABLE\n"$cRESET   # v4.12
+        else
+            echo -e $cBGRE"\t[✔]${cBWHT} firewall-start ${cBGRE}is monitoring WireGuard Firewall rules\n"$cRESET
+        fi
+    else
+        echo -e $cBRED"\t[✖]${cBWHT} firewall-start${cBRED} is NOT monitoring WireGuard Firewall rules - ${cBWHT}use 'firewallstart' to ENABLE\n"$cRESET
+    fi
+
+    if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOMENU" ${INSTALL_DIR}WireguardVPN.conf)" ];then     # v4.15
+        echo -e $cBRED"\t[✖]${cBWHT} NOMENU specified\n"                                                                # v4.15
+    fi
+
+    if [ -f ${INSTALL_DIR}WireguardVPN.conf ];then
+        if [ "$(Manage_KILL_Switch)" == "Y" ];then
+            local TEMP_PERM="temporarily "                                      # v4.12
+            [ -z "$(grep -oE "^#KILLSWITCH" ${INSTALL_DIR}WireguardVPN.conf)" ] && local TEMP_PERM=             # v4.12
+            echo -e $cBGRE"\t[✔]$cBWHT WAN ${cBGRE}KILL-Switch is ${TEMP_PERM}ENABLED"$cRESET" (use 'vx' command for info)" # v4.12
+        else
+            local TEMP_PERM="temporarily "                                      # v4.12
+            [ -z "$(grep -oE "^KILLSWITCH" ${INSTALL_DIR}WireguardVPN.conf)" ] && local TEMP_PERM=              # v4.12
+            echo -e $cRED"\t[✖]$cBWHT WAN ${cBGRE}KILL-Switch is "${cBRED}${aREVERSE}"${TEMP_PERM}DISABLED"$cRESET" (use 'vx' command for info)"    # v4.12
+        fi
+    else
+        echo -e $cRED"\t[✖]$cBWHT WAN ${cBGRE}KILL-Switch ${cBRED}STATUS N/A (${cRESET}${INSTALL_DIR}WireguardVPN.conf${cBRED} not found?)"$cRESET
+    fi
+
+    if [ "$(Manage_UDP_Monitor)" == "Y" ];then                          # v4.01
+        echo -e $cBGRE"\t[✔]${cBWHT} UDP ${cBGRE}monitor is ENABLED$cRESET"
+    else
+        echo -e $cRED"\t[✖]${cBWHT} UDP ${cBGRE}monitor is ${cBRED}DISABLED$cRESET"
+    fi
+
+    local FC_STATUS=$(Manage_FC "?")                          # v4.14
+    case "$FC_STATUS" in
+        *[Ee]nabled*)
+            echo -e $cBGRE"\n\t[✔]${cBWHT} Flow Cache ${cBGRE}is ENABLED$cRESET"
+        ;;
+        *[Dd]isabled*)
+            echo -e $cRED"\n\t[✖]${cBWHT} Flow Cache ${cBGRE}is ${cBRED}DISABLED$cRESET"
+        ;;
+        *)
+            echo -e $cBGRE"\n\t[✔]${cBWHT} Flow Cache status ${cBGRE} N/A$cRESET"
+        ;;
+    esac
+
+    local WAN_IF=$(Get_WAN_IF_Name)                                             # v4.11
+    local VAL=$(cat /proc/sys/net/ipv4/conf/$WAN_IF/rp_filter)                  # v4.11
+    [ "$VAL" == "1" ] && STATE="ENABLED" || STATE="${cBRED}DISABLED${cBGRE}"    # v4.11
+    echo -e $cBGRE"\n\t[ℹ ] ${cBWHT}Reverse Path Filtering${cBGRE} $STATE\n"$cRESET            # v4.11
+
+    if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOTCPMSS" ${INSTALL_DIR}WireguardVPN.conf)" ];then   # v4.12 v4.11
+        echo -e $cBRED"\t[✖]${cBWHT} 'NOTCPMSS' specified, TCP clamping to PMTU (-t mangle '--tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu')$cBRED DISABLED$cRESET" # v4.12
+    fi
+    if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOSETXMARK" ${INSTALL_DIR}WireguardVPN.conf)" ];then   # v4.12 v4.11
+        echo -e $cBRED"\t[✖]${cBWHT} 'NOSETXMARK' specified, (-t mangle  '-j MARK --set-xmark 0x01/0x7')$cBRED  DISABLED" # v4.12
+    fi
+
+    # Override IPv6 ?
+    if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOIP[Vv]6" ${INSTALL_DIR}WireguardVPN.conf)" ];then   # v4.11
+        [ "$(nvram get ipv6_service)" != "disabled" ] && echo -e $cBRED"\t[✖]${cBWHT} 'NOIPV6' specified, IPv6 ${cRED} is not allowed  - IPv4 configs ONLY$cRESET" # v4.11
+    fi
+
+    # Allow use of 3rd-Party Entware Kernel/Userspace Tools
+    if [ -f ${INSTALL_DIR}WireguardVPN.conf ] &&  [ -n "$(grep -oE "USE_ENTWARE_KERNEL_MODULE" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+            if [ -f /usr/sbin/wg ];then
+                if [ -n "$(grep -oE "^USE_ENTWARE_KERNEL_MODULE" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                    echo -e $cBGRE"\t[✔]Use 3rd-party Entware/Userspace Tools ${cBGRE}modules is ALLOWED\n$cRESET"
+                else
+                    echo -e $cBRED"\t[✖]${cBWHT} Use 3rd-party Entware/Userspace Tools ${cBGRE}modules is ${cBRED}DENIED\n$cRESET"
+                fi
+            fi
+    fi
+
+    [ $(cru l | grep ChkDDNS | wc -l) -gt 0 ] && echo -e $cBGRE"\t[✔] ${cRESET}Endpoint DDNS$cBGRE re-fresh monitor ACTIVE\n$cRESET"        # v4.15
+
+    [ "$READLINE" == "ReadLine" ] && echo -e $cBGRE"\t[✔]$cBWHT Use of 'Pg-Up' Key ${cBGRE}for command retrieval is ENABLED\n$cRESET" || echo -e $cBRED"\t[✖]${cBWHT} Use of 'Pg-Up' Key for command retrieval is ${cBRED}DISABLED\n$cRESET" # v4.14
+
+    Manage_Stats
+
+    echo -e $cBGRE"\n\t[ℹ ] ${cRESET}Speedtest quick link${cBYEL} https://fast.com/en/gb/ \n"$cRESET       # v4.12
+
+    echo -e $cBGRE"\t[ℹ ] ${cRESET}WireGuard© Official Site ${cBYEL}https://www.wireguard.com/ \n"$cRESET   # v4.15
+
+    echo -e $cBGRE"\t[ℹ ] ${cRESET}@ZebMcKayhan's$cBGRE Hint's and Tips Guide${cBYEL} https://github.com/ZebMcKayhan/WireguardManager/blob/main/README.md#table-of-content \n"$cRESET   # v4.13
+
+
+}
 exit_message() {
 
         local CODE=0
@@ -3226,6 +3666,7 @@ Install_WireGuard_Manager() {
     if [ "$NOPULL_SCRIPTS" != "noscripts" ];then
         if [ -d "${INSTALL_DIR}" ];then
             Get_scripts "$2"
+            Manage_Addon "wgmExpo.sh"       # v4.15 @ZeMcKayhan's Addon
             echo -e
         fi
     else
@@ -3236,6 +3677,7 @@ Install_WireGuard_Manager() {
     modprobe xt_comment
     opkg install column                     # v2.02
     opkg install coreutils-mkfifo
+    opkg install p7zip                      # v4.15
 
     # Kernel module in firmware?
     if [ "$(which wg)" == "/usr/sbin/wg" ];then # v4.12
@@ -3303,6 +3745,7 @@ EOF
 #AllowedIPs = 0.0.0.0/0 # All Access or [192.168.1.0/24,10.8.0.21/32] i.e. List of IP/Subnet/networks YOUR mobile device may access.
 # DeviceExample End
 
+                    chmod 600 ${CONFIG_DIR}wg2${I}.conf         # v4.15 Prevent wg-quick "Warning: '/opt/etc/wireguard.d/wg21.conf' is world accessible"
                     sqlite3 $SQL_DATABASE "INSERT INTO servers values('$WG_INTERFACE','$AUTO','$SUBNET','$PORT','$PUB_KEY','$PRIV_KEY','$ANNOTATE');"
                 done
         fi
@@ -3401,6 +3844,8 @@ Uninstall_WireGuard() {
         [ -f ${INSTALL_DIR}WireguardVPN.conf ] && mv ${INSTALL_DIR}WireguardVPN.conf ${CONFIG_DIR}
     fi
 
+    Manage_Addon "wgmExpo.sh" "del"     # v4.15 @ZeMcKayhan's Addon
+
     rm -rf ${INSTALL_DIR}
 
     echo -e $cBCYA"\tDeleted Peer Auto-start @BOOT\n"$cRESET
@@ -3418,6 +3863,8 @@ Uninstall_WireGuard() {
     Manage_alias "del"                  # v1.11
 
     Edit_DNSMasq "del"                  # v1.12
+
+    Unmount_WebUI $SCRIPT_NAME".asp"    # v4.15
 
     echo -e $cBGRE"\n\tWireGuard Uninstall complete for $HARDWARE_MODEL (v$BUILDNO)\n"$cRESET
 
@@ -3548,13 +3995,23 @@ Show_Peer_Status() {
 
                             local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM $TABLE WHERE peer='$WG_INTERFACE';")
                             local DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')
-                            local VPN_IP_TXT="Port:${LISTEN_PORT}\t${VPN_ADDR} ${cBYEL}\t\t\tVPN Tunnel Network"
+                            local TABS="\t\t\t"                                                                                                     # v4.15
+                            if [ "$(sqlite3 $SQL_DATABASE "SELECT auto FROM servers WHERE peer='$WG_INTERFACE';")" != "S" ];then
+                                local TABS="\t\t\t" # v4.15
+                                local VPN_IP_TXT="Port:${LISTEN_PORT}\t${VPN_ADDR} ${cBYEL}${TABS}VPN Tunnel Network"
+                            else
+                                local SOCKET=$(wg show $WG_INTERFACE endpoints | awk '{print $2}')
+                                [ -n "$SOCKET" ] && TABS="\t" || TABS="\t\t\t\t"
+                                local VPN_IP_TXT="Port:${LISTEN_PORT} Endpoint=${SOCKET} ${cBYEL}${TABS}VPN Tunnel Network"
+                            fi
+
                             [ "$WG_INTERFACE" == "wgs1" ] && DESC="${cBRED}***ASUS Internal GUI 'server' Peer***"
                         else
                             if [ "$MODE" == "client" ];then
                                 local TYPE="client"
                                 local TABLE="clients"
                             else
+                                local TYPE="device"         # v4.15
                                 local TABLE="devices"
                             fi
 
@@ -3620,6 +4077,12 @@ Show_Peer_Status() {
                                 # Need to get the last logged RX/TX Total values for the Peer, and only add to SQL if total > 0
                                 Parse "$(sqlite3 $SQL_DATABASE "SELECT rxtotal,txtotal FROM traffic WHERE peer='$WG_INTERFACE' order by timestamp desc limit 1;")" "|" RX_OLD TX_OLD    # v4.11
 
+                                if [ "$RX_OLD" != "*" ] && [ -n "$RX" ] && [ -n "$RX_OLD"];then
+                                    local RX_DELTA=$RX
+                                    local TX_DELTA=$TX
+                                    local INIT_TRAFFIC="Y"                          # v4.15
+                                fi
+
                                 if [ -n "$RX_OLD" ] && [ -n "$TX_OLD" ];then
                                     #local RX_DELTA=$((RX-RX_OLD))
                                     #local TX_DELTA=$((TX-TX_OLD))
@@ -3643,11 +4106,12 @@ Show_Peer_Status() {
                                 [ -z "$RX_DELTA" ] && local RX_DELTA=0          # v4.12 @Dreaz
                                 [ -z "$TX_DELTA" ] && local TX_DELTA=0          # v4.12 @Dreaz
 
-
-                                if [ $(expr "$RX_DELTA" + "$TX_DELTA") -gt 0 ];then # v4.11 @ZebMcKayhan
+                                if [ "$INIT_TRAFFIC" == "Y" ] || [ $(expr "$RX_DELTA" + "$TX_DELTA") -gt 0 ];then # v4.15 @JGrana v4.11 @ZebMcKayhan
                                     local TIMESTAMP=$(date +%s)
                                     sqlite3 $SQL_DATABASE "INSERT into traffic values('$WG_INTERFACE','$TIMESTAMP','$RX_DELTA','$TX_DELTA','$RX','$TX');"       # 4.11 v3.05
                                 fi
+
+                                local INIT_TRAFFIC="N"                          # v4.15
                             fi
                             local TABS="\t\t"
                             [ "${#LINE}" -lt 40 ] && local TABS="\t\t\t"
@@ -3671,6 +4135,7 @@ Show_Peer_Status() {
                                     [ -z "$DESC" ] && DESC="# "$DESC
                                 fi
                             fi
+
                             WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE pubkey='$PUB_KEY';")
 
                             [ -z "$WG_INTERFACE" ] && WG_INTERFACE=$(grep -F "$PUB_KEY" ${CONFIG_DIR}*_public.key | awk -F '[\/:\._]' '{print $6}')
@@ -3717,14 +4182,14 @@ Show_Peer_Config_Entry() {
     case ${WG_INTERFACE:0:3} in
 
         "")
-            echo -e $cBWHT"\n\tPeers (Auto=P - Policy, Auto=X - External i.e. Cell/Mobile)"$cBCYA
+            echo -e $cBWHT"\n\tPeers (Auto start: Auto=P - Policy, Auto=S - Site-to-Site)"$cBCYA
 
             COLUMN_TXT="Server,Auto,Subnet,Port,Annotate"
             sqlite3 $SQL_DATABASE "SELECT peer,auto,subnet,port,tag from servers;" | column -t  -s '|' --table-columns "$COLUMN_TXT"
             echo -e
             COLUMN_TXT="Client,Auto,IP,Endpoint,DNS,MTU,Annotate"           # v4.09
             sqlite3 $SQL_DATABASE "SELECT peer,auto,subnet,socket,dns,mtu,tag from clients;" | column -t  -s '|' --table-columns "$COLUMN_TXT"
-            echo -e
+            echo -e $cBWHT"\n\tPeers (Auto=X - External i.e. Cell/Mobile/Site)"$cBCYA
             COLUMN_TXT="Device,Auto,IP,DNS,Allowed IPs,Annotate"            # v4.09
             sqlite3 $SQL_DATABASE "SELECT name,auto,ip,dns,allowedip,tag from devices ORDER BY ip ASC;" | column -t  -s '|' --table-columns "$COLUMN_TXT"   # v4.11
 
@@ -4442,6 +4907,8 @@ Create_Site2Site() {
 
     # [ [name1] [name2] ['ip='ip_for_name1] ['port='listen_port_for_name1] ['lan='siteb_subnet] ]
 
+    # [ add wgxx name2 ['lan='siteC_subnet] ]
+
     shift
 
     local I=1
@@ -4451,8 +4918,19 @@ Create_Site2Site() {
             local ALLRULES="Y"
             ;;
         ip=*)                               # Tunnel VPN Pool SiteA e.g. 10.10.10.0 (SiteB will be assigned +1)
-            local VPN_POOL="$(echo "$1" | sed -n "s/^.*ip=//p" | awk '{print $1}')"
+            local VPN_POOL4="$(echo "$1" | sed -n "s/^.*ip=//p" | awk '{print $1}')"
             [ "$I" -ge 1 ] && local I=$((I-1))      # Retain Positional parameter
+            ;;
+        ipv6|ipv6=*)
+            local VPN_POOL6="$(echo "$1" | sed -n "s/^.*ipv6=//p" | awk '{print $1}')"
+            # Ensure IPv6 address is in standard compressed format
+            [ -n "$VPN_POOL6" ] && VPN_POOL6="$(IPv6_RFC "$VPN_POOL6")" # v4.15
+            USE_IPV6="Y"                                                # v4.15
+            [ "$I" -ge 1 ] && local I=$((I-1))      # Retain Positional parameter
+            ;;
+        noipv4|noIPv4)
+            local USE_IPV4="N"                  # v4.15
+            local IPV6_TXT="(IPv6 Only) "       # v4.15
             ;;
         port*)                              # SiteA ListenPort (SiteB will be assigned +1)
             local LISTEN_PORT="$(echo "$1" | sed -n "s/^.*port=//p" | awk '{print $1}')"
@@ -4462,9 +4940,19 @@ Create_Site2Site() {
             local SITE_TWO_LAN="$(echo "$1" | sed -n "s/^.*lan=//p" | awk '{print $1}')"
             [ "$I" -ge 1 ] && local I=$((I-1))      # Retain Positional parameter
             ;;
+        lanipv6*)
+            local SITE_TWO_LAN6="$(echo "$1" | sed -n "s/^.*lanipv6=//p" | awk '{print $1}')"
+            # Ensure IPv6 address is in standard compressed format
+            SITE_TWO_LAN6="$(IPv6_RFC "$SITE_TWO_LAN6")"    # v4.15
+            USE_IPV6="Y"                                    # v4.15
+            [ "$I" -ge 1 ] && local I=$((I-1))              # Retain Positional parameter
+            ;;
         allowips*)
             local SITE_TWO_ALLOWIPS="$(echo "$1" | sed -n "s/^.*allowips=//p" | awk '{print $1}' | sed 's~,\([1-2]\)~, \1~')"
             [ "$I" -ge 1 ] && local I=$((I-1))      # Retain Positional parameter
+            ;;
+        add)
+            local ADD_SITE="Y"
             ;;
         *)
             case $I in
@@ -4483,33 +4971,115 @@ Create_Site2Site() {
         I=$((I+1))
     done
 
-    [ -z "$NAME_ONE" ] && local NAME_ONE="SiteA"
-    [ -z "$NAME_TWO" ] && local NAME_TWO="SiteB"
+    if [ -z "$ADD_SITE" ];then
+        [ -z "$NAME_ONE" ] && local NAME_ONE="SiteA"
+        [ -z "$NAME_TWO" ] && local NAME_TWO="SiteB"
 
-    [ -z "$VPN_POOL" ] && local VPN_POOL="10.9.8.0"                 # VPN Tunnel Network
-    [ -z "$LISTEN_PORT" ] && local LISTEN_PORT="61820"              # Site $NAME_ONE
-    local LAN_ADDR=$(nvram get lan_ipaddr)
-    local LAN_SUBNET=${LAN_ADDR%.*}
-    local SITE_ONE_LAN=$LAN_SUBNET".0/24"
-
-    if [ "$USE_IPV6" == "Y" ];then
-        [ -z "$(echo "$VPN_POOL" | sed 's~/.*$~~' | Is_Private_IPv6)" ] && { echo -e $cBRED"\a\n\t***ERROR: ipv6='$VPN_POOL6' must be Private IPv6 address"$cRESET; return 1; }
+        if [ -n "$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE name='$NAME_ONE';")" ];then    # v4.15
+            echo -e $cBRED"\a\n\t***ERROR: '$NAME_ONE' Peer already exists"$cRESET
+            return 1
+        fi
     else
-        [ -z "$(echo "$VPN_POOL" | Is_IPv4)" ] && { echo -e $cBRED"\a\n\t***ERROR: '$VPN_POOL' must be IPv4 Address"$cRESET; return 1; }
+        local NAME_ONE=
+        [ -z "$NAME_TWO" ] && local NAME_TWO="SiteC"
     fi
 
-    local LAST_OCTET=${VPN_POOL##*.}
-    if [ "$LAST_OCTET" == "0" ];then
-        local SITE_ONE_IP=$(echo "$VPN_POOL" | grep -o '^.*\.')"1/32"
-        local SITE_TWO_IP=$(echo "$VPN_POOL" | grep -o '^.*\.')"2/32"
-    else
-        local SITE_ONE_IP=$VPN_POOL"/32"
-        local SITE_TWO_IP=$(echo "$VPN_POOL" | grep -o '^.*\.')$((LAST_OCTET+1))/32
+    if [ -n "$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE name='$NAME_TWO';")" ];then    # v4.15
+        echo -e $cBRED"\a\n\t***ERROR: '$NAME_TWO' remote 'device' Peer already exists"$cRESET
+        return 1
+    fi
+
+    if [ -z "$ADD_SITE" ];then
+        [ -z "$VPN_POOL4" ] && local VPN_POOL4="10.9.8.0"                 # VPN Tunnel Network
+        local TWO_OCTET=$(echo "$VPN_POOL4" | cut -d'.' -f2)
+        local THIRD_OCTET=$(echo "$VPN_POOL4" | cut -d'.' -f3)
+        local IPV6_TXT=
+        [ -z "$LISTEN_PORT" ] && local LISTEN_PORT="61820"              # Site $NAME_ONE
+        local LAN_ADDR=$(nvram get lan_ipaddr)
+        local LAN_SUBNET=${LAN_ADDR%.*}
+        local SITE_ONE_LAN=$LAN_SUBNET".0/24"
+
+        if [ "$USE_IPV6" == "Y" ] && [ -z "$VPN_POOL6" ];then
+            [ -z "$TWO_OCTET" ] && local TWO_OCTET="9"
+            [ -z "$NEW_THIRD_OCTET" ] && local NEW_THIRD_OCTET="8"
+            local VPN_POOL6="fc10:${TWO_OCTET}:${NEW_THIRD_OCTET}::1"
+            local IPV6_TXT="(IPv4/IPv6) "
+        fi
+    fi
+
+    [ -n "$VPN_POOL4" ] && local VPN_POOL=$VPN_POOL4    # v4.15
+
+    if [ -n "$VPN_POOL4" ] && [ -n "$VPN_POOL6" ];then  # v4.15
+            local VPN_POOL=$VPN_POOL4","$VPN_POOL6
+            local IPV6_TXT="(IPv4/IPv6) "               # v4.15
+    fi
+
+    if [ "$USE_IPV4" == "N" ];then                      # v4.15
+        if [ -n "$VPN_POOL6" ];then                     # v4.15
+            local VPN_POOL=$VPN_POOL6                   # v4.15
+            local IPV6_TXT="(IPv6) "                    # v4.15
+        else
+            echo -e $cBRED"\a\n\t***ERROR Create new WireGuard ${IPV6_TXT}'server' Peer has missing ${cRESET}IPv6 Private subnet${cBRED} - use $cRESET'ipv6[=]'$cBRED arg\n"$cRESET
+            return 1
+        fi
+    fi
+
+    for THIS in $(echo "$VPN_POOL" | tr ',' ' ')        # v4.15
+        do
+            if [ -z "$(echo "$THIS" | grep -F ":")" ];then
+                [ -z "$(echo "$THIS" | Is_IPv4)" ] && { echo -e $cBRED"\a\n\t***ERROR: '$THIS' must be IPv4 "$cRESET; return 1; }                                  # v4.15
+            else
+                [ -z "$(echo "$THIS" | sed 's~/.*$~~' | Is_Private_IPv6)" ] && { echo -e $cBRED"\a\n\t***ERROR: '$THIS' must be Private IPv6 address"$cRESET; return 1; }   # v4.15
+            fi
+        done
+
+    if [ -z "$ADD_SITE" ];then
+        local LAST_OCTET=${VPN_POOL4##*.}
+        if [ "$LAST_OCTET" == "0" ];then
+            local SITE_ONE_IP=$(echo "$VPN_POOL4" | grep -o '^.*\.')"1/32"
+            local SITE_TWO_IP=$(echo "$VPN_POOL4" | grep -o '^.*\.')"2/32"
+        else
+            local SITE_ONE_IP=$VPN_POOL"/32"
+            local SITE_TWO_IP=$(echo "$VPN_POOL4" | grep -o '^.*\.')$((LAST_OCTET+1))/32
+        fi
+        if [ "$USE_IPV6" == "Y" ] && [ -n "$VPN_POOL6" ];then
+            local SITE_ONE_IP=$SITE_ONE_IP", "$VPN_POOL6"/128"
+        fi
     fi
 
     if [ -z "$SITE_TWO_LAN" ];then
         local SITE_TWO_THIRD_OCTET=$(($(echo "$SITE_ONE_LAN" | cut -d'.' -f3) + 1))
         local SITE_TWO_LAN=$(echo "$SITE_ONE_LAN" | grep -oE '^(.{1,3}\.){2}')${SITE_TWO_THIRD_OCTET}.0/24
+        if [ "$USE_IPV6" == "Y" ];then
+            [ -z "$SITE_TWO_LAN6" ] && local SITE_TWO_LAN6="fc10:${TWO_OCTET}:${SITE_TWO_THIRD_OCTET}::1/64"
+            local VPN_POOL_IP=${SITE_TWO_LAN6%/*}
+            local VPN_POOL_MASK=${SITE_TWO_LAN6##*/}                    # v4.15
+            local VPN_SUBNET=${VPN_POOL_IP%:*}
+            local VPN_IP_EXPANDED=$(Expand_IPv6 "${VPN_POOL_IP%/*}")    # v4.15
+            local VPN_IP_COMPRESSED=$(Compress_IPv6 "${VPN_IP_EXPANDED}")
+            local VPN_POOL_PREFIX_EXPANDED=${VPN_IP_EXPANDED%:*}        # v4.15
+            local VPN_POOL_PREFIX_COMPRESSED=$(Compress_IPv6 "${VPN_POOL_PREFIX_EXPANDED}")
+
+            local IP=2
+
+            while true
+                do
+                    local MATCH="$(sqlite3 $SQL_DATABASE "SELECT ip FROM devices WHERE ip LIKE '%${VPN_POOL_PREFIX_COMPRESSED}${IP}/128%';" | tr ',' ' ')"  # v4.15 v4.11 v4.02
+                    local DUPLICATE=$(echo "$MATCH" | grep -ow "${VPN_POOL_PREFIX_COMPRESSED}${IP}/128")
+                    [ -z "$DUPLICATE" ] && break || local IP=$((IP+1))
+
+                    if [ $IP -ge 255 ];then
+                        echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) IPv6 subnet MAX 254 imposed!'"
+                        exit 98
+                    fi
+
+                    [ -z "$MATCH" ] && break
+
+                done
+
+            #local SITE_TWO_LAN=$SITE_TWO_LAN", "${VPN_POOL_PREFIX_COMPRESSED}$IP"/128"
+        fi
+
     else
         if [ -n "$(echo "$SITE_TWO_LAN" | Is_IPv4)" ] || [ -n "$(echo "$SITE_TWO_LAN" | Is_IPv4_CIDR)" ];then
             if [ -z "$(echo "$SITE_TWO_LAN" | Is_IPv4_CIDR)" ];then
@@ -4527,7 +5097,8 @@ Create_Site2Site() {
         local SITE_TWO_ALLOWIPS="$SITE_TWO_IP, $SITE_TWO_ALLOWIPS"
     fi
 
-    echo -e $cBCYA"\n\tCreating WireGuard Private/Public key-pair for Site-to-Site Peers ${cBMAG}${NAME_ONE}/${NAME_TWO}${cBCYA}"$cRESET
+    [ -n "$NAME_ONE" ] && local SLASH="/" || local SLASH=
+    echo -e $cBCYA"\n\tCreating WireGuard Private/Public key-pair for Site-to-Site ${IPV6_TXT}Peers ${cBMAG}${NAME_ONE}/${NAME_TWO}${cBCYA}"$cRESET
 
     for SITE in $NAME_ONE $NAME_TWO
         do
@@ -4546,7 +5117,8 @@ Create_Site2Site() {
 
     [ -n "$ANS" ] && local DDNS=$ANS || local DDNS=$NAME_TWO".DDNS"
 
-    cat > ${CONFIG_DIR}${NAME_ONE}.conf << EOF
+    if [ -z "$ADD_SITE" ];then
+        cat > ${CONFIG_DIR}${NAME_ONE}.conf << EOF
 # $NAME_ONE - $SITE_ONE_LAN
 [Interface]
 PrivateKey = $SITE_ONE_PRI_KEY
@@ -4560,9 +5132,34 @@ AllowedIPs = $SITE_TWO_ALLOWIPS
 Endpoint = $DDNS:$((LISTEN_PORT+1))
 EOF
 
-    local ROUTER_DDNS=$(nvram get ddns_hostname_x)
+        chmod 600 ${CONFIG_DIR}${NAME_ONE}.conf         # v4.15 Prevent wg-quick "Warning: '/opt/etc/wireguard.d/Home.conf' is world accessible"
+    fi
+
+    if [ -n "$ADD_SITE" ];then
+        # Determine WG interface if user doesn't explicitly specify the 'server' Peer
+        echo -e $cRESET"\tEnter the name of interface or descriptive name e.g. ${cBMAG}'Home'${cRESET} to bind site '${cBMAG}${NAME_TWO}${cRESET}' or press$cBGRE [Enter] to SKIP."
+        read -r "ANS"
+        if [ -n "$ANS" ];then
+            if [ "${ANS:0:3}" == "wg2" ];then
+                local WG_INTERFACE=$ANS
+            else
+                local MATCHTHIS="$ANS"
+                if [ -n "$(ls /opt/etc/wireguard.d/wg2*.conf 2>/dev/null)" ];then
+                    local SERVER_PEER_LIST=$(grep -HEi "^#.*${MATCHTHIS} " ${CONFIG_DIR}*.conf | grep "wg2" | tr '\n' ' ')    # v4.15
+                fi
+                [ -n "$SERVER_PEER_LIST" ] && local WG_INTERFACE=$(echo "$SERVER_PEER_LIST" | grep -Eo "wg2[1-9]")
+            fi
+        fi
+        if [ -n "$SERVER_PEER_LIST" ];then
+            NAME_ONE=$MATCHTHIS
+            SITE_ONE_IP=$(awk '/^[#]*Address/ {print $3}' /opt/etc/wireguard.d/$WG_INTERFACE.conf)
+            SITE_ONE_LAN=$('NR==1{print $NF}' /opt/etc/wireguard.d/$WG_INTERFACE.conf)
+            LISTEN_PORT=$(awk '/^ListenPort/ {print $3}' /opt/etc/wireguard.d/$WG_INTERFACE.conf)
+        fi
+    fi
 
     # If no formal DDNS...ask what to do, so $NAME_TWO can connect to this $NAME_ONE router
+    local ROUTER_DDNS=$(nvram get ddns_hostname_x)
     if [ -z "$ROUTER_DDNS" ];then
         echo -e $cRED"\n\a\tWarning: No DDNS is configured! to reach local ${cBMAG}${NAME_ONE}${cRED} Endpoint from remote ${cBMAG}$NAME_TWO"$cRESET
         echo -e $cRESET"\tPress$cBRED y$cRESET to use the current ${cBRED}WAN IP ${cRESET}or enter ${cBMAG}$NAME_ONE${cRESET} Endpoint IP or DDNS name or press$cBGRE [Enter] to SKIP."
@@ -4598,8 +5195,12 @@ AllowedIPs = $SITE_ONE_IP, $SITE_ONE_LAN
 Endpoint = $ROUTER_DDNS:$LISTEN_PORT
 EOF
 
-    # Create a 'device' for SiteB so the IP is recorded
-    sqlite3 $SQL_DATABASE "INSERT into devices values('$NAME_TWO','X','$SITE_TWO_IP','','$SITE_ONE_IP, $SITE_ONE_LAN','$SITE_TWO_PUB_KEY','$SITE_TWO_PRI_KEY','# $NAME_TWO Site-to-Site LAN $SITE_TWO_LAN','0');"
+    chmod 600 ${CONFIG_DIR}${NAME_TWO}.conf         # v4.15 Prevent wg-quick "Warning: '/opt/etc/wireguard.d/Cabin.conf' is world accessible"
+
+    if [ -n "$ADD_SITE" ];then
+        # Bind the remote site to the host
+        [ -n "$WG_INTERFACE" ] && Manage_Peer "peer" "$WG_INTERFACE" "bind" "$NAME_TWO"
+    fi
 
     echo -e "\n========== $NAME_ONE configuration =====================================================\n"$cRESET
     cat ${CONFIG_DIR}${NAME_ONE}.conf
@@ -4608,6 +5209,8 @@ EOF
     cat ${CONFIG_DIR}${NAME_TWO}.conf
 
     echo -e "\n=======================================================================================\n"
+
+    [ -n "$ADD_SITE" ] && local NAME_ONE=
 
     for FN in $NAME_ONE $NAME_TWO
         do
@@ -4655,16 +5258,39 @@ EOF
 
         done
 
-    echo -e $cBGRE"\n\tWireGuard Site-to-Site Peers ${cBMAG}${NAME_ONE} and ${NAME_TWO}${cBGRE} created\n"$cRESET
+    [ -n "$NAME_ONE" ] && local JOIN_TXT=" and " || JOIN_TXT=
+    echo -e $cBGRE"\n\tWireGuard Site-to-Site Peers ${cBMAG}${NAME_ONE}${JOIN_TXT}${NAME_TWO}${cBGRE} created\n"$cRESET
 
-    echo -e "\n\tCopy ${cBMAG}${NAME_TWO}/${NAME_ONE}${cRESET} files:\n"$cBCYA
-    ls -l ${CONFIG_DIR} | grep -E "$NAME_TWO|${NAME_ONE}_public"
+    echo -en "\n\tCopy ${cBMAG}${NAME_TWO}/${NAME_ONE}${cRESET} files: "$cBCYA
+
+    if [ -n "$(which 7z)" ];then                                                                        # v4.15
+        cd ${CONFIG_DIR}
+        rm ${CONFIG_DIR}WireGuard_${NAME_TWO}.7z 2>/dev/null
+        local FILES=$(ls ${CONFIG_DIR} | grep -E "${NAME_TWO}*\.*|${NAME_ONE}*\.*" | tr '\n' ' ')
+
+        for FILE in $FILES
+            do
+                7z a -bso0 ${CONFIG_DIR}WireGuard_$NAME_TWO "$FILE"                                     # v4.15
+            done
+
+        echo -e "${cRESET}(included in ZIP ${cBMAG}'"${CONFIG_DIR}WireGuard_${NAME_TWO}.7z"')\n"        # v4.15
+        7z l ${CONFIG_DIR}WireGuard_${NAME_TWO}.7z | grep -F "....A"
+        #echo -e "\t\t$cBMAG"$FILES "${cRESET}included in ZIP $cBMAG '"${CONFIG_DIR}WireGuard_${NAME_TWO}.7z"'"
+    else
+        echo -e $cBMAG"\n"
+        ls -l ${CONFIG_DIR} | grep -v "7z" | grep -E "${NAME_TWO}*\.*|${NAME_ONE}*\.*"                  # v4.15
+    fi
+
     echo -e ${cBCYA}${cRESET}"\n\tto remote location\n"
+    echo -e ${cBCYA}${cRESET}"\n\tImport ${cBMAG}${NAME_ONE}.conf${cRESET} on remote site using 'import ${NAME_ONE} type=device'\n\n"    # v4.15
 
     echo -e $cRESET"\tPress$cBRED y$cRESET to import ${cBMAG}$NAME_ONE${cRESET} or press$cBGRE [Enter] to SKIP."
     read -r "ANS"
     if [ "$ANS" == "y" ];then
         Import_Peer "import" $NAME_ONE "type=server"
+        sqlite3 $SQL_DATABASE "UPDATE servers SET auto='S' WHERE peer='$IMPORTED_PEER_NAME';"   # v4.15
+        # Create a 'device' for SiteB so the IP is recorded
+        sqlite3 $SQL_DATABASE "INSERT into devices values('$NAME_TWO','X','$SITE_TWO_IP','','$SITE_ONE_IP, $SITE_ONE_LAN','$SITE_TWO_PUB_KEY','$SITE_TWO_PRI_KEY','# $NAME_TWO Site-to-Site LAN $SITE_TWO_LAN','0');"
     fi
 
 }
@@ -4780,11 +5406,18 @@ Validate_User_Choice() {
             fc*);;      # v4.14
             pgup*);;    # v4.14
             site2site*);; # v4.14
+            raw" "*|print" "*|config" "*);; # v4.15
             "") ;;
             e*) ;;
+            www*);;         # v4.15
+            menu*);;        # v4.15
+            color*|colour*);;        # v4.15
+            addon*);;        # v4.15
+            zip|zipinstall);;        # v4.15
+            trimdb*);;        # v4.15
             *)
                :
-               ;;
+            ;;
         esac
 
         echo "$menu1"
@@ -4935,120 +5568,11 @@ Process_User_Choice() {
 
                 local ACTION="$(echo "$menu1"| awk '{print $1}')"
 
-                local CHANGELOG="$cRESET(${cBCYA}Change Log: ${cBYEL}https://github.com/MartineauUK/wireguard/commits/main/wg_manager.sh$cRESET)"   #v2.01
-                [ -n "$(echo $VERSION | grep "b")" ] && local CHANGELOG="$cRESET(${cBCYA}Change Log: ${cBYEL}https://github.com/MartineauUK/wireguard/commits/dev/wg_manager.sh$cRESET)" #v2.01
-
-                echo -e $cBWHT"\n\tRouter$cBMAG $HARDWARE_MODEL ${cBRESET}Firmware ${cBMAG}(v$BUILDNO)"             # v4.12
-                if [ -f "$ENTWARE_INFO" ] || [ -f /opt/etc/opkg.conf ];then
-                    if [ -f "$ENTWARE_INFO" ];then
-                        echo -e $cBGRE"\n\t[✔]${cBWHT} Entware Architecture${cBMAG} $(grep -E "^arch" $ENTWARE_INFO)\n"$cRESET     # v4.01 @Torson
-                    else
-                        echo -e $cBGRE"\n\t[✔]${cBWHT} Entware Architecture${cBMAG} $(grep -E "^arch.*\." /opt/etc/opkg.conf)\n"$cRESET
-                    fi
-                else
-                    echo -e $cBRED"\n\t[✖] Entware Architecture unknown!\n"$cRESET
-                fi
-
-                echo -e $cBMAG"\n\t${VERSION}$cBWHT WireGuard Session Manager" ${CHANGELOG}$cRESET  # v2.01
-
-                [ -d ${INSTALL_DIR} ] && Show_MD5 "script"
+                Show_Info_HDR
 
                 case "$ACTION" in
                     "?")
-                        if [ -f /usr/sbin/wg ];then             # v4.12
-                            local FPATH=$(modprobe --show-depends wireguard | awk '{print $2}')
-                            local FVERSION=$(strings $FPATH | grep "^version" | cut -d'=' -f2)  # v4.12 @ZebMcKayhan
-                            if [ "$(which wg)" != "/opt/bin/wg" ];then
-                                echo -e $cBGRE"\n\t[✔]$cBWHT WireGuard Kernel module/User Space Tools included in Firmware"$cRED" ($FVERSION)\n"$cRESET    # v4.12
-                            else
-                                echo -e $cBGRE"\n\t[ℹ ]$cBGRA WireGuard Kernel module/User Space Tools included in Firmware"$cBWHT" ($FVERSION)${cBGRA} but 3rd-Party modules installed...\n"$cRESET    # v4.12
-                            fi
-                        fi
-
-                        [ "$(which wg)" == "/opt/bin/wg" ] && Check_Module_Versions "report"
-
-                        echo -e $cRESET
-                        DNSmasq_Listening_WireGuard_Status
-
-                        if [ -f /jffs/scripts/firewall-start ];then
-                            if [ -z "$(grep -i "wireguard" /jffs/scripts/firewall-start)" ];then     # v1.11
-                                echo -e $cBRED"\t[✖]${cBWHT} firewall-start$${cBRED} is NOT monitoring WireGuard Firewall rules - ${cBWHT}use 'firewallstart' to ENABLE\n"$cRESET   # v4.12
-                            else
-                                echo -e $cBGRE"\t[✔]${cBWHT} firewall-start ${cBGRE}is monitoring WireGuard Firewall rules\n"$cRESET
-                            fi
-                        else
-                            echo -e $cBRED"\t[✖]${cBWHT} firewall-start${cBRED} is NOT monitoring WireGuard Firewall rules - ${cBWHT}use 'firewallstart' to ENABLE\n"$cRESET
-                        fi
-
-                        if [ -f ${INSTALL_DIR}WireguardVPN.conf ];then
-                            if [ "$(Manage_KILL_Switch)" == "Y" ];then
-                                local TEMP_PERM="temporarily "                                      # v4.12
-                                [ -z "$(grep -oE "^#KILLSWITCH" ${INSTALL_DIR}WireguardVPN.conf)" ] && local TEMP_PERM=             # v4.12
-                                echo -e $cBGRE"\t[✔]$cBWHT WAN ${cBGRE}KILL-Switch is ${TEMP_PERM}ENABLED"$cRESET" (use 'vx' command for info)" # v4.12
-                            else
-                                local TEMP_PERM="temporarily "                                      # v4.12
-                                [ -z "$(grep -oE "^KILLSWITCH" ${INSTALL_DIR}WireguardVPN.conf)" ] && local TEMP_PERM=              # v4.12
-                                echo -e $cRED"\t[✖]$cBWHT WAN ${cBGRE}KILL-Switch is "${cBRED}${aREVERSE}"${TEMP_PERM}DISABLED"$cRESET" (use 'vx' command for info)"    # v4.12
-                            fi
-                        else
-                            echo -e $cRED"\t[✖]$cBWHT WAN ${cBGRE}KILL-Switch ${cBRED}STATUS N/A (${cRESET}${INSTALL_DIR}WireguardVPN.conf${cBRED} not found?)"$cRESET
-                        fi
-
-                        if [ "$(Manage_UDP_Monitor)" == "Y" ];then                          # v4.01
-                            echo -e $cBGRE"\t[✔]${cBWHT} UDP ${cBGRE}monitor is ENABLED$cRESET"
-                        else
-                            echo -e $cRED"\t[✖]${cBWHT} UDP ${cBGRE}monitor is ${cBRED}DISABLED$cRESET"
-                        fi
-
-                        local FC_STATUS=$(Manage_FC "?")                          # v4.14
-                        case "$FC_STATUS" in
-                            *[Ee]nabled*)
-                                echo -e $cBGRE"\n\t[✔]${cBWHT} Flow Cache ${cBGRE}is ENABLED$cRESET"
-                            ;;
-                            *[Dd]isabled*)
-                                echo -e $cRED"\n\t[✖]${cBWHT} Flow Cache ${cBGRE}is ${cBRED}DISABLED$cRESET"
-                            ;;
-                            *)
-                                echo -e $cBGRE"\n\t[✔]${cBWHT} Flow Cache status ${cBGRE} N/A$cRESET"
-                            ;;
-                        esac
-
-                        local WAN_IF=$(Get_WAN_IF_Name)                                             # v4.11
-                        local VAL=$(cat /proc/sys/net/ipv4/conf/$WAN_IF/rp_filter)                  # v4.11
-                        [ "$VAL" == "1" ] && STATE="ENABLED" || STATE="${cBRED}DISABLED${cBGRE}"    # v4.11
-                        echo -e $cBGRE"\n\t[ℹ ] Reverse Path Filtering $STATE\n"$cRESET            # v4.11
-
-                        if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOTCPMSS" ${INSTALL_DIR}WireguardVPN.conf)" ];then   # v4.12 v4.11
-                            echo -e $cBRED"\t[✖]${cBWHT} 'NOTCPMSS' specified, TCP clamping to PMTU (-t mangle '--tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu')$cBRED DISABLED$cRESET" # v4.12
-                        fi
-                        if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOSETXMARK" ${INSTALL_DIR}WireguardVPN.conf)" ];then   # v4.12 v4.11
-                            echo -e $cBRED"\t[✖]${cBWHT} 'NOSETXMARK' specified, (-t mangle  '-j MARK --set-xmark 0x01/0x7')$cBRED  DISABLED" # v4.12
-                        fi
-
-                        # Override IPv6 ?
-                        if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOIP[Vv]6" ${INSTALL_DIR}WireguardVPN.conf)" ];then   # v4.11
-                            [ "$(nvram get ipv6_service)" != "disabled" ] && echo -e $cBRED"\t[✖]${cBWHT} 'NOIPV6' specified, IPv6 ${cRED} is not allowed  - IPv4 configs ONLY$cRESET" # v4.11
-                        fi
-
-                        # Allow use of 3rd-Party Entware Kernel/Userspace Tools
-                        if [ -f ${INSTALL_DIR}WireguardVPN.conf ] &&  [ -n "$(grep -oE "USE_ENTWARE_KERNEL_MODULE" ${INSTALL_DIR}WireguardVPN.conf)" ];then
-                                if [ -f /usr/sbin/wg ];then
-                                    if [ -n "$(grep -oE "^USE_ENTWARE_KERNEL_MODULE" ${INSTALL_DIR}WireguardVPN.conf)" ];then
-                                        echo -e $cBGRE"\t[✔]Use 3rd-party Entware/Userspace Tools ${cBGRE}modules is ALLOWED\n$cRESET"
-                                    else
-                                        echo -e $cBRED"\t[✖]${cBWHT} Use 3rd-party Entware/Userspace Tools ${cBGRE}modules is ${cBRED}DENIED\n$cRESET"
-                                    fi
-                                fi
-                        fi
-
-                        [ "$READLINE" == "ReadLine" ] && echo -e $cBGRE"\t[✔] Use of 'Pg-Up' Key for command retrieval is ENABLED\n$cRESET" || echo -e $cBRED"\t[✖]${cBWHT} Use of 'Pg-Up' Key for command retrieval is ${cBRED}DISABLED\n$cRESET" # v4.14
-
-                        Manage_Stats
-
-                        echo -e $cBGRE"\n\t[ℹ ] Speedtest quick link${cBYEL} https://fast.com/en/gb/ \n"$cRESET       # v4.12
-
-                        echo -e $cBGRE"\t[ℹ ] ${cRESET}@ZebMcKayhan's$cBGRE Hint's and Tips Guide${cBYEL} https://github.com/ZebMcKayhan/WireguardManager/blob/main/README.md#table-of-content \n"$cRESET   # v4.13
-
+                        Show_Info
                         ;;
                     *)
                         [ "$2" == "dev" ] && DEV="dev" || DEV="main"
@@ -5073,6 +5597,8 @@ Process_User_Choice() {
                             # Protect against curl download failures i.e. Github DOWN
                             cp $0 $0.u                                             # v3.03
                             Get_scripts "$DEV"
+
+                            Manage_Addon "wgmExpo.sh"       # v4.15 @ZeMcKayhan's Addon
 
                             [ -f ${INSTALL_DIR}$SCRIPT_NAME ] && { rm $0.u; sleep 1; exec "$0"; } || mv $0.u $0     # v4.14
 
@@ -5112,7 +5638,7 @@ Process_User_Choice() {
                     fi
 
             ;;
-            peer|peer" "*)                                           # peer [ 'list' | interface { [auto y|n|p ] 'del' | 'add' | 'comment' {'#'comment}'} ]  # v1.10
+            peer|peer" "*)                                           # peer [ 'list' | interface { [auto y|n|p ] 'del' | 'add' | 'comment' {'#'comment}'} | 'bind' {peer} ]  # v1.10
 
                 Manage_Peer $menu1
 
@@ -5199,12 +5725,25 @@ Process_User_Choice() {
 
                 [ -z "$IP" ] && { echo -en $cRED"\a\n\t***ERROR: LAN Host name or LAN IP address required'\n"$cRESET ; return 1; }
 
-                if [ -z "$(echo "$IP" | Is_IPv4)" ] && [ -z "$(echo "$IP" | Is_Private_IPv4)" ];then
-                    IP=
+                if [ -z "$(echo "$IP" | Is_IPv4)" ] && [ -z "$(echo "$IP" | Is_IPv4_CIDR)" ];then
+                    # Assume Hostname... so does it have a DHCP Reserved LAN IP?
+                    [ -f /etc/dnsmasq.conf ] && local IP=$(grep -i "$IP" /etc/dnsmasq.conf | awk -F',' '{print $4}')    # v4.15
                 else
-                    [ -f /etc/hosts.dnsmasq ] && local IP=$(grep -i "$IP" /etc/hosts.dnsmasq  | awk '{print $1}') || IP=
+                    # Allow known IPs / CIDR
+                    local LAN_SUBNET=$(nvram get lan_ipaddr | grep -o '^.*\.')                          # v4.15
+                    local MATCH_SUBNET=$(echo "$IP" | grep -o '^.*\.')                                  # v4.15
+                    if [ "$MATCH_SUBNET" == "$LAN_SUBNET" ] || \
+                       [ "$(nvram get vpn_server1_sn | grep -o '^.*\.')" == "$MATCH_SUBNET" ] || \
+                       [ "$(nvram get vpn_server2_sn | grep -o '^.*\.')" == "$MATCH_SUBNET" ] || \
+                       [ -n "$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers WHERE subnet LIKE '$MATCH_SUBNET%';")" ] || \
+                       [ -n "$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE ip LIKE '$MATCH_SUBNET%';")" ];then        # v4.15 WireGuard
+                        :
+                    else
+                        IP=
+                    fi
                 fi
-                [ -z "$IP" ] && { echo -en $cRED"\a\n\t***ERROR: Invalid host IPv4 address!'\n"$cRESET ; return 1; }
+
+                [ -z "$IP" ] && { echo -en $cRED"\a\n\t***ERROR: $cRESET'$1'$cBRED Invalid IPv4 address! - must be $cRESET'$LAN_SUBNET*'$cBRED or local VPN Server/client IP\n"$cRESET ; return 1; }
 
                 if [ "$LOCATION" != "@home" ] && [ "$LOCATION" != "*" ];then
                     local WG_INTERFACE=$LOCATION
@@ -5350,14 +5889,371 @@ Process_User_Choice() {
                 ;;
                 esac
             ;;
-            site2site*)
+            site2site*)                     # v4.14
 
-                Create_Site2Site $menu1
+                Create_Site2Site $menu1     # [ [name1] [name2] ['ip='ip_for_name1] ['port='listen_port_for_name1] ['lan='siteb_subnet] ]
+            ;;
+            raw" "*|print" "*|config" "*)   # v4.15             {['raw' | 'print' | 'config']' peer} ['all']
+
+                shift
+                local WG_INTERFACE=$1
+                local ACTION=$2
+
+                if [ -n "ls ${CONFIG_DIR}${WG_INTERFACE}*" ];then
+
+                     [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ]        && { echo -e "\n\t================Config==============="; cat ${CONFIG_DIR}${WG_INTERFACE}.conf; }
+                     if [ -n "$ACTION" ];then
+                         [ -f ${CONFIG_DIR}${WG_INTERFACE}_public.key ]  && { echo -e "\n\t================Public==============="; cat ${CONFIG_DIR}${WG_INTERFACE}_public.key; }
+                         [ -f ${CONFIG_DIR}${WG_INTERFACE}_private.key ] && { echo -e "\n\t================Private=============="; cat ${CONFIG_DIR}${WG_INTERFACE}_private.key; }
+                     fi
+                else
+                    echo -en $cRED"\a\n\t***ERROR: ${cBMAG}${WG_INTERFACE}${cRED} not found\n"$cRESET
+                fi
+            ;;
+            www" "*|www)                        # v4.15       www [ [ {on | off | mount | unmount} ] [rom] ]
+
+                local PAGE=$SCRIPT_NAME".asp"
+
+                local ACTION=$2
+                local PAGES=$3
+
+                [ -z "$ACTION" ] && local ACTION="debug"
+
+                [ "$PAGES" == "rom" ] && { local PAGES="Advanced_WireguardClient_Content.asp Advanced_WireguardServer_Content.asp Advanced_VPN_OpenVPN.asp"; local INTERNAL_PAGE="internal ROM"; }
+
+                case "$ACTION" in
+                    mount|on)
+                        echo -e $cBGRE
+                        if [ -z "$INTERNAL_PAGE" ];then
+                            Mount_WebUI "${PAGE}"
+                        else
+
+                            LOCKFILE=/tmp/addonwebui.lock
+                            FD=386
+                            eval exec "$FD>$LOCKFILE"
+                            flock -x "$FD"
+
+                            for PAGE in $PAGES
+                                do
+                                    umount /www/${PAGE} 2>/dev/null
+                                    echo -en $cBRED
+                                    mount -o bind ${INSTALL_DIR}${PAGE} /www/${PAGE}
+                                    if [ $? -eq 0 ];then
+                                        echo -e $cBGRE"\tCustom '$PAGE' mounted"$cRESET
+                                        SayT "Custom '${INSTALL_DIR}${PAGE}' page mounted"
+                                    fi
+                                done
+
+                            # ************************************** Temporary *********************************************
+                            sed -i '/Advanced_WireguardClient_Content.asp/s~__INHERIT__.*$~WireGuard© Client"},\t/\*Martineau Hack\*/~' /tmp/menuTree.js
+                            sed -i '/Advanced_WireguardServer_Content.asp/s~__INHERIT__.*$~WireGuard© Server"},\t/\*Martineau Hack\*/~'  /tmp/menuTree.js
+                            echo -e $cBRED"\tAdvancedWireGuard[Client|Server] /tmp/menuTree.js Martineau Hack!"$cRESET
+                            SayT "AdvancedWireGuard[Client|Server] /tmp/menuTree.js Martineau Hack!"
+                            # ************************************** Temporary *********************************************
+
+                            flock -u "$FD"
+                        fi
+                        echo -e $cRESET
+                    ;;
+                    unmount|off)
+                        echo -e $cBGRE
+                        if [ -z "$INTERNAL_PAGE" ];then
+                            Unmount_WebUI "${PAGE}"
+                        else
+                            LOCKFILE=/tmp/addonwebui.lock
+                            FD=386
+                            eval exec "$FD>$LOCKFILE"
+                            flock -x "$FD"
+
+                            for PAGE in $PAGES
+                                do
+                                    umount /www/${PAGE} 2>/dev/null
+                                    if [ $? -eq 0 ];then
+                                        echo -e $cBGRE"\tCustom '$PAGE' page unmounted"$cRESET
+                                        SayT "Custom '${INSTALL_DIR}${PAGE}' page unmounted"
+                                    fi
+                                done
+
+                            sed -i '/Advanced_WireguardClient_Content.asp/s/WireGuard© Client\"\},.*$/__INHERIT__\"},/' /tmp/menuTree.js
+                            sed -i '/Advanced_WireguardServer_Content.asp/s/WireGuard© Server\"\},.*$/__INHERIT__\"},/' /tmp/menuTree.js
+                            echo -e $cBGRE"\tAdvancedWireGuard[Client|Server] /tmp/menuTree.js Martineau Hack ${cBRED}DELETED!"$cRESET
+                            SayT "AdvancedWireGuard[Client|Server] /tmp/menuTree.js Martineau Hack DELETED"
+
+                            flock -u "$FD"
+                        fi
+                        echo -e $cRESET
+                    ;;
+                    debug)
+                        echo -e $cRESET
+                        df | grep -E "/www/|File"
+                        echo -e $cBCYA
+                        ls -lh /www/ext/user*.* | sort -k 8 ;echo -e $cRESET;grep -THE "user[1-9]\." /tmp/menuTree.js | sort -k 3
+                    ;;
+                    *)
+                        echo -en $cRED"\a\n\t***ERROR: Invalid arg $cBWHT'"$ACTION"'$cBRED for GUI TAB - valid 'mount' or 'unmount' only!\n"$cRESET
+                    ;;
+                esac
+
+            ;;
+            menu" "*|menu)                          # v4.15         menu { [show|on] | [hide|off] }
+
+                local ACTION=$2
+
+                case "$ACTION" in
+                    show|on)
+                        SUPPRESSMENU=
+                    ;;
+                    hide|off)
+                        SUPPRESSMENU="Suppress"
+                    ;;
+                esac
+            ;;
+            colour" "*|color" "*)                   # v4.15         {colour|color}  { [show|on] | [hide|off] }
+
+                local ACTION=$2
+
+                case "$ACTION" in
+                    show|on)
+                        ANSIColours
+                        if [ -f ${INSTALL_DIR}WireguardVPN.conf ] &&  [ -n "$(grep -oE "^NOCOLOUR" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                            sed -i 's/^NOCOLOUR/#NOCOLOUR/' ${INSTALL_DIR}WireguardVPN.conf
+                        fi
+                    ;;
+                    hide|off)
+                        ANSIColours "disable"
+                        if [ -f ${INSTALL_DIR}WireguardVPN.conf ] &&  [ -n "$(grep -oE "^#NOCOLOUR" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                            sed -i 's/^#NOCOLOUR/NOCOLOUR/' ${INSTALL_DIR}WireguardVPN.conf
+                        fi
+                    ;;
+                esac
+            ;;
+            addon|addon*)                           # v4.15         {script_name [ dev | remove | del ] }
+
+                shift
+
+                local FN=$1
+                local ACTION=$2;local BRANCH=$2
+
+                echo -e
+
+                case $ACTION in
+                    del|remove)
+
+                        if [ -f ${INSTALL_DIR}${FN} ];then
+                            Manage_Addon "$FN" "$ACTION"
+                            echo -e $cBGRE"\tAddon $cRESET'$FN'$cBGRE removed"$cRESET
+                            SayT "Addon '${INSTALL_DIR}${FN}' removed"
+                        else
+                            echo -en $cRED"\a\t***ERROR: Addon $cRESET'$FN'$cBRED NOT found!\n"$cRESET
+                        fi
+                    ;;
+                    *)
+                        Manage_Addon "$FN" "$BRANCH"        # v4.15
+                    ;;
+                esac
+
+            ;;
+            zip|zip" "install)
+                echo -e "\n\t"$cBGRA
+                opkg install p7zip      # v4.15
+            ;;
+            trimdb*)                                                # trimdb { '?' | days [ 'traffic' | 'sessions'] ['auto']  }
+                Purge_Database $menu1   # v4.15
             ;;
             *)
                 printf '\n\a\t%bInvalid Option%b "%s"%b Please enter a valid option\n' "$cBRED" "$cRESET" "$menu1" "$cBRED"    # v4.03 v3.04 v1.09
             ;;
         esac
+
+}
+Purge_Database() {
+
+    # trimdb { '?' | days [ 'traffic' | 'sessions'] ['auto']  }
+
+    local ANS=
+    [ -n "$(echo "$@" | grep -io "auto")" ] && local AUTOREPLY="Y"
+
+    local DAYS=$2
+
+    local TABLES_TXT="(traffic and sessions)"
+
+    local TABLE=$3
+    [ "$TABLE" == "auto" ] && TABLE=
+
+    [ -z "$TABLE" ] && TABLE="All"
+
+    case $TABLE in
+        traffic|session|All)
+        :
+        ;;
+        *)
+         echo -e $cBRED"\a\n\t***ERROR: SQL database table $cRESET'$TABLE'$cBRED NOT found! - use 'traffic' or 'session'\n"$cRESET
+         return 1
+        ;;
+    esac
+
+    if [ "$DAYS" == "?" ];then
+
+        [ "$TABLE" == "All" ] && TABLE="traffic session"
+
+        echo -e
+
+        for THIS in $TABLE
+
+            do
+                local OCNT=$(sqlite3 $SQL_DATABASE "SELECT Count(*) FROM $THIS;")
+                local OLDEST_EPOCH_SECS=$(sqlite3 $SQL_DATABASE "SELECT timestamp FROM $THIS order by timestamp limit 1;")
+                echo -e $cRESET"\tTable ${cBCYA}${THIS}$cRESET: oldest "${cBCYA}$(date -d @"$OLDEST_EPOCH_SECS" "+%c")$cRESET" records ${cBCYA}${OCNT}${cRESET}"
+            done
+
+        return
+    fi
+
+    if [ -n "$DAYS" ] && [ -n "$(echo "$DAYS" | grep -Eo "[[:digit:]]*")" ];then
+
+        local TABLES_TXT="($TABLE)"
+
+        local NOW=$(date "+%s")
+        local EPOCH_SECS=$((DAYS*86400))
+        local OLDEST_EPOCH_SECS=$((NOW-EPOCH_SECS))
+
+        echo -e "\n\t$TABLES_TXT statistics Records older than "${cBCYA}$(date -d @"$OLDEST_EPOCH_SECS" "+%c")${cRESET}" will be erased from SQL database"
+        [ "$TABLE" == "All" ] && TABLE="traffic session"
+
+        if [ -z "$AUTOREPLY" ];then
+            echo -e "\tPress$cBRED y$cRESET to$cBRED DELETE database records${cRESET} or press$cBGRE [Enter] to SKIP."
+            read -r "ANS"
+        else
+            local ANS="y"
+        fi
+
+        if [ "$ANS" == "y" ];then
+            echo -e
+            for THIS in $TABLE
+                do
+                    local OCNT=$(sqlite3 $SQL_DATABASE "SELECT Count(*) FROM $THIS;")
+                    sqlite3 $SQL_DATABASE "DELETE FROM $THIS WHERE timestamp <='$OLDEST_EPOCH_SECS';"
+                    local NCNT=$(sqlite3 $SQL_DATABASE "SELECT Count(*) FROM $THIS;")
+                    [ $OCNT -eq $NCNT ] && echo -e "$cRED\t $((OCNT-NCNT)) $THIS records deleted" || echo -e "$cBGRE\t $((OCNT-NCNT)) $THIS records deleted"
+                done
+        fi
+    else
+        echo -en $cBRED"\a\n\t***ERROR: Numbers of days $cRESET'$DAYS'$cBRED invalid!\n"$cRESET
+    fi
+
+}
+Get_WebUI_Installed() {
+    md5_installed="0"
+    if [ -f $installedMD5File ]; then
+        md5_installed="$(cat $installedMD5File)"
+    fi
+}
+Get_WebUI_Page(){
+    MyPage="none"
+    for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+        page="/www/user/user$i.asp"
+        if [ -f "$page" ] && [ "$(md5sum < "$1")" = "$(md5sum < "$page")" ]; then
+            MyPage="user$i.asp"
+            return
+        elif [ "$MyPage" = "none" ] && [ ! -f "$page" ]; then
+            MyPage="user$i.asp"
+        fi
+    done
+}
+Mount_WebUI(){
+    if nvram get rc_support | grep -qF "am_addons"; then
+
+        local PAGE=$1                                                       # Martineau Hack
+
+        ### locking mechanism code credit to Martineau (@MartineauUK) ###
+        LOCKFILE=/tmp/addonwebui.lock
+        FD=386
+        eval exec "$FD>$LOCKFILE"
+        flock -x "$FD"
+
+        Get_WebUI_Installed
+        Get_WebUI_Page "$SCRIPT_DIR/$PAGE" "$md5_installed"                         # Martineau Hack
+        if [ "$MyPage" = "none" ]; then
+            echo -e $cBRED"\aUnable to mount $SCRIPT_NAME WebUI page, exiting"$cRESET
+            flock -u "$FD"
+            return 1                                                                # Martineau Hack
+        fi
+
+        echo -en $cBRED                                                             # Martineau Hack
+
+        cp -f "$SCRIPT_DIR/$PAGE" "$SCRIPT_WEBPAGE_DIR/$MyPage"                     # Martineau Hack
+        #echo "Saving MD5 of installed file $SCRIPT_DIR/$PAGE to $installedMD5File" # Martineau Hack
+        md5sum < "$SCRIPT_DIR/$PAGE" > $installedMD5File                            # Martineau Hack
+
+        if [ ! -f "/tmp/index_style.css" ]; then
+            cp -f "/www/index_style.css" "/tmp/"
+        fi
+
+        if ! grep -q '.menu_Addons' /tmp/index_style.css ; then
+            echo ".menu_Addons { background: url(ext/shared-jy/addons.png); }" >> /tmp/index_style.css
+        fi
+
+        umount /www/index_style.css 2>/dev/null
+        mount -o bind /tmp/index_style.css /www/index_style.css
+
+        if [ ! -f "/tmp/menuTree.js" ]; then
+            cp -f "/www/require/modules/menuTree.js" "/tmp/"
+        fi
+
+        sed -i "\\~$MyPage~d" /tmp/menuTree.js
+
+        if ! grep -q 'menuName: "Addons"' /tmp/menuTree.js ; then
+            lineinsbefore="$(( $(grep -n "exclude:" /tmp/menuTree.js | cut -f1 -d':') - 1))"
+            sed -i "$lineinsbefore"'i,\n{\nmenuName: "Addons",\nindex: "menu_Addons",\ntab: [\n{url: "ext/shared-jy/redirect.htm", tabName: "Help & Support"},\n{url: "NULL", tabName: "__INHERIT__"}\n]\n}' /tmp/menuTree.js
+        fi
+
+        if grep -q "javascript:window.open('/ext/shared-jy/redirect.htm'" /tmp/menuTree.js ; then
+            sed -i "s~javascript:window.open('/ext/shared-jy/redirect.htm','_blank')~javascript:var helpwindow=window.open('/ext/shared-jy/redirect.htm','_blank')~" /tmp/menuTree.js
+        fi
+        if ! grep -q "javascript:var helpwindow=window.open('/ext/shared-jy/redirect.htm'" /tmp/menuTree.js ; then
+            sed -i "s~ext/shared-jy/redirect.htm~javascript:var helpwindow=window.open('/ext/shared-jy/redirect.htm','_blank')~" /tmp/menuTree.js
+        fi
+        sed -i "/url: \"javascript:var helpwindow=window.open('\/ext\/shared-jy\/redirect.htm'/i {url: \"$MyPage\", tabName: \"WireGuard Manager\"}," /tmp/menuTree.js
+
+        umount /www/require/modules/menuTree.js 2>/dev/null
+        mount -o bind /tmp/menuTree.js /www/require/modules/menuTree.js
+
+        echo -e $cBGRE"\t$SCRIPT_NAME WebUI page mounted as $cRESET'"$MyPage"'"     # Martineau Hack
+        SayT "$SCRIPT_NAME WebUI page mounted as $cRESET'"$MyPage"'"                # Martineau Hack
+
+        flock -u "$FD"
+    fi
+}
+Unmount_WebUI(){
+
+    local PAGE=$1                                                       # Martineau Hack
+
+    ### locking mechanism code credit to Martineau (@MartineauUK) ###
+    LOCKFILE=/tmp/addonwebui.lock
+    FD=386
+    eval exec "$FD>$LOCKFILE"
+    flock -x "$FD"
+
+    Get_WebUI_Installed
+    Get_WebUI_Page "$SCRIPT_DIR/$PAGE" "$md5_installed"                 # Martineau Hack
+    if [ "$md5_installed" != "0" ];then                                 # Martineau Hack
+        #echo "$MyPage"                                                 # Martineau Hack
+        if [ -n "$MyPage" ] && [ "$MyPage" != "none" ] && [ -f "/tmp/menuTree.js" ]; then
+            sed -i "\\~$MyPage~d" /tmp/menuTree.js
+            umount /www/require/modules/menuTree.js
+            mount -o bind /tmp/menuTree.js /www/require/modules/menuTree.js
+            rm -rf "$SCRIPT_WEBPAGE_DIR/$MyPage"
+            rm -rf "$SCRIPT_WEB_DIR"
+            echo -e $cBGRE"\t$SCRIPT_NAME WebUI page $cRESET'"$MyPage"'${cBGRE} unmounted${cRESET}"     # Martineau Hack
+            SayT "$SCRIPT_NAME WebUI page $cRESET'"$MyPage"' unmounted" # Martineau Hack
+        fi
+    else
+        echo -e $cRED"\a\t$SCRIPT_NAME WebUI page not mounted! $cRESET" # Martineau Hack
+    fi
+
+    rm "$installedMD5File" 2>/dev/null                                  # Martineau Hack
+
+    flock -u "$FD"
 }
 Show_Main_Menu() {
 
@@ -5438,6 +6334,7 @@ Create_RoadWarrior_Device() {
     local TAG="$(echo "$@" | sed -n "s/^.*tag=//p" | awk '{print $0}')"
     local ADD_ALLOWED_IPS="$(echo "$@" | sed -n "s/^.*ips=//p" | awk '{print $0}')"
     local DNS_RESOLVER="$(echo "$@" | sed -n "s/^.*dns=//p" | awk '{print $0}')"        # v3.04 Hotfix
+    local REMOTE_LISTEN_PORT="$(echo "$@" | sed -n "s/^.*port=//p" | awk '{print $0}')" # v4.14
 
     local SERVER_PEER=
     local PEER_TOPOLOGY="device"    # 4.14
@@ -5453,24 +6350,24 @@ Create_RoadWarrior_Device() {
             peer*)
                 local ALLOW_TUNNEL_PEERS="Y"        # v4.11
             ;;
-            site*)
-                local SITE2SITE="Y"                 # v4.14
-                local PEER_TOPOLOGY="device Multi Site-to-Site"  # v4.14
-                local TAG=$PEER_TOPOLOGY            # v4.14
-                local REMOTE_LISTEN_PORT="$(echo "$@" | sed -n "s/^.*port=//p" | awk '{print $0}')" # v4.14
-                local SITE_PEER="$(echo "$@" | sed -n "s/^.*site=//p" | awk '{print $0}')" # v4.14
-            ;;
-            *)
-
+            site=*)
+                local SITE2SITE="$(echo "$@" | sed -n "s/^.*site=//p" | awk '{print $0}')"  # v4.14
+                case $SITE2SITE in                                                          # v4.15
+                    [nN])
+                        local SITE2SITE=$(echo "$SITE2SITE" | tr 'a-z' 'A-Z')               # v4.15 disable device Multi Site-to-Site
+                    ;;
+                    remoteonly)
+                        local SITE2SITE_PEER_LAN=$SITE2SITE                                 # v4.15
+                    ;;
+                    *)
+                        echo -e $cBRED"\a\n\t***ERROR: Invalid 'site=$SITE2SITE' arg - 'n' or 'remoteonly' "$cRESET
+                        return 1
+                    ;;
+                esac
             ;;
         esac
         shift
     done
-
-    if [ "$SITE2SITE" == "Y" ];then
-        [ -z "$SITE_PEER" ] && SITE_PEER="SiteB"
-        [ ! -f ${CONFIG_DIR}${SITE_PEER}.conf ] && { echo -e $cBRED"\a\n\t***ERROR: $PEER_TOPOLOGY 'server' Peer $cRESET'$SITE_PEER'$cBRED NOT found!"$cRESET; return 1; }
-    fi
 
     # If user did not specify 'server' Peers, use the oldest 'server' Peer found ACTIVE or the first defined in the config
     [ -z "$SERVER_PEER" ] && SERVER_PEER=$(wg show interfaces | grep -vE "wg1" | grep -vE "wgs")    # v4.12
@@ -5488,6 +6385,18 @@ Create_RoadWarrior_Device() {
             fi
         done
 
+    if [ "$SITE2SITE" != "N" ] && [ "$(sqlite3 $SQL_DATABASE "SELECT auto FROM servers WHERE peer='$SERVER_PEER';")" == "S" ];then  # v4.15
+        local SITE2SITE="Y"                                 # v4.14
+        local PEER_TOPOLOGY="device Multi Site-to-Site"     # v4.14
+        local TAG=$PEER_TOPOLOGY
+        local SITE_PEER=$(awk '/^#.*LAN/ {print $2}' ${CONFIG_DIR}${SERVER_PEER}.conf )     # v4.15
+    fi
+
+    if [ "$SITE2SITE" == "Y" ];then
+        [ -z "$SITE_PEER" ] && SITE_PEER="SiteB"
+        [ ! -f ${CONFIG_DIR}${SITE_PEER}.conf ] && { echo -e $cBRED"\a\n\t***ERROR: $PEER_TOPOLOGY 'server' Peer $cRESET'$SITE_PEER'$cBRED NOT found!"$cRESET; return 1; }
+    fi
+
     # createsplit xxxxx 'peers'
     [ "$ACTION" == "createsplit" ] && SPLIT_TUNNEL="Y" || SPLIT_TUNNEL="Q. Split Tunnel"                       # v1.11 v1.06
 
@@ -5496,11 +6405,11 @@ Create_RoadWarrior_Device() {
         if [ ! -f ${CONFIG_DIR}${DEVICE_NAME} ] && [ -z "$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE name='$DEVICE_NAME';")" ];then
                 echo -e $cBCYA"\n\tCreating Wireguard Private/Public key pair for $PEER_TOPOLOGY '${cBMAG}${DEVICE_NAME}${cBCYA}'"$cBYEL
                 wg genkey | tee ${CONFIG_DIR}${DEVICE_NAME}_private.key | wg pubkey > ${CONFIG_DIR}${DEVICE_NAME}_public.key
-                echo -e $cBYEL"\t$PEER_TOPOLOGY '"$DEVICE_NAME"' Peer Public key="$(cat ${CONFIG_DIR}${DEVICE_NAME}_public.key)"\n"$cRESET
+                echo -e $cBYEL"\t$PEER_TOPOLOGY '"${cBMAG}${DEVICE_NAME}${cBYEL}"' Peer ${cBCYA}Public${cBYEL}     key="$(cat ${CONFIG_DIR}${DEVICE_NAME}_public.key)$cRESET
                 umask 077
                 wg genpsk > ${CONFIG_DIR}${DEVICE_NAME}_pre-shared.key                  # v4.12 or openssl rand -base64 32 > ${CONFIG_DIR}${SERVER_PEER}_pre-shared.key
                 local PRE_SHARED_KEY=$(cat ${CONFIG_DIR}${DEVICE_NAME}_pre-shared.key)  # v4.12
-                echo -e $cBYEL"\t$PEER_TOPOLOGY '"$DEVICE_NAME"' Peer Pre-shared key="$(cat ${CONFIG_DIR}${DEVICE_NAME}_pre-shared.key)"\n"$cRESET   # v4.14 v4.12
+                echo -e $cBYEL"\t$PEER_TOPOLOGY '"${cBMAG}${DEVICE_NAME}${cBYEL}"' Peer ${cBCYA}Pre-shared${cBYEL} key="$(cat ${CONFIG_DIR}${DEVICE_NAME}_pre-shared.key)$cRESET   # v4.14 v4.12
 
                 #local PRE_SHARED_KEY=$(Convert_Key "$PRE-SHARED_KEY")                  # v4.12
 
@@ -5511,9 +6420,8 @@ Create_RoadWarrior_Device() {
                 # Use the Public key of the designated 'server' Peer
                 # For instant testing the 'server' Peer needs to be restarted? # v1.06
                 if [ -n "$SERVER_PEER" ];then
-
                     local PUB_SERVER_KEY=$(cat ${CONFIG_DIR}${SERVER_PEER}_public.key)                  # v1.06
-                    echo -e $cBCYA"\tUsing Public key for 'server' Peer '"${cBMAG}${SERVER_PEER}${cBCYA}"'\n"
+                    [ "$SITE2SITE_PEER_LAN" != "remoteonly" ] && echo -e $cBCYA"\tUsing Public key for 'server' Peer '"${cBMAG}${SERVER_PEER}${cBCYA}
 
                     # Use the 'server' Peer LISTEN_PORT rather than default to 51820
                     local LISTEN_PORT=$(awk '/^ListenPort/ {print $3}' ${CONFIG_DIR}${SERVER_PEER}.conf)                # v3.04
@@ -5550,56 +6458,84 @@ Create_RoadWarrior_Device() {
                     [ "$ANS" != "y" ] && CREATE_DEVICE_CONFIG="N"
                 fi
 
-                [ -z "$VPN_POOL_IP" ] && local VPN_POOL=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers WHERE peer='$SERVER_PEER';")
-                if [ -z "$(echo "$VPN_POOL" | grep -F "::")" ];then
-                    local VPN_POOL_PREFIX=$(echo "$VPN_POOL_POOL" | sed 's/\:\:.*$//')
-                    if [ -z "$VPN_POOL_IP" ];then
-                        if [ -n "$VPN_POOL" ];then
-                            local VPN_POOL_SUBNET=${VPN_POOL%.*}
-                            #local VPN_POOL_IP=$(grep -F "$VPN_POOL_SUBNET." ${INSTALL_DIR}WireguardVPN.conf | grep -Ev "^#" | grep -v "$SERVER_PEER" | awk '{print $2}' | sed 's~/32.*$~~g' | sort -n -t . -k 1,1 -k 2,2 -k 3,3 -k 4,4 | tail -n 1)
-                            local IP=$(sqlite3 $SQL_DATABASE "SELECT COUNT(ip) FROM devices WHERE ip LIKE '${VPN_POOL_SUBNET}.%';") # v4.01 Hotfix
-                            #local IP=${VPN_POOL_IP##*.}        # 4th octet
-                            #local IP=$((IP+2))
-                            #[ $IP -eq 1 ] && local IP=2 ||     # .1 is the 'server' Peer! # v4.02
-                            local IP=2                          # v4.11
+                #[ -z "$VPN_POOL_IP" ] && local VPN_POOLS=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers WHERE peer='$SERVER_PEER';")
+                local VPN_POOLS=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers WHERE peer='$SERVER_PEER';")
+
+                for VPN_POOL in $(echo "$VPN_POOLS" | tr ',' ' ')       # v4.15
+                    do
+                        if [ -z "$(echo "$VPN_POOL" | grep -F ":")" ];then      # v4.15 Hotfix @ZebMcKayhan
+                            #local VPN_POOL_PREFIX=$(echo "$VPN_POOL" | sed 's/\:\:.*$//')
+                            #if [ -z "$VPN_POOL_IP" ];then
+                                if [ -n "$VPN_POOL" ];then
+                                    local VPN_POOL_SUBNET=${VPN_POOL%.*}
+                                    local IP=2                          # v4.11
+
+                                    while true
+                                        do
+                                            local MATCHES="$(sqlite3 $SQL_DATABASE "SELECT ip FROM devices WHERE ip LIKE '%${VPN_POOL_SUBNET}.${IP}/32%';" | tr '\n' ' ')"  # v4.15 v4.11 v4.02
+                                            for MATCH in $MATCHES
+                                                do
+                                                    MATCH=$(echo "$MATCH" | tr ',' ' ')
+                                                    local DUPLICATE=$(echo "$MATCH" | grep -ow "${VPN_POOL_SUBNET}.${IP}/32")
+                                                    [ -z "$DUPLICATE" ] && break || local IP=$((IP+1))
+                                                done
+
+                                            if [ $IP -ge 255 ];then
+                                                echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) subnet MAX 254 reached '${INSTALL_DIR}WireguardVPN.conf'"
+                                                exit 97
+                                            fi
+
+                                            [ -z "$MATCHES" ] && break
+                                        done
+
+                                        local VPN_POOL_IP4=$VPN_POOL_SUBNET"."$IP"/32"  # v4.15
+                                else
+                                    echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) subnet NOT defined 'device' Peers?"
+                                    return 1
+                                fi
+                            #fi
+                        else
+                            local USE_IPV6="Y"
+                            local VPN_POOL_IP=${VPN_POOL%/*}
+                            local VPN_POOL_MASK=${VPN_POOL##*/}                     # v4.15
+                            local VPN_SUBNET=${VPN_POOL_IP%:*}
+                            local VPN_IP_EXPANDED=$(Expand_IPv6 "${VPN_POOL%/*}")   # v4.15
+                            local VPN_IP_COMPRESSED=$(Compress_IPv6 "${VPN_IP_EXPANDED}")
+                            local VPN_POOL_PREFIX_EXPANDED=${VPN_IP_EXPANDED%:*}    # v4.15
+                            local VPN_POOL_PREFIX_COMPRESSED=$(Compress_IPv6 "${VPN_POOL_PREFIX_EXPANDED}")
+
+                            local IP=2
 
                             while true
                                 do
-                                    local DUPLICATE=$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE ip='${VPN_POOL_SUBNET}.${IP}/32';") # v4.11 v4.02
+                                    local MATCH="$(sqlite3 $SQL_DATABASE "SELECT ip FROM devices WHERE ip LIKE '%${VPN_POOL_PREFIX_COMPRESSED}${IP}/128%';" | tr ',' ' ')"  # v4.15 v4.11 v4.02
+                                    local DUPLICATE=$(echo "$MATCH" | grep -ow "${VPN_POOL_PREFIX_COMPRESSED}${IP}/128")
                                     [ -z "$DUPLICATE" ] && break || local IP=$((IP+1))
 
                                     if [ $IP -ge 255 ];then
-                                        echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) subnet MAX 254 reached '${INSTALL_DIR}WireguardVPN.conf'"
-                                        exit 97
+                                        echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) IPv6 subnet MAX 254 imposed!'"
+                                        exit 98
                                     fi
+
+                                    [ -z "$MATCH" ] && break
+
                                 done
 
-                                local VPN_POOL_IP=$VPN_POOL_SUBNET"."$IP"/32"
-                        else
-                            echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) subnet NOT defined 'device' Peers?"
-                            return 1
+                            local VPN_POOL_IP6=${VPN_POOL_PREFIX_COMPRESSED}$IP"/128"   # v4.15
+
                         fi
+                    done
+
+                VPN_POOL_IP=$VPN_POOL_IP4                                       # v4.15
+                if [ -n "$VPN_POOL_IP6" ];then                                  # v4.15
+                    local IPV6=", ::/0"                                         # v4.15
+                    if [ -n "$VPN_POOL_IP" ];then                               # v4.15
+                        local VPN_POOL_IP=$VPN_POOL_IP","$VPN_POOL_IP6          # v4.15
+                        local IPV6_TXT="(IPv4/IPv6) "                           # v4.15
+                    else
+                        local VPN_POOL_IP=$VPN_POOL_IP6                         # v4.15
+                        local IPV6_TXT="(IPv6) "                                # v4.15
                     fi
-                else
-                    local USE_IPV6="Y"
-                    local IPV6_TXT="IPv6 "
-                    local VPN_POOL_PREFIX=${VPN_POOL%/*}
-                    local VPN_POOL_PREFIX=$(echo "$VPN_POOL_PREFIX" | awk -F '[:/]' '{print $1":"$2":"$3"::"}')
-                    local IP=$(sqlite3 $SQL_DATABASE "SELECT COUNT(ip) FROM devices WHERE ip LIKE '${VPN_POOL_PREFIX}.%';")
-                    local IP=$((IP+2))
-
-                    while true
-                        do
-                            local DUPLICATE=$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE  ip LIKE '${VPN_POOL_PREFIX}.%';") # v4.02
-                            [ -z "$DUPLICATE" ] && break || local IP=$((IP+1))
-
-                            if [ $IP -ge 255 ];then
-                                echo -e $cBRED"\a\t***ERROR: 'server' Peer ($SERVER_PEER) subnet MAX 254 reached '${INSTALL_DIR}WireguardVPN.conf'"
-                                exit 98
-                            fi
-                        done
-
-                    local VPN_POOL_IP=${VPN_POOL_PREFIX}$IP"/128"
                 fi
 
                 # Should the Peer ONLY have access to LAN ? e.g. 192.168.1.0/24         # v1.06
@@ -5625,7 +6561,7 @@ Create_RoadWarrior_Device() {
                 else
                     # Default route ALL traffic via the remote 'server' Peer
                     local IP="0.0.0.0/0"
-                    [ "$USE_IPV6" == "Y" ] && IPV6=", ::/0"
+                    [ "$USE_IPV6" == "Y" ] && local IPV6=", ::/0"
                     local SPLIT_TXT="# ALL Traffic"
                 fi
 
@@ -5641,7 +6577,7 @@ Create_RoadWarrior_Device() {
                         fi
                         [ "$USE_IPV6" == "Y" ] && DNS_RESOLVER=$DNS_RESOLVER","$(nvram get ipv6_dns1)   # v3.04 Hotfix
                     else
-                        local DNS_RESOLVER="1.1.1.1"
+                        local DNS_RESOLVER=${VPN_POOL_IP%.*}".1,1.1.1.1"                # v4.15
                         [ "$USE_IPV6" == "Y" ] && DNS_RESOLVER="2606:4700:4700::1111"
                     fi
                 fi
@@ -5654,7 +6590,7 @@ Create_RoadWarrior_Device() {
 [Interface]
 PrivateKey = $PRI_KEY
 Address = $VPN_POOL_IP
-DNS = 1.1.1.1
+DNS = $DNS_RESOLVER
 
 # $HARDWARE_MODEL ${IPV6_TXT}'server' ($SERVER_PEER)
 [Peer]
@@ -5667,12 +6603,48 @@ PersistentKeepalive = 25
 # $DEVICE_NAME End
 EOF
 
-                echo -e $cBGRE"\n\tWireGuard config for $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBGRE}' (${cBWHT}${VPN_POOL_IP}${cBGRE}) created ${cBWHT}(Allowed IP's ${ALLOWED_IPS} ${SPLIT_TXT})\n"$cRESET
+                    # Add device IP address and identifier to config
+                    [ -z "$TAG" ] && TAG=$(echo -e "\"Device\"")                                   # v1.03
+                    LINE=$(echo "$DEVICE_NAME\tX\t\t$VPN_POOL_IP\t\t$PUB_KEY\t\t# $DEVICE_NAME $TAG")
+                    TAG=$(echo "$TAG" | sed "s/'/''/g")
+
+                    if [ "$SITE2SITE_PEER_LAN" != "remoteonly" ];then
+                        sqlite3 $SQL_DATABASE "INSERT into devices values('$DEVICE_NAME','X','$VPN_POOL_IP','$DNS_RESOLVER','$ALLOWED_IPS','$PUB_KEY','$PRI_KEY','# $DEVICE_NAME $TAG','0');"
+
+                        echo -e $cBGRE"\n\tWireGuard config for $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBGRE}' (${cBWHT}${VPN_POOL_IP}${cBGRE}) created ${cBWHT}(Allowed IP's ${ALLOWED_IPS} ${SPLIT_TXT})\n"$cRESET
+                    fi
+                fi
+                if [ "$SITE2SITE_PEER_LAN" != "remoteonly" ];then
+                    echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED ADD $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBRED}' ${cRESET}to 'server' Peer (${cBMAG}${SERVER_PEER}${cRESET}) or press$cBGRE [Enter] to SKIP."
+                    read -r "ANS"
+                    if [ "$ANS" == "y" ];then
+
+                        local PUB_KEY=$(Convert_Key "$PUB_KEY")
+                        sed -i -e :a -e '/^\n*$/{$d;N;};/\n$/ba' ${CONFIG_DIR}${SERVER_PEER}.conf       # v4.15 Delete all trailing blank lines from file
+                        echo -e >> ${CONFIG_DIR}${SERVER_PEER}.conf
+                        for SERVER_PEER in $SERVER_PEER                                         # v3.03
+                            do
+                                # Erase 'client' Peer device entry if it exists....
+                                [ -n "$(grep "$DEVICE_NAME" ${CONFIG_DIR}${SERVER_PEER}.conf)" ] && sed -i "/# $DEVICE_NAME/,/# $DEVICE_NAME End/d" ${CONFIG_DIR}${SERVER_PEER}.conf    # v1.08
+                            done
+                        cat >> ${CONFIG_DIR}${SERVER_PEER}.conf << EOF
+# $DEVICE_NAME $PEER_TOPOLOGY
+[Peer]
+PublicKey = $PUB_KEY
+AllowedIPs = $VPN_POOL_IP
+PresharedKey = $PRE_SHARED_KEY
+# $DEVICE_NAME End
+EOF
+                        for SERVER_PEER in $SERVER_PEER                                         # v3.03
+                            do
+                                 echo -e $cBCYA"\tAdded $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBCYA}' ${cBWHT}${VPN_POOL_IP}${cBCYA} to $HARDWARE_MODEL 'server' (${cBMAG}$SERVER_PEER${cBCYA}) and WireGuard config\n"
+                            done
+
+                        Display_QRCode "${CONFIG_DIR}${DEVICE_NAME}.conf"
+                    fi
                 fi
 
-                if [ -z "$SITE2SITE" ];then                                 # v4.14
-                    Display_QRCode "${CONFIG_DIR}${DEVICE_NAME}.conf"
-                else
+                if [ "$SITE2SITE" == "Y" ];then             # v4.15
 
                     cat > /tmp/${DEVICE_NAME}${SITE_PEER}.conf << EOF  # v4.14
 # $DEVICE_NAME $PEER_TOPOLOGY
@@ -5684,46 +6656,11 @@ PersistentKeepalive = 25
 # $DEVICE_NAME End
 EOF
 
-                echo -e $cBGRE"\n\tWireGuard config for 'server' $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBGRE}' (created ${cBWHT}(Allowed IP's ${ALLOWED_IPS} ${SPLIT_TXT})\n"$cRESET
-                fi
-
-                echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED ADD $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBRED}' ${cRESET}to 'server' Peer (${cBMAG}${SERVER_PEER}${cRESET}) or press$cBGRE [Enter] to SKIP."
-                read -r "ANS"
-                if [ "$ANS" == "y" ];then
-
-                    for SERVER_PEER in $SERVER_PEER                                         # v3.03
-                        do
-                            echo -e $cBCYA"\n\tAdding $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBCYA}' ${cBWHT}${VPN_POOL_IP}${cBCYA} to $HARDWARE_MODEL 'server' (${cBMAG}$SERVER_PEER${cBCYA}) and WireGuard config\n"
-
-                            # Erase 'client' Peer device entry if it exists....
-                            [ -n "$(grep "$DEVICE_NAME" ${CONFIG_DIR}${SERVER_PEER}.conf)" ] && sed -i "/# $DEVICE_NAME/,/# $DEVICE_NAME End/d" ${CONFIG_DIR}${SERVER_PEER}.conf    # v1.08
-                        done
-
-                    local PUB_KEY=$(Convert_Key "$PUB_KEY")
-
-                    echo -e >> ${CONFIG_DIR}${SERVER_PEER}.conf
-                    cat >> ${CONFIG_DIR}${SERVER_PEER}.conf << EOF
-# $DEVICE_NAME $PEER_TOPOLOGY
-[Peer]
-PublicKey = $PUB_KEY
-AllowedIPs = $VPN_POOL_IP
-PresharedKey = $PRE_SHARED_KEY
-# $DEVICE_NAME End
-EOF
-
-                    # Add device IP address and identifier to config
-                    [ -z "$TAG" ] && TAG=$(echo -e "\"Device\"")                                   # v1.03
-                    LINE=$(echo "$DEVICE_NAME\tX\t\t$VPN_POOL_IP\t\t$PUB_KEY\t\t# $DEVICE_NAME $TAG")
-                    #POS=$(awk '/^# Custom.*Peers/ {print NR}' ${INSTALL_DIR}WireguardVPN.conf)
-                    #[ -n "$POS" ] && sed -i "$POS a $LINE" ${INSTALL_DIR}WireguardVPN.conf
-                    TAG=$(echo "$TAG" | sed "s/'/''/g")
-                    sqlite3 $SQL_DATABASE "INSERT into devices values('$DEVICE_NAME','X','$VPN_POOL_IP','$DNS_RESOLVER','$ALLOWED_IPS','$PUB_KEY','$PRI_KEY','# $DEVICE_NAME $TAG','0');"
-
-                    #tail -n 1 ${INSTALL_DIR}WireguardVPN.conf
-
                     echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED ADD $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBRED}' ${cRESET}to remote 'server' Peer (${cBMAG}${SITE_PEER}${cRESET}) or press$cBGRE [Enter] to SKIP."
                     read -r "ANS"
                     if [ "$ANS" == "y" ];then
+                        sed -i -e :a -e '/^\n*$/{$d;N;};/\n$/ba' ${CONFIG_DIR}${SITE_PEER}.conf     # v4.15 Delete all trailing blank lines from file
+                        echo -e >> ${CONFIG_DIR}${SITE_PEER}.conf
                         cat /tmp/${DEVICE_NAME}${SITE_PEER}.conf >> ${CONFIG_DIR}${SITE_PEER}.conf
 
                         local SITE_PEER_PUB_KEY=$(cat ${CONFIG_DIR}${SITE_PEER}_public.key)
@@ -5744,21 +6681,22 @@ EOF
 
                     fi
 
+                fi
+
+                if [ "$SITE2SITE_PEER_LAN" != "remoteonly" ];then           # v4.15
                     # Need to Restart the Peer (if it is UP) or Start it so it can listen for new 'client' Peer device/site-2-site
                     [ -n "$(wg show interfaces | grep "$SERVER_PEER")" ] && CMD="restart" ||  CMD="start"   # v1.08
                     echo -e $cBWHT"\a\n\tWireGuard 'server' Peer needs to be ${CMD}ed to listen for 'client' $PEER_TOPOLOGY Peer ${cBMAG}$DEVICE_NAME $TAG"
-                    echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer ($SERVER_PEER) ${cRESET}or press$cBGRE [Enter] to SKIP."
+                    echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer (${cBMAG}${SERVER_PEER}${cRESET}) or press$cBGRE [Enter] to SKIP."
                     read -r "ANS"
                     [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$SERVER_PEER"; Show_Peer_Status "show"; }  # v3.03
-
-                    if [ "$SITE2SITE" == "Y" ];then
-                        echo -e $cRESET"\n\tNow Copy ${cBMAG}${SITE_PEER}/${DEVICE_NAME}${cRESET} files:\n"$cBCYA
-                        ls -l ${CONFIG_DIR} | grep -E "${SITE_PEER}.conf|${DEVICE_NAME}_public"
-                        echo -e ${cBCYA}${cRESET}"\n\tto remote location\n\tNOTE: If ${cBMAG}${SITE_PEER}${cRESET} has already been imported at the remote site, then simply rename $cBCYA'${SITE_PEER}.conf'$cRESET to its 'wg2x' equivalent, then restart it"
-                    fi
                 fi
 
-
+                if [ "$SITE2SITE" == "Y" ];then
+                    echo -e $cRESET"\n\tNow Copy ${cBMAG}${SITE_PEER}/${DEVICE_NAME}${cRESET} files:\n"$cBCYA
+                    ls -l ${CONFIG_DIR} | grep -E "${SITE_PEER}.conf|${DEVICE_NAME}"    # v4.15
+                    echo -e ${cBCYA}${cRESET}"\n\tto remote location\n\tNOTE: If ${cBMAG}${SITE_PEER}${cRESET} has already been imported at the remote site, then simply rename $cBCYA'${SITE_PEER}.conf'$cRESET to its 'wg2x' equivalent, then restart it"
+                fi
 
         else
             echo -e $cRED"\a\n\t***ERROR: Peer $PEER_TOPOLOGY '${cBMAG}${DEVICE_NAME}${cRED}' already EXISTS!"
@@ -5775,7 +6713,9 @@ Main() { true; }            # Syntax that is Atom Shellchecker compatible!
 
 PATH=/opt/sbin:/opt/bin:/opt/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-ANSIColours
+if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -z "$(grep -E "^NOCOLOR|^NOCOLOUR" ${INSTALL_DIR}WireguardVPN.conf)" ];then     # v4.15
+    ANSIColours
+fi
 
 FIRMWARE=$(echo $(nvram get buildno) | awk 'BEGIN { FS = "." } {printf("%03d%02d",$1,$2)}')
 HARDWARE_MODEL=$(Get_Router_Model)
@@ -5828,6 +6768,7 @@ if [ "$1" == "-h" ] || [ "$1" == "help" ];then
     exit 0
 fi
 
+# Enable debugging ?
 if [ "$1" == "debug" ] || [ "$1" == "debugall" ];then
     if [ "$1" == "debug" ];then
         DEBUGMODE="$(echo -e ${cRESET}$cWRED"Debug mode enabled"$cRESET)"
@@ -5838,9 +6779,31 @@ fi
 
 [ ! -L "/opt/bin/wg_manager" ] && Manage_alias "create"
 
-NOCHK=
 NOCHK="Martineau Disabled hack"
 [ -n "$(echo "$@" | grep -w "nochk")" ] & NOCHK="Y"
+
+# Remove WireGuard Manager ?
+if [ "$1" == "uninstall" ];then         # v4.15
+    NOCHK="Y"                           # v4.15
+    Uninstall_WireGuard                 # v4.15
+    echo -e $cRESET                     # v4.15
+    exit 0                              # v4.15
+fi
+
+# Purge old traffic/session database records        # trimdb {days [ 'traffic' | 'session' ] [auto]}
+if [ "$1" == "trimdb" ];then            # v4.15
+    Purge_Database "$@" "auto"          # v4.15
+    echo -e $cRESET                     # v4.15
+    exit 0                              # v4.15
+fi
+
+# Show INFO
+if [ "$1" == "?" ];then                 # v4.15
+    Show_Info_HDR                       # v4.15
+    Show_Info                           # v4.15
+    echo -e $cRESET                     # v4.15
+    exit 0                              # v4.15
+fi
 
 # Retain commandline compatibility
 if [ "$1" != "install" ];then   # v2.01
@@ -5933,7 +6896,7 @@ if [ "$1" != "install" ];then   # v2.01
                 echo -e $cRESET
                 exit_message
             ;;
-            show)
+            show|list)
                 Show_Peer_Status "full"                        # Force verbose detail
                 echo -e $cRESET
                 exit_message
@@ -5964,6 +6927,58 @@ if [ "$1" != "install" ];then   # v2.01
                 fi
                 exit_message
             ;;
+            menu*)                                          # menu [ hide | show ]          # v4.15
+
+                ACTION=$2
+
+                case "$ACTION" in
+                    hide|off)
+                        if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^#NOMENU" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                            sed -i 's/^#NOMENU/NOMENU/' ${INSTALL_DIR}WireguardVPN.conf                                 # v4.15
+                        fi
+                            echo -e $cRED"\n\t[✖]${cBWHT} Menu display ${cBGRE}is ${cBRED}${ALERT}DISABLED"$cRESET
+                    ;;
+                    show|on)
+                        if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOMENU" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                            sed -i 's/^NOMENU/#NOMENU/' ${INSTALL_DIR}WireguardVPN.conf                                 # v4.15
+                        fi
+                            echo -e $cBGRE"\n\t[✔]${cBWHT} Menu display ${cBGRE}is ENABLED"$cRESET
+                    ;;
+                    *)
+                        echo -en $cRED"\a\n\t***ERROR: Invalid arg $cBWHT'"$ACTION"'$cBRED for Menu dislay - valid 'off' or 'on' only!\n"$cRESET
+                    ;;
+                esac
+
+                echo -e $cRESET
+                exit_message
+            ;;
+            colour*|color*)                                          # colo[u]r [ off | on ]          # v4.15
+
+                ACTION=$2
+
+                case "$ACTION" in
+                    hide|off)
+                        if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^#NOCOLOUR|#NOCOLOR" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                            sed -i 's/^#NOCOLOR/NOCOLOR/' ${INSTALL_DIR}WireguardVPN.conf                                 # v4.15
+                            ANSIColours "disable"
+                        fi
+                        echo -e $cRED"\n\t[✖]${cBWHT} Display colour attributes ${cBGRE}is ${cBRED}${ALERT}DISABLED"$cRESET
+                    ;;
+                    show|on)
+                        if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOCOLOUR|NOCOLOR" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                            sed -i 's/^NOCOLOR/#NOCOLOR/' ${INSTALL_DIR}WireguardVPN.conf                                 # v4.15
+                            ANSIColours
+                        fi
+                        echo -e $cBGRE"\n\t[✔]${cBWHT} Display colour attributes ${cBGRE}is ENABLED"$cRESET
+                    ;;
+                    *)
+                        echo -en $cRED"\a\n\t***ERROR: Invalid arg $cBWHT'"$ACTION"'$cBRED for Display colour attributes - valid 'off' or 'on' only!\n"$cRESET
+                    ;;
+                esac
+
+                echo -e $cRESET
+                exit_message
+            ;;
         esac
     else
         if [ "$1" != "init" ];then              # v4.11
@@ -5977,6 +6992,10 @@ fi
 # Override use of Pg-Up key for command retrieval?
 if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOPG_UP" ${INSTALL_DIR}WireguardVPN.conf)" ];then    # v4.14
     READLINE=                                                                                                       # v4.14
+fi
+
+if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOMENU" ${INSTALL_DIR}WireguardVPN.conf)" ];then     # v4.15
+    SUPPRESSMENU="NOMENU - specified"                                                                               # v4.15
 fi
 
 clear
