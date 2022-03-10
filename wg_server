@@ -1,9 +1,9 @@
-VERSION="v4.15.11"
-#============================================================================================ © 2021-2022 Martineau v4.15.11
+VERSION="v4.16.1"
+#============================================================================================ © 2021-2022 Martineau v4.16.1
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 06-Mar-2022
+# Last Updated Date: 10-Mar-2022
 #
 # Description:
 #
@@ -51,7 +51,7 @@ Is_IPv4_CIDR () {
 Is_IPv6() {
     # Note this matches compression anywhere in the address, though it won't match the loopback address ::1
     grep -oE '([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4}'       # IPv6 format -very crude
-}
+    }
 Is_Private_IPv6 () {
     grep -oE "(::1$)|([fF][cCdD])"
 }
@@ -91,7 +91,7 @@ Firewall_delete() {
     iptables -D OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
     iptables -t nat -D PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
 
-    local LOCALIPS=$(echo "$Subnet" | tr ',' ' ')               # v4.11
+    local LOCALIPS=$(echo "$SUBNET" | tr ',' ' ')               # v4.11
     for THIS in $LOCALIPS                                       # v4.11
         do                                                      # v4.11
             if [ -z "$(echo "$THIS" | grep -F ":")" ] ;then     # v4.11
@@ -114,7 +114,7 @@ Firewall_delete() {
         ip6tables -D OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
         ip6tables -t nat -D PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null   # v4.14.1
 
-        local LOCALIPS=$(echo "$Subnet" | tr ',' ' ')               # v4.11
+        local LOCALIPS=$(echo "$SUBNET" | tr ',' ' ')               # v4.11
         for THIS in $LOCALIPS                                       # v4.11
             do                                                      # v4.11
                 if [ -n "$(echo "$THIS" | grep -F ":")" ] ;then     # v4.11
@@ -262,7 +262,7 @@ VPN_NUM=${VPN_ID#"${VPN_ID%?}"}                     # v4.02
 WAN_IF=$(Get_WAN_IF_Name)
 
 wgport=$(awk '/^Listen/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)        # v4.14.4
-Subnet=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers where peer='$WG_INTERFACE';") # v1.09 @here1310
+SUBNET=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers where peer='$WG_INTERFACE';") # v1.09 @here1310
 
 SOCKET=$(nvram get wan0_gateway)":"$wgport          # v4.04
 
@@ -303,18 +303,31 @@ WAN_IPV4=$(ip -4 addr | sed -ne 's|^.* inet  \([^/]*\)/.* scope global.*$|\1|p' 
 
 if [ "$USE_IPV6" != "Y" ];then
     # CIDR ?
-    if [ -z "$(echo "$Subnet" | Is_IPv4_CIDR)" ];then
-        SUBNET_PREFIX=${Subnet%.*}
-        Subnet=$SUBNET_PREFIX".0/24"
+    if [ -z "$(echo "$SUBNET" | Is_IPv4_CIDR)" ];then
+        SUBNET_PREFIX=${SUBNET%.*}
+        SUBNET=$SUBNET_PREFIX".0/24"
+        IPV6_TXT=                       # v4.16.1
     fi
 fi
 
+
 LISTEN_PORT=$(awk '/^ListenPort/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)
+
+ADDRESS_TXT=                                                    # v4.16.1
+for THIS in $(echo "$SUBNET" | tr ',' ' ')                      # v4.16.1
+    do                                                          # v4.16.1
+
+        IP=${THIS%/*}
+        [ -n "$(echo "$IP" | grep -F ":")" ] && IP="["$IP"]"
+        [ -n "$ADDRESS_TXT" ] && ADDRESS_TXT=${ADDRESS_TXT}","${IP} || ADDRESS_TXT=${IP}    # v4.16.1
+    done
+
+ADDRESS_TXT=$ADDRESS_TXT":"$LISTEN_PORT                         # v4.16.1
 
 if [ "$2" != "disable" ];then
 
-    logger -t "wireguard-server${VPN_ID:3:1}" "Initialising Wireguard VPN ${IPV6_TXT}'Server' Peer ($VPN_ID) on $SOCKET"
-    echo -e $cBCYA"\twireguard-server${VPN_ID:3:1}: Initialising Wireguard VPN ${IPV6_TXT}'Server' Peer (${cBMAG}$VPN_ID$cBCYA) on $SOCKET (${cBMAG}${DESC}${cBCYA})"$cRESET
+    logger -t "wireguard-server${VPN_ID:3:1}" "Initialising Wireguard VPN ${IPV6_TXT}'Server' Peer ($VPN_ID) on $ADDRESS_TXT"       # v4.16.1 @ZebMcKayhan
+    echo -e $cBCYA"\twireguard-server${VPN_ID:3:1}: Initialising Wireguard VPN ${IPV6_TXT}'Server' Peer (${cBMAG}$VPN_ID$cBCYA) on $ADDRESS_TXT (${cBMAG}${DESC}${cBCYA})"$cRESET   # v4.16.1 @ZebMcKayhan
 
     ip link del dev $VPN_ID 2>/dev/null
     cmd ip link add dev $VPN_ID type wireguard
@@ -347,15 +360,16 @@ if [ "$2" != "disable" ];then
     Process_Pre_Post_Commands "PreUp"   # v4.14.1
 
     cmd ip link set up dev $VPN_ID
-    if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$Subnet" | grep ":")" ];then         # v4.05
+    if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$SUBNET" | grep ":")" ];then         # v4.05
         cmd ip -6 link set up dev $VPN_ID
     fi
 
     # v4.12 Assign both IPv4 and IPv6 IPs to interface as required
-    LOCALIPS=$(echo "$Subnet" | tr ',' ' ')                                                 # v4.10
+    LOCALIPS=$(echo "$SUBNET" | tr ',' ' ')                                                 # v4.10
     for LOCALIP in $LOCALIPS                                                                # v4.10
         do
             if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$LOCALIP" | grep -F ":")" ];then     # v4.10
+                # Assumed Private IPv6 but user may have created 'server' Peer with non-Private IPv6?   # v4.16.1
                 cmd ip -6 address add dev $VPN_ID $LOCALIP                                  # v4.10
             else
                 if [ -n "$(echo "$LOCALIP" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$LOCALIP" | Is_IPv4)" ];then
@@ -446,7 +460,7 @@ if [ "$2" != "disable" ];then
         cmd iptables -I OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
         cmd iptables -t nat -I PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'"
 
-        for THIS in $(echo "$Subnet" | tr ',' ' ')                  # v4.15.10
+        for THIS in $(echo "$SUBNET" | tr ',' ' ')                  # v4.15.10
             do
                 if [ -z "$(echo "$THIS" | grep -F ":" )" ];then     # v4.15.10
                     cmd iptables -t nat -I POSTROUTING -s $THIS -o br0 -j MASQUERADE -m comment --comment "WireGuard 'server clients to LAN'" # v4.14.2
@@ -486,7 +500,7 @@ if [ "$2" != "disable" ];then
                 cmd ip -6 route add $ALLOWIP dev $VPN_ID
             else
                 if [ -n "$(echo "$ALLOWIP" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$ALLOWIP" | Is_IPv4)" ];then
-                    #[ "$(echo "$ALLOWIP" | grep -o "^.*\.")" != "$(echo "$Subnet" | grep -o "^.*\.")" ] && cmd ip route add $ALLOWIP dev $VPN_ID        # v4.15.3
+                    #[ "$(echo "$ALLOWIP" | grep -o "^.*\.")" != "$(echo "$SUBNET" | grep -o "^.*\.")" ] && cmd ip route add $ALLOWIP dev $VPN_ID        # v4.15.3
                     cmd ip route add $ALLOWIP dev $VPN_ID        # v4.15.5 v4.15.3
                 fi
             fi
@@ -549,9 +563,9 @@ else
     # v4.14 Process 'PostDown' commands
     Process_Pre_Post_Commands "PostDown"    # v4.14.1
 
-    logger -t "wireguard-server${VPN_ID:3:1}" "Wireguard VPN 'server' Peer ($VPN_ID) on" $SOCKET "Terminated"
+    logger -t "wireguard-server${VPN_ID:3:1}" "Wireguard VPN 'server' Peer ($VPN_ID) on" $ADDRESS_TXT "Terminated"  # v4.16.1
 
-    echo -en $cBGRE"\twireguard-server${VPN_ID:3:1}: Wireguard VPN ${IPV6_TXT}'Server' Peer (${cBMAG}$VPN_ID$cBGRE) on $SOCKET (${cBMAG}${DESC}${cBGRE}) ${cBRED}Terminated\n"$cRESET
+    echo -en $cBGRE"\twireguard-server${VPN_ID:3:1}: Wireguard VPN ${IPV6_TXT}'Server' Peer (${cBMAG}$VPN_ID$cBGRE) on $ADDRESS_TXT (${cBMAG}${DESC}${cBGRE}) ${cBRED}Terminated\n"$cRESET  # 4.16.1
 
     echo -e $cRESET
 fi
