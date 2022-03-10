@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.16b"
-#============================================================================================ © 2021-2022 Martineau v4.16b
+VERSION="v4.16b2"
+#============================================================================================ © 2021-2022 Martineau v4.16b2
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.16b"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 09-Mar-2022
+# Last Updated Date: 10-Mar-2022
 
 #
 # Description:
@@ -861,7 +861,8 @@ Create_Peer() {
             if [ -z "$(echo "$THIS" | grep -F ":")" ];then
                 [ -z "$(echo "$THIS" | Is_IPv4_CIDR)" ] && { echo -e $cBRED"\a\n\t***ERROR: '$THIS' must be IPv4 CIDR"$cRESET; return 1; }                                  # v4.15
             else
-                [ -z "$(echo "$THIS" | sed 's~/.*$~~' | Is_Private_IPv6)" ] && { echo -e $cBRED"\a\n\t***ERROR: '$THIS' must be Private IPv6 address"$cRESET; return 1; }   # v4.15
+                #[ -z "$(echo "$THIS" | sed 's~/.*$~~' | Is_Private_IPv6)" ] && { echo -e $cBRED"\a\n\t***ERROR: '$THIS' must be Private IPv6 address"$cRESET; return 1; }   # v4.15
+                :       # v4.16
             fi
         done
 
@@ -6463,7 +6464,7 @@ Create_RoadWarrior_Device() {
                             #if [ -z "$VPN_POOL_IP" ];then
                                 if [ -n "$VPN_POOL" ];then
                                     local VPN_POOL_SUBNET=${VPN_POOL%.*}
-                                    local IP=2                          # v4.11
+                                    local IP=$((${VPN_POOL##*.}+1))     # v4.16 Use the 'server' (BASE IP)+1 rather than assume '.2' @ZebMcKayhan
 
                                     while true
                                         do
@@ -6499,7 +6500,7 @@ Create_RoadWarrior_Device() {
                             local VPN_POOL_PREFIX_EXPANDED=${VPN_IP_EXPANDED%:*}    # v4.15
                             local VPN_POOL_PREFIX_COMPRESSED=$(Compress_IPv6 "${VPN_POOL_PREFIX_EXPANDED}")
 
-                            local IP=2
+                            IP=$((${VPN_POOL_IP##*:}+1))        # v4.16 Use the 'server' (BASE IP)+1 rather than assume '.2' @ZebMcKayhan
 
                             while true
                                 do
