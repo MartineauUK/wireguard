@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.16b2"
-#============================================================================================ © 2021-2022 Martineau v4.16b2
+VERSION="v4.16b3"
+#============================================================================================ © 2021-2022 Martineau v4.16b3
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.16b2"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 10-Mar-2022
+# Last Updated Date: 11-Mar-2022
 
 #
 # Description:
@@ -181,16 +181,8 @@ Repeat() {
 Is_IPv4() {
     grep -oE '^([0-9]{1,3}\.){3}[0-9]{1,3}$'                    # IPv4 format
 }
-Is_IPv6() {
-    # Note this matches compression anywhere in the address, though it won't match the loopback address ::1
-    grep -oE '([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4}'       # IPv6 format -very crude
-}
 Is_IPv4_CIDR() {
         grep -oE '^([0-9]{1,3}\.){3}[0-9]{1,3}/(3[012]|[12]?[0-9])$'    # IPv4 CIDR range notation
-}
-Is_IPv6() {
-    # Note this matches compression anywhere in the address, though it won't match the loopback address ::1
-    grep -oE '([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4}'       # IPv6 format -very crude
 }
 Is_Private_IPv4() {
     # 127.  0.0.0 – 127.255.255.255     127.0.0.0 /8
@@ -199,6 +191,10 @@ Is_Private_IPv4() {
     # 192.168.0.0 – 192.168.255.255   192.168.0.0 /16
     #grep -oE "(^192\.168\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])$)|(^172\.([1][6-9]|[2][0-9]|[3][0-1])\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])$)|(^10\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])\.([0-9]|[0-9][0-9]|[0-2][0-5][0-5])$)"
     grep -oE "(^127\.)|(^(0)?10\.)|(^172\.(0)?1[6-9]\.)|(^172\.(0)?2[0-9]\.)|(^172\.(0)?3[0-1]\.)|(^169\.254\.)|(^192\.168\.)"
+}
+Is_IPv6() {
+    # Note this matches compression anywhere in the address, though it won't match the loopback address ::1
+    grep -oE '([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4}'       # IPv6 format -very crude
 }
 Is_Private_IPv6() {
     grep -oE "(::1$)|([fF][cCdD])"
@@ -861,8 +857,8 @@ Create_Peer() {
             if [ -z "$(echo "$THIS" | grep -F ":")" ];then
                 [ -z "$(echo "$THIS" | Is_IPv4_CIDR)" ] && { echo -e $cBRED"\a\n\t***ERROR: '$THIS' must be IPv4 CIDR"$cRESET; return 1; }                                  # v4.15
             else
-                #[ -z "$(echo "$THIS" | sed 's~/.*$~~' | Is_Private_IPv6)" ] && { echo -e $cBRED"\a\n\t***ERROR: '$THIS' must be Private IPv6 address"$cRESET; return 1; }   # v4.15
-                :       # v4.16
+                # ANY IPv6 but don't allow Link-Local IPv6 (i.e. fe80::/10 but in practice, only fe80::/64 is commonly used)                                                            # v4.16
+                [ "$THIS{0:4}" == "fe80" ] && { echo -e $cBRED"\a\n\t***ERROR: IPv6 Link-Local address '$THIS' NOT allowed!"$cRESET; return 1; }                                    # v4.16
             fi
         done
 
@@ -2176,7 +2172,7 @@ Manage_Wireguard_Sessions() {
                     if [ "$ACTION" == "restart" ];then                                      # v1.09
                         # If it is UP then terminate the Peer
                         if [ -n "$(ifconfig $WG_INTERFACE 2>/dev/null | grep inet)" ];then  # v1.09
-                            echo -e $cBWHT"\tRestarting Wireguard '$Mode' Peer (${cBMAG}${WG_INTERFACE}${cBWHT})"$cRESET 2>&1
+                            echo -e $cBWHT"\tRestarting Wireguard '$Mode' Peer (${cBMAG}${WG_INTERFACE}${cBWHT})"$cBCYA 2>&1
                             SayT "$VERSION Restarting Wireguard '$Mode' Peer ($WG_INTERFACE)"
                             [ "$Mode" == "server" ] && /jffs/addons/wireguard/wg_server $WG_INTERFACE "disable" "$SHOWCMDS" "$WG_QUICK" || ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" "$SHOWCMDS" "$WG_QUICK"                 # v1.09
                         fi
@@ -2792,24 +2788,28 @@ Manage_FC() {
             disable|off)
 
                 if [ -n "$(fc status | grep "Flow Learning Enabled")" ];then
+                    echo -en $cBRED"\t"
                     fc disable
+                    echo -en $cBGRE"\t"
                     fc flush
                     SayT "Broadcom Packet Flow Cache learning via BLOG (Flow Cache) DISABLED"   # v4.11 @Torson
                     nvram set fc_disable=1      # v4.12
                     nvram commit                # v4.12
                 fi
-                local STATUS="\t${cBRED}Disabled"
+                local STATUS="\n\t${cBRED}Flow Cache Disabled"
             ;;
             enable|off)
 
                 if [ -z "$(fc status | grep "Flow Learning Enabled")" ];then
+                    echo -en $cBGRE"\t"
                     fc enable
+                    echo -en $cBGRE"\t"
                     fc flush
                     SayT "Broadcom Packet Flow Cache learning via BLOG (Flow Cache) ENABLED"   # v4.11 @Torson
                     nvram set fc_disable=0      # v4.12
                     nvram commit                # v4.12
                 fi
-                local STATUS="\t${cBGRE}Enabled"
+                local STATUS="\n\t${cBGRE}Flow Cache Enabled"
             ;;
             *)
                 [ -n "$(fc status | grep "Flow Learning Enabled")" ] && local STATUS="\tFlow Cache Enabled" || local STATUS="\tFlow Cache Disabled"
@@ -3041,6 +3041,10 @@ STATS
 #CHK_ENDPOINT = curl -s https://am.i.mullvad.net/connected , * wg14-
 #CHK_ENDPOINT = curl -s https://am.i.mullvad.net/connected , wg11
 #CHK_ENDPOINT = curl -s https://Torguard, wg14
+
+# Disable Flow Cache Permanently. (Checked each time wireguard_manager is INITialised or command 'wgm start' is issued)
+#     Use command 'vx' to edit this setting or command 'fc {disable | enable}'
+#DISABLE_FLOW_CACHE
 
 EOF
     return 0
@@ -3567,6 +3571,8 @@ Show_Info() {
         ;;
     esac
 
+    [ "$(nvram get ipv6_service)" == "disabled" ] && echo -e $cBRED"\n\t[✖]${cBWHT} IPv6 Service is ${cBRED}DISABLED$cRESET" || echo -e $cBGRE"\n\t[✔]${cBWHT} IPv6 Service is ${cBRED}$(nvram get ipv6_service)"$cRESET    # v4.16
+
     local WAN_IF=$(Get_WAN_IF_Name)                                             # v4.11
     local VAL=$(cat /proc/sys/net/ipv4/conf/$WAN_IF/rp_filter)                  # v4.11
     [ "$VAL" == "1" ] && STATE="ENABLED" || STATE="${cBRED}DISABLED${cBGRE}"    # v4.11
@@ -3595,7 +3601,7 @@ Show_Info() {
             fi
     fi
 
-    [ $(cru l | grep ChkDDNS | wc -l) -gt 0 ] && echo -e $cBGRE"\t[✔] ${cRESET}Endpoint DDNS$cBGRE re-fresh monitor ACTIVE\n$cRESET"        # v4.15
+    [ $(cru l | grep ChkDDNS | wc -l) -gt 0 ] && echo -e $cBGRE"\t[✔] ${cBWHT}Endpoint DDNS$cBGRE re-fresh monitor ACTIVE\n$cRESET"        # v4.15
 
     [ "$READLINE" == "ReadLine" ] && echo -e $cBGRE"\t[✔]$cBWHT Use of 'Pg-Up' Key ${cBGRE}for command retrieval is ENABLED\n$cRESET" || echo -e $cBRED"\t[✖]${cBWHT} Use of 'Pg-Up' Key for command retrieval is ${cBRED}DISABLED\n$cRESET" # v4.14
 
@@ -5411,6 +5417,7 @@ Validate_User_Choice() {
             addon*);;        # v4.15
             zip|zipinstall);;        # v4.15
             trimdb*);;        # v4.15
+            ipv6*);;        # v4.16
             *)
                :
             ;;
@@ -5858,9 +5865,10 @@ Process_User_Choice() {
 
                     enable|disable|"?")
                         echo -e "\n$(Manage_FC "$ACTION")"
+                        [ "$ACTION" == "disable" ] && echo -e $cBWHT"\t(Use '${cBCYA}vx$cBWHT' command to uncomment config option '${cBCYA}DISABLE_FLOW_CACHE$cBWHT' to DISABLE permanently)\n"$cRESET  # v4.16
                     ;;
                     *)
-                        echo -en $cRED"\a\n\t***ERROR: Flow Cache arg $cBWHT'"$ACTION"'$cBRED invalid - enable or disable or ? ONLY\n"$cRESET
+                        echo -e $cRED"\a\n\t***ERROR: Flow Cache arg $cBWHT'"$ACTION"'$cBRED invalid - 'enable' or 'disable' or '?' ONLY"$cRESET
                     ;;
                 esac
             ;;
@@ -6055,6 +6063,34 @@ Process_User_Choice() {
             ;;
             trimdb*)                                                # trimdb { '?' | days [ 'traffic' | 'sessions'] ['auto']  }
                 Purge_Database $menu1   # v4.15
+            ;;
+            ipv6|ipv6" "*)                                          # ipv6 [ '?' | 'spoof' | 'simulate' | 'disable' ]
+
+                local ARG=$2
+
+                case $ARG in
+                    spoof|simulate)
+                        $(nvram set ipv6_service="$ARG")            # v4.16
+                        echo -e $cBGRE"\n\t[✔] IPv6 Service SET $cBGRE'$ARG'"$cRESET
+                    ;;
+                    "?")
+                        :
+                    ;;
+                    6to4|6in4|6rd|native|ipv6pt|dhcp6)
+                        :
+                    ;;
+                    "disable")
+                        if [ "$(nvram get ipv6_service)" == "spoof" ] || [ "$(nvram get ipv6_service)" == "simulate" ];then
+                            $(nvram set ipv6_service="disabled")    # v4.16
+                            echo -e $cBGRE"\n\t[✔] IPv6 Service SET ${cRED}DISABLED!"$cRESET
+                        fi
+                    ;;
+                    *)
+                         [ -n "$ARG" ] && echo -en $cBRED"\n\a\t***ERROR: Arg invalid! $cBWHT'$ARG' - specify  '?', 'spoof' or 'disable'!\n"$cRESET
+                    ;;
+                esac
+
+                [ "$(nvram get ipv6_service)" == "disabled" ] && echo -e $cBRED"\n\t[✖]${cBWHT} IPv6 Service is ${cBRED}DISABLED$cRESET" || echo -e $cBGRE"\n\t[✔]${cBWHT} IPv6 Service is ${cBRED}$(nvram get ipv6_service)"$cRESET    # v4.16
             ;;
             *)
                 printf '\n\a\t%bInvalid Option%b "%s"%b Please enter a valid option\n' "$cBRED" "$cRESET" "$menu1" "$cBRED"    # v4.03 v3.04 v1.09
@@ -6729,13 +6765,10 @@ EASYMENU="Y"
 IPV6_SERVICE=$(nvram get ipv6_service)                  # v4.14
 if [ "$IPV6_SERVICE" != "disabled" ];then               # v4.14
     case $IPV6_SERVICE in
-        native|ipv6pt|dhcp6)
+        native|ipv6pt|dhcp6|6to4|6in4|6rd)
             USE_IPV6="Y"; IPV6_TXT="(IPv6) "
             LAN_SUBNET_IPV6=$(nvram get ipv6_prefix)    # v4.14.6
             LAN_ADDR_IPV6=$(nvram get ipv6_rtr_addr)    # v4.14.6
-        ;;
-        6to4|6in4|6rd)
-            :
         ;;
         other)
             :
@@ -6786,21 +6819,6 @@ if [ "$1" == "uninstall" ];then         # v4.15
     exit 0                              # v4.15
 fi
 
-# Purge old traffic/session database records        # trimdb {days [ 'traffic' | 'session' ] [auto]}
-if [ "$1" == "trimdb" ];then            # v4.15
-    Purge_Database "$@" "auto"          # v4.15
-    echo -e $cRESET                     # v4.15
-    exit 0                              # v4.15
-fi
-
-# Show INFO
-if [ "$1" == "?" ];then                 # v4.15
-    Show_Info_HDR                       # v4.15
-    Show_Info                           # v4.15
-    echo -e $cRESET                     # v4.15
-    exit 0                              # v4.15
-fi
-
 # Retain commandline compatibility
 if [ "$1" != "install" ];then   # v2.01
 
@@ -6846,6 +6864,21 @@ if [ "$1" != "install" ];then   # v2.01
         exit_message
     fi
 
+    # Purge old traffic/session database records        # trimdb {days [ 'traffic' | 'session' ] [auto]}
+    if [ "$1" == "trimdb" ];then            # v4.15
+        Purge_Database "$@" "auto"          # v4.15
+        echo -e $cRESET                     # v4.15
+        exit 0                              # v4.15
+    fi
+
+    # Show INFO
+    if [ "$1" == "?" ];then                 # v4.15
+        Show_Info_HDR                       # v4.15
+        Show_Info                           # v4.15
+        echo -e $cRESET                     # v4.15
+        exit 0                              # v4.15
+    fi
+
     if [ "$NOCHK" == "Y" ] || [ "$(WireGuard_Installed)" == "Y" ];then # v4.12 v2.01
 
         # Ensure Kernel module is loaded
@@ -6872,8 +6905,9 @@ if [ "$1" != "install" ];then   # v2.01
                 fi
 
                 # http://www.snbforums.com/threads/beta-wireguard-session-manager.70787/post-688282
-                if [ "$HARDWARE_MODEL" == "RT-AX86U" ];then
-                    RC="$(Manage_FC "disable")"                           # v4.14
+                if { [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^DISABLE_FLOW_CACHE" ${INSTALL_DIR}WireguardVPN.conf)" ] ;} || \
+                     [ -n "$(echo "RT-AX86U RT-AX56U" | grep -ow "$HARDWARE_MODEL")" ];then     # v4.16 v4.15
+                        RC="$(Manage_FC "disable")"                                             # v4.14
                 fi
 
                 Manage_Wireguard_Sessions "start" "$PEER" "$NOPOLICY"
