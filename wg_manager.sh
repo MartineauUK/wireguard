@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.16b3"
-#============================================================================================ © 2021-2022 Martineau v4.16b3
+VERSION="v4.16b4"
+#============================================================================================ © 2021-2022 Martineau v4.16b4
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.16b3"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 11-Mar-2022
+# Last Updated Date: 12-Mar-2022
 
 #
 # Description:
@@ -6499,8 +6499,9 @@ Create_RoadWarrior_Device() {
                             #local VPN_POOL_PREFIX=$(echo "$VPN_POOL" | sed 's/\:\:.*$//')
                             #if [ -z "$VPN_POOL_IP" ];then
                                 if [ -n "$VPN_POOL" ];then
+                                    local VPN_POOL_IP=${VPN_POOL%/*}       # v4.16
                                     local VPN_POOL_SUBNET=${VPN_POOL%.*}
-                                    local IP=$((${VPN_POOL##*.}+1))     # v4.16 Use the 'server' (BASE IP)+1 rather than assume '.2' @ZebMcKayhan
+                                    local IP=$((${VPN_POOL_IP##*.}+1))     # v4.16 Use the 'server' (BASE IP)+1 rather than assume '.2' @ZebMcKayhan
 
                                     while true
                                         do
