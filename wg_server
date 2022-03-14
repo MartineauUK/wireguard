@@ -1,9 +1,9 @@
-VERSION="v4.16.3"
-#============================================================================================ © 2021-2022 Martineau v4.16.3
+VERSION="v4.16.4"
+#============================================================================================ © 2021-2022 Martineau v4.16.4
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 13-Mar-2022
+# Last Updated Date: 14-Mar-2022
 #
 # Description:
 #
@@ -51,7 +51,7 @@ Is_IPv4_CIDR () {
 Is_IPv6() {
     # Note this matches compression anywhere in the address, though it won't match the loopback address ::1
     grep -oE '([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4}'       # IPv6 format -very crude
-    }
+}
 Is_Private_IPv6 () {
     grep -oE "(::1$)|([fF][cCdD])"
 }
@@ -91,7 +91,7 @@ Firewall_delete() {
     iptables -D OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
     iptables -t nat -D PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
 
-    local LOCALIPS=$(echo "$SUBNET" | tr ',' ' ')               # v4.11
+    local LOCALIPS=${SUBNET//,/ }                               # v4.16.4 v4.11
     for THIS in $LOCALIPS                                       # v4.11
         do                                                      # v4.11
             if [ -z "$(echo "$THIS" | grep -F ":")" ] ;then     # v4.11
@@ -114,7 +114,7 @@ Firewall_delete() {
         ip6tables -D OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null
         ip6tables -t nat -D PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'" 2>/dev/null   # v4.14.1
 
-        local LOCALIPS=$(echo "$SUBNET" | tr ',' ' ')               # v4.11
+        local LOCALIPS=${SUBNET//,/ }                               # v4.16.4 v4.11
         for THIS in $LOCALIPS                                       # v4.11
             do                                                      # v4.11
                 if [ -n "$(echo "$THIS" | grep -F ":")" ] ;then     # v4.11
@@ -163,8 +163,8 @@ EOR
 Process_Pre_Post_Commands() {
     # v4.14.1
     while read LINE; do
-            CMDTYPE=$1
-            CMD="$(echo "$LINE" | sed "s/\%i/$WG_INTERFACE/g;s/\%w/$WAN_IF/g;s/\%p/$LISTEN_PORT/g")"    # v4.14.4 v4.14.1
+            local CMDTYPE=$1
+            local CMD="$(echo "$LINE" | sed "s/\%wan/$WAN_IF/g;s/\%net/$SUBNET_PREFIX4/g;s/\%lan/$LAN_PREFIX/g;s/\%pos/$POS/g;s/\%p/$LISTEN_PORT/g;s/\%i/$WG_INTERFACE/g")"    # v4.14.4 v4.14.1
             if [ -n "$CMD" ];then
                 logger -t "WireGuard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"
                 if [ -n "$(echo "$CMDTYPE" | grep "Up")" ];then             # v4.4.4
@@ -229,6 +229,10 @@ fi
 SQL_DATABASE="/opt/etc/wireguard.d/WireGuard.db"        # v1.13
 CONFIG_DIR="/opt/etc/wireguard.d/"                 # Conform to "standards"         # v1.08 @elorimer
 INSTALL_DIR="/jffs/addons/wireguard/"
+
+LANIPADDR=$(nvram get lan_ipaddr)
+LAN_PREFIX=${LANIPADDR%.*}
+POS=$(($(iptables -nvL FORWARD --line -t filter | grep -Em 1 ".*\*.*\*.*state.*ESTABLISHED" | cut -d' ' -f1)+1))
 
 VPN_ID=$1
 [ -z "$1" ] && VPN_ID="wg21"
@@ -306,15 +310,13 @@ if [ "$USE_IPV6" != "Y" ];then
     fi
 fi
 
-
 LISTEN_PORT=$(awk '/^ListenPort/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf)
 
 ADDRESS_TXT=                                                    # v4.16.1
-for THIS in $(echo "$SUBNET" | tr ',' ' ')                      # v4.16.1
+for THIS in ${SUBNET//,/ }                                      # v4.16.4 v4.16.1
     do                                                          # v4.16.1
-
         IP=${THIS%/*}
-        [ -n "$(echo "$IP" | grep -F ":")" ] && IP="["$IP"]"
+        [ -n "$(echo "$IP" | grep -F ":")" ] && IP="["$IP"]" || SUBNET_PREFIX4=${IP%.*}     # v4.16.4
         [ -n "$ADDRESS_TXT" ] && ADDRESS_TXT=${ADDRESS_TXT}","${IP} || ADDRESS_TXT=${IP}    # v4.16.1
     done
 
@@ -337,17 +339,16 @@ if [ "$2" != "disable" ];then
     grep -v "#" ${CONFIG_DIR}$VPN_ID.conf | sed '/^DNS/d; /^MTU/d; /^Address/d; /^PreU/d; /^PreD/d; /^Post/d; /^Table/d; /^SaveC/d; /^FWmark/d' > /tmp/$VPN_ID.$$   # v4.16.2
     [ "$SHOWCMDS" == "Y" ] && echo -e "[#] wg setconf $VPN_ID /tmp/$VPN_ID.$$ #(${CONFIG_DIR}$VPN_ID.conf)"    # v.4.16.3 v4.14.5
 
-    echo -en ${cRED}
+    echo -e ${cWRED}
     wg setconf $VPN_ID /tmp/$VPN_ID.$$                                                      # v4.16.2
     if [ $? -ne 0 ];then                                                                    # v4.14.5
-
         # Syntax ERROR?
         # e.g. Endpoint DDNS not valid/resolved?
-        echo -e $cRESET
+        echo -en $cRESET
         cmd ip link del dev $VPN_ID                                                         # v4.14.5
         [ "$USE_IPV6" == "Y" ] && cmd ip -6 link del dev $VPN_ID
         logger -t "WireGuard-server${VPN_ID:3:1}" "***ERROR Initialisation ABORTED"         # v4.14.5
-        echo -e ${cRESET}$cBRED"\a\t***ERROR Initialisation ABORTED - 'wg setconf $VPN_ID ${CONFIG_DIR}$VPN_ID.conf' FAILED\n"$cRESET
+        echo -e ${cRESET}$cBRED"\a\n\t***ERROR Initialisation ABORTED - 'wg setconf $VPN_ID /tmp/$VPN_ID.$$ (${CONFIG_DIR}$VPN_ID.conf)' FAILED\n"$cRESET
 
         echo -en $cRESET
         exit 1                                                                              # v4.14.5
@@ -364,7 +365,7 @@ if [ "$2" != "disable" ];then
     fi
 
     # v4.12 Assign both IPv4 and IPv6 IPs to interface as required
-    LOCALIPS=$(echo "$SUBNET" | tr ',' ' ')                                                 # v4.10
+    LOCALIPS=${SUBNET//, /}                                                                 # v4.16.4 v4.10
     for LOCALIP in $LOCALIPS                                                                # v4.10
         do
             if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$LOCALIP" | grep -F ":")" ];then     # v4.10
@@ -457,7 +458,7 @@ if [ "$2" != "disable" ];then
 
         if [ -z "$(iptables-save | grep WGM_ACL)" ];then    # v4.16
             cmd iptables -N WGM_ACL_F 2>/dev/null           # v4.16
-            cmd iptables -I FORWARD "$(($(iptables -nvL FORWARD --line -t filter | grep -Em 1 ".*\*.*\*.*state.*ESTABLISHED" | cut -d' ' -f1)+1))" -i wg2+ -j WGM_ACL_F -m comment --comment "Wireguard ACL"        # v4.16
+            cmd iptables -I FORWARD "$(($(iptables -nvL FORWARD --line -t filter | grep -Em 1 ".*\*.*\*.*state.*ESTABLISHED" | cut -d' ' -f1)+1))" -i wg+ -j WGM_ACL_F -m comment --comment "Wireguard ACL"        # v4.16
         fi
 
         POS=$(($(iptables -nvL FORWARD --line -t filter | grep -Em 1 ".*WGM_ACL_F" | cut -d' ' -f1)+1)) # v4.16.3
@@ -467,7 +468,7 @@ if [ "$2" != "disable" ];then
         cmd iptables -I OUTPUT -o $VPN_ID -j ACCEPT -m comment --comment "WireGuard 'server'"
         cmd iptables -t nat -I PREROUTING -p udp --dport $wgport -j ACCEPT -m comment --comment "WireGuard 'server'"
 
-        for THIS in $(echo "$SUBNET" | tr ',' ' ')                  # v4.15.10
+        for THIS in ${SUBNET//,/ }                                  # v4.16.4 v4.15.10
             do
                 if [ -z "$(echo "$THIS" | grep -F ":" )" ];then     # v4.15.10
                     cmd iptables -t nat -I POSTROUTING -s $THIS -o br0 -j MASQUERADE -m comment --comment "WireGuard 'server clients to LAN'" # v4.14.2
