@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.16.2"
-#============================================================================================ © 2021-2022 Martineau v4.16.2
+VERSION="v4.16.3"
+#============================================================================================ © 2021-2022 Martineau v4.16.3
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 13-Mar-2022
+# Last Updated Date: 14-Mar-2022
 #
 # Description:
 #
@@ -151,7 +151,7 @@ Firewall_delete() {
 # Adapted from RMerlin's 'vpnrouting.sh'
 create_client_list(){
 
-    local PEERDNS_LIST=$(echo "$PEER_DNS" | tr ',' ' ') # v4.14.8 @ZebMcKayhan
+    local PEERDNS_LIST=${PEER_DNS//,/ } # v4.14.8 @ZebMcKayhan
 
     # v4.09 Use new 'policy' table layout
     [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$WG_INTERFACE';") -eq 0 ] && { logger -t "WireGuard-${MODE}${VPN_NAME}" "Warning: No Selective Routing rules found";return 1; }
@@ -294,8 +294,8 @@ EOR
 Process_Pre_Post_Commands() {
     # v4.14.1
     while read LINE; do
-            CMDTYPE=$1
-            CMD="$(echo "$LINE" | sed "s/\%i/$WG_INTERFACE/g;s/\%w/$WAN_IF/g;s/\%p/$LISTEN_PORT/g")"    # v4.14.4 v4.14.1
+            local CMDTYPE=$1
+            local CMD="$(echo "$LINE" | sed "s/\%wan/$WAN_IF/g;s/\%net/$SUBNET_PREFIX4/g;s/\%lan/$LAN_SUBNET/g;s/\%pos/$POS/g;s/\%p/$LISTEN_PORT/g;s/\%i/$WG_INTERFACE/g")"    # v4.16.3 v4.14.1
             if [ -n "$CMD" ];then
                 logger -t "WireGuard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"
                 if [ -n "$(echo "$CMDTYPE" | grep "Up")" ];then             # v4.4.4
@@ -503,26 +503,28 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         if [ $? -ne 0 ];then
             # Syntax ERROR?                                                                     # v4.14.13
             # e.g. Endpoint DDNS not valid/resolved?
-            echo -e $cRESET
+            echo -en $cRESET
             cmd ip link del dev $VPN_ID                                                         # v4.14.13
             [ "$USE_IPV6" == "Y" ] && cmd ip -6 link del dev $VPN_ID
             logger -t "WireGuard-${MODE}${VPN_NAME}" "***ERROR Initialisation ABORTED"
-            echo -e ${cRESET}$cBRED"\a\t***ERROR Initialisation ABORTED - 'wg setconf $VPN_ID ${CONFIG_DIR}$VPN_ID.conf' FAILED\n"$cRESET
+            echo -e ${cRESET}$cBRED"\a\n\t***ERROR Initialisation ABORTED - 'wg setconf $VPN_ID /tmp/$VPN_ID.$$ (${CONFIG_DIR}$VPN_ID.conf)' FAILED\n"$cRESET
 
+            echo -en $cRESET
             exit 1                                                                              # v4.14.13
         fi
 
         #  Suppress the message if a domain is supplied i.e.'Error: any valid prefix is expected rather than "'xxx.com"
 
         # v4.12 Assign both IPv4 and IPv6 IPs to interface as required
-        LOCALIPS=$(echo "$LOCALIP" | tr ',' ' ')     # v4.11
+        LOCALIPS=${LOCALIP//,/ }     # v4.16.3 v4.11
         for LOCALIP in $LOCALIPS
             do
                 if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$LOCALIP" | grep -F ":")" ];then     # v4.12
                     cmd ip -6 address add dev $VPN_ID $LOCALIP     # v4.02D
                 else
                     if [ -n "$(echo "$LOCALIP" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$LOCALIP" | Is_IPv4)" ];then
-                        cmd ip address add dev $VPN_ID $LOCALIP  # v4.02
+                        cmd ip address add dev $VPN_ID $LOCALIP # v4.02
+                        SUBNET_PREFIX4=${LOCALIP%.*}                    # v4.16.3
                     fi
                 fi
             done
@@ -537,6 +539,13 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         TIMESTAMP=$(date +%s)
         sqlite3 $SQL_DATABASE "INSERT into session values('$WG_INTERFACE','Start','$TIMESTAMP');"   # v1.08
         sqlite3 $SQL_DATABASE "INSERT into traffic values('$WG_INTERFACE','$TIMESTAMP','0','0','0','0');"
+zz="==================================================================================542"
+        if [ -z "$(iptables-save | grep WGM_ACL)" ];then    # v4.16.3
+            cmd iptables -N WGM_ACL_F 2>/dev/null           # v4.16.3
+            cmd iptables -I FORWARD "$(($(iptables -nvL FORWARD --line -t filter | grep -Em 1 ".*\*.*\*.*state.*ESTABLISHED" | cut -d' ' -f1)+1))" -i wg+ -j WGM_ACL_F -m comment --comment "Wireguard ACL" # v4.16.3
+        fi
+
+        POS=$(($(iptables -nvL FORWARD --line -t filter | grep -Em 1 ".*WGM_ACL_F" | cut -d' ' -f1)+1)) # v4.16.3
 
         # v4.14 Process 'PreUp' commands
         Process_Pre_Post_Commands "PreUp"
