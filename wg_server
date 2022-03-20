@@ -1,9 +1,9 @@
-VERSION="v4.16.4"
-#============================================================================================ © 2021-2022 Martineau v4.16.4
+VERSION="v4.16.5"
+#============================================================================================ © 2021-2022 Martineau v4.16.5
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 14-Mar-2022
+# Last Updated Date: 20-Mar-2022
 #
 # Description:
 #
@@ -243,14 +243,14 @@ modprobe xt_set
 modprobe xt_comment                                                                 # v1.13 Hotfix
 if [ -f /opt/lib/modules/wireguard.ko ];then
     insmod /opt/lib/modules/wireguard 2> /dev/null
-    logger -t "WireGuard-server${VPN_ID:3:1}" "Initialising WireGuard 3rd-Party/Entware Kernel module '/opt/lib/modules/wireguard.ko'"
+    logger -t "WireGuard-server${VPN_NAME}" "Initialising WireGuard 3rd-Party/Entware Kernel module '/opt/lib/modules/wireguard.ko'"
 else
     KERNEL_MODULE=$(find /lib/modules -name "wireguard.ko")                      # v4.05
     if [ -n "$KERNEL_MODULE" ];then
         insmod $KERNEL_MODULE 2> /dev/null  # v4.05
-        logger -t "WireGuard-server${VPN_ID:3:1}" "Initialising WireGuard Kernel module '$KERNEL_MODULE'"
+        logger -t "WireGuard-server${VPN_NAME}" "Initialising WireGuard Kernel module '$KERNEL_MODULE'"
     else
-        logger -t "WireGuard-server${VPN_ID:3:1}" "***ERROR Failure to Initialise WireGuard Kernel module - ABORTing"
+        logger -t "WireGuard-server${VPN_NAME}" "***ERROR Failure to Initialise WireGuard Kernel module - ABORTing"
         exit 99
     fi
 fi
@@ -324,8 +324,8 @@ ADDRESS_TXT=$ADDRESS_TXT":"$LISTEN_PORT                         # v4.16.1
 
 if [ "$2" != "disable" ];then
 
-    logger -t "WireGuard-server${VPN_ID:3:1}" "Initialising WireGuard VPN ${IPV6_TXT}'Server' Peer ($VPN_ID) on $ADDRESS_TXT"       # v4.16.1 @ZebMcKayhan
-    echo -e $cBCYA"\tWireGuard-server${VPN_ID:3:1}: Initialising WireGuard VPN ${IPV6_TXT}'Server' Peer (${cBMAG}$VPN_ID$cBCYA) on $ADDRESS_TXT (${cBMAG}${DESC}${cBCYA})"$cRESET   # v4.16.1 @ZebMcKayhan
+    logger -t "WireGuard-server${VPN_NAME}" "Initialising WireGuard VPN ${IPV6_TXT}'Server' Peer ($VPN_ID) on $ADDRESS_TXT"       # v4.16.1 @ZebMcKayhan
+    echo -e $cBCYA"\tWireGuard-server${VPN_NAME}: Initialising WireGuard VPN ${IPV6_TXT}'Server' Peer (${cBMAG}${VPN_ID}${cBCYA}) on $ADDRESS_TXT (${cBMAG}${DESC}${cBCYA})"$cRESET   # v4.16.1 @ZebMcKayhan
 
     ip link del dev $VPN_ID 2>/dev/null
     cmd ip link add dev $VPN_ID type wireguard
@@ -339,7 +339,7 @@ if [ "$2" != "disable" ];then
     grep -v "#" ${CONFIG_DIR}$VPN_ID.conf | sed '/^DNS/d; /^MTU/d; /^Address/d; /^PreU/d; /^PreD/d; /^Post/d; /^Table/d; /^SaveC/d; /^FWmark/d' > /tmp/$VPN_ID.$$   # v4.16.2
     [ "$SHOWCMDS" == "Y" ] && echo -e "[#] wg setconf $VPN_ID /tmp/$VPN_ID.$$ #(${CONFIG_DIR}$VPN_ID.conf)"    # v.4.16.3 v4.14.5
 
-    echo -e ${cWRED}
+    echo -en ${cWRED}
     wg setconf $VPN_ID /tmp/$VPN_ID.$$                                                      # v4.16.2
     if [ $? -ne 0 ];then                                                                    # v4.14.5
         # Syntax ERROR?
@@ -347,14 +347,14 @@ if [ "$2" != "disable" ];then
         echo -en $cRESET
         cmd ip link del dev $VPN_ID                                                         # v4.14.5
         [ "$USE_IPV6" == "Y" ] && cmd ip -6 link del dev $VPN_ID
-        logger -t "WireGuard-server${VPN_ID:3:1}" "***ERROR Initialisation ABORTED"         # v4.14.5
+        logger -t "WireGuard-server${VPN_NAME}" "***ERROR Initialisation ABORTED"         # v4.14.5
         echo -e ${cRESET}$cBRED"\a\n\t***ERROR Initialisation ABORTED - 'wg setconf $VPN_ID /tmp/$VPN_ID.$$ (${CONFIG_DIR}$VPN_ID.conf)' FAILED\n"$cRESET
 
         echo -en $cRESET
         exit 1                                                                              # v4.14.5
     fi
 
-    echo -e $cRESET
+    echo -en $cRESET
 
     # v4.14 Process 'PreUp' commands
     Process_Pre_Post_Commands "PreUp"   # v4.14.1
@@ -420,7 +420,7 @@ if [ "$2" != "disable" ];then
 
         if [ $DDNS_FOUND -eq 1 ];then                                                                       # v4.15.3
             cru a WireGuard_ChkDDNS${WG_INTERFACE} "*/5 * * * * ${INSTALL_DIR}wg_ChkEndpointDDNS.sh $WG_INTERFACE"  # v4.15.3
-            logger -t "WireGuard-server${VPN_ID:3:1}" "Endpoint DDNS refresh monitor started - cru #WireGuard_ChkDDNS${WG_INTERFACE}#."
+            logger -t "WireGuard-server${VPN_NAME}" "Endpoint DDNS refresh monitor started - cru #WireGuard_ChkDDNS${WG_INTERFACE}#."
         fi
     fi
 
@@ -523,15 +523,14 @@ if [ "$2" != "disable" ];then
         done
 
     # User Exit @ZebMcKayhan
-    [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh ] && { logger -t "WireGuard-server${VPN_ID:3:1}" "Executing ${VPN_ID}-up.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh; }
+    [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh ] && { logger -t "WireGuard-server${VPN_NAME}" "Executing ${VPN_ID}-up.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh; }
 
     # v4.14 Process 'PostUp' commands
     Process_Pre_Post_Commands "PostUp"  # v4.14.1
 
-    echo -en $cBGRE"\t"
-    logger -st "WireGuard-server${VPN_ID:3:1}" "Initialisation complete."
+    echo -en ${cRESET}$cBGRE"\t"
+    logger -st "WireGuard-server${VPN_NAME}" "Initialisation complete."
     echo -e $cRESET
-
 else
 
     # v4.14 Process 'PreDown' commands
@@ -574,16 +573,15 @@ else
     ip -6 route flush cache 2>/dev/null                    # v4.03
 
     # User Exit @ZebMcKayhan
-    [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh ] && { logger -t "WireGuard-server${VPN_ID:3:1}" "Executing ${VPN_ID}-down.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh; }
+    [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh ] && { logger -t "WireGuard-server${VPN_NAME}" "Executing ${VPN_ID}-down.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh; }
 
     # v4.14 Process 'PostDown' commands
     Process_Pre_Post_Commands "PostDown"    # v4.14.1
 
     rm /tmp/$VPN_ID.* 2>/dev/null           # v4.16.3
 
-    logger -t "WireGuard-server${VPN_ID:3:1}" "WireGuard VPN 'server' Peer ($VPN_ID) on" $ADDRESS_TXT "Terminated"  # v4.16.1
-    echo -e $cBGRE
-    echo -e "\tWireGuard-server${VPN_ID:3:1}: WireGuard VPN ${IPV6_TXT}'Server' Peer (${cBMAG}$VPN_ID$cBGRE) on $ADDRESS_TXT (${cBMAG}${DESC}${cBGRE}) ${cBRED}Terminated\n"$cRESET  # 4.16.1
+    logger -t "WireGuard-server${VPN_NAME}" "WireGuard VPN 'server' Peer ($VPN_ID) on" $ADDRESS_TXT "Terminated"  # v4.16.1
+    echo -e ${cRESET}$cBGRE"\tWireGuard-server${VPN_NAME}: WireGuard VPN ${IPV6_TXT}'Server' Peer (${cBMAG}$VPN_ID$cBGRE) on $ADDRESS_TXT (${cBMAG}${DESC}${cBGRE}) ${cBRED}Terminated\n"$cRESET  # 4.16.1
 
 fi
 
