@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.16.3"
-#============================================================================================ © 2021-2022 Martineau v4.16.3
+VERSION="v4.16.4"
+#============================================================================================ © 2021-2022 Martineau v4.16.4
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 14-Mar-2022
+# Last Updated Date: 20-Mar-2022
 #
 # Description:
 #
@@ -498,7 +498,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         grep -v "#" ${CONFIG_DIR}$VPN_ID.conf | sed '/^DNS/d; /^MTU/d; /^Address/d; /^PreU/d; /^PreD/d; /^Post/d; /^Table/d; /^SaveC/d; /^FWmark/d' > /tmp/$VPN_ID.$$   # v4.16.2
         [ "$SHOWCMDS" == "Y" ] && echo -e "[#] wg setconf $VPN_ID /tmp/$VPN_ID.$$ #(${CONFIG_DIR}$VPN_ID.conf)"    # v4.16.2 v4.14.13
 
-        echo -e ${cWRED}                                                                        # v4.14.13
+        echo -en ${cWRED}                                                                        # v4.14.13
         wg setconf $VPN_ID /tmp/$VPN_ID.$$                                                      # v4.16.2 v4.14.13
         if [ $? -ne 0 ];then
             # Syntax ERROR?                                                                     # v4.14.13
@@ -539,7 +539,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         TIMESTAMP=$(date +%s)
         sqlite3 $SQL_DATABASE "INSERT into session values('$WG_INTERFACE','Start','$TIMESTAMP');"   # v1.08
         sqlite3 $SQL_DATABASE "INSERT into traffic values('$WG_INTERFACE','$TIMESTAMP','0','0','0','0');"
-zz="==================================================================================542"
+
         if [ -z "$(iptables-save | grep WGM_ACL)" ];then    # v4.16.3
             cmd iptables -N WGM_ACL_F 2>/dev/null           # v4.16.3
             cmd iptables -I FORWARD "$(($(iptables -nvL FORWARD --line -t filter | grep -Em 1 ".*\*.*\*.*state.*ESTABLISHED" | cut -d' ' -f1)+1))" -i wg+ -j WGM_ACL_F -m comment --comment "Wireguard ACL" # v4.16.3
@@ -854,10 +854,9 @@ zz="============================================================================
 
         echo -en $cBGRE"\t"
         logger -st "WireGuard-${MODE}${VPN_NAME}" "Initialisation complete."
-        echo -e $cRESET
+        echo -en $cRESET
     else
-        echo -e "\a\n\t";logger -st "WireGuard-{$MODE}${VPN_NAME}" "Local Peer I/P endpoint ('${INSTALL_DIR}WireguardVPN.conf') not VALID. ABORTing Initialisation."
-        echo -e
+        echo -e "\a\n\t";logger -st "WireGuard-{$MODE}${VPN_NAME}" "Local Peer I/P endpoint ('${INSTALL_DIR}WireguardVPN.conf') not VALID. ABORTing Initialisation.\n"
     fi
 else
 
