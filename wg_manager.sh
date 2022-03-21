@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.16b6"
-#============================================================================================ © 2021-2022 Martineau v4.16b6
+VERSION="v4.16b7"
+#============================================================================================ © 2021-2022 Martineau v4.16b7
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.16b6"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 20-Mar-2022
+# Last Updated Date: 21-Mar-2022
 
 #
 # Description:
@@ -201,28 +201,32 @@ Is_Private_IPv6() {
 }
 Generate_IPv6_ULA() {
 
+    local USE_ULA=$1                    # 'fcxx' or fdxx' prefix
+
     # From time+EUI-64 as per RFC 4193 https://www.rfc-editor.org/rfc/rfc4193#section-3.2.2
 
     # Pre-reqs      Entware date (coreutils-date)
 
-    [ ! -f /opt/bin/date ] && { SayT "*** ERROR Requires Entware 'date' module....ABORTing\n"; return 1 ;}
+    [ ! -f /opt/bin/date ] && { SayT "***ERROR Requires Entware 'date' module....ABORTing\n"; echo "***ERROR Requires Entware module" 2>&1; return 1 ;}
 
-    NANO_SECS=$(/opt/bin/date +%s%N)
+    local NANO_SECS=$(/opt/bin/date +%s%N)
 
     # wl1_hwaddr=24:4B:FE:AC:54:DC
     # wan0_gw_mac=AC:9E:17:7E:E4:A0
-    HEX1=$(nvram get wan0_gw_mac)
-    HEX2=$(nvram get wl1_hwaddr)
+    local HEX1=$(nvram get wan0_gw_mac)
+    local HEX2=$(nvram get wl1_hwaddr)
 
-    HEX=${NANO_SECS}${HEX1//:/}${HEX2//:/}
+    local HEX=${NANO_SECS}${HEX1//:/}${HEX2//:/}
 
     echo -e "$HEX" >/tmp/wgm_ula
-    HASH=$(openssl dgst -sha1 /tmp/wgm_ula | awk '{print $2}' | cut -c 31- )
+    local HASH=$(openssl dgst -sha1 /tmp/wgm_ula | awk '{print $2}' | cut -c 31- )
 
-    IPV6="fd"${HASH:0:2}:${HASH:2:4}:${HASH:6:4}"::/64"
+    local IPV6="fd"${HASH:0:2}:${HASH:2:4}:${HASH:6:4}"::1/64"
 
     # https://blogs.infoblox.com/ipv6-coe/ula-is-broken-in-dual-stack-networks/         # @heysoundude
-    SayT "Here is your IPv6 ULA based on this hardware's MACs IPV6="$IPV6" (Use 'aa"${HASH:0:2}:${HASH:2:4}:${HASH:6:4}"::/64' for Dual-stack IPv4+IPv6)"
+    SayT "Here is your IPv6 ULA based on this hardware's MACs IPV6="$IPV6" (Use 'aa"${HASH:0:2}:${HASH:2:4}:${HASH:6:4}"::1/64' for Dual-stack IPv4+IPv6)"
+
+    [ -z "$USE_ULA" ] && local IPV6="$(echo "$IPV6" | sed 's/^fd/aa/')"     # v4.16 Override standard ULA 'fcxx/fdxx' prefix
 
     rm /tmp/wgm_ula 2>/dev/null
 
@@ -806,7 +810,12 @@ Create_Peer() {
                 # Ensure IPv6 address is in standard compressed format
                 VPN_POOL6="$(IPv6_RFC "$VPN_POOL6")"        # v4.15
                 local VPN_POOL_USER="Y"
+                local USE_ULA=
             fi
+            ;;
+        ula4|ula)
+            [ "$1" == "ula" ]  && local USE_ULA="Y"
+            [ "$1" == "ula4" ] && local USE_ULA="4"         # v4.16
             ;;
         ip=*)
             local VPN_POOL4="$(echo "$@" | sed -n "s/^.*ip=//p" | awk '{print $1}')"
@@ -865,7 +874,16 @@ Create_Peer() {
         if [ "$USE_IPV6" == "Y" ] && [ -z "$VPN_POOL6" ];then
             [ -z "$TWO_OCTET" ] && local TWO_OCTET="50"
             [ -z "$NEW_THIRD_OCTET" ] && local NEW_THIRD_OCTET="1"
-            local VPN_POOL6="fd00:${TWO_OCTET}:${NEW_THIRD_OCTET}::1/64"
+
+            case $USE_ULA in
+                4)
+                    local VPN_POOL6="fd00:${TWO_OCTET}:${NEW_THIRD_OCTET}::1/64"
+                ;;
+                *)
+                    local VPN_POOL6=$(Generate_IPv6_ULA "$USE_ULA") # v4.16
+                    [ "$VPN_POOL6" == "***ERROR Requires Entware module" ] && local VPN_POOL6="fd00:${TWO_OCTET}:${NEW_THIRD_OCTET}::1/64"
+                ;;
+            esac
         fi
     fi
 
@@ -1588,8 +1606,10 @@ Manage_Peer() {
                     echo -e "\tpeer peer_name category [category_name {del | add peer_name[...]} ]\t- Create a new category with 3 Peers e.g. peer category GroupA add wg17 wg99 wg11"
 
                     echo -e "\tpeer new [peer_name [options]]\t\t\t\t\t\t- Create new server Peer             e.g. peer new wg27 ip=10.50.99.1/24 port=12345"
-                    echo -e "\tpeer new [peer_name] {ipv6}\t\t\t\t\t\t- Create new Dual-stack server Peer  e.g. peer new ipv6"
-                    echo -e "\tpeer new [peer_name] {ipv6 noipv4}\t\t\t\t\t- Create new IPv6 Only server Peer   e.g. peer new ipv6 noipv4"
+                    echo -e "\tpeer new [peer_name] {ipv6}\t\t\t\t\t\t- Create new Dual-stack server Peer  with 'fd' prefix e.g. peer new ipv6"
+                    echo -e "\tpeer new [peer_name] {ipv6}\t\t\t\t\t\t- Create new Dual-stack server Peer with 'aa' prefix  e.g. peer new ipv6 ula"
+                    echo -e "\tpeer new [peer_name] {ipv6 noipv4 [ula[4]]}\t\t\t\t- Create new IPv6 Only server Peer   e.g. peer new ipv6 noipv4"
+                    echo -e "\tpeer new [peer_name] {ipv6 noipv4}\t\t\t\t\t- Create new IPv6 Only server Peer   e.g. peer new ipv6 noipv4 ipv6=aaff:a37f:fa75:100:100::1/120"
 
                     echo -e "\tpeer import peer_conf [options]\t\t\t\t\t\t- Import '.conf' into SQL database e.g. import Mullvad_Dallas"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t\t   e.g. import SiteA type=server"
