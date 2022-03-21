@@ -972,7 +972,7 @@ Delete_Peer() {
                             wg1*) local Mode="client";;
                         esac
                     fi
-                    [ "$Mode" == "server" ] && local TABLE="servers" || local TABLE="clients"
+                    [ "$Mode" == "server" ] && local TABLE="servers" || { local TABLE="clients"; local FORCE="FORCEDCLIENT" ;}  # v4.16b6
                     #[  "${WG_INTERFACE:0:2}" != "wg" ] && { TABLE="devices"; local SQL_COL="name"; Mode="device"; }
 
                     echo -e $cBWHT"\n\tDeleting '$Mode' Peer (${cBMAG}${WG_INTERFACE}${cBWHT})\n"$cBRED
@@ -3203,7 +3203,7 @@ Server_or_Client() {
                 fi
 
                 # Alternatively determine if it's a 'client','server' or 'device' Peer from its config file
-                if [ "$PEER_TYPE" == "**ERROR**" ] && [ -f ${SOURCE_DIR}${WG_INTERFACE}.conf ] && ;then     # v4.16b6                                # v4.12 v1.03
+                if [ "$PEER_TYPE" == "**ERROR**" ] && [ -f ${SOURCE_DIR}${WG_INTERFACE}.conf ];then         # v4.16b6 v4.12 v1.03
 
                     if [ -z "$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers WHERE peer='$WG_INTERFACE';")" ] && [ -n "$(grep -iE "^Endpoint" ${SOURCE_DIR}${WG_INTERFACE}.conf)" ];then  # v4.14 v4.12 v1.03
                         local PEER_TYPE="client"
