@@ -1606,8 +1606,8 @@ Manage_Peer() {
                     echo -e "\tpeer peer_name category [category_name {del | add peer_name[...]} ]\t- Create a new category with 3 Peers e.g. peer category GroupA add wg17 wg99 wg11"
 
                     echo -e "\tpeer new [peer_name [options]]\t\t\t\t\t\t- Create new server Peer             e.g. peer new wg27 ip=10.50.99.1/24 port=12345"
-                    echo -e "\tpeer new [peer_name] {ipv6}\t\t\t\t\t\t- Create new Dual-stack server Peer  with 'fd' prefix e.g. peer new ipv6"
-                    echo -e "\tpeer new [peer_name] {ipv6}\t\t\t\t\t\t- Create new Dual-stack server Peer with 'aa' prefix  e.g. peer new ipv6 ula"
+                    echo -e "\tpeer new [peer_name] {ipv6}\t\t\t\t\t\t- Create new Dual-stack server Peer  with 'aa' prefix e.g. peer new ipv6"
+                    echo -e "\tpeer new [peer_name] {ipv6}\t\t\t\t\t\t- Create new Dual-stack server Peer with 'fd' prefix  e.g. peer new ipv6 ula"
                     echo -e "\tpeer new [peer_name] {ipv6 noipv4 [ula[4]]}\t\t\t\t- Create new IPv6 Only server Peer   e.g. peer new ipv6 noipv4"
                     echo -e "\tpeer new [peer_name] {ipv6 noipv4}\t\t\t\t\t- Create new IPv6 Only server Peer   e.g. peer new ipv6 noipv4 ipv6=aaff:a37f:fa75:100:100::1/120"
 
