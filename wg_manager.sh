@@ -6180,10 +6180,10 @@ Process_User_Choice() {
                         local TMPMODULE="Y"
                     fi
 
-                    local IPV6_ULA=$(Generate_IPv6_ULA "ula")	# ALWAYS request true ULA 'fdxx'
+                    local IPV6_ULA=$(Generate_IPv6_ULA "ula")   # ALWAYS request true ULA 'fdxx'
                     [ "$TMPMODULE" == "Y" ] && { echo -en $cBGRA"\t";opkg remove coreutils-date ;}
-					[ -n "$(echo "$IPV6_ULA" | grep -F ":")" ] && echo -e ${cGRE}"\n\tOn $(date +%c), Your IPv6 ULA is $cBWHT'"${IPV6_ULA}"'$cBYEL (Use $cBWHT'$(echo $IPV6_ULA | sed 's/^../aa/')'$cBYEL for Dual-stack IPv4+IPv6)"${cRESET} || echo -e ${cBRED}"\a\n\t*** ERROR.. $(which date)"${cRESET}
-				fi
+                    [ -n "$(echo "$IPV6_ULA" | grep -F ":")" ] && echo -e ${cGRE}"\n\tOn $(date +%c), Your IPv6 ULA is $cBWHT'"${IPV6_ULA}"'$cBYEL (Use $cBWHT'$(echo $IPV6_ULA | sed 's/^../aa/')'$cBYEL for Dual-stack IPv4+IPv6)"${cRESET} || echo -e ${cBRED}"\a\n\t*** ERROR.. $(which date)"${cRESET}
+                fi
             ;;
             formatwg-quick*|formatwgquick*)                     # formatwg-quick [ config_file[.conf] ]
 
