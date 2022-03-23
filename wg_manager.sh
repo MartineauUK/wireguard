@@ -24,7 +24,7 @@ VERSION="v4.16b7"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 21-Mar-2022
+# Last Updated Date: 23-Mar-2022
 
 #
 # Description:
@@ -1606,7 +1606,7 @@ Manage_Peer() {
                     echo -e "\tpeer peer_name category [category_name {del | add peer_name[...]} ]\t- Create a new category with 3 Peers e.g. peer category GroupA add wg17 wg99 wg11"
 
                     echo -e "\tpeer new [peer_name [options]]\t\t\t\t\t\t- Create new server Peer             e.g. peer new wg27 ip=10.50.99.1/24 port=12345"
-                    echo -e "\tpeer new [peer_name] {ipv6}\t\t\t\t\t\t- Create new Dual-stack server Peer  with 'aa' prefix e.g. peer new ipv6"
+                    echo -e "\tpeer new [peer_name] {ipv6}\t\t\t\t\t\t- Create new Dual-stack server Peer with 'aa' prefix e.g. peer new ipv6"
                     echo -e "\tpeer new [peer_name] {ipv6}\t\t\t\t\t\t- Create new Dual-stack server Peer with 'fd' prefix  e.g. peer new ipv6 ula"
                     echo -e "\tpeer new [peer_name] {ipv6 noipv4 [ula[4]]}\t\t\t\t- Create new IPv6 Only server Peer   e.g. peer new ipv6 noipv4"
                     echo -e "\tpeer new [peer_name] {ipv6 noipv4}\t\t\t\t\t- Create new IPv6 Only server Peer   e.g. peer new ipv6 noipv4 ipv6=aaff:a37f:fa75:100:100::1/120"
@@ -6139,11 +6139,16 @@ Process_User_Choice() {
             trimdb*)                                                # trimdb { '?' | days [ 'traffic' | 'sessions'] ['auto']  }
                 Purge_Database $menu1   # v4.15
             ;;
-            ipv6|ipv6" "*)                                          # ipv6 [ '?' | 'spoof' | 'simulate' | 'disable'  | ula]
+            ipv6|ipv6" "*)                                          # ipv6 [ '?' | 'spoof' | 'simulate' | 'disable'  | {'gen' [['un]loadmodule'] ['ula']}]
 
                 local ARG=$2
+                local TYPE=$3
+                local TMPMODULE=
 
-                if [ "$ARG" != "ula" ];then
+                [ "$TYPE" = "loadmodule" ] && { echo -en $cBGRA"\n";opkg install coreutils-date; shift; local TYPE=$3 ;}
+                [ "$TYPE" = "unloadmodule" ] && { echo -en $cBGRA"\n\t";opkg remove coreutils-date; return ;}
+
+                if [ "$ARG" != "show" ] && [ "$ARG" != "gen" ];then # v4.16
                     case $ARG in
                         spoof|simulate)
                             $(nvram set ipv6_service="$ARG")            # v4.16
@@ -6168,15 +6173,18 @@ Process_User_Choice() {
 
                     [ "$(nvram get ipv6_service)" == "disabled" ] && echo -e $cBRED"\n\t[✖]${cBWHT} IPv6 Service is ${cBRED}DISABLED$cRESET" || echo -e $cBGRE"\n\t[✔]${cBWHT} IPv6 Service is ${cBRED}$(nvram get ipv6_service)"$cRESET    # v4.16
                 else
-
                     if [ ! -f /opt/bin/date ];then
-                        SayT "*** ERROR IPv6 ULA generate function requires Entware 'date' module (coreutils-date)"
-                        echo -e $cBRED"\a\n\t*** ERROR IPv6 ULA generate function requires Entware 'date' module (coreutils-date)"
-                    else
-                        local IPV6_ULA=$(Generate_IPv6_ULA)
-
-                        [ -n "$(echo "$IPV6_ULA" | grep -F ":")" ] && echo -e ${cGRE}"\n\tOn $(date +%c), Your IPv6 ULA is $cBWHT'"${IPV6_ULA}"'$cBYEL (Use $cBWHT'$(echo $IPV6_ULA | sed 's/^../aa/')'$cBYEL for Dual-stack IPv4+IPv6)"${cRESET} || echo -e ${cBRED}"\a\n\t*** ERROR.. $(which date)"${cRESET}
+                        SayT "Warning IPv6 ULA generate function requires Entware 'date' module (coreutils-date)...temporarily loading"
+                        echo -e $cRED"\n\tWarning IPv6 ULA generate function requires Entware 'date' module.....')"
+                        echo -en $cBGRA;opkg install coreutils-date
+                        local TMPMODULE="Y"
                     fi
+
+                    # ipv6 gen [ula]
+                    local IPV6_ULA=$(Generate_IPv6_ULA "$TYPE")
+                    [ "$TMPMODULE" == "Y" ] && { echo -en $cBGRA"\t";opkg remove coreutils-date ;}
+
+                    [ -n "$(echo "$IPV6_ULA" | grep -F ":")" ] && echo -e ${cGRE}"\n\tOn $(date +%c), Your IPv6 ULA is $cBWHT'"${IPV6_ULA}"'$cBYEL (Use $cBWHT'$(echo $IPV6_ULA | sed 's/^../aa/')'$cBYEL for Dual-stack IPv4+IPv6)"${cRESET} || echo -e ${cBRED}"\a\n\t*** ERROR.. $(which date)"${cRESET}
                 fi
             ;;
             formatwg-quick*|formatwgquick*)                     # formatwg-quick [ config_file[.conf] ]
