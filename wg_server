@@ -1,9 +1,9 @@
-VERSION="v4.16.6"
-#============================================================================================ © 2021-2022 Martineau v4.16.6
+VERSION="v4.16.7"
+#============================================================================================ © 2021-2022 Martineau v4.16.7
 #
 
 # Maintainer: Martineau
-# Last Updated Date: xx-Mar-2022
+# Last Updated Date: 24-Mar-2022
 #
 # Description:
 #
@@ -245,19 +245,6 @@ fi
 
 modprobe xt_set
 modprobe xt_comment                                                                 # v1.13 Hotfix
-if [ -f /opt/lib/modules/wireguard.ko ];then
-    insmod /opt/lib/modules/wireguard 2> /dev/null
-    logger -t "WireGuard-server${VPN_NAME}" "Initialising WireGuard 3rd-Party/Entware Kernel module '/opt/lib/modules/wireguard.ko'"
-else
-    KERNEL_MODULE=$(find /lib/modules -name "wireguard.ko")                      # v4.05
-    if [ -n "$KERNEL_MODULE" ];then
-        insmod $KERNEL_MODULE 2> /dev/null  # v4.05
-        logger -t "WireGuard-server${VPN_NAME}" "Initialising WireGuard Kernel module '$KERNEL_MODULE'"
-    else
-        logger -t "WireGuard-server${VPN_NAME}" "***ERROR Failure to Initialise WireGuard Kernel module - ABORTing"
-        exit 99
-    fi
-fi
 
 [ -n "$(echo "$@" | grep "debug")" ] && SHOWCMDS="Y"                        # v4.14.4
 
