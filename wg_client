@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.16.5"
-#============================================================================================ © 2021-2022 Martineau v4.16.5
+VERSION="v4.16.6"
+#============================================================================================ © 2021-2022 Martineau v4.16.6
 #
 
 # Maintainer: Martineau
-# Last Updated Date: xx-Mar-2022
+# Last Updated Date: 24-Mar-2022
 #
 # Description:
 #
@@ -369,7 +369,6 @@ fi
 
 modprobe xt_set
 modprobe xt_comment
-insmod /opt/lib/modules/wireguard 2> /dev/null
 
 VPN_ID=$1
 [ -z "$1" ] && VPN_ID="wg0"
