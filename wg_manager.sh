@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.16b7"
-#============================================================================================ © 2021-2022 Martineau v4.16b7
+VERSION="v4.16b8"
+#============================================================================================ © 2021-2022 Martineau v4.16b8
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.16b7"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 23-Mar-2022
+# Last Updated Date: 24-Mar-2022
 
 #
 # Description:
@@ -154,7 +154,7 @@ Chain_exists() {
         return 0
     fi
 }
-Get_WAN_IF_Name () {
+Get_WAN_IF_Name() {
     # echo $([ -n "$(nvram get wan0_pppoe_ifname)" ] && echo $(nvram get wan0_pppoe_ifname) || echo $(nvram get wan0_ifname))
     #   nvram get wan0_gw_ifname
     #   nvram get wan0_proto
@@ -3289,24 +3289,24 @@ Manage_KILL_Switch() {
 
     local SILENT="N"
     local TEMP_PERM="temporarily"
-
+    local WAN_IF=$(Get_WAN_IF_Name)
 
     if [ -n "$ACTION" ];then
         if [ "$ACTION" != "off" ];then
-                iptables -D FORWARD -i br0 -o $(nvram get wan0_ifname) -j REJECT -m comment --comment "WireGuard KILL-Switch" 2>/dev/null
-                iptables -I FORWARD -i br0 -o $(nvram get wan0_ifname) -j REJECT -m comment --comment "WireGuard KILL-Switch" 2>/dev/null
-                [ -z "$(grep -oE "^#KILLSWITCH" ${INSTALL_DIR}WireguardVPN.conf)" ] && local TEMP_PERM=             # v4.12
-                [ "$SILENT" == "N" ] && echo -e $cBGRE"\n\t[✔] WireGuard WAN KILL-Switch "${cBRED}${aREVERSE}"$TEMP_PERM ENABLED"$cRESET" (use 'vx' command for info)" 2>&1         # v4.12
+                iptables -D FORWARD -i br0 -o $WAN_IF -j REJECT -m comment --comment "WireGuard KILL-Switch" 2>/dev/null
+                iptables -I FORWARD -i br0 -o $WAN_IF -j REJECT -m comment --comment "WireGuard KILL-Switch" 2>/dev/null
+                [ -z "$(grep -oE "^#KILLSWITCH" ${INSTALL_DIR}WireguardVPN.conf)" ] && local TEMP_PERM="permanently"             # v4.12
+                #[ "$SILENT" == "N" ] && echo -e $cBGRE"\n\t[✔] WireGuard WAN KILL-Switch "${cBRED}${aREVERSE}"$TEMP_PERM ENABLED"$cRESET" (use 'vx' command for info)" 2>&1         # v4.12
         else
-                iptables -D FORWARD -i br0 -o $(nvram get wan0_ifname) -j REJECT -m comment --comment "WireGuard KILL-Switch" 2>/dev/null
-                [ -z "$(grep -oE "^KILLSWITCH" ${INSTALL_DIR}WireguardVPN.conf)" ] && local TEMP_PERM=              # v4.12
-                [ "$SILENT" == "N" ] && echo -e $cBRED"\n\t[✖] ${cBGRE}WireGuard WAN KILL-Switch "${cBRED}${aREVERSE}"$TEMP_PERM DISABLED"$cRESET" (use 'vx' command for info)" 2>&1    # v4.12
+                iptables -D FORWARD -i br0 -o $WAN_IF -j REJECT -m comment --comment "WireGuard KILL-Switch" 2>/dev/null
+                [ -z "$(grep -oE "^KILLSWITCH" ${INSTALL_DIR}WireguardVPN.conf)" ] && local TEMP_PERM= "permanently"              # v4.12
+                #[ "$SILENT" == "N" ] && echo -e $cBRED"\n\t[✖] ${cBGRE}WireGuard WAN KILL-Switch "${cBRED}${aREVERSE}"$TEMP_PERM DISABLED"$cRESET" (use 'vx' command for info)" 2>&1    # v4.12
         fi
     fi
 
     [ -n "$(iptables -nvL FORWARD | grep "WireGuard KILL-Switch")" ] && STATUS="Y" || STATUS="N"    # v4.14
 
-    echo "$STATUS"      # Y/N
+    echo "${STATUS}_${TEMP_PERM}"      # Y/N_[temporarily/Permanently]
 }
 Manage_Stats() {
 
@@ -3608,7 +3608,7 @@ Show_Info() {
     fi
 
     if [ -f ${INSTALL_DIR}WireguardVPN.conf ];then
-        if [ "$(Manage_KILL_Switch)" == "Y" ];then
+        if [ -n "$(echo "$(Manage_KILL_Switch)" | grep -F "Y_")" ];then
             local TEMP_PERM="temporarily "                                      # v4.12
             [ -z "$(grep -oE "^#KILLSWITCH" ${INSTALL_DIR}WireguardVPN.conf)" ] && local TEMP_PERM=             # v4.12
             echo -e $cBGRE"\t[✔]$cBWHT WAN ${cBGRE}KILL-Switch is ${TEMP_PERM}ENABLED"$cRESET" (use 'vx' command for info)" # v4.12
@@ -3976,7 +3976,7 @@ Session_Duration() {
                     [ -n "$(wg show "$WG_INTERFACE" 2>/dev/null)" ] && local LAST_END=$(date +%s) || local LAST_START=$LAST_END
                     local ENDTAG=${cRESET}" >>>>>>"
                 else
-                    local ENDTAG=${RESET}" to $c{BRED}"$(EpochTime "$LAST_END" "FULL")
+                    [ "$CRON_PERIOD" != "Y" ] && local ENDTAG=${RESET}" to $c{BRED}"$(EpochTime "$LAST_END" "FULL") # v4.16
                 fi
             fi
 
@@ -4225,9 +4225,15 @@ Show_Peer_Status() {
                         if [ $MINS -lt 30 ];then        # v4.11
                             if [ "$STATS" == "Y" ];then     # v4.11
                                 if [ -n "$(echo "$LINE" | grep -E "transfer:")" ];then
-                                    SayT ${WG_INTERFACE}":"${LINE}"$cBRED "$(EpochTime "$(date +%s)" "FULL")" "${cRESET}
-                                    SayT ${WG_INTERFACE}": period : $(Size_Human $RX_DELTA) received, $(Size_Human $TX_DELTA) sent (Rx=$RX_DELTA;Tx=$TX_DELTA)"
-                                    [ -z "$STATS_FILE" ] && echo -e "\t\t"${WG_INTERFACE}":"${LINE}$cRESET || echo -e "\t\t$cRESET"${WG_INTERFACE}":"${LINE}$cBRED" "$(EpochTime "$(date +%s)" "FULL")$cRESET > $STATS_FILE
+                                    if [ "$CRON_PERIOD" != "Y" ];then                   # v4.16
+                                        SayT ${WG_INTERFACE}":"${LINE}"$cBRED "$(EpochTime "$(date +%s)" "FULL")" "${cRESET}
+                                        SayT ${WG_INTERFACE}": period : $(Size_Human $RX_DELTA) received, $(Size_Human $TX_DELTA) sent (Rx=$RX_DELTA;Tx=$TX_DELTA)"
+                                        [ -z "$STATS_FILE" ] && echo -e "\t\t"${WG_INTERFACE}":"${LINE}$cRESET || echo -e "\t\t$cRESET"${WG_INTERFACE}":"${LINE}$cBRED" "$(EpochTime "$(date +%s)" "FULL")$cRESET > $STATS_FILE
+                                    else
+                                        SayT ${WG_INTERFACE}":"${LINE}${cRESET}         # v4.16
+                                        SayT ${WG_INTERFACE}": period : $(Size_Human $RX_DELTA) received, $(Size_Human $TX_DELTA) sent (Rx=$RX_DELTA;Tx=$TX_DELTA)"
+                                        [ -z "$STATS_FILE" ] && echo -e "\t\t"${WG_INTERFACE}":"${LINE}$cRESET || echo -e "\t\t$cRESET"${WG_INTERFACE}":"${LINE}$cBRED$cRESET > $STATS_FILE
+                                    fi
                                     [ -z "$STATS_FILE" ] && echo -e "\t\t"${WG_INTERFACE}": period : $(Size_Human $RX_DELTA) received, $(Size_Human $TX_DELTA) sent (Rx=$RX_DELTA;Tx=$TX_DELTA)"$cBCYA  || echo -e "\t\t$cRESET"${WG_INTERFACE}": period : $(Size_Human $RX_DELTA) received, $(Size_Human $TX_DELTA) sent (Rx=$RX_DELTA;Tx=$TX_DELTA)"$cBCYA >> $STATS_FILE
                                 fi
                             else
@@ -5442,6 +5448,10 @@ Validate_User_Choice() {
     if [ "$EASYMENU" == "Y" ];then
         case "$menu1" in
             0) ;;
+            10*|ipset*) menu1=$(echo "$menu1" | awk '{$1="ipset"}1') ;;
+            11*|import*) menu1=$(echo "$menu1" | awk '{$1="import"}1') ;;
+            12*|vpndirector*) menu1=$(echo "$menu1" | awk '{$1="vpndirector"}1') ;; # v4.14 v4.13
+            13*|export*) menu1=$(echo "$menu1" | awk '{$1="export"}1') ;;
             1*|i)
                 [ -z "$(ls ${INSTALL_DIR}*.ipk 2>/dev/null)" ]  && menu1="install "$(echo "$menu1" | awk '{print $2}') || menu1="getmodules";;
             2|z|remove) menu1="uninstall";; # v4.14
@@ -5452,10 +5462,7 @@ Validate_User_Choice() {
             7*|qrcode*) menu1=$(echo "$menu1" | awk '{$1="qrcode"}1') ;;
             8*|peer|peer" "*) menu1=$(echo "$menu1" | awk '{$1="peer"}1') ;;
             9*) menu1=$(echo "$menu1" | awk '{$1="create"}1') ;;
-            10*|ipset*) menu1=$(echo "$menu1" | awk '{$1="ipset"}1') ;;
-            11*|import*) menu1=$(echo "$menu1" | awk '{$1="import"}1') ;;
-            12*|vpndirector*) menu1=$(echo "$menu1" | awk '{$1="vpndirector"}1') ;; # v4.14 v4.13
-            13*|export*) menu1=$(echo "$menu1" | awk '{$1="export"}1') ;;
+
             u|uf|uf" "*) ;;                           # v3.14
             "?") ;;
             v|vx) ;;
@@ -5746,7 +5753,9 @@ Process_User_Choice() {
                     local ARG="$(printf "%s" "$menu1" | cut -d' ' -f2)"
                 fi
 
-                RC=$(Manage_KILL_Switch "$ARG")
+                Parse "$(Manage_KILL_Switch "$ARG")" "_" RC TEMP_PERM
+
+                [ "$RC" == "Y" ] && echo -e $cBGRE"\n\t[✔] WireGuard WAN KILL-Switch "${cBGRE}${aREVERSE}"${TEMP_PERM} ENABLED"$cRESET" (use 'vx' command for info)" || echo -e $cBRED"\n\t[✖] ${cBGRE}WireGuard WAN KILL-Switch "${cBRED}${aREVERSE}"${TEMP_PERM} DISABLED"$cRESET" (use 'vx' command for info)"
             ;;
             ip)
 
@@ -5793,7 +5802,9 @@ Process_User_Choice() {
 
             ;;
             generatestats*)
+                CRON_PERIOD="Y"                     # v4.16
                 Show_Peer_Status "generatestats"
+                CRON_PERIOD=                        # v4.16
             ;;
             jump*|geo*|livin*)                                                         # livin { @home | * | {[France | wg14]} {LAN device}     # v4.07
                 shift
@@ -6461,7 +6472,7 @@ Show_Main_Menu() {
             fi
 
             local STATUS_LINE="WireGuard ACTIVE Peer Status: "$(Peer_Status_Summary)                  # v3.04 v2.01
-            [ "$(Manage_KILL_Switch)" == "Y" ] && local KILL_STATUS="${cBGRE}${aREVERSE}KILL-Switch ACTIVE$cRESET" || local KILL_STATUS="                 " # v4.12
+            [ -n "$(echo "$(Manage_KILL_Switch)" | grep -F "Y_")" ] && local KILL_STATUS="${cBGRE}${aREVERSE}KILL-Switch ACTIVE$cRESET" || local KILL_STATUS="                 " # v4.12
             echo -e $cRESET"\n"${KILL_STATUS}"\t${cRESET}${cBMAG}${STATUS_LINE}"$cRESET
 
             if [ -z "$NOCHK" ];then
@@ -7051,6 +7062,8 @@ if [ "$1" != "install" ];then   # v2.01
                         exit 99
                     fi
 
+                    Load_UserspaceTool                      # v4.16
+
                     #if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^ENABLE_UDPMON" ${INSTALL_DIR}WireguardVPN.conf)" ];then                         # v4.16
                         #[ $(sqlite3 $SQL_DATABASE "SELECT COUNT(auto) FROM servers WHERE auto='Y';") -gt 0 ] && UDP_MONITOR=$(Manage_UDP_Monitor "INIT" "enable")  # v4.16 v4.11
                     #fi
@@ -7094,7 +7107,8 @@ if [ "$1" != "install" ];then   # v2.01
             generatestats)
 
                 Peer_Status_Summary "Syslog"
-                Show_Peer_Status "generatestats" # cron     # v3.05
+                CRON_PERIOD="Y"                     # v4.16
+                Show_Peer_Status "generatestats"    # cron     # v4.16 v3.05
                 echo -e $cRESET
                 exit_message
             ;;
