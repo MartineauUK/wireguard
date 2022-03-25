@@ -24,7 +24,7 @@ VERSION="v4.16b8"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 24-Mar-2022
+# Last Updated Date: 25-Mar-2022
 
 #
 # Description:
@@ -4230,7 +4230,8 @@ Show_Peer_Status() {
                                         SayT ${WG_INTERFACE}": period : $(Size_Human $RX_DELTA) received, $(Size_Human $TX_DELTA) sent (Rx=$RX_DELTA;Tx=$TX_DELTA)"
                                         [ -z "$STATS_FILE" ] && echo -e "\t\t"${WG_INTERFACE}":"${LINE}$cRESET || echo -e "\t\t$cRESET"${WG_INTERFACE}":"${LINE}$cBRED" "$(EpochTime "$(date +%s)" "FULL")$cRESET > $STATS_FILE
                                     else
-                                        SayT ${WG_INTERFACE}":"${LINE}${cRESET}         # v4.16
+                                        local LINE="$(echo "$LINE" | sed 's/\\t\\t/; /')"
+                                        SayT ${WG_INTERFACE}":"${LINE}${cRESET}        # v4.16
                                         SayT ${WG_INTERFACE}": period : $(Size_Human $RX_DELTA) received, $(Size_Human $TX_DELTA) sent (Rx=$RX_DELTA;Tx=$TX_DELTA)"
                                         [ -z "$STATS_FILE" ] && echo -e "\t\t"${WG_INTERFACE}":"${LINE}$cRESET || echo -e "\t\t$cRESET"${WG_INTERFACE}":"${LINE}$cBRED$cRESET > $STATS_FILE
                                     fi
@@ -5212,6 +5213,8 @@ ListenPort = $LISTEN_PORT
 PublicKey = $SITE_TWO_PUB_KEY
 AllowedIPs = $SITE_TWO_ALLOWIPS
 Endpoint = $DDNS:$((LISTEN_PORT+1))
+#PresharedKey = $PRE_SHARED_KEY
+PersistentKeepalive = 25
 EOF
 
         chmod 600 ${CONFIG_DIR}${NAME_ONE}.conf         # v4.15 Prevent wg-quick "Warning: '/opt/etc/wireguard.d/Home.conf' is world accessible"
@@ -5275,6 +5278,8 @@ ListenPort = $((LISTEN_PORT+1))
 PublicKey = $SITE_ONE_PUB_KEY
 AllowedIPs = $SITE_ONE_IP, $SITE_ONE_LAN
 Endpoint = $ROUTER_DDNS:$LISTEN_PORT
+#PresharedKey = $PRE_SHARED_KEY
+PersistentKeepalive = 25
 EOF
 
     chmod 600 ${CONFIG_DIR}${NAME_TWO}.conf         # v4.15 Prevent wg-quick "Warning: '/opt/etc/wireguard.d/Cabin.conf' is world accessible"
@@ -5302,7 +5307,7 @@ EOF
 
             cat > /tmp/Site2Site.txt << EOF
 
-# WireGuard (%p - ListenPort ONLY recognised by Martineau's WireGuard Manager/wg-quick2)
+# WireGuard (%p - ListenPort; %wan - WAN interface; %lan - LAN subnet; %net - IPv4 Tunnel subnet ONLY recognised by Martineau's WireGuard Manager/wg-quick2)
 
 PostUp =   iptables -I INPUT -p udp --dport %p -j ACCEPT; iptables -I INPUT -i %i -j ACCEPT; iptables -I FORWARD -i %i -j ACCEPT
 PostDown = iptables -D INPUT -p udp --dport %p -j ACCEPT; iptables -D INPUT -i %i -j ACCEPT; iptables -D FORWARD -i %i -j ACCEPT
@@ -5312,15 +5317,15 @@ EOF
             if [ "$ALLRULES" == "Y" ];then
                 cat > /tmp/Site2Site.txt << EOF
 
-# WireGuard (%p - ListenPort ONLY recognised by Martineau's WireGuard Manager/wg-quick2)
-PreUp = iptables -I INPUT -p udp --dport $LISTEN_PORT -j ACCEPT
+# WireGuard (%p - ListenPort; %wan - WAN interface; %lan - LAN subnet; %net - IPv4 Tunnel subnet ONLY recognised by Martineau's WireGuard Manager/wg-quick2)
+PreUp = iptables -I INPUT -p udp --dport %p -j ACCEPT
 PreUp = iptables -I INPUT -i %i -j ACCEPT
-PreUp = iptables -t nat -I PREROUTING -p udp --dport $LISTEN_PORT -j ACCEPT
-PreUp = iptables -t nat -I POSTROUTING -s $SUBNET/24 -o br0 -j MASQUERADE
-PostDown = iptables -D INPUT -p udp --dport $LISTEN_PORT -j ACCEPT
+PreUp = iptables -t nat -I PREROUTING -p udp --dport %p -j ACCEPT
+PreUp = iptables -t nat -I POSTROUTING -s %net/24 -o br0 -j MASQUERADE
+PostDown = iptables -D INPUT -p udp --dport %p -j ACCEPT
 PostDown = iptables -D INPUT -i %i -j ACCEPT
-PostDown = iptables -t nat -D PREROUTING -p udp --dport $LISTEN_PORT -j ACCEPT
-PostDown = iptables -t nat -D POSTROUTING -s $SUBNET/24 -o br0 -j MASQUERADE
+PostDown = iptables -t nat -D PREROUTING -p udp --dport %p -j ACCEPT
+PostDown = iptables -t nat -D POSTROUTING -s %net/24 -o br0 -j MASQUERADE
 
 # Firewall
 PreUp = iptables -I INPUT   -i %i -j ACCEPT
@@ -5412,9 +5417,9 @@ Build_Menu() {
                 MENU_T="$(printf '%b5 %b = %bStop%b    [ [Peer... ] | category ] e.g. stop clients\n' "${cBYEL}" "${cRESET}" "${cBGRA}" "${cBGRA}")"
             fi
             MENU_R="$(printf '%b6 %b = %bRestart%b [ [Peer... ] | category ]%b e.g. restart servers\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
-            MENU_Q="$(printf '%b7 %b = %bQRcode%b for a Peer {device} e.g. iPhone%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"   # v4.12
-            MENU_P="$(printf '%b8 %b = %bPeer%b management [ "list" | "category" | "new" ] | [ {Peer | category} [ 'del' | 'show' | 'add' [{"auto="[y|n|p]}] ]%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
-            MENU_C="$(printf '%b9 %b = %bCreate[split]%b Key-pair for Peer {Device} e.g. Nokia6310i (creates Nokia6310i.conf etc.)%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
+            MENU_Q="$(printf '%b7 %b = %bQRcode%b display for a Peer {device} e.g. iPhone%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"   # v4.12
+            MENU_P="$(printf '%b8 %b = %bPeer%b management [ "help" | "list" | "new" ] | [ {Peer | category} [ 'del' | 'show' | 'add' [{"auto="[y|n|p]}] ]%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
+            MENU_C="$(printf '%b9 %b = %bCreate[split]%b Key-pair for Peer {Device [server]} e.g. Nokia6310i (creates Nokia6310i.conf etc.)%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
             MENU_IPS="$(printf '%b10 %b= %bIPSet%b management [ "list" ] | [ "upd" { ipset [ "fwmark" {fwmark} ] | [ "enable" {"y"|"n"}] | [ "dstsrc"] ] } ] %b' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
             MENU_ISPIMP="$(printf '%b11 %b= %bImport%b WireGuard configuration { [ "?" | [ "dir" directory ] | [/path/]config_file [ "name="rename_as ] ]} %b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
             MENU_VPNDIR="$(printf '%b12 %b= %bvpndirector%b Clone VPN Director rules [ "clone" [ "wan" | "ovpn"n [ changeto_wg1n ]] | "delete" | "list" ] %b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")" # v4.14
