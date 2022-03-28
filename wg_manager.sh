@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.16b8"
-#============================================================================================ © 2021-2022 Martineau v4.16b8
+VERSION="v4.16b9"
+#============================================================================================ © 2021-2022 Martineau v4.16b9
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,14 +24,14 @@ VERSION="v4.16b8"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 25-Mar-2022
+# Last Updated Date: 28-Mar-2022
 
 #
 # Description:
 #
 # Acknowledgement:
 #
-# Contributors: odkrys,Torson,ZebMcKayhan,jobhax,elorimer,Sh0cker54,here1310,defung,The Chief,abir1909,JGrana,heysoundude
+# Contributors: odkrys,Torson,ZebMcKayhan,jobhax,elorimer,Sh0cker54,here1310,defung,The Chief,abir1909,JGrana,heysoundude,archiel
 
 GIT_REPO="wireguard"
 GITHUB_MARTINEAU="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/main"
@@ -790,6 +790,7 @@ Create_Peer() {
     local USE_IPV4="Y"              # v4.15
     local USE_IPV6="N"
     local VPN_POOL6=                # v4.15
+    local IPV6_TXT=                 # v4.16 @archiel
 
     while [ $# -gt 0 ]; do          # v3.02
         case "$1" in
@@ -5008,7 +5009,7 @@ Create_Site2Site() {
             local VPN_POOL6="$(echo "$1" | sed -n "s/^.*ipv6=//p" | awk '{print $1}')"
             # Ensure IPv6 address is in standard compressed format
             [ -n "$VPN_POOL6" ] && VPN_POOL6="$(IPv6_RFC "$VPN_POOL6")" # v4.15
-            USE_IPV6="Y"                                                # v4.15
+            local USE_IPV6="Y"                      # v4.16 v4.15
             [ "$I" -ge 1 ] && local I=$((I-1))      # Retain Positional parameter
             ;;
         noipv4|noIPv4)
@@ -5026,8 +5027,8 @@ Create_Site2Site() {
         lanipv6*)
             local SITE_TWO_LAN6="$(echo "$1" | sed -n "s/^.*lanipv6=//p" | awk '{print $1}')"
             # Ensure IPv6 address is in standard compressed format
-            SITE_TWO_LAN6="$(IPv6_RFC "$SITE_TWO_LAN6")"    # v4.15
-            USE_IPV6="Y"                                    # v4.15
+            local SITE_TWO_LAN6="$(IPv6_RFC "$SITE_TWO_LAN6")"    # v4.15
+            local USE_IPV6="Y"                              # v4.15
             [ "$I" -ge 1 ] && local I=$((I-1))              # Retain Positional parameter
             ;;
         allowips*)
@@ -6528,6 +6529,8 @@ Create_RoadWarrior_Device() {
 
     local DEVICE_NAME=$2
 
+    local DEVICE_USE_IPV6="N"                      # v4.16
+
     local TAG="$(echo "$@" | sed -n "s/^.*tag=//p" | awk '{print $0}')"
     local ADD_ALLOWED_IPS="$(echo "$@" | sed -n "s/^.*ips=//p" | awk '{print $0}')"
     local DNS_RESOLVER="$(echo "$@" | sed -n "s/^.*dns=//p" | awk '{print $0}')"        # v3.04 Hotfix
@@ -6561,6 +6564,12 @@ Create_RoadWarrior_Device() {
                         return 1
                     ;;
                 esac
+            ;;
+            ipv6|ipv6=*)
+                #local VPN_POOL6="$(echo "$1" | sed -n "s/^.*ipv6=//p" | awk '{print $1}')"
+                # Ensure IPv6 address is in standard compressed format
+                #[ -n "$VPN_POOL6" ] && VPN_POOL6="$(IPv6_RFC "$VPN_POOL6")" # v4.15
+                local DEVICE_USE_IPV6="Y"                      # v4.16
             ;;
         esac
         shift
@@ -6694,7 +6703,7 @@ Create_RoadWarrior_Device() {
                                 fi
                             #fi
                         else
-                            local USE_IPV6="Y"
+                            local DEVICE_USE_IPV6="Y"
                             local VPN_POOL_IP=${VPN_POOL%/*}
                             local VPN_POOL_MASK=${VPN_POOL##*/}                     # v4.15
                             local VPN_SUBNET=${VPN_POOL_IP%:*}
@@ -6726,7 +6735,7 @@ Create_RoadWarrior_Device() {
                     done
 
                 VPN_POOL_IP=$VPN_POOL_IP4                                       # v4.15
-                if [ -n "$VPN_POOL_IP6" ];then                                  # v4.15
+                if [ "$DEVICE_USE_IPV6" == "Y" ] && [ -n "$VPN_POOL_IP6" ];then        # v4.16 v4.15
                     local IPV6=", ::/0"                                         # v4.15
                     if [ -n "$VPN_POOL_IP" ];then                               # v4.15
                         local VPN_POOL_IP=$VPN_POOL_IP","$VPN_POOL_IP6          # v4.15
@@ -6760,7 +6769,7 @@ Create_RoadWarrior_Device() {
                 else
                     # Default route ALL traffic via the remote 'server' Peer
                     local IP="0.0.0.0/0"
-                    [ "$USE_IPV6" == "Y" ] && local IPV6=", ::/0"
+                    [ "$DEVICE_USE_IPV6" == "Y" ] && local IPV6=", ::/0"
                     local SPLIT_TXT="# ALL Traffic"
                 fi
 
@@ -6774,10 +6783,10 @@ Create_RoadWarrior_Device() {
                             echo -e $cRED"\a\tWarning: No DNS (${cBWHT}nvram get wan0_dns${cRED}) is configured! - will use ${cBWHT}${VPN_POOL_SUBNET}.1"   # v4.12 @underdose
                             local DNS_RESOLVER="${VPN_POOL_SUBNET}.1"                                   # v4.12 @underdose
                         fi
-                        [ "$USE_IPV6" == "Y" ] && DNS_RESOLVER=$DNS_RESOLVER","$(nvram get ipv6_dns1)   # v3.04 Hotfix
+                        [ "$DEVICE_USE_IPV6" == "Y" ] && DNS_RESOLVER=$DNS_RESOLVER","$(nvram get ipv6_dns1)   # v4.16 v3.04 Hotfix
                     else
                         local DNS_RESOLVER=${VPN_POOL_IP%.*}".1,1.1.1.1"                # v4.15
-                        [ "$USE_IPV6" == "Y" ] && DNS_RESOLVER="2606:4700:4700::1111"
+                        [ "$DEVICE_USE_IPV6" == "Y" ] && DNS_RESOLVER="2606:4700:4700::1111"                    # v4.16
                     fi
                 fi
 
