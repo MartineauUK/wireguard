@@ -1,9 +1,9 @@
-VERSION="v4.16.7"
-#============================================================================================ © 2021-2022 Martineau v4.16.7
+VERSION="v4.16.8"
+#============================================================================================ © 2021-2022 Martineau v4.16.8
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 24-Mar-2022
+# Last Updated Date: 01-Apr-2022
 #
 # Description:
 #
@@ -150,12 +150,23 @@ Manage_Passthru() {
                         done << EOR
 $(ip route | grep "$WG_INTERFACE")
 EOR
+                        if [ "$USE_IPV6" == "Y" ];then                  # v4.16.9
+                            # Ensure target WireGuard 'client' peer IPv6 routing policy table contains WireGuard 'server' peer IP/network in the passthru tunnel @chongnt
+                            while read ROUTE; do
+                                ip -6 route $ACTION $ROUTE table $TABLE 2>/dev/null && ROUTING_CHANGED=
+                            done << EOR
+$(ip -6 route | grep "$WG_INTERFACE")
+EOR
+                        fi
+
                     fi
 
                     ip rule $ACTION from $IP_ADDR table $TABLE prio 998$VPN_NUM                 # v4.14 v4.13 Fix @chongnt
+                    [ "$USE_IPV6" == "Y" ] && ip -6 rule $ACTION from $IP_ADDR table $TABLE prio 998$VPN_NUM    # v4.16.9
 
                 else
                     ip rule $ACTION from $IP_ADDR table $TABLE prio 998$VPN_NUM 2>/dev/null     # v4.14
+                    [ "$USE_IPV6" == "Y" ] && ip -6 rule $ACTION from $IP_ADDR table $TABLE prio 998$VPN_NUM 2>/dev/null    # v4.16.9
                 fi
             done
     fi
