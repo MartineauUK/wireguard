@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.16b9"
-#============================================================================================ © 2021-2022 Martineau v4.16b9
+VERSION="v4.16bA"
+#============================================================================================ © 2021-2022 Martineau v4.16bA
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.16b9"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 28-Mar-2022
+# Last Updated Date: 01-Apr-2022
 
 #
 # Description:
@@ -1031,7 +1031,13 @@ Delete_Peer() {
                         # IPsets
                         sqlite3 $SQL_DATABASE "DELETE FROM ipset WHERE peer='$WG_INTERFACE';"
                         # Passthru
-                        #sqlite3 $SQL_DATABASE "DELETE FROM passthru WHERE peer='$WG_INTERFACE';"
+                        if [ "$Mode" == "server" ];then                                                 # v4.16
+                            sqlite3 $SQL_DATABASE "DELETE FROM passthru WHERE server='$WG_INTERFACE';"  # v4.16
+                        fi
+                        if [ "$Mode" == "client" ];then                                                 # v4.16
+                            sqlite3 $SQL_DATABASE "DELETE FROM passthru WHERE client='$WG_INTERFACE';"  # v4.16
+                        fi
+                        [ -n "$(sqlite3 $SQL_DATABASE "SELECT * FROM passthru WHERE ip_subnet='$WG_INTERFACE';")" ] && sqlite3 $SQL_DATABASE "DELETE FROM passthru WHERE ip_subnet='$WG_INTERFACE';"    # v4.16
 
                         #   DDNS martineau.homeip.net
                         #   Endpoint = martineau.homeip.net:51820
@@ -1261,10 +1267,6 @@ Import_Peer() {
                                 Endpoint) local SOCKET=${LINE##* }
                                     local SOCKET=$(echo "$SOCKET" | awk '{$1=$1};1')    # v4.12  strip leading/trailing spaces/tabs
                                 ;;
-                                #"#"MTU) local MTU=${LINE##* };;                 # v4.09
-                                #"#"DNS) local COMMENT_DNS=${LINE##* } ;;
-                                #"#"Address) local COMMENT_SUBNET=${LINE##* } ;;
-                                #"#"PreUp);;                                     # v4.14
                                 PreUp)                                          # v4.14
                                     # This must be commented out!
                                     if [ "$MODE" != "device" ];then
@@ -1300,22 +1302,10 @@ Import_Peer() {
                                     fi
                                 ;;
                                 MTU) local MTU=${LINE##* }                      # v4.09
-                                    # This must be commented out!
-                                    if [ "$MODE" != "device" ];then
-                                        COMMENT_OUT="Y"
-                                    fi
                                 ;;
-                                DNS) local DNS=${LINE##* }
-                                    # This must be commented out!
-                                    if [ "$MODE" != "device" ];then
-                                        COMMENT_OUT="Y"
-                                    fi
+                                DNS) local DNS=$(echo "$LINE" | sed 's/^DNS.*=//' | awk '{$1=$1};1')                # HOTFIX v4.16
                                 ;;
-                                Address) local SUBNET=${LINE##* }
-                                    # This must be commented out!
-                                    if [ "$MODE" != "device" ];then
-                                        COMMENT_OUT="Y"
-                                    fi
+                                Address) local SUBNET=$(echo "$LINE" | sed 's/^Address.*=//' | awk '{$1=$1};1')     # HOTFIX v4.16
                                 ;;
                             esac
                         done < ${IMPORT_DIR}${WG_INTERFACE}.conf
@@ -1626,6 +1616,8 @@ Manage_Peer() {
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru add wg11 SGS8"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru add wg15 all"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru add wg12 10.100.100.0/27"
+                    echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru del SGS8"
+                    echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru del all"
                     echo -e "\tpeer serv_peer_name {bind device_peer}\t\t\t\t\t- Bind a Road Warrior 'device' Peer to a 'server' Peer e.g. peer wg21 bind SGS20"
 
                     return
@@ -3114,7 +3106,13 @@ STATS
 #     Use command 'vx' to edit this setting
 #PRINT_DDNS_RERESOLV_MSGS
 
+# Enable Weekly 07:00 every Sunday cron job to trim SQL database older than xx days (0 - no trimming!)
+#     Use command 'vx' to edit this setting
+#     (You can temporarily override this by using menu command 'trimdb cron xx')
+TrimDB 99
+
 EOF
+
     return 0
 }
 _quote() {
@@ -3672,6 +3670,8 @@ Show_Info() {
     fi
 
     [ $(cru l | grep ChkDDNS | wc -l) -gt 0 ] && echo -e $cBGRE"\t[✔] ${cBWHT}Endpoint DDNS$cBGRE re-fresh monitor ACTIVE\n$cRESET"        # v4.15
+
+    [ $(cru l | grep -E "wireguard_manager.*trimdb" | wc -l) -gt 0 ] && echo -e $cBGRE"\t[✔] ${cBWHT}Cron schedule ${cBGRE}$(cru l | awk '/wireguard_manager.sh trimdb/ {print $9}') ($(cru l | awk '/wireguard_manager.sh trimdb/ {print $1" "$2" "$3" "$4" "$5}'))$cBWHT to trim older than ${cBGRE}$(cru l | awk '/wireguard_manager.sh trimdb/ {print $8}') days$cBWHT from WireGuard SQL Database ${cBGRE}ENABLED\n"$cRESET
 
     [ "$READLINE" == "ReadLine" ] && echo -e $cBGRE"\t[✔]$cBWHT Use of 'Pg-Up' Key ${cBGRE}for command retrieval is ENABLED\n$cRESET" || echo -e $cBRED"\t[✖]${cBWHT} Use of 'Pg-Up' Key for command retrieval is ${cBRED}DISABLED\n$cRESET" # v4.14
 
@@ -5420,7 +5420,7 @@ Build_Menu() {
             MENU_R="$(printf '%b6 %b = %bRestart%b [ [Peer... ] | category ]%b e.g. restart servers\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
             MENU_Q="$(printf '%b7 %b = %bQRcode%b display for a Peer {device} e.g. iPhone%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"   # v4.12
             MENU_P="$(printf '%b8 %b = %bPeer%b management [ "help" | "list" | "new" ] | [ {Peer | category} [ 'del' | 'show' | 'add' [{"auto="[y|n|p]}] ]%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
-            MENU_C="$(printf '%b9 %b = %bCreate[split]%b Key-pair for Peer {Device [server]} e.g. Nokia6310i (creates Nokia6310i.conf etc.)%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
+            MENU_C="$(printf '%b9 %b = %bCreate[split]%b Road-Warrior 'device' Peer for 'server' Peer {device [server]} e.g. create myPhone wg21%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
             MENU_IPS="$(printf '%b10 %b= %bIPSet%b management [ "list" ] | [ "upd" { ipset [ "fwmark" {fwmark} ] | [ "enable" {"y"|"n"}] | [ "dstsrc"] ] } ] %b' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
             MENU_ISPIMP="$(printf '%b11 %b= %bImport%b WireGuard configuration { [ "?" | [ "dir" directory ] | [/path/]config_file [ "name="rename_as ] ]} %b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
             MENU_VPNDIR="$(printf '%b12 %b= %bvpndirector%b Clone VPN Director rules [ "clone" [ "wan" | "ovpn"n [ changeto_wg1n ]] | "delete" | "list" ] %b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")" # v4.14
@@ -5648,12 +5648,20 @@ Process_User_Choice() {
                     local ARG="$(printf "%s" "$menu1" | cut -d' ' -f2)"
                 fi
 
-                if [ -z "$(echo "$ARG" | tr -cd \"\')" ];then   # v4.14 Peer name can't contain single/double quotes
-                    Create_RoadWarrior_Device $menu1
+                if [ "$ARG" == "help" ];then
+                    echo -e "\n\tcreate help\t\t\t\t\t\t\t\t- This text"
+                    echo -e "\tcreate[split] {device_name [server_name] [options]}\t\t\t- Create 'device' Peer and bind to 'server' Peer wg21 e.g. create SGS22 tag=\"My Samsung phone\""
+                    echo -e "\tcreate device_name ipv6\t\t\t\t\t\t\t- Create 'device' Peer and include IPv6 'AllowedIPs = ::/0' e.g. create iPhone12 ipv6"
+                    echo -e "\tcreate device_name ipv6 ips=ipv4/ipv6_ip_subnet\t\t\t\t- Override 'AllowedIPs = 0.0.0.0/0, ::/0' e.g. create iPhone ipv6 ips=192.168.5.0/24,fdaa:abcd:cdef::/64"
+                    echo -e "\tcreate device_name server_name dns=local\t\t\t\t- Create 'device' Peer with local (private) DNS e.g. create Pixel6 wg24 dns=local"
+                    echo -e "\tcreatesplit device_name\t\t\t\t\t\t\t- Create 'device' Peer with LAN access ONLY (say 192.168.1.0/24) e.g. createsplit Pixel6"
                 else
-                    echo -e $cBRED"\a\n\t***ERROR Peer '$ARG' contains quotes\n"$cRESET
+                    if [ -z "$(echo "$ARG" | tr -cd \"\')" ];then   # v4.14 Peer name can't contain single/double quotes
+                        Create_RoadWarrior_Device $menu1
+                    else
+                        echo -e $cBRED"\a\n\t***ERROR Peer '$ARG' contains quotes\n"$cRESET
+                    fi
                 fi
-
                 ;;
             "?"|u|u" "*|uf|uf" "*)
 
@@ -6153,8 +6161,19 @@ Process_User_Choice() {
                 echo -e "\n\t"$cBGRA
                 opkg install p7zip      # v4.15
             ;;
-            trimdb*)                                                # trimdb { '?' | days [ 'traffic' | 'sessions'] ['auto']  }
-                Purge_Database $menu1   # v4.15
+            trimdb*)                                                # trimdb { '?' | days [ 'traffic' | 'sessions'] ['auto']  } | [cron {number_of_days}]
+                if [ "$2" == "cron" ];then                          # v4.16
+                    [ -z "$3" ] && local DAYS=90 || DAYS=$3         # v4.16
+                    cru d WireGuard_DB 2>/dev/null                  # v4.16
+                    if [ $DAYS -gt 0 ];then
+                        cru a WireGuard_DB "0 7 * * 6 /jffs/addons/wireguard/wireguard_manager.sh trimdb $DAYS"     # v4.16
+                        echo -e $cBGRE"\n\t[✔] Cron schedule to trim WireGuard SQL Database created $cBWHT(07:00 every Sunday)$cBGRE older than ${cBWHT}$DAYS${cBGRE} days)\n"$cRESET   # v4.16
+                    else
+                        echo -e $cBRED"\n\t[✖] ${cBGRE}Cron schedule to trim WireGuard SQL Database ${cBRED}DELETED\n"$cRESET
+                    fi
+                else
+                    Purge_Database $menu1   # v4.15
+                fi
             ;;
             ipv6|ipv6" "*)                                          # ipv6 [ '?' | 'spoof' | 'simulate' | 'disable'  | {'gen' [['un]loadmodule'] ['ula']}]
 
@@ -6533,7 +6552,14 @@ Create_RoadWarrior_Device() {
 
     local TAG="$(echo "$@" | sed -n "s/^.*tag=//p" | awk '{print $0}')"
     local ADD_ALLOWED_IPS="$(echo "$@" | sed -n "s/^.*ips=//p" | awk '{print $0}')"
+
+    # use dns=local or dns=push to use LAN DNS
     local DNS_RESOLVER="$(echo "$@" | sed -n "s/^.*dns=//p" | awk '{print $0}')"        # v3.04 Hotfix
+    if [ "$DNS_RESOLVER" == "push" ] || [ "$DNS_RESOLVER" == "local" ];then             # v4.16
+        local PUSHDNS="Y"                                                               # v4.16
+        local DNS_RESOLVER=                                                             # v4.16
+    fi
+
     local REMOTE_LISTEN_PORT="$(echo "$@" | sed -n "s/^.*port=//p" | awk '{print $0}')" # v4.14
 
     local SERVER_PEER=
@@ -6575,7 +6601,7 @@ Create_RoadWarrior_Device() {
         shift
     done
 
-    # If user did not specify 'server' Peers, use the oldest 'server' Peer found ACTIVE or the first defined in the config
+    # If user did not specify 'server' Peers, use the oldest 'server' Peer found ACTIVE or the first (usually wg21) defined in the SQL database
     [ -z "$SERVER_PEER" ] && SERVER_PEER=$(wg show interfaces | grep -vE "wg1" | grep -vE "wgs")    # v4.12
     [ -z "$SERVER_PEER" ] && SERVER_PEER=$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers order by peer;" | head -n 1)
     [ -z "$SERVER_PEER" ] && { echo -e $cBRED"\a\n\t***ERROR: no 'server' Peers specified or found (wg2*)"$cRESET; return 1; }
@@ -6736,7 +6762,7 @@ Create_RoadWarrior_Device() {
 
                 VPN_POOL_IP=$VPN_POOL_IP4                                       # v4.15
                 if [ "$DEVICE_USE_IPV6" == "Y" ] && [ -n "$VPN_POOL_IP6" ];then        # v4.16 v4.15
-                    local IPV6=", ::/0"                                         # v4.15
+                    [ "$SPLIT_TUNNEL" != "Y" ] && local IPV6=", ::/0"                                         # v4.15
                     if [ -n "$VPN_POOL_IP" ];then                               # v4.15
                         local VPN_POOL_IP=$VPN_POOL_IP","$VPN_POOL_IP6          # v4.15
                         local IPV6_TXT="(IPv4/IPv6) "                           # v4.15
@@ -6763,6 +6789,7 @@ Create_RoadWarrior_Device() {
                     # Should we EXPLICITLY allow access to ALL other VPN Tunnel Peers?
                     if [ "$ALLOW_TUNNEL_PEERS" == "Y" ];then            # v4.11
                         local TUNNEL_PEERS=$VPN_POOL_SUBNET".0/24, "    # v4.11
+                        [ "$DEVICE_USE_IPV6" == "Y" ] && local TUNNEL_PEERS=$TUNNEL_PEERS", "$(nvram get ipv6_rtr_addr) # v4.16
                         SPLIT_TXT=$SPLIT_TXT", but Road-Warrior Peer-to-Peer allowed"   # v4.11
                     fi
 
@@ -6778,17 +6805,32 @@ Create_RoadWarrior_Device() {
                 # User specifed DNS ?
                 if [ -z "$DNS_RESOLVER" ];then                                                      # v3.04 Hotfix
                     if [ "$SITE2SITE" != "Y" ];then
-                        local DNS_RESOLVER=$(nvram get wan0_dns | awk '{print $1}')                     # v3.04 Hotfix @Sh0cker54 #v3.04 Hotfix
-                        if [ -z "$DNS_RESOLVER" ];then                                                  # v4.12 @underdose
-                            echo -e $cRED"\a\tWarning: No DNS (${cBWHT}nvram get wan0_dns${cRED}) is configured! - will use ${cBWHT}${VPN_POOL_SUBNET}.1"   # v4.12 @underdose
-                            local DNS_RESOLVER="${VPN_POOL_SUBNET}.1"                                   # v4.12 @underdose
+                        if [ -z "$PUSHDNS" ];then
+                            local DNS_RESOLVER=$(nvram get wan0_dns | awk '{print $1}')                     # v3.04 Hotfix @Sh0cker54 #v3.04 Hotfix
+                            if [ -z "$DNS_RESOLVER" ];then                                                  # v4.12 @underdose
+                                echo -e $cRED"\a\tWarning: No DNS (${cBWHT}nvram get wan0_dns${cRED}) is configured! - will use ${cBWHT}${VPN_POOL_SUBNET}.1"   # v4.12 @underdose
+                                local DNS_RESOLVER="${VPN_POOL_SUBNET}.1"                                   # v4.12 @underdose
+                            fi
+                            [ "$DEVICE_USE_IPV6" == "Y" ] && DNS_RESOLVER=$DNS_RESOLVER","$(nvram get ipv6_dns1)   # v4.16 v3.04 Hotfix
+                        else
+                            if [ "$PUSHDNS" == "Y" ];then
+                                if [ -z "$IPV6_TXT" ] || [ -n "$(echo "$IPV6_TXT" | grep "IPv4")" ];then
+                                    local DNS_RESOLVER="${VPN_POOL_SUBNET}.1"
+                                fi
+
+                                if [ "$DEVICE_USE_IPV6" == "Y" ] && [ -n "$VPN_POOL_IP6" ];then     # v4.16
+                                    [ -n "$DNS_RESOLVER" ] && local DNS_RESOLVER=$DNS_RESOLVER", "$VPN_IP_COMPRESSED || DNS_RESOLVER=$VPN_IP_COMPRESSED     # v4.16
+                                fi
+                                local ALLOWED_IPS=$ALLOWED_IPS", "$DNS_RESOLVER                     # v4.16
+                            fi
                         fi
-                        [ "$DEVICE_USE_IPV6" == "Y" ] && DNS_RESOLVER=$DNS_RESOLVER","$(nvram get ipv6_dns1)   # v4.16 v3.04 Hotfix
                     else
                         local DNS_RESOLVER=${VPN_POOL_IP%.*}".1,1.1.1.1"                # v4.15
                         [ "$DEVICE_USE_IPV6" == "Y" ] && DNS_RESOLVER="2606:4700:4700::1111"                    # v4.16
                     fi
                 fi
+
+                [ -z "$DNS_RESOLVER" ] && local DNS_RESOLVER="${VPN_POOL_SUBNET}.1"
 
                 # NOTE: A Road-Warrior Peer .config may have multiple '[PEER]' clauses to connect to several 'server' Peers concurrently!
                 #       ( Will also need to define the appropriate additional 'server' Peer /24 subnets in the single 'Address' directive)
@@ -7084,6 +7126,16 @@ if [ "$1" != "install" ];then   # v2.01
 
                     Manage_Stats "INIT" "enable"
 
+                    # Trim DB schedule
+                    DAYS=90                             # Default in ${INSTALL_DIR}WireguardVPN.conf is 99 for debugging!
+                    if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^TrimDB" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                        DAYS=$(awk '/^TrimDB/ {print $2}' ${INSTALL_DIR}WireguardVPN.conf)
+                    fi
+                    if [ $DAYS -gt 0 ];then
+                        cru d WireGuard_DB 2>/dev/null                                                          # v4.16
+                        cru a WireGuard_DB "0 7 * * 6 /jffs/addons/wireguard/wireguard_manager.sh trimdb $DAYS" # v4.16
+                        SayT "Cron job scheduled 07:00 every Sunday to purge SQL Session/traffic statistics metrics records older than $DAYS days"  # v4.16
+                    fi
                 fi
 
                 # http://www.snbforums.com/threads/beta-wireguard-session-manager.70787/post-688282
