@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.16.6"
-#============================================================================================ © 2021-2022 Martineau v4.16.6
+VERSION="v4.16.7"
+#============================================================================================ © 2021-2022 Martineau v4.16.7
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 25-Mar-2022
+# Last Updated Date: 01-Apr-2022
 #
 # Description:
 #
@@ -284,7 +284,24 @@ $(ip route | grep "$PASSTHRU_SERVER")
 EOR
 
                         fi
-                        [ "$FLUSH" == "Y" ] && ip route flush cache || logger -st "WireGuard-${MODE}${VPN_NAME}" "Warning 'server' peer ($PASSTHRU_SERVER) route not found - is it UP? FLUSH="$FLUSH
+                        if [ "$USE_IPV6" == "Y" ];then                                          # v4.16.7
+                            if [ -n "$(wg show interfaces | grep "$PASSTHRU_SERVER")" ];then
+
+                                while read ROUTE; do
+                                   ip -6 route $ACTION $ROUTE table 12$VPN_NUM 2>/dev/null      # v4.16.7
+                                   local FLUSH="Y"
+                                done << EOR
+$(ip -6 route | grep "$PASSTHRU_SERVER")
+EOR
+
+                            fi
+                        fi
+                        if [ "$FLUSH" == "Y" ];then 
+                            ip route flush cache
+                            [ "$USE_IPV6" == "Y" ] && ip -6 route flush cache                   # v4.16.7
+                        else
+                            logger -st "WireGuard-${MODE}${VPN_NAME}" "Warning 'server' peer ($PASSTHRU_SERVER) route not found - is it UP? FLUSH="$FLUSH
+                        fi
                         local FLUSH=
                     fi
                 fi
@@ -437,7 +454,8 @@ if [ "$MODE" == "client" ];then                         # v1.03
        [ -z "$LOCALIP" ] && { echo -e $cBRED"\a\n\t***ERROR: WireGuard '$MODE' doesn't have a LOCAL IP Address! - try 'peer $WG_INTERFACE ip=xxx.xxx.xxx.xxx/32'?\n"$cRESET ; exit 87 ; }   # v4.13
        #export LocalIP=$LOCALIP
     fi
-    PEER_DNS=$(sqlite3 $SQL_DATABASE "SELECT dns FROM clients where peer='$WG_INTERFACE';")        # v4.05
+    
+    PEER_DNS_LIST=$(sqlite3 $SQL_DATABASE "SELECT dns FROM clients where peer='$WG_INTERFACE';")        # V4.16 v4.05
 
     [ -z "$SOCKET" ] && SOCKET=$(sqlite3 $SQL_DATABASE "SELECT socket FROM clients where peer='$WG_INTERFACE';")
     if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.09
@@ -471,9 +489,9 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
 
     if [ -n "$LOCALIP" ] || [ "$MODE" == "client" ];then                                # v1.03
         logger -t "WireGuard-${MODE}${VPN_NAME}" "Initialising WireGuard VPN $MODE Peer ($VPN_ID) ${POLICY_MODE}${TXT} $SOCKET ($DESC)"
-        echo -e $cBCYA"\tWireGuard-${MODE}${VPN_NAME}: Initialising WireGuard VPN '$MODE' Peer (${cBMAG}$VPN_ID${cBCYA}) ${POLICY_MODE}${TXT} $SOCKET (${cBMAG}$DESC${cBCYA}) ${cBWHT}DNS=$PEER_DNS"$cRESET
+        echo -e $cBCYA"\tWireGuard-${MODE}${VPN_NAME}: Initialising WireGuard VPN '$MODE' Peer (${cBMAG}$VPN_ID${cBCYA}) ${POLICY_MODE}${TXT} $SOCKET (${cBMAG}$DESC${cBCYA}) ${cBWHT}DNS=$PEER_DNS_LIST"$cRESET        # v4.16
 
-        if [ -n "$PEER_DNS" ];then            # v4.05
+        if [ -n "$PEER_DNS_LIST" ];then            # v4.16 v4.05
             if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.09
                 cmd iptables -t nat -N WGDNS${VPN_NUM}                      # v4.05
                 [ $? -gt 0 ] && { echo -e $cBRED"\a\n\t"; logger -st "WireGuard-${MODE}${VPN_NAME}" "***ERROR Failed to create -t nat WGDNS${VPN_NUM}."; echo -e $cRESET; exit 99; }
@@ -597,19 +615,27 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
             fi
 
             # Could be anything really....  e.g. 0.0.0.0/0,::0/0
-            if [ "$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "0.0.0.0/0")" == "0.0.0.0/0" ];then
-                if [ -n "$PEER_DNS" ];then
-                    if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.09
-                        if [ -n "$(echo "${LAN_SUBNET}.0/24") | Is_IPv4_CIDR" ];then
-                            cmd iptables -t nat -A WGDNS$VPN_NUM -s ${LAN_SUBNET}.0/24 -j DNAT --to-destination $PEER_DNS -m comment --comment "WireGuard 'client${VPN_NUM} DNS'" # v4.05
-                        fi
-                        if [ "$USE_IPV6" == "Y" ];then
-                            [ -n "$(nvram get ipv61_ipaddr)" ] && cmd ip6tables -t nat -A WGDNS$VPN_NUM -s $(nvram get ipv6_rtr_addr) -j DNAT --to-destination $PEER_DNS -m comment --comment "WireGuard 'client${VPN_NUM} DNS'"
-                            #[ -z "$(nvram get ipv61_ipaddr)" ] && ip6tables -t nat -A WGDNS$VPN_NUM -s ::1 -j DNAT --to-destination $PEER_DNS -m comment --comment "WireGuard 'client${VPN_NUM} DNS'"
-                        fi
-                    else
-                        cmd iptables -t nat -A WGDNS$WG_INTERFACE -s ${LAN_SUBNET}.0/24 -j DNAT --to-destination $PEER_DNS -m comment --comment "WireGuard 'client${WG_INTERFACE} DNS'" # v4.09
-                    fi
+            if [ -n "$(awk '/^AllowedIPs/ {print $0}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "0.0.0.0/0")" ] || [ -n "$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "::0/0")" ];then
+                if [ -n "$PEER_DNS_LIST" ];then                                             # V4.16
+                    for PEER_DNS in $(echo "$PEER_DNS_LIST" | tr ',' ' ')                   # v4.16
+                        do
+                            if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.09
+                                if [ -n "$(echo "${LAN_SUBNET}.0/24") | Is_IPv4_CIDR" ];then
+                                    if [ -z "$(echo "$PEER_DNS" | grep -F ":")" ];then      # v4.16 @archiel 
+                                        cmd iptables -t nat -A WGDNS$VPN_NUM -s ${LAN_SUBNET}.0/24 -j DNAT --to-destination $PEER_DNS -m comment --comment "WireGuard 'client${VPN_NUM} DNS'" # v4.05
+                                    fi
+                                fi
+                                if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$PEER_DNS" | grep -F ":")" ];then
+                                    #   ipv6_service=dhcp6
+                                    #   ipv6_prefix=2a02:c7f:xxxx:yyyy::
+                                    #   ipv6_prefix_length=56
+                                    #   ipv6_rtr_addr=2a02:c7f:xxxx:yyyy::1
+                                    [ -n "$(nvram get ipv6_rtr_addr)" ] && cmd ip6tables -t nat -A WGDNS$VPN_NUM -s $(nvram get ipv6_prefix)/$(nvram get ipv6_prefix_length)  -j DNAT --to-destination $PEER_DNS -m comment --comment "WireGuard 'client${VPN_NUM} DNS'"
+                                fi
+                            else
+                                [ -z "$(echo "$PEER_DNS" | grep -F ":")" ] && cmd iptables -t nat -A WGDNS$WG_INTERFACE -s ${LAN_SUBNET}.0/24 -j DNAT --to-destination $PEER_DNS -m comment --comment "WireGuard 'client${WG_INTERFACE} DNS'" # v4.09
+                            fi
+                        done
                 fi
             fi
         else
@@ -735,7 +761,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
             cmd iptables -t nat -I POSTROUTING -s $(nvram get lan_ipaddr)/24 -o $VPN_ID -j MASQUERADE -m comment --comment "WireGuard 'client'"
         fi
 
-        if [ -n "$PEER_DNS" ];then
+        if [ -n "$PEER_DNS_LIST" ];then
             if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.10
                 cmd iptables -t nat -I PREROUTING -p tcp -m tcp --dport 53 -j WGDNS${VPN_NUM} -m comment --comment "WireGuard 'client${VPN_NUM} DNS'"
                 cmd iptables -t nat -I PREROUTING -p udp -m udp --dport 53 -j WGDNS${VPN_NUM} -m comment --comment "WireGuard 'client${VPN_NUM} DNS'"
@@ -772,7 +798,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
                 [ -n "$(nvram get ipv6_rtr_addr)" ] && cmd ip6tables -t nat -I POSTROUTING -s $(nvram get ipv6_rtr_addr)/64 -o $VPN_ID -j MASQUERADE -m comment --comment "WireGuard 'client'"
             fi
 
-            if [ -n "$PEER_DNS" ];then
+            if [ -n "$PEER_DNS_LIST" ];then
                 if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.10
                     cmd ip6tables -t nat -I PREROUTING -p tcp -m tcp --dport 53 -j WGDNS${VPN_NUM} -m comment --comment "WireGuard 'client${VPN_NUM} DNS'"
                     cmd ip6tables -t nat -I PREROUTING -p udp -m udp --dport 53 -j WGDNS${VPN_NUM} -m comment --comment "WireGuard 'client${VPN_NUM} DNS'"
