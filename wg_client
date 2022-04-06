@@ -1,16 +1,16 @@
-#!/bin/sh
-VERSION="v4.16.7"
-#============================================================================================ © 2021-2022 Martineau v4.16.7
+    #!/bin/sh
+VERSION="v4.16.8"
+#============================================================================================ © 2021-2022 Martineau v4.16.8
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 01-Apr-2022
+# Last Updated Date: 06-Apr-2022
 #
 # Description:
 #
 # Acknowledgement:
 #
-# Contributors: odkrys,@ZebMcKayhan,Torson,The Chief
+# Contributors: odkrys,ZebMcKayhan,Torson,The Chief,archiel
 
 Parse() {
     #
@@ -296,7 +296,7 @@ EOR
 
                             fi
                         fi
-                        if [ "$FLUSH" == "Y" ];then 
+                        if [ "$FLUSH" == "Y" ];then
                             ip route flush cache
                             [ "$USE_IPV6" == "Y" ] && ip -6 route flush cache                   # v4.16.7
                         else
@@ -362,6 +362,22 @@ cmd() {
     esac
 
     "$@"
+}
+Manage_IPV6_PRIO() {
+
+    # add | {get vpn_num}
+
+    local ACTION=$1
+    local VPN_NUM=$2
+
+    if [ "$ACTION" == "add" ];then
+        local CNT=$(ip -6 rule | grep -E "^998.:" | wc -l)
+        local IPV6PRIO=$((9989 - $CNT))
+    else
+        local IPV6PRIO=$(ip -6 rule | grep -E "from all lookup 12$VPN_NUM$"| awk '{print $1}' | sed 's/://')
+    fi
+
+    echo "$IPV6PRIO"
 }
 #=============================================Main=============================================================
 
@@ -454,7 +470,7 @@ if [ "$MODE" == "client" ];then                         # v1.03
        [ -z "$LOCALIP" ] && { echo -e $cBRED"\a\n\t***ERROR: WireGuard '$MODE' doesn't have a LOCAL IP Address! - try 'peer $WG_INTERFACE ip=xxx.xxx.xxx.xxx/32'?\n"$cRESET ; exit 87 ; }   # v4.13
        #export LocalIP=$LOCALIP
     fi
-    
+
     PEER_DNS_LIST=$(sqlite3 $SQL_DATABASE "SELECT dns FROM clients where peer='$WG_INTERFACE';")        # V4.16 v4.05
 
     [ -z "$SOCKET" ] && SOCKET=$(sqlite3 $SQL_DATABASE "SELECT socket FROM clients where peer='$WG_INTERFACE';")
@@ -595,10 +611,12 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
                     cmd ip route add 0/1   dev $VPN_ID
                     cmd ip route add 128/1 dev $VPN_ID
                 fi
-                if [ "$(awk '/^AllowedIPs/ {print $0}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "::0/0")" == "::0/0" ];then   # v4.14
-                    if [ "$USE_IPV6" == "Y" ];then
-                        #ip -6 route add ::/0 dev $VPN_ID table 12$VPN_NUM
-                        cmd ip -6 rule add from all table 12$VPN_NUM prio 999$VPN_NUM
+
+                if [ "$USE_IPV6" == "Y" ];then
+                    cmd ip -6 route add default dev $VPN_ID metric 1 pref medium table 12$VPN_NUM   # v4.16
+                    if [ "$(awk '/^AllowedIPs/ {print $0}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "::0/0")" == "::0/0" ];then   # v4.14
+                        IPV6PRIO=$(Manage_IPV6_PRIO "add")                                          # v4.16
+                        cmd ip -6 rule add from all table 12$VPN_NUM prio $IPV6PRIO                 # v4.16
                     fi
                 fi
             else
@@ -621,7 +639,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
                         do
                             if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.09
                                 if [ -n "$(echo "${LAN_SUBNET}.0/24") | Is_IPv4_CIDR" ];then
-                                    if [ -z "$(echo "$PEER_DNS" | grep -F ":")" ];then      # v4.16 @archiel 
+                                    if [ -z "$(echo "$PEER_DNS" | grep -F ":")" ];then      # v4.16 @archiel
                                         cmd iptables -t nat -A WGDNS$VPN_NUM -s ${LAN_SUBNET}.0/24 -j DNAT --to-destination $PEER_DNS -m comment --comment "WireGuard 'client${VPN_NUM} DNS'" # v4.05
                                     fi
                                 fi
@@ -640,7 +658,8 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
             fi
         else
             # [ -z "$(ip -6 route show dev $VPN_ID match ::/0" 2>/dev/null) ] && ip -6 route add "::/0" dev "$VPN_ID" prio 999$VPN_NUM
-            cmd ip -6 route add ::/0 dev $VPN_ID table 12$VPN_NUM
+            #cmd ip -6 route add ::/0 dev $VPN_ID table 12$VPN_NUM
+            cmd ip -6 route add default dev $VPN_ID metric 1 pref medium table 12$VPN_NUM   # v4.16
 
             #ip rule add from $(nvram get lan_ipaddr | cut -d"." -f1-3).0/24 table 12$VPN_NUM prio 99$VPN_NUM"9"
             if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.09
@@ -696,9 +715,9 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         if [ -n "$(awk '/^AllowedIPs/ {print $0}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "0.0.0.0/0")" ] || [ -n "$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "::0/0")" ];then  # v4.14
             cmd ip route add 0/1   dev $VPN_ID table 12$VPN_NUM
             cmd ip route add 128/1 dev $VPN_ID table 12$VPN_NUM
-
             if [ "$USE_IPV6" == "Y" ];then                                              # v4.08
-                ip -6 route add ::/0 dev $VPN_ID table 12$VPN_NUM 2>/dev/null           # Duplicate?
+                #ip -6 route add default dev $VPN_ID table 12$VPN_NUM 2>/dev/null           # Duplicate?
+                :
             fi
         fi
 
@@ -904,7 +923,9 @@ else
             #ip -6 route del ::/1     dev $VPN_ID   2>/dev/null      # v4.12
             #ip -6 route del 8000::/1 dev $VPN_ID   2>/dev/null      # v4.12
             cmd ip -6 route del ::/0 dev $VPN_ID 2>/dev/null
-            cmd ip -6 rule del prio 999$VPN_NUM 2>/dev/null
+            cmd ip -6 route del default dev $VPN_ID 2>/dev/null
+            IPV6PRIO=$(Manage_IPV6_PRIO "get" "$VPN_NUM")       # v4.16
+            cmd ip -6 rule del prio $IPV6PRIO                   # v4.16
         fi
 
         for ALLOWIP in $(awk '/^AllowedIPs/ {$1="";$2="";print $0}' ${CONFIG_DIR}${VPN_ID}.conf | tr ',' ' ')   # v4.14
@@ -929,6 +950,7 @@ else
                             ip route add 128/1  dev $WG_IFACE 2>/dev/null
                             if [ "$USE_IPV6" == "Y" ];then
                                 #ip -6 route add ::/0 dev $WG_IFACE 2>/dev/null
+                                # Deletion of the RPDB rule whould suffice? as PRIO 9989-9981 is ALWAYS  a backup?
                                 :
                             fi
                             break
@@ -943,7 +965,8 @@ else
             ip route del $host 2>/dev/null                  # v4.14
         else
             hostipv6="$(wg show $VPN_ID endpoints | grep -oE "\[.*\]" | sed 's/\[//g' | sed 's/\]//g')" # v4.14
-            #ip -6 route del $hostipv6 2>/dev/null                                                          # v4.14
+            ip -6 route del $hostipv6 2>/dev/null                                                          # v4.14
+
         fi
         cmd ip link del dev $VPN_ID
         [ "$USE_IPV6" == "Y" ] && cmd ip -6 link del dev $VPN_ID 2>/dev/null
@@ -968,9 +991,11 @@ else
     if [ "$USE_IPV6" == "Y" ];then
         if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.10
             ip -6 rule del from $(nvram get ipv6_rtr_addr | sed 's/::/|/' | cut -d"|" -f1)::0/64 table 12$VPN_NUM prio 992$VPN_NUM   2>/dev/null # v4.11
-
+            ip -6 rule del from $(nvram get ipv6_prefix)/$(nvram get ipv6_prefix_length) table 12$VPN_NUM prio 992$VPN_NUM   2>/dev/null
             ip -6 route flush table 12$VPN_NUM 2>/dev/null
             ip -6 rule del prio 992$VPN_NUM   2>/dev/null
+            IPV6PRIO==$(Manage_IPV6_PRIO "get" "$VPN_NUM")  # v4.16
+            ip -6 rule del prio $IPV6PRIO 2>/dev/null       # v4.16
             ip -6 route flush cache 2>/dev/null
         fi
     fi
