@@ -1,9 +1,9 @@
-VERSION="v4.16.8"
-#============================================================================================ © 2021-2022 Martineau v4.16.8
+VERSION="v4.16.9"
+#============================================================================================ © 2021-2022 Martineau v4.16.9
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 01-Apr-2022
+# Last Updated Date: 08-Apr-2022
 #
 # Description:
 #
@@ -178,6 +178,7 @@ Process_Pre_Post_Commands() {
             local CMD="$(echo "$LINE" | sed "s/\%wan/$WAN_IF/g;s/\%net/$SUBNET_PREFIX4/g;s/\%lan/$LAN_PREFIX/g;s/\%pos/$POS/g;s/\%p/$LISTEN_PORT/g;s/\%i/$WG_INTERFACE/g")"    # v4.14.4 v4.14.1
             if [ -n "$CMD" ];then
                 logger -t "WireGuard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"
+                [ "$SHOWCMDS" == "Y" ] && echo -e "[>] ${CMDTYPE}" >&2
                 if [ -n "$(echo "$CMDTYPE" | grep "Up")" ];then             # v4.4.4
                     cmd $CMD
                 else
@@ -526,7 +527,11 @@ if [ "$2" != "disable" ];then
         done
 
     # User Exit @ZebMcKayhan
-    [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh ] && { logger -t "WireGuard-server${VPN_NAME}" "Executing ${VPN_ID}-up.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh; }
+    if [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh ];then
+        logger -t "WireGuard-server${VPN_NAME}" "Executing ${VPN_ID}-up.sh"
+        sh ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh
+        [ "$SHOWCMDS" == "Y" ] && echo -e "[+] ${VPN_ID}-up.sh"
+    fi
 
     # v4.14 Process 'PostUp' commands
     Process_Pre_Post_Commands "PostUp"  # v4.14.1
@@ -576,7 +581,11 @@ else
     ip -6 route flush cache 2>/dev/null                    # v4.03
 
     # User Exit @ZebMcKayhan
-    [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh ] && { logger -t "WireGuard-server${VPN_NAME}" "Executing ${VPN_ID}-down.sh"; sh ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh; }
+    if [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh ];then
+        logger -t "WireGuard-server${VPN_NAME}" "Executing ${VPN_ID}-down.sh"
+        sh ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh
+        [ "$SHOWCMDS" == "Y" ] && echo -e "[+] ${VPN_ID}-down.sh"
+    fi
 
     # v4.14 Process 'PostDown' commands
     Process_Pre_Post_Commands "PostDown"    # v4.14.1
