@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.16.10"
-#============================================================================================ © 2021-2022 Martineau v4.16.10
+VERSION="v4.16.11"
+#============================================================================================ © 2021-2022 Martineau v4.16.11
 #
 
 # Maintainer: Martineau
-# Last Updated Date: xx-Apr-2022
+# Last Updated Date: 09-Apr-2022
 #
 # Description:
 #
@@ -606,11 +606,13 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
             #cmd ip route add $(ip route get $host | sed '/ via [0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}/{s/^\(.* via [0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\).*/\1/}' | head -n 1)
            if [ $(ip route show $host | wc -l) -eq 0 ];then                             # v4.16.10
                 cmd ip route add $(ip -o route get $host  | awk '{print $1" "$2" "$3}')
-            fi
+           fi
         else
             hostipv6="$(wg show $VPN_ID endpoints | grep -oE "\[.*\]" | tr -d '[]')"
             cmd ip -6 route add ::/0 dev $VPN_ID table 12$VPN_NUM prio 999$VPN_NUM
-            cmd ip -6 route add $(ip -6 -o route get $hostipv6  | awk '{print $1" "$2" "$3}')   # v4.16.10
+            if [ $(ip -6 route show $hostipv6 | wc -l) -eq 0 ];then                                 # v4.16.11
+                cmd ip -6 route add $(ip -6 -o route get $hostipv6  | awk '{print $1" "$2" "$3}')   # v4.16.10
+            fi
         fi
 
         # If there is ALREADY an ACTIVE WireGuard VPN Client, then tough! - make this one the default!!!!
@@ -629,8 +631,10 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
             # 0.0.0.0/0 Default
             if [ -n "$(awk '/^AllowedIPs/ {print $0}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "0.0.0.0/0")" ] || [ -n "$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "::0/0")" ];then  # v4.14
                 if [ "$(awk '/^AllowedIPs/ {print $0}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "0.0.0.0/0")" == "0.0.0.0/0" ];then   # v4.14
-                    cmd ip route add 0/1   dev $VPN_ID
-                    cmd ip route add 128/1 dev $VPN_ID
+                    if [ -z "$(ip route show 0/1 | grep "dev $VPN_ID")" ];then  # v4.16.11
+                        cmd ip route add 0/1   dev $VPN_ID
+                        cmd ip route add 128/1 dev $VPN_ID
+                    fi
                 fi
 
                 if [ "$USE_IPV6" == "Y" ];then
@@ -639,8 +643,10 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
                     if [ "$(awk '/^AllowedIPs/ {print $0}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "::0/0")" == "::0/0" ];then   # v4.14
                         #IPV6PRIO=$(Manage_IPV6_PRIO "add")                                          # v4.16
                         #cmd ip -6 rule add from all table 12$VPN_NUM prio $IPV6PRIO                 # v4.16
-                        cmd ip -6 route add 0::/1    dev $VPN_ID
-                        cmd ip -6 route add 8000::/1 dev $VPN_ID
+                        if [ -z "$(ip -6 route show ::/1 | grep "dev $VPN_ID")" ];then  # v4.16.11
+                            cmd ip -6 route add 0::/1    dev $VPN_ID
+                            cmd ip -6 route add 8000::/1 dev $VPN_ID
+                        fi
                     fi
                 fi
             else
@@ -982,16 +988,20 @@ else
                             if [ -n "$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${WG_IFACE}.conf | grep -oE "0.0.0.0/0")" ];then
                                 #ip route add 0/1    dev $WG_IFACE 2>/dev/null
                                 #ip route add 128/1  dev $WG_IFACE 2>/dev/null
-                                cmd ip route add 0/1    dev $WG_IFACE
-                                cmd ip route add 128/1  dev $WG_IFACE
+                                if [ -z "$(ip route show 0/1 | grep "dev $WG_IFACE")" ];then    # v4.16.11
+                                    cmd ip route add 0/1    dev $WG_IFACE
+                                    cmd ip route add 128/1  dev $WG_IFACE
+                                fi
                             fi
 
                             if [ "$USE_IPV6" == "Y" ];then
                                 if [ -n "$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${WG_IFACE}.conf | grep -oE "::0/0")" ];then
                                     #ip -6 route add 0::/1    dev $WG_IFACE
                                     #ip -6 route add 8000::/1 dev $WG_IFACE
-                                    cmd ip -6 route add 0::/1    dev $WG_IFACE
-                                    cmd ip -6 route add 8000::/1 dev $WG_IFACE
+                                    if [ -z "$(ip -6 route show ::/1 | grep "dev $WG_IFACE")" ];then    # v4.16.11
+                                        cmd ip -6 route add 0::/1    dev $WG_IFACE
+                                        cmd ip -6 route add 8000::/1 dev $WG_IFACE
+                                    fi
                                 fi
                             fi
                             break
