@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.16.11"
-#============================================================================================ © 2021-2022 Martineau v4.16.11
+VERSION="v4.16.12"
+#============================================================================================ © 2021-2022 Martineau v4.16.12
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 09-Apr-2022
+# Last Updated Date: 19-Apr-2022
 #
 # Description:
 #
@@ -705,7 +705,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
                 echo -e
             fi
 
-            # Ipsets ?
+            # IPSets ?
             if [ -n "$(sqlite3 $SQL_DATABASE "SELECT ipset FROM ipset WHERE peer='${WG_INTERFACE}';")" ];then
 
                 IPSETS=$(sqlite3 $SQL_DATABASE "SELECT ipset FROM ipset WHERE peer='${WG_INTERFACE}';" | tr '\n' ' ')
@@ -729,19 +729,47 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
                             fi
 
                             # Differentiate between IPSETs containing IPv4 or IPv6 IPs
-                            if [ "$IPSET_FAMILY" != "inet6" ];then      # IPv4
-                                iptables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'" 2>/dev/null # v4.12
-                                cmd iptables -t mangle -A PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'"             # v4.12
+                            if [ "$IPSET_FAMILY" = "inet6" ];then   # IPv6
+                                ADD_IPV6_RULE="Y"                   # v4.16
                             else
-                                if [ "$USE_IPV6" == "Y" ];then          # IPv6
+                                # Presumed IPv4
+                                ADD_IPV4_RULE="Y"                   # v4.16
+                            fi
+
+                            # IPSets containing MACs can only be 'src'; and should be applied to both IPv4 and IPv6 firewall?
+                            #   hash:mac
+                            #   hash:ip,mac
+
+                            # NOTE: Preferable to actually explicitly define both an IPv4 and IPV6 IPSet?
+                            if [ -n "$(ipset list $IPSET | grep -E "hash:mac|hash:ip,mac")" ];then      # v4.16 @ZebMcKayhan
+                                DSTSRC="src"
+                                ADD_IPV4_RULE="Y"                                       # v4.16 @ZebMcKayhan
+                                ADD_IPV6_RULE="Y"                                       # v4.16 @ZebMcKayhan
+                                IPV_TEXT="IPv4/IPv6"                                    # v4.16
+                            fi
+
+                            if [ "$ADD_IPV4_RULE" == "Y" ] || [ "$ADD_IPV6_RULE" == "Y" ];then
+                                if [ "$ADD_IPV4_RULE" == "Y" ];then
+                                    iptables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'" 2>/dev/null # v4.12
+                                    cmd iptables -t mangle -A PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'"             # v4.12
+                                fi
+
+                                if [ "$ADD_IPV6_RULE" == "Y" ] && [ "$USE_IPV6" == "Y" ];then
                                     ip6tables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'" 2>/dev/null    # v4.12
                                     cmd ip6tables -t mangle -A PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'"                # v4.12
                                 fi
+
+                                logger -t "WireGuard-${MODE}${VPN_NAME}" "Adding $IPV_TEXT IPSet '$IPSET' route through VPN 'client' Peer" $WG_INTERFACE
+                            else
+                                logger -t "WireGuard-${MODE}${VPN_NAME}" "***ERROR IPSet '$IPSET' unknown IPv4/IPv6 type for routing through VPN 'client' Peer "$WG_INTERFACE
+                                echo -e $cBRED"\a\n\t***ERROR IPSet '$IPSET' unidentified IPv4/IPv6 type for routing through VPN 'client' Peer "$WG_INTERFACE"\n"$cRESET
                             fi
-                            logger -t "WireGuard-${MODE}${VPN_NAME}" "Adding $IPV_TEXT IPSet '$IPSET' route through VPN 'client' Peer" $WG_INTERFACE
                         else
                             logger -t "WireGuard-${MODE}${VPN_NAME}" "***ERROR IPSet '$IPSET' does NOT EXIST! for routing through VPN 'client' Peer "$WG_INTERFACE
                         fi
+
+                        ADD_IPV4_RULE=
+                        ADD_IPV6_RULE=
                     done
             fi
 
@@ -880,8 +908,8 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
             #        CHK_ENDPOINT = curl -s https://am.i.mullvad.net/connected  , * wg14-
             #        Full feature URL check https://mullvad.net/en/check/  (e.g. Mullvad hijacks DNS requests see https://schnerring.net/blog/use-custom-dns-servers-with-mullvad-and-any-WireGuard-client/)
 
-            CHK_ENDPOINT=$( awk "/^CHK_ENDPOINT=.*\*/" ${INSTALL_DIR}WireguardVPN.conf)             # v4.14
-            [ -z "$CHK_ENDPOINT" ] && CHK_ENDPOINT=$( awk "/^CHK_ENDPOINT=.*${WG_INTERFACE}/" ${INSTALL_DIR}WireguardVPN.conf)
+            CHK_ENDPOINT=$( awk "/^CHK_ENDPOINT.*\*/" ${INSTALL_DIR}WireguardVPN.conf)             # v4.16.12 v4.14
+            [ -z "$CHK_ENDPOINT" ] && CHK_ENDPOINT=$( awk "/^CHK_ENDPOINT.*${WG_INTERFACE}/" ${INSTALL_DIR}WireguardVPN.conf)   # v4.16.12
 
             if [ -n "$CHK_ENDPOINT" ];then              # v4.14
                 END_POINT_INTERFACES=$(echo "$CHK_ENDPOINT" | awk -F ',' '{print $2}')
@@ -890,7 +918,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
 
                 if [ -n "$(echo "$END_POINT_INTERFACES" | grep -F "*")" ] || [ -n "$(echo "$END_POINT_INTERFACES" | grep "$WG_INTERFACE")" ] ;then
                     if [ -z "$(echo "$END_POINT_INTERFACES" | grep "${WG_INTERFACE}-")" ];then
-                        CHK_ENDPOINT="$($CMD_ENDPOINT)"                        # v4.14
+                        CHK_ENDPOINT=$($CMD_ENDPOINT)                        # v4.14
                         echo -en $cBGRE
                         if [ -z "$(echo "$CHK_ENDPOINT" | grep -i "not connected")" ];then    # v4.14
                             echo -en $cBCYA"\t"
