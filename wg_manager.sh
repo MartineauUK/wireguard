@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.16bA"
-#============================================================================================ © 2021-2022 Martineau v4.16bA
+VERSION="v4.16bB"
+#============================================================================================ © 2021-2022 Martineau v4.16bB
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.16bA"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 01-Apr-2022
+# Last Updated Date: xx-Apr-2022
 
 #
 # Description:
@@ -1605,7 +1605,9 @@ Manage_Peer() {
                     echo -e "\tpeer import peer_conf [options]\t\t\t\t\t\t- Import '.conf' into SQL database e.g. import Mullvad_Dallas"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t\t   e.g. import SiteA type=server"
 
-                    echo -e "\tpeer peer_name [del|add] ipset {ipset_name[...]}\t\t\t- Selectively Route IPSets e.g. peer wg13 add ipset NetFlix Hulu"
+                    echo -e "\tpeer peer_name [del|add|upd] ipset {ipset_name[...]}\t\t\t- Selectively Route IPSets e.g. peer wg13 add ipset NetFlix Hulu"
+                    echo -e "\t\t\t\t\t\t\t\t\t\t                                peer wg12 upd ipset MACs dstsrc src"
+                    echo -e "\t\t\t\t\t\t\t\t\t\t                                peer wg12 upd ipset all enable n"
 
                     echo -e "\tpeer peer_name [add] subnet {IPSubnet[...]}\t\t\t\t- Configure downstream subnets e.g. peer wg13 add subnet 192.168.5.0/24"
 
@@ -1957,7 +1959,7 @@ Manage_Peer() {
                                      echo -e $cBRED"\a\n\t***ERROR 'client' Peer '$WG_INTERFACE' cannot set Listen Port\n"$cRESET
                                 fi
                             ;;
-                            add*|ipset*)                            # peer wg1x [add|del|edit] ipset Netflix[.....]
+                            add*|ipset*)                            # peer wg1x [add|del|upd] ipset Netflix[.....]
 
                                 local ARGS=$@
                                 if [ "$SUBCMD" == "add" ] || [ "$SUBCMD" == "del" ] || [ "$SUBCMD" == "upd" ];then
@@ -2330,7 +2332,8 @@ Manage_Wireguard_Sessions() {
                                         sqlite3 $SQL_DATABASE "INSERT into session values('$DEVICE','End','$TIMESTAMP');"
                                     done
 
-                                sh ${INSTALL_DIR}wg_server $WG_INTERFACE "disable" "$SHOWCMDS" "$WG_QUICK"
+                                #sh ${INSTALL_DIR}wg_server $WG_INTERFACE "disable" "$SHOWCMDS" "$WG_QUICK"
+                                ${INSTALL_DIR}wg_server $WG_INTERFACE "disable" "$SHOWCMDS" "$WG_QUICK"     # v4.16
 
                                 # If there are no 'server' Peers ACTIVE then terminate UDP monitoring
                                 # Will require REBOOT to reinstate! or 'wgm init'
@@ -2340,9 +2343,9 @@ Manage_Wireguard_Sessions() {
                                 # Dump the stats
                                 Show_Peer_Status "generatestats" "$WG_INTERFACE" "ToFile"   # v4.16 v4.04
                                 if [ "$Mode" == "client" ] && [ "$Route" != "policy" ] ; then
-                                    wg show $WG_INTERFACE >/dev/null 2>&1 && sh ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" "$FORCE" "$SHOWCMDS" "$WG_QUICK" || Say "WireGuard $Mode service ('$WG_INTERFACE') NOT running."
+                                    wg show $WG_INTERFACE >/dev/null 2>&1 && ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" "$FORCE" "$SHOWCMDS" "$WG_QUICK" || Say "WireGuard $Mode service ('$WG_INTERFACE') NOT running."                       # v4.16
                                 else
-                                    wg show $WG_INTERFACE >/dev/null 2>&1 && sh ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" "policy" "$FORCE" "$SHOWCMDS" "$WG_QUICK" || Say "WireGuard $Mode (Policy) service ('$WG_INTERFACE') NOT running."
+                                    wg show $WG_INTERFACE >/dev/null 2>&1 && ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" "policy" "$FORCE" "$SHOWCMDS" "$WG_QUICK" || Say "WireGuard $Mode (Policy) service ('$WG_INTERFACE') NOT running."     # v4.16
                                 fi
                                 [ -f /tmp/metrics.wg ] && { cat /tmp/metrics.wg; rm /tmp/metrics.wg ;}          # v4.16
                             fi
@@ -3639,7 +3642,13 @@ Show_Info() {
         ;;
     esac
 
-    [ "$(nvram get ipv6_service)" == "disabled" ] && echo -e $cBRED"\n\t[✖]${cBWHT} IPv6 Service is ${cBRED}DISABLED$cRESET" || echo -e $cBGRE"\n\t[✔]${cBWHT} IPv6 Service is ${cBRED}$(nvram get ipv6_service)"$cRESET    # v4.16
+    if [ "$(nvram get ipv6_service)" == "disabled" ];then
+        echo -e $cBRED"\n\t[✖]${cBWHT} IPv6 Service is ${cBRED}DISABLED$cRESET"
+        echo -e $cBGRE"\t[ℹ ] ${cBWHT}$(wget -O - -q http://ip4.me/api | sed 's/,Remain.*$//')"
+    else
+        echo -e $cBGRE"\n\t[✔]${cBWHT} IPv6 Service is ${cBRED}$(nvram get ipv6_service)"$cRESET    # v4.16
+        echo -e $cBGRE"\t[ℹ ] ${cBWHT}$(wget -O - -q http://ip6.me/api | sed 's/,Remain.*$//')"
+    fi
 
     local WAN_IF=$(Get_WAN_IF_Name)                                             # v4.11
     local VAL=$(cat /proc/sys/net/ipv4/conf/$WAN_IF/rp_filter)                  # v4.11
@@ -3677,7 +3686,9 @@ Show_Info() {
 
     Manage_Stats
 
-    echo -e $cBGRE"\n\t[ℹ ] ${cRESET}Speedtest quick link${cBYEL} https://fast.com/en/gb/ \n"$cRESET       # v4.12
+    echo -e $cBGRE"\n\t[ℹ ] ${cRESET}Speedtest link${cBYEL} https://fast.com/en/gb/ \n"$cRESET              # v4.12
+
+    echo -e $cBGRE"\t[ℹ ] ${cRESET}IPv6 Test link${cBYEL} https://ipv6-test.com/ \n"$cRESET             # v4.16
 
     echo -e $cBGRE"\t[ℹ ] ${cRESET}WireGuard© Official Site ${cBYEL}https://www.wireguard.com/ \n"$cRESET   # v4.15
 
@@ -4285,22 +4296,25 @@ Show_Peer_Config_Entry() {
             case "$Mode" in
                 server)
                     local TABLE="servers"; local ID="peer"; local SQL_COL="server"
-                    local COLUMN_TXT="Server,Auto,Subnet,Port,Public,Private,Annotate"
+                    local COLUMN_TXT="Server,Auto,Subnet,Port,Annotate"         # v4.16
+                    local COLS="peer,auto,subnet,port,tag"                      # v4.16
                     ;;
                 client)
                     local TABLE="clients"; local ID="peer"; local SQL_COL="client"
-                    local COLUMN_TXT="Client,Auto,IP,Endpoint,DNS,MTU,Public,Private,Annotate"    # v4.09 v4.04
+                    local COLUMN_TXT="Client,Auto,IP,Endpoint,DNS,MTU,Annotate" # v4.16 v4.09 v4.04
+                    local COLS="peer,auto,subnet,socket,dns,mtu,tag"            # v4.16
                     ;;
                 *)
                     local TABLE="devices"; local ID="name"
-                    local COLUMN_TXT="Device,Auto,IP,DNS,Allowed IPs,Public,Private,Annotate,Conntrack" # v4.09
+                    local COLUMN_TXT="Device,Auto,IP,DNS,Allowed IPs,Annotate,Conntrack"    # v4.16 v4.09
+                    local COLS="name,auto,ip,dns,allowedip,tag,conntrack"                   # v4.16
                     ;;
             esac
 
             local AUTO="$(sqlite3 $SQL_DATABASE "SELECT auto FROM $TABLE WHERE $ID='$WG_INTERFACE';")"  # v4.11
 
             echo -e
-            sqlite3 $SQL_DATABASE "SELECT * from $TABLE WHERE $ID='$WG_INTERFACE';" | column -t  -s '|' --table-columns "$COLUMN_TXT"
+            sqlite3 $SQL_DATABASE "SELECT $COLS from $TABLE WHERE $ID='$WG_INTERFACE';" | column -t  -s '|' --table-columns "$COLUMN_TXT"   # v4.16
 
             if [ "$ID" == "peer" ];then                                                        # v4.09
                 if [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$WG_INTERFACE';")" -gt 0 ] || [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(client) FROM passthru WHERE client='$WG_INTERFACE';")" -gt 0 ];then
@@ -4801,29 +4815,41 @@ Manage_IPSET() {
             echo -e
             for IPSET in $@
                 do
-                        local USE="Y"
-                        local FWMARK=$(sqlite3 $SQL_DATABASE "SELECT fwmark FROM fwmark WHERE peer='$WG_INTERFACE';")
-                        local DSTSRC="dst"
+                    local USE="Y"
+                    local FWMARK=$(sqlite3 $SQL_DATABASE "SELECT fwmark FROM fwmark WHERE peer='$WG_INTERFACE';")
+                    [ -z "$DSTSRC" ] && local DSTSRC="dst"
 
-                        if [ "$ACTION" == "add" ];then
-                            ipset list $IPSET >/dev/null 2>&1;if [ $? -eq 0 ]; then
-                                if [ -z "$(sqlite3 $SQL_DATABASE "SELECT * FROM ipset WHERE peer='$WG_INTERFACE' AND ipset='$IPSET';")" ];then
-                                    sqlite3 $SQL_DATABASE "INSERT into ipset values('$IPSET','$USE','$WG_INTERFACE','$FWMARK','$DSTSRC');"
-                                    echo -e $cBGRE"\n\t[✔] Ipset '$IPSET' Selective Routing ${ACTION}ed ${cBMAG}$WG_INTERFACE"$cRESET
-                                else
-                                    echo -e $cRED"\tWarning: IPSet '$IPSET' already exists for Peer ${cBMAG}$WG_INTERFACE"$cRESET
-                                fi
+                    # IPSets containing MACs can only be 'src'!
+                    #   hash:mac
+                    #
+                    #   Can only be 'src,src' or 'dst,src'
+                    #   hash:ip,mac
+                    #   bitmap:ip,mac
+                    #if [ "$(ipset list $IPSET | awk -F ',' '/^Type/ {print $NF}')" == "mac" ];then
+                        [ -n "$(ipset list $IPSET | grep -F "hash:mac")" ] && DSTSRC="src"  # v4.16
+                    #fi
+
+                    if [ "$ACTION" == "add" ];then
+                        ipset list $IPSET >/dev/null 2>&1;if [ $? -eq 0 ]; then
+                            if [ -z "$(sqlite3 $SQL_DATABASE "SELECT * FROM ipset WHERE peer='$WG_INTERFACE' AND ipset='$IPSET';")" ];then
+                                sqlite3 $SQL_DATABASE "INSERT into ipset values('$IPSET','$USE','$WG_INTERFACE','$FWMARK','$DSTSRC');"
+                                echo -e $cBGRE"\n\t[✔] Ipset ${cBWHT}'$IPSET'${cBGRE} Selective Routing ${ACTION}ed ${cBMAG}$WG_INTERFACE"$cRESET
                             else
-                                echo -e $cRED"\a\t***ERROR: IPSet '$IPSET' does not EXIST! for routing via ${cBMAG}$WG_INTERFACE"$cRESET
+                                echo -e $cRED"\tWarning: IPSet ${cBWHT}'$IPSET'${cBGRE} already exists for Peer ${cBMAG}$WG_INTERFACE"$cRESET
                             fi
                         else
-                            if [ -n "$(sqlite3 $SQL_DATABASE "SELECT * FROM ipset WHERE peer='$WG_INTERFACE' AND ipset='$IPSET';")" ];then
-                                sqlite3 $SQL_DATABASE "DELETE FROM ipset WHERE ipset='$IPSET' AND peer='$WG_INTERFACE';"
-                                echo -e $cBGRE"\n\t[✔] Ipset '$IPSET' Selective Routing ${ACTION}ed ${cBMAG}$WG_INTERFACE"$cRESET
-                            else
-                                echo -e $cRED"\tWarning: IPSet '$IPSET' not used by Peer ${cBMAG}$WG_INTERFACE"$cRESET
-                            fi
+                            echo -e $cRED"\a\t***ERROR: IPSet '$IPSET' does not EXIST! for routing via ${cBMAG}$WG_INTERFACE"$cRESET
                         fi
+                    else
+                        if [ -n "$(sqlite3 $SQL_DATABASE "SELECT * FROM ipset WHERE peer='$WG_INTERFACE' AND ipset='$IPSET';")" ];then
+                            sqlite3 $SQL_DATABASE "DELETE FROM ipset WHERE ipset='$IPSET' AND peer='$WG_INTERFACE';"
+                            echo -e $cBGRE"\n\t[✔] Ipset ${cBWHT}'$IPSET'${cBGRE} Selective Routing ${ACTION}ed ${cBMAG}$WG_INTERFACE"$cRESET
+                        else
+                            echo -e $cRED"\tWarning: IPSet '$IPSET' not used by Peer ${cBMAG}$WG_INTERFACE"$cRESET
+                        fi
+                    fi
+
+                    local DSTSRC=
                 done
         else
             # Direct manipulation of the IPSET ?
@@ -4840,7 +4866,7 @@ Manage_IPSET() {
             fi
 
         fi
-        Manage_Peer "list" "$WG_INTERFACE"
+        [ "${WG_INTERFACE:0:3}" == "wg1" ] && Manage_Peer "list" "$WG_INTERFACE"        # v4.16
         return 0
     fi
 
@@ -4859,6 +4885,15 @@ Manage_IPSET() {
                     local USE="Y"
                     local FWMARK=$(sqlite3 $SQL_DATABASE "SELECT fwmark FROM fwmark WHERE peer='$WG_INTERFACE';")
                     local DSTSRC="dst"
+                    # IPSets containing MACs can only be 'src'!
+                    #   hash:mac
+                    #
+                    #   Can only be 'src,src' or 'dst,src'
+                    #   hash:ip,mac
+                    #   bitmap:ip,mac
+                    #if [ "$(ipset list $IPSET | awk -F ',' '/^Type/ {print $NF}')" == "mac" ];then
+                        [ -n "$(ipset list $IPSET | grep -F "hash:mac")" ] && DSTSRC="src"  # v4.16
+                    #f
                     sqlite3 $SQL_DATABASE "INSERT into ipset values('$IPSET','$USE','$WG_INTERFACE','$FWMARK','$DSTSRC');"
                 fi
             else
@@ -4891,15 +4926,32 @@ Manage_IPSET() {
                 dst|src);;
                 dst","src);;
                 src","dst);;
+                src","src);;        # v4.16
                 dst","dst);;
                 *)
                     VALID="N"
                 ;;
             esac
+
+            # IPSets containing MACs can only be 'src'!
+            #   hash:mac
+            #
+            #   Can only be 'src,src' or 'dst,src'
+            #   hash:ip,mac
+            #   bitmap:ip,mac
+            #if [ "$(ipset list $IPSET | awk -F ',' '/^Type/ {print $NF}')" == "mac" ];then # v4.16
+                #local DIMENSION=$(ipset list $IPSET | grep -E "^TYPE" | sed 's/^.*://')        # v4.16
+                #[ "$DIMENSION" == "mac" ] && DSTSRC="src"                                  # v4.16
+                [ -n "$(ipset list $IPSET | grep -F "hash:mac")" ] && DSTSRC="src"  # v4.16
+            #fi
+
             if [ "$VALID" == "Y" ];then
                 [ "$IPSET" != "all" ] && local SQL_WHERE="ipset='$IPSET' AND" || SQL_WHERE=
                 sqlite3 $SQL_DATABASE "UPDATE ipset SET dstsrc='$DSTSRC' WHERE $SQL_WHERE peer='$WG_INTERFACE';"    # v4.12 @ZebMcKayhan
-                echo -e $cBGRE"\n\t[✔] Updated IPSet DST/SRC for ${cBMAG}$WG_INTERFACE \n"$cRESET
+                echo -e $cBGRE"\n\t[✔] Updated IPSet ${cBWHT}'$IPSET'${cBGRE} DST/SRC for ${cBMAG}$WG_INTERFACE \n"$cRESET
+                [ "${WG_INTERFACE:0:3}" == "wg1" ] && Manage_Peer "list" "$WG_INTERFACE"        # v4.16
+            else
+                echo -e $cBRED"\a\n\t***ERROR IPSet DST/SRC ${cBWHT}'$DSTSRC'${cBRED} INVALID! use { dst | src | dst,src | src,dst | src,src | dst,dst }\n"$cRESET          # v4.16
             fi
         ;;
         enable)
@@ -4908,7 +4960,8 @@ Manage_IPSET() {
             if [ -n $(echo "$USE" | grep -iE "Y|N") ];then
                 local USE=$(echo "$USE" | tr 'a-z' 'A-Z')
                 sqlite3 $SQL_DATABASE "UPDATE ipset SET use='$USE' WHERE $SQL_WHERE peer='$WG_INTERFACE';"
-                echo -e $cBGRE"\n\t[✔] Updated IPSet Enable for ${cBMAG}$WG_INTERFACE \n"$cRESET
+                echo -e $cBGRE"\n\t[✔] Updated IPSet ${cBWHT}'$IPSET'${cBGRE} Enable for ${cBMAG}$WG_INTERFACE \n"$cRESET
+                [ "${WG_INTERFACE:0:3}" == "wg1" ] && Manage_Peer "list" "$WG_INTERFACE"        # v4.16
             fi
         ;;
         summary)
@@ -5421,7 +5474,7 @@ Build_Menu() {
             MENU_Q="$(printf '%b7 %b = %bQRcode%b display for a Peer {device} e.g. iPhone%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"   # v4.12
             MENU_P="$(printf '%b8 %b = %bPeer%b management [ "help" | "list" | "new" ] | [ {Peer | category} [ 'del' | 'show' | 'add' [{"auto="[y|n|p]}] ]%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
             MENU_C="$(printf '%b9 %b = %bCreate[split]%b Road-Warrior 'device' Peer for 'server' Peer {device [server]} e.g. create myPhone wg21%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
-            MENU_IPS="$(printf '%b10 %b= %bIPSet%b management [ "list" ] | [ "upd" { ipset [ "fwmark" {fwmark} ] | [ "enable" {"y"|"n"}] | [ "dstsrc"] ] } ] %b' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
+            MENU_IPS="$(printf '%b10 %b= %bIPSet%b management [ "upd" { ipset [ "fwmark" {fwmark} ] | [ "enable" {"y"|"n"}] | [ "dstsrc"] {src} ] }] %b' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
             MENU_ISPIMP="$(printf '%b11 %b= %bImport%b WireGuard configuration { [ "?" | [ "dir" directory ] | [/path/]config_file [ "name="rename_as ] ]} %b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
             MENU_VPNDIR="$(printf '%b12 %b= %bvpndirector%b Clone VPN Director rules [ "clone" [ "wan" | "ovpn"n [ changeto_wg1n ]] | "delete" | "list" ] %b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")" # v4.14
         fi
@@ -5506,6 +5559,7 @@ Validate_User_Choice() {
             trimdb*);;        # v4.15
             ipv6*);;        # v4.16
             formatwg-quick*|formatwgquick*);;   # v4.16
+            ipmon*);;                           # v4.16
             *)
                :
             ;;
@@ -6277,6 +6331,14 @@ Process_User_Choice() {
                     done
 
             ;;
+            ipmon*)                                 #   ipmon [wg_interface]
+
+                local ARG=$2
+                [ -n "$(wg show interfaces | grep -wo "$ARG")" ] && THIS="dev "$ARG || THIS=
+                echo -e "\n\t\t${cBGRE}Press CTRL-C to stop iproute2 monitor\n"$cRESET
+                trap 'Process_User_Choice' INT
+                ip -ts monitor label $THIS
+            ;;
             *)
                 printf '\n\a\t%bInvalid Option%b "%s"%b Please enter a valid option\n' "$cBRED" "$cRESET" "$menu1" "$cBRED"    # v4.03 v3.04 v1.09
             ;;
@@ -6963,8 +7025,6 @@ Main() { true; }            # Syntax that is Atom Shellchecker compatible!
 
 PATH=/opt/sbin:/opt/bin:/opt/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-
-
 if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -z "$(grep -E "^NOCOLOR|^NOCOLOUR" ${INSTALL_DIR}WireguardVPN.conf)" ];then     # v4.15
     ANSIColours
 fi
@@ -7113,7 +7173,7 @@ if [ "$1" != "install" ];then   # v2.01
                     if [ "$(nvram get ntp_ready)" = "0" ];then              # v4.01 Ensure event 'restart_diskmon' triggers the actual start of WireGuard Session Manager
                         FN="/jffs/scripts/service-event-end"
                         [ ! -f $FN ] && { echo "#!/bin/sh" > $FN; chmod +x $FN; }
-                        [ -z "$(grep -i "WireGuard" $FN)" ] && echo -e "if [ "\$2" = "diskmon" ]; then { sh /jffs/addons/wireguard/wg_manager.sh init & } ; fi # WireGuard_Manager" >> $FN   # v4.01
+                        [ -z "$(grep -i "WireGuard" $FN)" ] && echo -e "if [ "\$2" = "diskmon" ]; then { /bin/sh /jffs/addons/wireguard/wg_manager.sh init & } ; fi # WireGuard_Manager" >> $FN   #  v4.16 v4.01
                         SayT "WireGuard Session Manager delayed for NTP synch event trigger 'restart_diskmon'"  # v4.11 v4.01
                         exit 99
                     fi
@@ -7161,7 +7221,8 @@ if [ "$1" != "install" ];then   # v2.01
                 exit_message
             ;;
             show|list)
-                Show_Peer_Status "full"                        # Force verbose detail
+                # Force verbose detail if active Peers
+                [ -n "$(wg show interfaces)" ] && Show_Peer_Status "full" || { echo -e; Say "WireGuard ACTIVE Peer Status: Clients 0, Servers 0" ;}     # v4.16                       # Force verbose detail
                 echo -e $cRESET
                 exit_message
             ;;
