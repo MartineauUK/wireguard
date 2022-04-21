@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.16.12"
-#============================================================================================ © 2021-2022 Martineau v4.16.12
+VERSION="v4.16.13"
+#============================================================================================ © 2021-2022 Martineau v4.16.13
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 19-Apr-2022
+# Last Updated Date: 21-Apr-2022
 #
 # Description:
 #
@@ -711,7 +711,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
                 IPSETS=$(sqlite3 $SQL_DATABASE "SELECT ipset FROM ipset WHERE peer='${WG_INTERFACE}';" | tr '\n' ' ')
                 for IPSET in $IPSETS
                     do
-                        ipset list $IPSET >/dev/null 2>&1;if [ $? -eq 0 ]; then
+                        ipset list $IPSET -n >/dev/null 2>&1;if [ $? -eq 0 ]; then
 
                             IPSET_FAMILY=$(ipset list $IPSET | awk '/^Header/ {print $3}')
                             [ "$IPSET_FAMILY" == "inet6" ] && IPV_TEXT="IPv6" || IPV_TEXT="IPv4"
@@ -749,7 +749,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
                             fi
 
                             if [ "$ADD_IPV4_RULE" == "Y" ] || [ "$ADD_IPV6_RULE" == "Y" ];then
-                                if [ "$ADD_IPV4_RULE" == "Y" ];then
+                                if [ "$ADD_IPV4_RULE" == "Y" ] && [ "$IPSET_FAMILY" != "inet6" ];then
                                     iptables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'" 2>/dev/null # v4.12
                                     cmd iptables -t mangle -A PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'"             # v4.12
                                 fi
@@ -775,18 +775,18 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
 
         fi
 
-        # if [ -n "$(awk '/^AllowedIPs/ {print $0}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "0.0.0.0/0")" ] || [ -n "$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "::0/0")" ];then  # v4.14
-            # if [ -n "$(awk '/^AllowedIPs/ {print $0}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "0.0.0.0/0")" ];then
-                # cmd ip route add 0/1   dev $VPN_ID table 12$VPN_NUM
-                # cmd ip route add 128/1 dev $VPN_ID table 12$VPN_NUM
-            # fi
-            # if [ "$USE_IPV6" == "Y" ];then                                              # v4.08
-                # if [ -n "$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "::0/0")" ];then
-                    # cmd ip -6 route add 0::/1 dev $VPN_ID table 12$VPN_NUM
-                    # cmd ip -6 route add 8000::/1 dev $VPN_ID table 12$VPN_NUM
-                # fi
-            # fi
-        # fi
+        #if [ -n "$(awk '/^AllowedIPs/ {print $0}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "0.0.0.0/0")" ] || [ -n "$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "::0/0")" ];then  # v4.14
+            #if [ -n "$(awk '/^AllowedIPs/ {print $0}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "0.0.0.0/0")" ];then
+                cmd ip route add 0/1   dev $VPN_ID table 12$VPN_NUM
+                cmd ip route add 128/1 dev $VPN_ID table 12$VPN_NUM
+            #fi
+            if [ "$USE_IPV6" == "Y" ];then                                              # v4.08
+                #if [ -n "$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf | grep -oF "::0/0")" ];then
+                    cmd ip -6 route add 0::/1 dev $VPN_ID table 12$VPN_NUM
+                    cmd ip -6 route add 8000::/1 dev $VPN_ID table 12$VPN_NUM
+                #fi
+            fi
+        #fi
 
         ip route show table main dev $(nvram get lan_ifname) | while read ROUTE
             do
