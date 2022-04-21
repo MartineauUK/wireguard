@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.16bB"
-#============================================================================================ © 2021-2022 Martineau v4.16bB
+VERSION="v4.16bC"
+#============================================================================================ © 2021-2022 Martineau v4.16bC
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.16bB"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: xx-Apr-2022
+# Last Updated Date: 21-Apr-2022
 
 #
 # Description:
@@ -4825,12 +4825,12 @@ Manage_IPSET() {
                     #   Can only be 'src,src' or 'dst,src'
                     #   hash:ip,mac
                     #   bitmap:ip,mac
-                    #if [ "$(ipset list $IPSET | awk -F ',' '/^Type/ {print $NF}')" == "mac" ];then
-                        [ -n "$(ipset list $IPSET | grep -F "hash:mac")" ] && DSTSRC="src"  # v4.16
+                    #if [ "$(ipset list $IPSET -t | awk -F ',' '/^Type/ {print $NF}')" == "mac" ];then
+                        [ -n "$(ipset list $IPSET -t | grep -F "hash:mac")" ] && DSTSRC="src"  # v4.16
                     #fi
 
                     if [ "$ACTION" == "add" ];then
-                        ipset list $IPSET >/dev/null 2>&1;if [ $? -eq 0 ]; then
+                        ipset list $IPSET -n >/dev/null 2>&1;if [ $? -eq 0 ]; then
                             if [ -z "$(sqlite3 $SQL_DATABASE "SELECT * FROM ipset WHERE peer='$WG_INTERFACE' AND ipset='$IPSET';")" ];then
                                 sqlite3 $SQL_DATABASE "INSERT into ipset values('$IPSET','$USE','$WG_INTERFACE','$FWMARK','$DSTSRC');"
                                 echo -e $cBGRE"\n\t[✔] Ipset ${cBWHT}'$IPSET'${cBGRE} Selective Routing ${ACTION}ed ${cBMAG}$WG_INTERFACE"$cRESET
@@ -4891,8 +4891,8 @@ Manage_IPSET() {
                     #   Can only be 'src,src' or 'dst,src'
                     #   hash:ip,mac
                     #   bitmap:ip,mac
-                    #if [ "$(ipset list $IPSET | awk -F ',' '/^Type/ {print $NF}')" == "mac" ];then
-                        [ -n "$(ipset list $IPSET | grep -F "hash:mac")" ] && DSTSRC="src"  # v4.16
+                    #if [ "$(ipset list $IPSET -t | awk -F ',' '/^Type/ {print $NF}')" == "mac" ];then
+                        [ -n "$(ipset list $IPSET -t | grep -F "hash:mac")" ] && DSTSRC="src"  # v4.16
                     #f
                     sqlite3 $SQL_DATABASE "INSERT into ipset values('$IPSET','$USE','$WG_INTERFACE','$FWMARK','$DSTSRC');"
                 fi
@@ -4939,10 +4939,10 @@ Manage_IPSET() {
             #   Can only be 'src,src' or 'dst,src'
             #   hash:ip,mac
             #   bitmap:ip,mac
-            #if [ "$(ipset list $IPSET | awk -F ',' '/^Type/ {print $NF}')" == "mac" ];then # v4.16
-                #local DIMENSION=$(ipset list $IPSET | grep -E "^TYPE" | sed 's/^.*://')        # v4.16
+            #if [ "$(ipset list $IPSET -t | awk -F ',' '/^Type/ {print $NF}')" == "mac" ];then # v4.16
+                #local DIMENSION=$(ipset list $IPSET -t | grep -E "^TYPE" | sed 's/^.*://')        # v4.16
                 #[ "$DIMENSION" == "mac" ] && DSTSRC="src"                                  # v4.16
-                [ -n "$(ipset list $IPSET | grep -F "hash:mac")" ] && DSTSRC="src"  # v4.16
+                [ -n "$(ipset list $IPSET -t | grep -F "hash:mac")" ] && DSTSRC="src"  # v4.16
             #fi
 
             if [ "$VALID" == "Y" ];then
