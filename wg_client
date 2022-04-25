@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.16.13"
-#============================================================================================ © 2021-2022 Martineau v4.16.13
+VERSION="v4.16.14"
+#============================================================================================ © 2021-2022 Martineau v4.16.14
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 21-Apr-2022
+# Last Updated Date: 25-Apr-2022
 #
 # Description:
 #
@@ -267,12 +267,31 @@ Manage_Passthru(){
                 fi
 
                 if [ -n "$IP_ADDR" ];then
-                    #logger -t "WireGuard-${MODE}${VPN_NAME}" "Psuedo command 'pass-thru' will be applied to "$TYPE $IP_ADDR "directly via VPN Client '"$WG_INTERFACE"' ("$DESC")"
-                    ip rule del from $IP_ADDR table 12$VPN_NUM prio 998$VPN_NUM 2> /dev/null
-                    [ "$ACTION" != "del" ] && ip rule $ACTION from $IP_ADDR table 12$VPN_NUM prio 998$VPN_NUM
-                    logger -t "WireGuard-${MODE}${VPN_NAME}" "'server' peer ($PASSTHRU_SERVER) RPDB" "'pass-thru': 'ip rule $ACTION from $IP_ADDR table 12$VPN_NUM'"
-                    iptables -t nat -D POSTROUTING -s  $IP_ADDR -o wg1$VPN_NUM -j MASQUERADE 2> /dev/null
-                    [ "$ACTION" != "del" ] && iptables -t nat -I POSTROUTING -s  $IP_ADDR -o wg1$VPN_NUM -j MASQUERADE
+                    for PASSTHRU_IP in $(echo "$IP_ADDR" | tr ',' ' ')
+                        do 
+                            ip rule del from $PASSTHRU_IP table 12$VPN_NUM prio 998$VPN_NUM 2> /dev/null
+                            ip -6 rule del from $PASSTHRU_IP table 12$VPN_NUM prio 998$VPN_NUM 2> /dev/null         # v4.16.14  
+                            iptables  -t nat -D POSTROUTING -s  $IP_ADDR -o wg1$VPN_NUM -j MASQUERADE 2> /dev/null  # v4.16.14
+                            ip6tables -t nat -D POSTROUTING -s  $IP_ADDR -o wg1$VPN_NUM -j MASQUERADE 2> /dev/null  # v4.16.14
+                        done
+
+                    if [ "$ACTION" != "del" ];then 
+                        DASH6=                                                                                      # v4.16.14              
+                        for PASSTHRU_IP in $(echo "$IP_ADDR" | tr ',' ' ')                                          # v4.16.14
+                            do
+                                if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$PASSTHRU_IP" | grep -F ":")" ];then     # v4.16.14
+                                    cmd ip -6 ip rule $ACTION from $PASSTHRU_IP table 12$VPN_NUM prio 998$VPN_NUM   # v4.16.14
+                                    cmd ip6tables -t nat -I POSTROUTING -s  $IP_ADDR -o wg1$VPN_NUM -j MASQUERADE   # v4.16.14
+                                    DASH6="-6 "
+                                else
+                                    if [ -n "$(echo "$PASSTHRU_IP" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$PASSTHRU_IP" | Is_IPv4)" ];then # v4.16.14
+                                        cmd ip rule $ACTION from $PASSTHRU_IP table 12$VPN_NUM prio 998$VPN_NUM         # v4.16.14
+                                        cmd iptables -t nat -I POSTROUTING -s  $IP_ADDR -o wg1$VPN_NUM -j MASQUERADE    # v4.16.14
+                                    fi
+                                fi
+                                logger -t "WireGuard-${MODE}${VPN_NAME}" "'server' peer ($PASSTHRU_SERVER) RPDB" "'pass-thru': 'ip ${DASH6}rule $ACTION from $PASSTHRU_IP table 12$VPN_NUM'"    # v4.16.14      
+                            done
+                    fi
 
                     if [ "$ACTION" == "add" ];then
                         # Ensure target WireGuard 'client' peer routing policy table contains WireGuard 'server' peer IP/network in the passthru tunnel @chongnt
@@ -299,8 +318,13 @@ EOR
                             fi
                         fi
                         if [ "$FLUSH" == "Y" ];then
-                            ip route flush cache
-                            [ "$USE_IPV6" == "Y" ] && ip -6 route flush cache                   # v4.16.7
+                            cmd ip route flush cache
+                            if [ "$USE_IPV6" == "Y" ];then
+                                # The following ALWAYS issues
+                                #   'Failed to send flush request: No such process', so try it anyway, a reboot will fix it!
+                                [ "$SHOWCMDS" == "Y" ] && echo -e "[?] ip -6 route flush cache $cBRED>>>>'Failed to send flush request: No such process'$cRESET.....ALWAYS FAILS!!!!"
+                                ip -6 route flush cache 2>/dev/null              # v4.16.7
+                            fi
                         else
                             logger -st "WireGuard-${MODE}${VPN_NAME}" "Warning 'server' peer ($PASSTHRU_SERVER) route not found - is it UP? FLUSH="$FLUSH
                         fi
@@ -598,8 +622,8 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         # User Exit @Torson
         if [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-route-up.sh ];then
             logger -t "WireGuard-${MODE}${VPN_NAME}" "Executing Event:${VPN_ID}-route-up.sh"
+            [ "$SHOWCMDS" == "Y" ] && echo -e "[+] ${VPN_ID}-route-up.sh"           
             sh ${INSTALL_DIR}Scripts/${VPN_ID}-route-up.sh
-            [ "$SHOWCMDS" == "Y" ] && echo -e "[+] ${VPN_ID}-route-up.sh"
         fi
         host="$(wg show $VPN_ID endpoints | sed -n 's/.*\t\(.*\):.*/\1/p')"
         if [ -n "$(echo "$host" | Is_IPv4)" ];then          # v4.08
@@ -816,8 +840,8 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         # User Exit @ZebMcKayhan
         if [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh ];then
             logger -t "WireGuard-${MODE}${VPN_NAME}" "Executing Event:${VPN_ID}-up.sh"
+            [ "$SHOWCMDS" == "Y" ] && echo -e "[+] ${VPN_ID}-up.sh"         
             sh ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh  # v4.08
-            [ "$SHOWCMDS" == "Y" ] && echo -e "[+] ${VPN_ID}-up.sh"
         fi
 
         if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -z "$(grep -E "^NOTCPMSS" /jffs/addons/wireguard/WireguardVPN.conf)" ];then    # v4.12
@@ -977,8 +1001,8 @@ else
     # User Exit @Torson
     if [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-route-down.sh ];then
         logger -t "WireGuard-${MODE}${VPN_NAME}" "Executing Event:${VPN_ID}-route-down.sh"
+        [ "$SHOWCMDS" == "Y" ] && echo -e "[+] ${VPN_ID}-route-down.sh"     
         sh ${INSTALL_DIR}Scripts/${VPN_ID}-route-down.sh
-        [ "$SHOWCMDS" == "Y" ] && echo -e "[+] ${VPN_ID}-route-down.sh"
     fi
 
     # If Policy mode, then there was no default route
@@ -1088,6 +1112,7 @@ else
             ip rule del from 0/0 fwmark $TAG_MARK"/"$TAG_MARK table 12$VPN_NUM prio 999$VPN_NUM   2>/dev/null               # v4.12
 
             iptables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'" 2>/dev/null # v4.12
+
             if [ "$USE_IPV6" == "Y" ];then
                 ip6tables -t mangle -D PREROUTING -m set --match-set $IPSET $DSTSRC -j MARK --set-mark ${FWMARK}/${FWMARK} -m comment --comment "WireGuard 'client'" 2>/dev/null    # v4.12
             fi
@@ -1100,8 +1125,8 @@ else
     # User Exit @ZebMcKayhan
     if [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh ];then
         logger -t "WireGuard-${MODE}${VPN_NAME}" "Executing Event:${VPN_ID}-down.sh"
+        [ "$SHOWCMDS" == "Y" ] && echo -e "[+] ${VPN_ID}-down.sh"       
         sh ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh
-        [ "$SHOWCMDS" == "Y" ] && echo -e "[+] ${VPN_ID}-down.sh"
     fi
 
     #mv /tmp/resolv.dnsmasq_backup.$WG_INTERFACE /tmp/resolv.dnsmasq 2>/dev/null
