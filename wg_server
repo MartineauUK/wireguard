@@ -1,9 +1,9 @@
-VERSION="v4.16.9"
-#============================================================================================ © 2021-2022 Martineau v4.16.9
+VERSION="v4.16.10"
+#============================================================================================ © 2021-2022 Martineau v4.16.10
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 08-Apr-2022
+# Last Updated Date: 25-Apr-2022
 #
 # Description:
 #
@@ -146,14 +146,14 @@ Manage_Passthru() {
                     if [ "$VPN_ID" != "wan" ];then
                         # Ensure target WireGuard 'client' peer routing policy table contains WireGuard 'server' peer IP/network in the passthru tunnel @chongnt
                         while read ROUTE; do
-                            ip route $ACTION $ROUTE table $TABLE 2>/dev/null && ROUTING_CHANGED=
+                            cmd ip route $ACTION $ROUTE table $TABLE 2>/dev/null && ROUTING_CHANGED=
                         done << EOR
 $(ip route | grep "$WG_INTERFACE")
 EOR
                         if [ "$USE_IPV6" == "Y" ];then                  # v4.16.9
                             # Ensure target WireGuard 'client' peer IPv6 routing policy table contains WireGuard 'server' peer IP/network in the passthru tunnel @chongnt
                             while read ROUTE; do
-                                ip -6 route $ACTION $ROUTE table $TABLE 2>/dev/null && ROUTING_CHANGED=
+                                cmd ip -6 route $ACTION $ROUTE table $TABLE 2>/dev/null && ROUTING_CHANGED=
                             done << EOR
 $(ip -6 route | grep "$WG_INTERFACE")
 EOR
@@ -161,8 +161,10 @@ EOR
 
                     fi
 
-                    ip rule $ACTION from $IP_ADDR table $TABLE prio 998$VPN_NUM                 # v4.14 v4.13 Fix @chongnt
-                    [ "$USE_IPV6" == "Y" ] && ip -6 rule $ACTION from $IP_ADDR table $TABLE prio 998$VPN_NUM    # v4.16.9
+                    cmd ip rule $ACTION from $IP_ADDR table $TABLE prio 998$VPN_NUM                 # v4.14 v4.13 Fix @chongnt
+                    if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$IP_ADDR"  | grep -F ":")" ];then
+                        cmd ip -6 rule $ACTION from $IP_ADDR table $TABLE prio 998$VPN_NUM    # v4.16.9
+                    fi
 
                 else
                     ip rule $ACTION from $IP_ADDR table $TABLE prio 998$VPN_NUM 2>/dev/null     # v4.14
@@ -529,8 +531,8 @@ if [ "$2" != "disable" ];then
     # User Exit @ZebMcKayhan
     if [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh ];then
         logger -t "WireGuard-server${VPN_NAME}" "Executing ${VPN_ID}-up.sh"
-        sh ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh
         [ "$SHOWCMDS" == "Y" ] && echo -e "[+] ${VPN_ID}-up.sh"
+        sh ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh
     fi
 
     # v4.14 Process 'PostUp' commands
@@ -583,8 +585,8 @@ else
     # User Exit @ZebMcKayhan
     if [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh ];then
         logger -t "WireGuard-server${VPN_NAME}" "Executing ${VPN_ID}-down.sh"
-        sh ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh
         [ "$SHOWCMDS" == "Y" ] && echo -e "[+] ${VPN_ID}-down.sh"
+        sh ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh
     fi
 
     # v4.14 Process 'PostDown' commands
