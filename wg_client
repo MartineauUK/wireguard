@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.16.14"
-#============================================================================================ © 2021-2022 Martineau v4.16.14
+VERSION="v4.16.15"
+#============================================================================================ © 2021-2022 Martineau v4.16.15
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 25-Apr-2022
+# Last Updated Date: 26-Apr-2022
 #
 # Description:
 #
@@ -275,21 +275,21 @@ Manage_Passthru(){
                             ip6tables -t nat -D POSTROUTING -s  $IP_ADDR -o wg1$VPN_NUM -j MASQUERADE 2> /dev/null  # v4.16.14
                         done
 
-                    if [ "$ACTION" != "del" ];then 
-                        DASH6=                                                                                      # v4.16.14              
+                    if [ "$ACTION" != "del" ];then              
                         for PASSTHRU_IP in $(echo "$IP_ADDR" | tr ',' ' ')                                          # v4.16.14
                             do
                                 if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$PASSTHRU_IP" | grep -F ":")" ];then     # v4.16.14
-                                    cmd ip -6 ip rule $ACTION from $PASSTHRU_IP table 12$VPN_NUM prio 998$VPN_NUM   # v4.16.14
-                                    cmd ip6tables -t nat -I POSTROUTING -s  $IP_ADDR -o wg1$VPN_NUM -j MASQUERADE   # v4.16.14
-                                    DASH6="-6 "
+                                    cmd ip -6 rule $ACTION from $PASSTHRU_IP table 12$VPN_NUM prio 998$VPN_NUM          # v4.16.15
+                                    cmd ip6tables -t nat -I POSTROUTING -s $PASSTHRU_IP -o wg1$VPN_NUM -j MASQUERADE    # v4.16.15
+                                    DASH6="-6 "     # v4.16.15 v4.16.14
                                 else
                                     if [ -n "$(echo "$PASSTHRU_IP" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$PASSTHRU_IP" | Is_IPv4)" ];then # v4.16.14
                                         cmd ip rule $ACTION from $PASSTHRU_IP table 12$VPN_NUM prio 998$VPN_NUM         # v4.16.14
-                                        cmd iptables -t nat -I POSTROUTING -s  $IP_ADDR -o wg1$VPN_NUM -j MASQUERADE    # v4.16.14
+                                        cmd iptables -t nat -I POSTROUTING -s  $PASSTHRU_IP -o wg1$VPN_NUM -j MASQUERADE    # v4.16.15
                                     fi
                                 fi
                                 logger -t "WireGuard-${MODE}${VPN_NAME}" "'server' peer ($PASSTHRU_SERVER) RPDB" "'pass-thru': 'ip ${DASH6}rule $ACTION from $PASSTHRU_IP table 12$VPN_NUM'"    # v4.16.14      
+                                DASH6=                                                                                      # v4.16.14 
                             done
                     fi
 
@@ -318,8 +318,10 @@ EOR
                             fi
                         fi
                         if [ "$FLUSH" == "Y" ];then
+                            #ip route show cache
                             cmd ip route flush cache
                             if [ "$USE_IPV6" == "Y" ];then
+                                #ip -6 route show cache
                                 # The following ALWAYS issues
                                 #   'Failed to send flush request: No such process', so try it anyway, a reboot will fix it!
                                 [ "$SHOWCMDS" == "Y" ] && echo -e "[?] ip -6 route flush cache $cBRED>>>>'Failed to send flush request: No such process'$cRESET.....ALWAYS FAILS!!!!"
