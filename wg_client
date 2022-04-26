@@ -268,14 +268,14 @@ Manage_Passthru(){
 
                 if [ -n "$IP_ADDR" ];then
                     for PASSTHRU_IP in $(echo "$IP_ADDR" | tr ',' ' ')
-                        do 
+                        do
                             ip rule del from $PASSTHRU_IP table 12$VPN_NUM prio 998$VPN_NUM 2> /dev/null
-                            ip -6 rule del from $PASSTHRU_IP table 12$VPN_NUM prio 998$VPN_NUM 2> /dev/null         # v4.16.14  
+                            ip -6 rule del from $PASSTHRU_IP table 12$VPN_NUM prio 998$VPN_NUM 2> /dev/null         # v4.16.14
                             iptables  -t nat -D POSTROUTING -s  $IP_ADDR -o wg1$VPN_NUM -j MASQUERADE 2> /dev/null  # v4.16.14
                             ip6tables -t nat -D POSTROUTING -s  $IP_ADDR -o wg1$VPN_NUM -j MASQUERADE 2> /dev/null  # v4.16.14
                         done
 
-                    if [ "$ACTION" != "del" ];then              
+                    if [ "$ACTION" != "del" ];then
                         for PASSTHRU_IP in $(echo "$IP_ADDR" | tr ',' ' ')                                          # v4.16.14
                             do
                                 if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$PASSTHRU_IP" | grep -F ":")" ];then     # v4.16.14
@@ -288,8 +288,8 @@ Manage_Passthru(){
                                         cmd iptables -t nat -I POSTROUTING -s  $PASSTHRU_IP -o wg1$VPN_NUM -j MASQUERADE    # v4.16.15
                                     fi
                                 fi
-                                logger -t "WireGuard-${MODE}${VPN_NAME}" "'server' peer ($PASSTHRU_SERVER) RPDB" "'pass-thru': 'ip ${DASH6}rule $ACTION from $PASSTHRU_IP table 12$VPN_NUM'"    # v4.16.14      
-                                DASH6=                                                                                      # v4.16.14 
+                                logger -t "WireGuard-${MODE}${VPN_NAME}" "'server' peer ($PASSTHRU_SERVER) RPDB" "'pass-thru': 'ip ${DASH6}rule $ACTION from $PASSTHRU_IP table 12$VPN_NUM'"    # v4.16.14
+                                DASH6=                                                                                      # v4.16.14
                             done
                     fi
 
@@ -317,23 +317,23 @@ EOR
 
                             fi
                         fi
-                        if [ "$FLUSH" == "Y" ];then
-                            #ip route show cache
-                            cmd ip route flush cache
-                            if [ "$USE_IPV6" == "Y" ];then
-                                #ip -6 route show cache
-                                # The following ALWAYS issues
-                                #   'Failed to send flush request: No such process', so try it anyway, a reboot will fix it!
-                                [ "$SHOWCMDS" == "Y" ] && echo -e "[?] ip -6 route flush cache $cBRED>>>>'Failed to send flush request: No such process'$cRESET.....ALWAYS FAILS!!!!"
-                                ip -6 route flush cache 2>/dev/null              # v4.16.7
-                            fi
-                        else
-                            logger -st "WireGuard-${MODE}${VPN_NAME}" "Warning 'server' peer ($PASSTHRU_SERVER) route not found - is it UP? FLUSH="$FLUSH
-                        fi
-                        local FLUSH=
                     fi
                 fi
             done
+
+            if [ "$FLUSH" == "Y" ];then
+                #ip route show cache
+                cmd ip route flush cache
+                if [ "$USE_IPV6" == "Y" ];then
+                    #ip -6 route show cache
+                    # The following ALWAYS issues
+                    #   'Failed to send flush request: No such process', so try it anyway, a reboot will fix it!
+                    [ "$SHOWCMDS" == "Y" ] && echo -e "[?] ip -6 route flush cache $cBRED>>>>'Failed to send flush request: No such process'$cRESET.....ALWAYS FAILS!!!!"
+                    ip -6 route flush cache 2>/dev/null              # v4.16.7
+                fi
+            else
+                logger -st "WireGuard-${MODE}${VPN_NAME}" "Warning 'server' peer ($PASSTHRU_SERVER) route not found - is it UP? FLUSH="$FLUSH
+            fi
     fi
 }
 Process_Pre_Post_Commands() {
@@ -624,7 +624,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         # User Exit @Torson
         if [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-route-up.sh ];then
             logger -t "WireGuard-${MODE}${VPN_NAME}" "Executing Event:${VPN_ID}-route-up.sh"
-            [ "$SHOWCMDS" == "Y" ] && echo -e "[+] ${VPN_ID}-route-up.sh"           
+            [ "$SHOWCMDS" == "Y" ] && echo -e "[+] ${VPN_ID}-route-up.sh"
             sh ${INSTALL_DIR}Scripts/${VPN_ID}-route-up.sh
         fi
         host="$(wg show $VPN_ID endpoints | sed -n 's/.*\t\(.*\):.*/\1/p')"
@@ -842,7 +842,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         # User Exit @ZebMcKayhan
         if [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh ];then
             logger -t "WireGuard-${MODE}${VPN_NAME}" "Executing Event:${VPN_ID}-up.sh"
-            [ "$SHOWCMDS" == "Y" ] && echo -e "[+] ${VPN_ID}-up.sh"         
+            [ "$SHOWCMDS" == "Y" ] && echo -e "[+] ${VPN_ID}-up.sh"
             sh ${INSTALL_DIR}Scripts/${VPN_ID}-up.sh  # v4.08
         fi
 
@@ -1003,7 +1003,7 @@ else
     # User Exit @Torson
     if [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-route-down.sh ];then
         logger -t "WireGuard-${MODE}${VPN_NAME}" "Executing Event:${VPN_ID}-route-down.sh"
-        [ "$SHOWCMDS" == "Y" ] && echo -e "[+] ${VPN_ID}-route-down.sh"     
+        [ "$SHOWCMDS" == "Y" ] && echo -e "[+] ${VPN_ID}-route-down.sh"
         sh ${INSTALL_DIR}Scripts/${VPN_ID}-route-down.sh
     fi
 
@@ -1127,7 +1127,7 @@ else
     # User Exit @ZebMcKayhan
     if [ -f ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh ];then
         logger -t "WireGuard-${MODE}${VPN_NAME}" "Executing Event:${VPN_ID}-down.sh"
-        [ "$SHOWCMDS" == "Y" ] && echo -e "[+] ${VPN_ID}-down.sh"       
+        [ "$SHOWCMDS" == "Y" ] && echo -e "[+] ${VPN_ID}-down.sh"
         sh ${INSTALL_DIR}Scripts/${VPN_ID}-down.sh
     fi
 
