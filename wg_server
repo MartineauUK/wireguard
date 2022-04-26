@@ -1,9 +1,9 @@
-VERSION="v4.16.10"
-#============================================================================================ © 2021-2022 Martineau v4.16.10
+VERSION="v4.16.11"
+#============================================================================================ © 2021-2022 Martineau v4.16.11
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 25-Apr-2022
+# Last Updated Date: 26-Apr-2022
 #
 # Description:
 #
@@ -134,7 +134,7 @@ Manage_Passthru() {
 
     if [ -n "$PASSTHRU_CLIENTS" ];then
 
-    local IP_ADDR=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers where peer='$WG_INTERFACE';")
+        local IP_ADDR=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers where peer='$WG_INTERFACE';")
 
         for VPN_ID in $PASSTHRU_CLIENTS     # wg11 wg14
             do
@@ -146,31 +146,49 @@ Manage_Passthru() {
                     if [ "$VPN_ID" != "wan" ];then
                         # Ensure target WireGuard 'client' peer routing policy table contains WireGuard 'server' peer IP/network in the passthru tunnel @chongnt
                         while read ROUTE; do
-                            cmd ip route $ACTION $ROUTE table $TABLE 2>/dev/null && ROUTING_CHANGED=
+                            cmd ip route $ACTION $ROUTE table $TABLE 2>/dev/null && FLUSH="Y"
                         done << EOR
 $(ip route | grep "$WG_INTERFACE")
 EOR
                         if [ "$USE_IPV6" == "Y" ];then                  # v4.16.9
                             # Ensure target WireGuard 'client' peer IPv6 routing policy table contains WireGuard 'server' peer IP/network in the passthru tunnel @chongnt
                             while read ROUTE; do
-                                cmd ip -6 route $ACTION $ROUTE table $TABLE 2>/dev/null && ROUTING_CHANGED=
+                                cmd ip -6 route $ACTION $ROUTE table $TABLE 2>/dev/null && FLUSH="Y"
                             done << EOR
 $(ip -6 route | grep "$WG_INTERFACE")
 EOR
                         fi
-
                     fi
 
-                    cmd ip rule $ACTION from $IP_ADDR table $TABLE prio 998$VPN_NUM                 # v4.14 v4.13 Fix @chongnt
-                    if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$IP_ADDR"  | grep -F ":")" ];then
-                        cmd ip -6 rule $ACTION from $IP_ADDR table $TABLE prio 998$VPN_NUM    # v4.16.9
-                    fi
-
+                    for PASSTHRU_IP in $(echo "$IP_ADDR" | tr ',' ' ')                              # v4.16.11
+                        do
+                            [ -z "$(echo "$PASSTHRU_IP"  | grep -F ":")" ] && cmd ip rule $ACTION from $PASSTHRU_IP table $TABLE prio 998$VPN_NUM     # v4.16.11 v4.14 v4.13 Fix @chongnt
+                            if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$PASSTHRU_IP"  | grep -F ":")" ];then    # v4.16.11
+                                cmd ip -6 rule $ACTION from $PASSTHRU_IP table $TABLE prio 998$VPN_NUM          # v4.16.11 v4.16.9
+                                DASH6="-6 "                                                                     # v4.16.11
+                            fi
+                            logger -t "WireGuard-${MODE}${VPN_NAME}" "'client' peer ($PASSTHRU_CLIENTS) RPDB" "'pass-thru': 'ip ${DASH6}rule $ACTION from $PASSTHRU_IP table $TABLE'"
+                            DASH6=                                                                              # v4.16.11
+                        done
                 else
                     ip rule $ACTION from $IP_ADDR table $TABLE prio 998$VPN_NUM 2>/dev/null     # v4.14
                     [ "$USE_IPV6" == "Y" ] && ip -6 rule $ACTION from $IP_ADDR table $TABLE prio 998$VPN_NUM 2>/dev/null    # v4.16.9
                 fi
             done
+
+            if [ "$FLUSH" == "Y" ];then
+                #ip route show cache
+                cmd ip route flush cache
+                if [ "$USE_IPV6" == "Y" ];then
+                    #ip -6 route show cache
+                    # The following ALWAYS issues
+                    #   'Failed to send flush request: No such process', so try it anyway, a reboot will fix it!
+                    [ "$SHOWCMDS" == "Y" ] && echo -e "[?] ip -6 route flush cache $cBRED>>>>'Failed to send flush request: No such process'$cRESET.....ALWAYS FAILS!!!!"
+                    ip -6 route flush cache 2>/dev/null              # v4.16.7
+                fi
+            #else
+                #logger -st "WireGuard-${MODE}${VPN_NAME}" "Warning 'server' peer ($PASSTHRU_SERVER) route not found - is it UP? FLUSH="$FLUSH
+            fi
     fi
 }
 Process_Pre_Post_Commands() {
