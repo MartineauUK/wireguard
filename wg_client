@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.16.15"
-#============================================================================================ © 2021-2022 Martineau v4.16.15
+VERSION="v4.16.16"
+#============================================================================================ © 2021-2022 Martineau v4.16.16
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 26-Apr-2022
+# Last Updated Date: 27-Apr-2022
 #
 # Description:
 #
@@ -264,6 +264,10 @@ Manage_Passthru(){
                     local IP_ADDR=$(sqlite3 $SQL_DATABASE "SELECT ip FROM devices where name='$PASSTHRU';" 2> /dev/null)
                     [ -z "$IP_ADDR" ] && local IP_ADDR=$PASSTHRU
                     local TYPE="I/P"
+                    local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM clients where peer='$PASSTHRU';")                               # v4.16.16
+                    [ -z "$DESC" ] && local DESC=$(grep -FB1 "[Interface]" ${CONFIG_DIR}${PASSTHRU}.conf | grep -vF "[Interface]")      # v4.16.16
+                    local DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')                                                   # v4.16.16
+                    [ -z "$DESC" ] && local DESC="# $PASSTHRU"                                                                          # v4.16.16
                 fi
 
                 if [ -n "$IP_ADDR" ];then
@@ -288,7 +292,7 @@ Manage_Passthru(){
                                         cmd iptables -t nat -I POSTROUTING -s  $PASSTHRU_IP -o wg1$VPN_NUM -j MASQUERADE    # v4.16.15
                                     fi
                                 fi
-                                logger -t "WireGuard-${MODE}${VPN_NAME}" "'server' peer ($PASSTHRU_SERVER) RPDB" "'pass-thru': 'ip ${DASH6}rule $ACTION from $PASSTHRU_IP table 12$VPN_NUM'"    # v4.16.14
+                                logger -t "WireGuard-${MODE}${VPN_NAME}" "'server' peer ($PASSTHRU_SERVER) RPDB" "'$TYPE pass-thru': 'ip ${DASH6}rule $ACTION from $PASSTHRU_IP table 12$VPN_NUM' $DESC"    # # v4.16.16 v4.16.14
                                 DASH6=                                                                                      # v4.16.14
                             done
                     fi
@@ -332,7 +336,7 @@ EOR
                     ip -6 route flush cache 2>/dev/null              # v4.16.7
                 fi
             else
-                logger -st "WireGuard-${MODE}${VPN_NAME}" "Warning 'server' peer ($PASSTHRU_SERVER) route not found - is it UP? FLUSH="$FLUSH
+                [ "$ACTION" != "del" ] && logger -t "WireGuard-${MODE}${VPN_NAME}" "Warning 'server' peer ($PASSTHRU_SERVER) route not found - is it UP? FLUSH="$FLUSH
             fi
     fi
 }
