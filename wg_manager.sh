@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.16bC"
-#============================================================================================ © 2021-2022 Martineau v4.16bC
+VERSION="v4.16bD"
+#============================================================================================ © 2021-2022 Martineau v4.16bD
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.16bC"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 21-Apr-2022
+# Last Updated Date: 27-Apr-2022
 
 #
 # Description:
@@ -2007,6 +2007,17 @@ $PRE_SHARED_KEY
 EOF
 
                                         echo -e $cBGRE"\n\t[✔] Device '${DEVICE}' bind to 'server' Peer '$SERVER_PEER' success\n"$cRESET
+
+                                        # Need to Restart the 'server' Peer if it is UP
+                                        if [ -n "$(wg show interfaces | grep "$SERVER_PEER")" ];then    # v4.16
+                                            local CMD="restart"                                         # v4.16
+                                            echo -e $cBWHT"\a\n\tWireGuard 'server' Peer needs to be ${CMD}ed to allow 'client' Peer ${cBMAG}$DEVICE"
+                                            echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer (${cBWHT}${SERVER_PEER}${cBRED}) or press$cBGRE [Enter] to SKIP."
+                                            read -r "ANS"                                                                                       # v4.16
+                                            [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$SERVER_PEER"; Show_Peer_Status "show"; }  # v4.16
+                                        fi
+
+
                                     else
                                         echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard 'device' Peer '$DEVICE'\n"$cRESET
                                     fi
@@ -2693,7 +2704,17 @@ Manage_PASSTHRU_rules() {
                     fi
                 fi
 
+                if [ -n "$(echo "$IP_SUBNET" | Is_IPv4)" ] || [ -n "$(echo "$IP_SUBNET" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$IP_SUBNET" | grep -F ":")" ];then  # v4.16
+                    :
+                else
+                    if [ -z "$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE name='$IP_SUBNET';")" ];then           # v4.16
+                        [ -n "$IP_SUBNET" ] && echo -e $cBRED"\a\n\t***ERROR: 'device' Peer (${cBWHT}$IP_SUBNET${cBRED}) doesn't exist!"$cRESET || echo -e $cBRED"\a\n\t***ERROR: 'device' Peer missing ${cRESET}(or use 'all') e.g add $IFACE MyPhone"
+                        return 1
+                    fi
+                fi
+
                 sqlite3 $SQL_DATABASE "INSERT INTO passthru values('$WG_INTERFACE','$IFACE','$IP_SUBNET');"
+
                 echo -e $cBGRE"\n\t[✔] Updated Passthru Routing rule for $WG_INTERFACE \n"$cRESET  2>&1
                 if [ "$IFACE" == "wan" ];then
                    # Need to Restart the 'server' Peer if it is UP
@@ -2702,7 +2723,16 @@ Manage_PASSTHRU_rules() {
                         echo -e $cBWHT"\a\n\tWireGuard 'server' Peer needs to be ${CMD}ed to implement 'wan' passthru"
                         echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer ($WG_INTERFACE) or press$cBGRE [Enter] to SKIP."
                         read -r "ANS"
-                        [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$WG_INTERFACE"; Show_Peer_Status "show"; }  # v4.12
+                        [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$WG_INTERFACE"; REDISPLAY=1; }  # v4.12
+                    fi
+                else
+                    # Need to Restart the 'client' Peer if it is UP
+                    if [ -n "$(wg show interfaces | grep "$IFACE")" ];then
+                        CMD="restart"
+                        echo -e $cBWHT"\a\n\tWireGuard 'client' Peer needs to be ${CMD}ed to implement '$IP_SUBNET' passthru"
+                        echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'client' Peer ($IFACE) or press$cBGRE [Enter] to SKIP."
+                        read -r "ANS"
+                        [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$IFACE"; REDISPLAY=1; }
                     fi
                 fi
             ;;
@@ -2717,7 +2747,16 @@ Manage_PASSTHRU_rules() {
                             echo -e $cBWHT"\a\n\tWireGuard 'server' Peer needs to be ${CMD}ed to remove 'wan' passthru"
                             echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer ($WG_INTERFACE) or press$cBGRE [Enter] to SKIP."
                             read -r "ANS"
-                            [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$WG_INTERFACE"; Show_Peer_Status "show"; }  # v4.12
+                            [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$WG_INTERFACE"; REDISPLAY=1; }  # v4.12
+                        fi
+                    else
+                        # Need to Restart the 'client' Peer if it is UP
+                        if [ -n "$(wg show interfaces | grep "$IFACE")" ];then
+                            CMD="restart"
+                            echo -e $cBWHT"\a\n\tWireGuard 'client' Peer needs to be ${CMD}ed to remove '$IP_SUBNET' passthru"
+                            echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'client' Peer ($IFACE) or press$cBGRE [Enter] to SKIP."
+                            read -r "ANS"
+                            [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$IFACE"; REDISPLAY=1; }
                         fi
                     fi
                 else
@@ -2725,8 +2764,22 @@ Manage_PASSTHRU_rules() {
                     echo -e "\tPress$cBRED y$cRESET to$cBRED CONFIRM${cRESET} or press$cBGRE [Enter] to SKIP."
                     read -r "ANS"
                     if [ "$ANS" == "y" ];then
+                        local RESTART_CLIENTS=$(sqlite3 $SQL_DATABASE "SELECT client FROM passthru WHERE server='$WG_INTERFACE';")  # v4.16
+                        local RESTART_CLIENTS=$(echo "$RESTART_CLIENTS" | xargs -n1 | sort -u | xargs)  # Remove duplicates from the restart list
                         sqlite3 $SQL_DATABASE "DELETE FROM passthru WHERE server='$WG_INTERFACE';"
                         echo -e $cBGRE"\n\t[✔] Deleted ALL Passthru Routing rules for $WG_INTERFACE \n"$cRESET  2>&1
+                        # Do we need to restart any 'client' Peers?                                                     # v4.16
+                        for CLIENT_PEER in $RESTART_CLIENTS
+                            do
+                                # Need to Restart the 'client' Peer if it is UP
+                                if [ -n "$(wg show interfaces | grep "$CLIENT_PEER")" ];then
+                                    CMD="restart"
+                                    echo -e $cBWHT"\a\n\tWireGuard 'client' Peer needs to be ${CMD}ed to remove 'passthru' rules"
+                                    echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'client' Peer ($CLIENT_PEER) or press$cBGRE [Enter] to SKIP."
+                                    read -r "ANS"
+                                    [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$CLIENT_PEER"; REDISPLAY=1; }
+                                fi
+                            done
                     else
                         REDISPLAY=0
                     fi
@@ -4585,11 +4638,9 @@ Diag_Routes() {
     local WG_INTERFACE=
 
     if [ "$1" == "4" ];then
-        local IPT="iptables"
         local DASH6=
         local IPVER=
     else
-        local IPT="ip6tables"
         local DASH6="-6"
         local IPVER="IPv6"
     fi
@@ -4599,6 +4650,9 @@ Diag_Routes() {
 
     echo -e $cBYEL"\n\tDEBUG: $IPVER Routing Table main\n"$cBCYA 2>&1
     ip $DASH6 route | grep -E "wg."
+
+    echo -e $cBYEL"\n\tDEBUG: $IPVER Routing Cache\n"$cBCYA 2>&1    # v4.16
+    ip $DASH6 -s route show cache                                   # v4.16
 
 }
 Diag_Rules() {
