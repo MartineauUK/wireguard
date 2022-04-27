@@ -1,5 +1,5 @@
-VERSION="v4.16.11"
-#============================================================================================ © 2021-2022 Martineau v4.16.11
+VERSION="v4.16.12"
+#============================================================================================ © 2021-2022 Martineau v4.16.12
 #
 
 # Maintainer: Martineau
@@ -461,7 +461,7 @@ if [ "$2" != "disable" ];then
             cmd ip -6 rule add fwmark $(printf "%#07x\n" "2${VPN_NUM}0") table 2${VPN_NUM}"0" prio 98${VPN_NUM}0   # v4.03
         fi
 
-        Manage_Passthru "add"
+        #Manage_Passthru "add"
 
         if [ -f /jffs/addons/wireguard/WireguardVPN.conf ] && [ -z "$(grep -E "^NOTCPMSS" /jffs/addons/wireguard/WireguardVPN.conf)" ];then    # v4.12
             cmd iptables -t mangle -I FORWARD -o $VPN_ID -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu -m comment --comment "WireGuard 'server'"
@@ -590,7 +590,7 @@ else
 
     Firewall_delete
 
-    Manage_Passthru "del"
+    #Manage_Passthru "del"
 
     ip route flush table 2${VPN_NUM}"0" 2>/dev/null     # v4.03
     ip rule del prio 98${VPN_NUM}0      2>/dev/null     # v4.03
