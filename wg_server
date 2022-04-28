@@ -1,9 +1,10 @@
-VERSION="v4.16.12"
-#============================================================================================ © 2021-2022 Martineau v4.16.12
+#!/bin/sh
+VERSION="v4.16.13"
+#============================================================================================ © 2021-2022 Martineau v4.16.13
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 26-Apr-2022
+# Last Updated Date: 28-Apr-2022
 #
 # Description:
 #
@@ -126,7 +127,7 @@ Firewall_delete() {
 }
 Manage_Passthru() {
 
-    local PASSTHRU_CLIENTS=$(sqlite3 /opt/etc/wireguard.d/WireGuard.db "SELECT client FROM passthru where server='$WG_INTERFACE';" | sort | uniq | tr '\n' ' ')
+    local PASSTHRU_CLIENTS=$(sqlite3 $SQL_DATABASE "SELECT client FROM passthru where server='$WG_INTERFACE';" | sort | uniq | tr '\n' ' ')
     local VPN_ID=           # v4.13 Fix @chongnt
 
     local ACTION="add"
@@ -558,6 +559,28 @@ if [ "$2" != "disable" ];then
 
     echo -en ${cRESET}$cBGRE"\t"
     logger -st "WireGuard-server${VPN_NAME}" "Initialisation complete."
+
+    # If there are Passthru devices, ask if the 'client' Peers should be restarted if they are UP?
+    PASSTHRU_CLIENTS=$(sqlite3 $SQL_DATABASE "SELECT client FROM passthru where server='$VPN_ID';" | sort | uniq | tr '\n' ' ')
+
+    if [ -n "$PASSTHRU_CLIENTS" ];then
+        for WG_INTERFACE in $PASSTHRU_CLIENTS
+            do
+                # Need to Restart the 'client' Peer if it is UP
+                if [ -n "$(wg show interfaces | grep "$WG_INTERFACE")" ];then
+                    [ "$(sqlite3 $SQL_DATABASE "SELECT auto FROM clients WHERE peer='$WG_INTERFACE';")" == "P" ] && POLICY="policy" || POLICY=
+                    CMD="restart"
+                    echo -e $cBWHT"\a\n\tWireGuard 'client' Peer needs to be ${CMD}ed to refresh Passthru rules"
+                    echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'client' Peer (${cRESET}${WG_INTERFACE}$cBRED) or press$cBGRE [Enter] to SKIP."
+                    read -r "ANS"
+                    if [ "$ANS" == "y" ];then
+                        ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" $POLICY
+                        ${INSTALL_DIR}wg_client $WG_INTERFACE $POLICY
+                    fi
+                fi
+            done
+    fi
+
     echo -e $cRESET
 else
 
