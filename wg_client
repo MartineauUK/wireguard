@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.16.16"
-#============================================================================================ © 2021-2022 Martineau v4.16.16
+VERSION="v4.16.17"
+#============================================================================================ © 2021-2022 Martineau v4.16.17
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 27-Apr-2022
+# Last Updated Date: 28-Apr-2022
 #
 # Description:
 #
@@ -264,17 +264,20 @@ Manage_Passthru(){
                     local IP_ADDR=$(sqlite3 $SQL_DATABASE "SELECT ip FROM devices where name='$PASSTHRU';" 2> /dev/null)
                     [ -z "$IP_ADDR" ] && local IP_ADDR=$PASSTHRU
                     local TYPE="I/P"
-                    local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM clients where peer='$PASSTHRU';")                               # v4.16.16
-                    [ -z "$DESC" ] && local DESC=$(grep -FB1 "[Interface]" ${CONFIG_DIR}${PASSTHRU}.conf | grep -vF "[Interface]")      # v4.16.16
-                    local DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')                                                   # v4.16.16
-                    [ -z "$DESC" ] && local DESC="# $PASSTHRU"                                                                          # v4.16.16
+
+                    local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM clients where peer='$PASSTHRU';")               # v4.16.16
+                    if [ -z "$DESC" ] && [ -f ${CONFIG_DIR}${PASSTHRU}.conf ];then                                      # v4.16.17 @archiel
+                        local DESC=$(grep -FB1 "[Interface]" ${CONFIG_DIR}${PASSTHRU}.conf | grep -vF "[Interface]")    # v4.16.16
+                        local DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')                               # v4.16.16
+                    fi
+                    [ -z "$DESC" ] && local DESC="# $PASSTHRU"                                                          # v4.16.16
                 fi
 
                 if [ -n "$IP_ADDR" ];then
                     for PASSTHRU_IP in $(echo "$IP_ADDR" | tr ',' ' ')
                         do
-                            ip rule del from $PASSTHRU_IP table 12$VPN_NUM prio 998$VPN_NUM 2> /dev/null
-                            ip -6 rule del from $PASSTHRU_IP table 12$VPN_NUM prio 998$VPN_NUM 2> /dev/null         # v4.16.14
+                            while [ $? -eq 0 ];do ip    rule del table 12$VPN_NUM prio 998$VPN_NUM 2>/dev/null;done # v4.16.17
+                            while [ $? -eq 0 ];do ip -6 rule del table 12$VPN_NUM prio 998$VPN_NUM 2>/dev/null;done # v4.16.17
                             iptables  -t nat -D POSTROUTING -s  $IP_ADDR -o wg1$VPN_NUM -j MASQUERADE 2> /dev/null  # v4.16.14
                             ip6tables -t nat -D POSTROUTING -s  $IP_ADDR -o wg1$VPN_NUM -j MASQUERADE 2> /dev/null  # v4.16.14
                         done
@@ -1090,8 +1093,7 @@ else
     if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.10
         ip rule del from $(nvram get lan_ipaddr | cut -d"." -f1-3).0/24 table 12$VPN_NUM prio 992$VPN_NUM   2>/dev/null
         ip route flush table 12$VPN_NUM 2>/dev/null
-        ip rule del prio 992$VPN_NUM   2>/dev/null
-
+        while [ $? -eq 0 ];do ip rule del table 12$VPN_NUM prio 99${VPN_NUM}1 2>/dev/null;done  # v4.16.17
         purge_client_list                                           # v4.09
 
         ip route flush cache
@@ -1102,7 +1104,7 @@ else
             ip -6 rule del from $(nvram get ipv6_rtr_addr | sed 's/::/|/' | cut -d"|" -f1)::0/64 table 12$VPN_NUM prio 992$VPN_NUM   2>/dev/null # v4.11
             ip -6 rule del from $(nvram get ipv6_prefix)/$(nvram get ipv6_prefix_length) table 12$VPN_NUM prio 992$VPN_NUM   2>/dev/null
             ip -6 route flush table 12$VPN_NUM 2>/dev/null
-            ip -6 rule del prio 992$VPN_NUM   2>/dev/null
+            while [ $? -eq 0 ];do ip -6 rule del prio 99${VPN_NUM}1 2>/dev/null;done    # v4.16.17
             #IPV6PRIO==$(Manage_IPV6_PRIO "get" "$VPN_NUM")  # v4.16
             #ip -6 rule del prio $IPV6PRIO 2>/dev/null       # v4.16
             ip -6 route flush cache 2>/dev/null
