@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.16bD"
-#============================================================================================ © 2021-2022 Martineau v4.16bD
+VERSION="v4.16bE"
+#============================================================================================ © 2021-2022 Martineau v4.16bE
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.16bD"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 27-Apr-2022
+# Last Updated Date: 28-Apr-2022
 
 #
 # Description:
@@ -1618,6 +1618,7 @@ Manage_Peer() {
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru add wg11 SGS8"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru add wg15 all"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru add wg12 10.100.100.0/27"
+                    echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru del wg15 all"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru del SGS8"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru del all"
                     echo -e "\tpeer serv_peer_name {bind device_peer}\t\t\t\t\t- Bind a Road Warrior 'device' Peer to a 'server' Peer e.g. peer wg21 bind SGS20"
@@ -2661,6 +2662,8 @@ Manage_RPDB_rules() {
 }
 Manage_PASSTHRU_rules() {
     # v4.12
+    # v4.16     del { 'all' | wg1x [ 'all' | IP/CIDR ] }
+    #           add { 'all' | IP/CIDR }
     local REDISPLAY=1
     local ACTION=$1
     shift
@@ -2704,14 +2707,21 @@ Manage_PASSTHRU_rules() {
                     fi
                 fi
 
-                if [ -n "$(echo "$IP_SUBNET" | Is_IPv4)" ] || [ -n "$(echo "$IP_SUBNET" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$IP_SUBNET" | grep -F ":")" ];then  # v4.16
-                    :
-                else
-                    if [ -z "$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE name='$IP_SUBNET';")" ];then           # v4.16
-                        [ -n "$IP_SUBNET" ] && echo -e $cBRED"\a\n\t***ERROR: 'device' Peer (${cBWHT}$IP_SUBNET${cBRED}) doesn't exist!"$cRESET || echo -e $cBRED"\a\n\t***ERROR: 'device' Peer missing ${cRESET}(or use 'all') e.g add $IFACE MyPhone"
-                        return 1
-                    fi
+                if [ "$IP_SUBNET" == "all" ];then
+                    local IP_SUBNET=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers WHERE peer='$WG_INTERFACE';")
                 fi
+
+                for THIS in "$(echo "$IP_SUBNET" | tr ',' ' ')"
+                    do
+                        if [ -n "$(echo "$THIS" | Is_IPv4)" ] || [ -n "$(echo "$THIS" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$THIS" | grep -F ":")" ];then  # v4.16
+                            :
+                        else
+                            if [ -z "$(sqlite3 $SQL_DATABASE "SELECT name FROM devices WHERE name='$THIS';")" ];then           # v4.16
+                                [ -n "$THIS" ] && echo -e $cBRED"\a\n\t***ERROR: 'device' Peer (${cBWHT}$THIS${cBRED}) doesn't exist!"$cRESET || echo -e $cBRED"\a\n\t***ERROR: 'device' Peer missing ${cRESET}(or use 'all') e.g add $IFACE MyPhone"
+                                return 1
+                            fi
+                        fi
+                    done
 
                 sqlite3 $SQL_DATABASE "INSERT INTO passthru values('$WG_INTERFACE','$IFACE','$IP_SUBNET');"
 
@@ -2738,8 +2748,31 @@ Manage_PASSTHRU_rules() {
             ;;
             del)
                 if [ "$IFACE" != "all" ];then
-                    sqlite3 $SQL_DATABASE "DELETE FROM passthru WHERE server='$WG_INTERFACE' AND client='$IFACE' AND ip_subnet='$IP_SUBNET';"
-                    echo -e $cBGRE"\n\t[✔] Deleted Passthru Routing rule for $WG_INTERFACE \n"$cRESET  2>&1
+
+                    [ -z "$IP_SUBNET" ] && local IP_SUBNET="all"        # v4.16
+
+                    if [ "$IP_SUBNET" != "all" ];then                   # v4.16
+                        if [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(server) FROM passthru WHERE server='$WG_INTERFACE' AND client='$IFACE' AND ip_subnet='$IP_SUBNET';") -gt 0 ];then    # v4.16
+                            sqlite3 $SQL_DATABASE "DELETE FROM passthru WHERE server='$WG_INTERFACE' AND client='$IFACE' AND ip_subnet='$IP_SUBNET';"
+                            echo -e $cBGRE"\n\t[✔] Deleted Passthru Routing rule for $WG_INTERFACE via $IFACE\n"$cRESET  2>&1   # v4.16
+                        else
+                            echo -e $cBRED"\a\n\t***ERROR: No matching Passthru Routing rule?!"$cRESET 2>&1     # v4.16
+                            return 1
+                        fi
+                    else
+                        if [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(server) FROM passthru WHERE server='$WG_INTERFACE' AND client='$IFACE';") -gt 0 ];then   # v4.16
+                            sqlite3 $SQL_DATABASE "DELETE FROM passthru WHERE server='$WG_INTERFACE' AND client='$IFACE';"  # v4.16
+                            echo -e $cBGRE"\n\t[✔] Deleted ALL Passthru Routing rules for $WG_INTERFACE via $IFACE\n"$cRESET  2>&1
+                        else
+                            if [ -n "$IFACE" ];then
+                                echo -e $cBRED"\a\n\t***ERROR: No matching Passthru Routing rules for $WG_INTERFACE via $IFACE\n"$cRESET 2>&1       # v4.16
+                            else
+                                echo -e $cBRED"\a\n\t***ERROR: No matching Passthru Routing rules for $WG_INTERFACE\n"$cRESET 2>&1      # v4.16
+                            fi
+                            return 1
+                        fi
+                    fi
+
                     if [ "$IFACE" == "wan" ];then
                         # Need to Restart the 'server' Peer if it is UP
                         if [ -n "$(wg show interfaces | grep "$WG_INTERFACE")" ];then
@@ -2766,20 +2799,26 @@ Manage_PASSTHRU_rules() {
                     if [ "$ANS" == "y" ];then
                         local RESTART_CLIENTS=$(sqlite3 $SQL_DATABASE "SELECT client FROM passthru WHERE server='$WG_INTERFACE';")  # v4.16
                         local RESTART_CLIENTS=$(echo "$RESTART_CLIENTS" | xargs -n1 | sort -u | xargs)  # Remove duplicates from the restart list
-                        sqlite3 $SQL_DATABASE "DELETE FROM passthru WHERE server='$WG_INTERFACE';"
-                        echo -e $cBGRE"\n\t[✔] Deleted ALL Passthru Routing rules for $WG_INTERFACE \n"$cRESET  2>&1
-                        # Do we need to restart any 'client' Peers?                                                     # v4.16
-                        for CLIENT_PEER in $RESTART_CLIENTS
-                            do
-                                # Need to Restart the 'client' Peer if it is UP
-                                if [ -n "$(wg show interfaces | grep "$CLIENT_PEER")" ];then
-                                    CMD="restart"
-                                    echo -e $cBWHT"\a\n\tWireGuard 'client' Peer needs to be ${CMD}ed to remove 'passthru' rules"
-                                    echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'client' Peer ($CLIENT_PEER) or press$cBGRE [Enter] to SKIP."
-                                    read -r "ANS"
-                                    [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$CLIENT_PEER"; REDISPLAY=1; }
-                                fi
-                            done
+
+                        if [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(server) FROM passthru WHERE server='$WG_INTERFACE';") -gt 0 ];then   # v4.16
+                            sqlite3 $SQL_DATABASE "DELETE FROM passthru WHERE server='$WG_INTERFACE';"
+                            echo -e $cBGRE"\n\t[✔] Deleted ALL Passthru Routing rules for $WG_INTERFACE \n"$cRESET  2>&1
+                            # Do we need to restart any 'client' Peers?                                                     # v4.16
+                            for CLIENT_PEER in $RESTART_CLIENTS
+                                do
+                                    # Need to Restart the 'client' Peer if it is UP
+                                    if [ -n "$(wg show interfaces | grep "$CLIENT_PEER")" ];then
+                                        CMD="restart"
+                                        echo -e $cBWHT"\a\n\tWireGuard 'client' Peer needs to be ${CMD}ed to remove 'passthru' rules"
+                                        echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'client' Peer ($CLIENT_PEER) or press$cBGRE [Enter] to SKIP."
+                                        read -r "ANS"
+                                        [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$CLIENT_PEER"; REDISPLAY=1; }
+                                    fi
+                                done
+                        else
+                            echo -e $cGRE"\a\n\tWarning: No matching Passthru Routing rules for $WG_INTERFACE\n"$cRESET 2>&1        # v4.16
+                            REDISPLAY=1
+                        fi
                     else
                         REDISPLAY=0
                     fi
