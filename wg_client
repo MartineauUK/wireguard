@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.16.18"
-#============================================================================================ © 2021-2022 Martineau v4.16.18
+VERSION="v4.16.19"
+#============================================================================================ © 2021-2022 Martineau v4.16.19
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 28-Apr-2022
+# Last Updated Date: 29-Apr-2022
 #
 # Description:
 #
@@ -276,11 +276,18 @@ Manage_Passthru(){
                 if [ -n "$IP_ADDR" ];then
                     for PASSTHRU_IP in $(echo "$IP_ADDR" | tr ',' ' ')
                         do
-                            while [ $? -eq 0 ];do ip    rule del table 12$VPN_NUM prio 998$VPN_NUM 2>/dev/null;done # v4.16.17
-                            while [ $? -eq 0 ];do ip -6 rule del table 12$VPN_NUM prio 998$VPN_NUM 2>/dev/null;done # v4.16.17
-                            iptables  -t nat -D POSTROUTING -s  $IP_ADDR -o wg1$VPN_NUM -j MASQUERADE 2> /dev/null  # v4.16.14
-                            ip6tables -t nat -D POSTROUTING -s  $IP_ADDR -o wg1$VPN_NUM -j MASQUERADE 2> /dev/null  # v4.16.14
+                            unset DONE;while [ -z ${DONE+x} ];do ip    rule del prio 998${VPN_NUM} 2>/dev/null;[ $? -gt 0 ] && DONE=1;done  # v4.16.19
+                            unset DONE;while [ -z ${DONE+x} ];do ip -6 rule del prio 998${VPN_NUM} 2>/dev/null;[ $? -gt 0 ] && DONE=1;done  # v4.16.19
+                            if [ "$PASSTHRU_ONLY" != "Y" ];then         # Called from wg_manager ?
+                                iptables  -t nat -D POSTROUTING -s  $IP_ADDR -o wg1$VPN_NUM -j MASQUERADE 2> /dev/null  # v4.16.14
+                                ip6tables -t nat -D POSTROUTING -s  $IP_ADDR -o wg1$VPN_NUM -j MASQUERADE 2> /dev/null  # v4.16.14
+                            fi
                         done
+
+                    if [ "$PASSTHRU_ONLY" == "Y" ];then
+                        logger -t "WireGuard-${MODE}${VPN_NAME}" "'server' peer ($PASSTHRU_SERVER) RPDB" "'pass-thru': $WG_INTERFACE rules removed"
+                        local FLUSH="Y"     # Force
+                    fi
 
                     if [ "$ACTION" != "del" ];then
                         for PASSTHRU_IP in $(echo "$IP_ADDR" | tr ',' ' ')                                          # v4.16.14
@@ -542,6 +549,13 @@ DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')
 
 MTU=$(sqlite3 $SQL_DATABASE "SELECT mtu FROM clients where peer='$WG_INTERFACE';")          # v4.09
 [ -z "$MTU" ] && MTU=1420                                                                   # v4.09
+
+# Called from wg_manager? in response to 'peer wg2X passthru [add|del]'
+if [ "$2" == "passthru_rules" ];then
+    PASSTHRU_ONLY="Y"
+    Manage_Passthru $3
+    exit 0
+fi
 
 if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
 
@@ -1093,8 +1107,8 @@ else
     if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.10
         ip rule del from $(nvram get lan_ipaddr | cut -d"." -f1-3).0/24 table 12$VPN_NUM prio 992$VPN_NUM   2>/dev/null
         ip route flush table 12$VPN_NUM 2>/dev/null
-        while [ $? -eq 0 ];do ip rule del prio 99${VPN_NUM}1 2>/dev/null;done   # v4.16.18
-        while [ $? -eq 0 ];do ip rule del prio 998${VPN_NUM} 2>/dev/null;done   # v4.16.18
+        unset DONE;while [ -z ${DONE+x} ];do ip rule del prio 99${VPN_NUM}1 2>/dev/null;[ $? -gt 0 ] && DONE=1;done # v4.16.19
+        unset DONE;while [ -z ${DONE+x} ];do ip rule del prio 998${VPN_NUM} 2>/dev/null;[ $? -gt 0 ] && DONE=1;done # v4.16.19
         purge_client_list                                           # v4.09
 
         ip route flush cache
@@ -1105,8 +1119,8 @@ else
             ip -6 rule del from $(nvram get ipv6_rtr_addr | sed 's/::/|/' | cut -d"|" -f1)::0/64 table 12$VPN_NUM prio 992$VPN_NUM   2>/dev/null # v4.11
             ip -6 rule del from $(nvram get ipv6_prefix)/$(nvram get ipv6_prefix_length) table 12$VPN_NUM prio 992$VPN_NUM   2>/dev/null
             ip -6 route flush table 12$VPN_NUM 2>/dev/null
-            while [ $? -eq 0 ];do ip -6 rule del prio 99${VPN_NUM}1 2>/dev/null;done    # v4.16.18
-            while [ $? -eq 0 ];do ip -6 rule del prio 998${VPN_NUM} 2>/dev/null;done    # v4.16.18
+            unset DONE;while [ -z ${DONE+x} ];do ip -6 rule del prio 99${VPN_NUM}1 2>/dev/null;[ $? -gt 0 ] && DONE=1;done  # v4.16.18
+            unset DONE;while [ -z ${DONE+x} ];do ip -6 rule del prio 998${VPN_NUM} 2>/dev/null;[ $? -gt 0 ] && DONE=1;done  # v4.16.18
             #IPV6PRIO==$(Manage_IPV6_PRIO "get" "$VPN_NUM")  # v4.16
             #ip -6 rule del prio $IPV6PRIO 2>/dev/null       # v4.16
             ip -6 route flush cache 2>/dev/null
