@@ -22,7 +22,7 @@ Example successful install.....
     +======================================================================+
     |  Welcome to the WireGuard Manager/Installer script (Asuswrt-Merlin)  |
     |                                                                      |
-    |                      Version v4.15 by Martineau                      |
+    |                      Version v4.16 by Martineau                      |
     |                                                                      |
     | Requirements: HND or AX router with Kernel 4.1.xx or later           |
     |                         e.g. RT-AC86U or RT-AX86U etc.               |
