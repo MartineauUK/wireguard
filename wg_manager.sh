@@ -1,6 +1,6 @@
 #!/bin/sh
-VERSION="v4.16bE"
-#============================================================================================ © 2021-2022 Martineau v4.16bE
+VERSION="v4.17b"
+#============================================================================================ © 2021-2022 Martineau v4.17b
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -24,7 +24,7 @@ VERSION="v4.16bE"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 28-Apr-2022
+# Last Updated Date: 01-May-2022
 
 #
 # Description:
@@ -510,7 +510,7 @@ _Get_File() {
 
     [ "$REPOSITORY_OWNER" != "odkrys" ] && local REPOSITORY="https://github.com/ZebMcKayhan/Wireguard/raw/${FROM_REPOSITORY}/"    # v4.12 v4.11
 
-    [ -z "$(echo "$@" | grep "NOMSG")" ] && echo -e $cBCYA"\n\tDownloading WireGuard Kernel module ${cBWHT}'$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO) @$REPOSITORY_OWNER $FROM_RESPOSITORY_TXT"$cRESET    # v4.12
+    [ -z "$(echo "$@" | grep "NOMSG")" ] && echo -e $cBCYA"\n\tDownloading WireGuard® Kernel module ${cBWHT}'$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO) @$REPOSITORY_OWNER $FROM_RESPOSITORY_TXT"$cRESET    # v4.12
 
     echo -en $cBGRE
 
@@ -570,7 +570,7 @@ Download_Modules() {
                     _Get_File "$(echo "$WEBFILE_NAMES" | awk '/k52/ {print}')" "$REPOSITORY_OWNER" "$FROM_REPOSITORY"   # k52_1
                 ;;
             *)
-                echo -e $cBRED"\a\n\t***ERROR: Unable to find 3rd-Party WireGuard Kernel module for $ROUTER (v$BUILDNO)\n"$cRESET
+                echo -e $cBRED"\a\n\t***ERROR: Unable to find 3rd-Party WireGuard® Kernel module for $ROUTER (v$BUILDNO)\n"$cRESET
                 # Deliberately Download an incompatible file simply so that an error message is produced by 'opkg install*.ipk'
                 #
                 #       Unknown package 'wireguard-kernel'.
@@ -586,15 +586,15 @@ Download_Modules() {
     else
         local FPATH=$(modprobe --show-depends wireguard | awk '{print $2}')
         local FVERSION=$(strings $FPATH | grep "^version" | cut -d'=' -f2)  # v4.12 @ZebMcKayhan
-        echo -e $cBGRE"\n\t[✔]$cBWHT WireGuard Kernel module/User Space Tools included in Firmware $ROUTER (v$BUILDNO)"$cRED" ($FVERSION)\n"$cRESET    # v4.12
-        echo -e $cBYEL"\a\t\tWireGuard exists in firmware       - use ${cRESET}'vx'${cBYEL} command to override with 3rd-Party/Entware (if available)"$cRESET
+        echo -e $cBGRE"\n\t[✔]$cBWHT WireGuard® Kernel module/User Space Tools included in Firmware $ROUTER (v$BUILDNO)"$cRED" ($FVERSION)\n"$cRESET    # v4.12
+        echo -e $cBYEL"\a\t\tWireGuard® exists in firmware       - use ${cRESET}'vx'${cBYEL} command to override with 3rd-Party/Entware (if available)"$cRESET
     fi
 
     # User Space Tools - Allow use of Entware/3rd Party modules even if Modules included in firmware
     if [ ! -f /usr/sbin/wg ] || [ "$USE_ENTWARE_KERNEL_MODULE" == "Y" ];then    # v4.12 Is the User Space Tools included in the firmware?
         if [ "$ROUTER_COMPATIBLE" != "N" ];then     # v4.13 HOTFIX
             WEBFILE=$(echo "$WEBFILE_NAMES" | awk '/wireguard-tools/ {print}')
-            echo -e $cBCYA"\n\tDownloading WireGuard User space Tool$cBWHT '$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO) @$REPOSITORY_OWNER $FROM_RESPOSITORY_TXT"$cRESET  # v4.11
+            echo -e $cBCYA"\n\tDownloading WireGuard® User space Tool$cBWHT '$WEBFILE'$cBCYA for $ROUTER (v$BUILDNO) @$REPOSITORY_OWNER $FROM_RESPOSITORY_TXT"$cRESET  # v4.11
             _Get_File  "$WEBFILE" "$REPOSITORY_OWNER" "$FROM_REPOSITORY" "NOMSG"            # v4.12 v4.11
         fi
     else
@@ -611,7 +611,7 @@ Load_UserspaceTool() {
 
     if [ ! -d "${INSTALL_DIR}" ];then
         echo -e $cRED"\a\n\tNo modules found - '/${INSTALL_DIR} doesn't exist'\n"
-        echo -e "\tPress$cBRED y$cRESET to$cBRED DOWNLOAD WireGuard Kernel and Userspace Tool modules ${cRESET} or press$cBGRE [Enter] to SKIP."
+        echo -e "\tPress$cBRED y$cRESET to$cBRED DOWNLOAD WireGuard® Kernel and Userspace Tool modules ${cRESET} or press$cBGRE [Enter] to SKIP."
             read -r "ANS"
             if [ "$ANS" == "y" ];then
                 Download_Modules $HARDWARE_MODEL
@@ -622,14 +622,14 @@ Load_UserspaceTool() {
 
     local STATUS=0
     if [ ! -f /usr/sbin/wg ] || [ "$USE_ENTWARE_KERNEL_MODULE" == "Y" ];then           # v4.12 Is the User Space Tools included in the firmware?
-        echo -e $cBCYA"\n\tLoading WireGuard Kernel module and Userspace Tool for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
+        echo -e $cBCYA"\n\tLoading WireGuard® Kernel module and Userspace Tool for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
         if [ -n "$(ls /jffs/addons/wireguard/*.ipk 2>/dev/null)" ];then
             [ -n "$ACTIVE_WG_INTERFACES" ] && Manage_Wireguard_Sessions "stop" "$ACTIVE_WG_INTERFACES"  # v4.14
             for MODULE in $(ls /jffs/addons/wireguard/*.ipk)
                 do
                     local MODULE_NAME=$(echo "$(basename $MODULE)" | sed 's/_.*$//')
-                    SayT "Initialising WireGuard module '$MODULE_NAME'"
-                    echo -e $cBCYA"\tInitialising WireGuard module $cRESET'$MODULE_NAME'"
+                    SayT "Initialising WireGuard® module '$MODULE_NAME'"
+                    echo -e $cBCYA"\tInitialising WireGuard® module $cRESET'$MODULE_NAME'"
                     opkg install $MODULE
                     if [ $? -eq 0 ];then
                         md5sum $MODULE > ${INSTALL_DIR}$MODULE_NAME".md5"
@@ -647,7 +647,7 @@ Load_UserspaceTool() {
             echo -e $cBGRA"\t"$(dmesg | grep -a "wireguard: Copyright" | tail -n 1)"\n"$cRESET
             local STATUS=0
         else
-            echo -e $cBRED"\a\n\t***ERROR: Unable to LOAD Entware/3rd-party WireGuard Kernel and Userspace Tool modules\n"
+            echo -e $cBRED"\a\n\t***ERROR: Unable to LOAD Entware/3rd-party WireGuard® Kernel and Userspace Tool modules\n"
             local STATUS=1
         fi
     else
@@ -657,10 +657,10 @@ Load_UserspaceTool() {
         if [ -n "$KERNEL_MODULE" ];then
             local FPATH=$(modprobe --show-depends wireguard | awk '{print $2}')
             local FVERSION=$(strings $FPATH | grep "^version" | cut -d'=' -f2)  # v4.12 @ZebMcKayhan
-            echo -e $cBGRE"\n\t[✔]$cBWHT WireGuard Kernel module/User Space Tools included in Firmware"$cRED" ($FVERSION)\n"$cRESET
+            echo -e $cBGRE"\n\t[✔]$cBWHT WireGuard® Kernel module/User Space Tools included in Firmware"$cRED" ($FVERSION)\n"$cRESET
             [ -n "$ACTIVE_WG_INTERFACES" ] && Manage_Wireguard_Sessions "stop" "$ACTIVE_WG_INTERFACES"  # v4.14
-            SayT "Initialising WireGuard Kernel module '$KERNEL_MODULE'"
-            echo -e $cBCYA"\tInitialising WireGuard Kernel module $cRESET'$KERNEL_MODULE'"
+            SayT "Initialising WireGuard® Kernel module '$KERNEL_MODULE'"
+            echo -e $cBCYA"\tInitialising WireGuard® Kernel module $cRESET'$KERNEL_MODULE'"
             rmmod  $KERNEL_MODULE 2>/dev/null                   # v4.12
             insmod $KERNEL_MODULE 2>/dev/null                   # v4.12
             echo -e $cBGRA"\t"$(dmesg | grep -a "WireGuard" | tail -n 1)
@@ -671,7 +671,7 @@ Load_UserspaceTool() {
             [ -n "$(opkg list-installed | grep "wireguard-tools")" ]  && opkg remove wireguard-tools  1>/dev/null
 
         else
-            logger -t "wireguard-server${VPN_ID:3:1}" "***ERROR Failure to Initialise WireGuard Kernel module!"
+            logger -t "wireguard-server${VPN_ID:3:1}" "***ERROR Failure to Initialise WireGuard® Kernel module!"
             local STATUS=1
         fi
     fi
@@ -692,7 +692,7 @@ Show_MD5() {
             echo -e $cBCYA"\tMD5="$(awk '{print $0}' ${INSTALL_DIR}wireguard-kernel.md5)
             echo -e $cBCYA"\tMD5="$(awk '{print $0}' ${INSTALL_DIR}wireguard-tools.md5)
         else
-            #echo -e $cBYEL"\a\n\t***ERROR: MD5= ???? - WireGuard exists in firmware for $ROUTER (v$BUILDNO)\n"$cRESET
+            #echo -e $cBYEL"\a\n\t***ERROR: MD5= ???? - WireGuard® exists in firmware for $ROUTER (v$BUILDNO)\n"$cRESET
             :
         fi
     fi
@@ -712,9 +712,9 @@ Check_Module_Versions() {
         else
             local LOADTIME=
         fi
-        echo -e $cBGRE"\t[✔] WireGuard Module LOADED $LOADTIME\n"$cRESET
+        echo -e $cBGRE"\t[✔] WireGuard® Module LOADED $LOADTIME\n"$cRESET
     else
-        echo -e $cBRED"\t[✖] WireGuard Module is NOT LOADED\n"$cRESET
+        echo -e $cBRED"\t[✖] WireGuard® Module is NOT LOADED\n"$cRESET
     fi
 
     # Without a BOOT or 'loadmodule' command was issued, there may be a mismatch
@@ -732,14 +732,14 @@ Check_Module_Versions() {
         local WGKERNEL=$(strings $FPATH | grep "^version" | cut -d'=' -f2)  # v4.12 @ZebMcKayhan
     fi
 
-    #[ "$WGKERNEL" != "$BOOTLOADED" ] && echo -e $cRED"\a\n\tWarning: Reboot or 'loadmodule command' required for (dmesg) WireGuard $WGKERNEL $BOOTLOADED\n"
+    #[ "$WGKERNEL" != "$BOOTLOADED" ] && echo -e $cRED"\a\n\tWarning: Reboot or 'loadmodule command' required for (dmesg) WireGuard® $WGKERNEL $BOOTLOADED\n"
 
     Show_MD5
 
     if [ "$ACTION" != "report" ];then
 
         # Check if Kernel and User Tools Update available
-        echo -e $cBWHT"\tChecking for WireGuard Kernel and Userspace Tool updates..."
+        echo -e $cBWHT"\tChecking for WireGuard® Kernel and Userspace Tool updates..."
         if [ "$HARDWARE_MODEL" != "RT-AC86U" ] && [ "$HARDWARE_MODEL" != "GT-AC2900" ];then                 # v4.12
             local REPOSITORY_OWNER="odkrys"                                                                 # v4.12
             local REPOSITORY_TITLE="entware-makefile-for-merlin"                                            # v4.12
@@ -759,7 +759,7 @@ Check_Module_Versions() {
 
         if [ "$UPDATES" == "Y" ];then
             if [ "$ACTION" != "force" ];then            # v4.12
-                echo -e $cRESET"\n\tPress$cBRED y$cRESET to$cBRED Update WireGuard Kernel and Userspace Tool${cRESET} or press$cBGRE [Enter] to SKIP."
+                echo -e $cRESET"\n\tPress$cBRED y$cRESET to$cBRED Update WireGuard® Kernel and Userspace Tool${cRESET} or press$cBGRE [Enter] to SKIP."
                 read -r "ANS"
             else
                 local ANS="y"                           # v4.12
@@ -772,7 +772,7 @@ Check_Module_Versions() {
                 echo -e $cBWHT"\n\tUpdate skipped\n"$cRESET
             fi
         else
-            echo -e $cBGRE"\n\tWireGuard Kernel and Userspace Tool up to date.\n"$cRESET
+            echo -e $cBGRE"\n\tWireGuard® Kernel and Userspace Tool up to date.\n"$cRESET
         fi
     fi
 }
@@ -855,7 +855,7 @@ Create_Peer() {
             INDEX=${SERVER_PEER:3:1}
             local AUTO_VPN_POOL="10.50.$((INDEX-1)).1/24"       # v4.15
         else
-            echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard 'server' Peer prefix (wg2*) '$SERVER_PEER'\n"$cRESET
+            echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard® 'server' Peer prefix (wg2*) '$SERVER_PEER'\n"$cRESET
             return 1
         fi
     fi
@@ -900,7 +900,7 @@ Create_Peer() {
             local VPN_POOL=$VPN_POOL6                   # v4.15
             local IPV6_TXT="(IPv6) "                    # v4.15
         else
-            echo -e $cBRED"\a\n\t***ERROR Create new WireGuard ${IPV6_TXT}'server' Peer has missing ${cRESET}IPv6 Private subnet${cBRED} - use $cRESET'ipv6[=]'$cBRED arg\n"$cRESET
+            echo -e $cBRED"\a\n\t***ERROR Create new WireGuard® ${IPV6_TXT}'server' Peer has missing ${cRESET}IPv6 Private subnet${cBRED} - use $cRESET'ipv6[=]'$cBRED arg\n"$cRESET
             return 1
         fi
     fi
@@ -919,7 +919,7 @@ Create_Peer() {
         done
 
     if [ -f ${CONFIG_DIR}${SERVER_PEER}.conf ] || [ -n "$(grep -E "^$SERVER_PEER" ${INSTALL_DIR}WireguardVPN.conf)" ];then
-        echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard 'server' Peer '$SERVER_PEER' already exists\n"$cRESET
+        echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard® 'server' Peer '$SERVER_PEER' already exists\n"$cRESET
         return 1
     fi
 
@@ -929,7 +929,7 @@ Create_Peer() {
     read -r "ANS"
     [ "$ANS" == "y" ] || return 1
 
-    echo -e $cBCYA"\tCreating WireGuard Private/Public key-pair for ${IPV6_TXT}'server' Peer ${cBMAG}${SERVER_PEER}${cBCYA} on $HARDWARE_MODEL (v$BUILDNO)"$cRESET
+    echo -e $cBCYA"\tCreating WireGuard® Private/Public key-pair for ${IPV6_TXT}'server' Peer ${cBMAG}${SERVER_PEER}${cBCYA} on $HARDWARE_MODEL (v$BUILDNO)"$cRESET
     if [ -n "$(which wg)" ];then
         wg genkey | tee ${CONFIG_DIR}${SERVER_PEER}_private.key | wg pubkey > ${CONFIG_DIR}${SERVER_PEER}_public.key
         local PRI_KEY=$(cat ${CONFIG_DIR}${SERVER_PEER}_private.key)
@@ -1106,7 +1106,7 @@ Delete_Peer() {
                                 # Need to Restart the 'server' Peer if it is UP
                                 if [ -n "$(wg show interfaces | grep "$SERVER_PEER")" ];then
                                     CMD="restart"
-                                    echo -e $cBWHT"\a\n\tWireGuard 'server' Peer needs to be ${CMD}ed to remove 'client' Peer ${cBMAG}$DEVICE_NAME $TAG"
+                                    echo -e $cBWHT"\a\n\tWireGuard® 'server' Peer needs to be ${CMD}ed to remove 'client' Peer ${cBMAG}$DEVICE_NAME $TAG"
                                     echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer ($SERVER_PEER) or press$cBGRE [Enter] to SKIP."
                                     read -r "ANS"
                                     [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$SERVER_PEER"; Show_Peer_Status "show"; }  # v3.03
@@ -1116,8 +1116,8 @@ Delete_Peer() {
                 fi
             else
                 [ -n "$Mode" ] && TXT="'$Mode' " || TXT=            # v3.03
-                SayT "***ERROR: WireGuard VPN ${TXT}Peer ('$WG_INTERFACE') config NOT found?....skipping $ACTION request"
-                echo -e $cBRED"\a\n\t***ERROR: WireGuard ${TXT}Peer (${cBWHT}$WG_INTERFACE${cBRED}) config NOT found?....skipping delete Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1  # v1.09
+                SayT "***ERROR: WireGuard® VPN ${TXT}Peer ('$WG_INTERFACE') config NOT found?....skipping $ACTION request"
+                echo -e $cBRED"\a\n\t***ERROR: WireGuard® ${TXT}Peer (${cBWHT}$WG_INTERFACE${cBRED}) config NOT found?....skipping delete Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1  # v1.09
             fi
         done
 
@@ -1239,7 +1239,7 @@ Import_Peer() {
                         ;;
                         *)
                             SayT "***ERROR: WireGuard Peer TYPE ('$FORCE_TYPE') must be 'client'/'server' or 'device'....skipping import request"
-                            echo -e $cBRED"\a\n\t***ERROR: WireGuard Peer TYPE (${cBWHT}$FORCE_TYPE${cBRED}) must be 'client'/'server' or 'device'....skipping import Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
+                            echo -e $cBRED"\a\n\t***ERROR: WireGuard® Peer TYPE (${cBWHT}$FORCE_TYPE${cBRED}) must be 'client'/'server' or 'device'....skipping import Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
                             return 1
                         ;;
                     esac
@@ -1261,7 +1261,13 @@ Import_Peer() {
 
                                 PrivateKey) local PRI_KEY=${LINE##* };;
                                 PublicKey) local PUB_KEY=${LINE##* };;
-                                ListenPort) local LISTEN_PORT=${LINE##* } ;;    # v4.14
+                                ListenPort) local LISTEN_PORT=${LINE##* }               # v4.17 v4.14
+                                    # Torguard profile defines 51820 which will conflict with the wg21 'server' Peer default 51820
+                                    # Check if port is already in use by a 'server' Peer; if so comment it out
+                                    [ "$LISTEN_PORT" == "51820" ] && COMMENT_OUT="Y"    # v4.17
+                                    [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM servers WHERE port='$LISTEN_PORT';") -gt 0 ] && COMMENT_OUT="Y"  # v4.17
+
+                                ;;
                                 AllowedIPs) local ALLOWIP=$(echo "$LINE" | sed 's/^AllowedIPs.*=//' | awk '{$1=$1};1')  # v4.12 strip leading/trailing spaces/tabs
                                 ;;
                                 Endpoint) local SOCKET=${LINE##* }
@@ -1390,12 +1396,13 @@ Import_Peer() {
                         if [ "$COMMENT_OUT" == "Y" ];then
                             # sed -i 's/^DNS/#DNS/' ${IMPORT_DIR}${WG_INTERFACE}.conf
                             # sed -i 's/^Address/#Address/' ${IMPORT_DIR}${WG_INTERFACE}.conf
-                            # sed -i 's/^MTU/#MTU/' ${IMPORT_DIR}${WG_INTERFACE}.conf # v4.09
-                            # sed -i 's/^PreUp/#PreUp/g' ${IMPORT_DIR}${WG_INTERFACE}.conf            # v4.14
-                            # sed -i 's/^PostUp/#PostUp/g' ${IMPORT_DIR}${WG_INTERFACE}.conf          # v4.14
-                            # sed -i 's/^PreDown/#PreDown/g' ${IMPORT_DIR}${WG_INTERFACE}.conf        # v4.14
-                            # sed -i 's/^PostDown/#PostDown/g' ${IMPORT_DIR}${WG_INTERFACE}.conf      # v4.14
-                            # sed -i 's/^SaveConfig/#SaveConfig/g' ${IMPORT_DIR}${WG_INTERFACE}.conf      # v4.14
+                            # sed -i 's/^MTU/#MTU/' ${IMPORT_DIR}${WG_INTERFACE}.conf                   # v4.09
+                            # sed -i 's/^PreUp/#PreUp/g' ${IMPORT_DIR}${WG_INTERFACE}.conf              # v4.14
+                            # sed -i 's/^PostUp/#PostUp/g' ${IMPORT_DIR}${WG_INTERFACE}.conf            # v4.14
+                            # sed -i 's/^PreDown/#PreDown/g' ${IMPORT_DIR}${WG_INTERFACE}.conf          # v4.14
+                            # sed -i 's/^PostDown/#PostDown/g' ${IMPORT_DIR}${WG_INTERFACE}.conf        # v4.14
+                            # sed -i 's/^SaveConfig/#SaveConfig/g' ${IMPORT_DIR}${WG_INTERFACE}.conf    # v4.14
+                            sed -i 's/^ListenPort/#ListenPort/g' ${IMPORT_DIR}${WG_INTERFACE}.conf      # v4.17
 
                             # Insert the tag
                             if [ "$ANNOTATE" != "# N/A" ];then
@@ -1438,16 +1445,16 @@ Import_Peer() {
 
                         local COMMENTOUT=; local RENAME=; local AS_TXT=
                     else
-                        SayT "***ERROR: WireGuard VPN 'client' Peer ('$WG_INTERFACE') ALREADY exists in database?....skipping import request"
-                        echo -e $cBRED"\a\n\t***ERROR: WireGuard 'client' Peer (${cBWHT}$WG_INTERFACE${cBRED}) ALREADY exists in database?....skipping import Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
+                        SayT "***ERROR: WireGuard® VPN 'client' Peer ('$WG_INTERFACE') ALREADY exists in database?....skipping import request"
+                        echo -e $cBRED"\a\n\t***ERROR: WireGuard® 'client' Peer (${cBWHT}$WG_INTERFACE${cBRED}) ALREADY exists in database?....skipping import Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
                     fi
                 #else
                     #SayT "***ERROR: WireGuard VPN Peer ('$WG_INTERFACE') must be 'client'....skipping import request"
                     #echo -e $cBRED"\a\n\t***ERROR: WireGuard Peer (${cBWHT}$WG_INTERFACE${cBRED}) must be 'client'....skipping import Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
                 #fi
             else
-                SayT "***ERROR: WireGuard VPN 'client' Peer ('${IMPORT_DIR}$WG_INTERFACE.conf') configuration file NOT found?....skipping import request"   # v4.12
-                echo -e $cBRED"\a\n\t***ERROR: WireGuard 'client' Peer (${cBWHT}${IMPORT_DIR}$WG_INTERFACE.conf${cBRED}) configuration file NOT found?....skipping import Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1   # v4.12
+                SayT "***ERROR: WireGuard® VPN 'client' Peer ('${IMPORT_DIR}$WG_INTERFACE.conf') configuration file NOT found?....skipping import request"   # v4.12
+                echo -e $cBRED"\a\n\t***ERROR: WireGuard® 'client' Peer (${cBWHT}${IMPORT_DIR}$WG_INTERFACE.conf${cBRED}) configuration file NOT found?....skipping import Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1   # v4.12
             fi
         done
 
@@ -1798,7 +1805,7 @@ Manage_Peer() {
                                     if [ -n "$(wg show interfaces | grep -ow "$WG_INTERFACE")" ];then
                                         CMD="restart"
                                         local TAG=$cBWHT"("${cBMAG}$(sqlite3 $SQL_DATABASE "select tag FROM $TABLE WHERE $ID='$WG_INTERFACE';")${cBWHT}")"
-                                        echo -e $cBWHT"\a\n\tWireGuard 'client' Peer ${cBMAG}${WG_INTERFACE} ${TAG}$cBWHT needs to be ${CMD}ed"
+                                        echo -e $cBWHT"\a\n\tWireGuard® 'client' Peer ${cBMAG}${WG_INTERFACE} ${TAG}$cBWHT needs to be ${CMD}ed"
                                         echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'client' Peer ($WG_INTERFACE) or press$cBGRE [Enter] to SKIP."
                                         read -r "ANS"
                                         [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$WG_INTERFACE"; Show_Peer_Status "show"; }
@@ -1868,7 +1875,7 @@ Manage_Peer() {
                                                             if [ -n "$(wg show interfaces | grep "$SERVER_PEER")" ];then
                                                                 CMD="restart"
                                                                 local TAG=$cBWHT"("${cBMAG}$(sqlite3 $SQL_DATABASE "select tag FROM devices WHERE $ID='$DEVICE_NAME';")${cBWHT}")"
-                                                                echo -e $cBWHT"\a\n\tWireGuard 'server' Peer needs to be ${CMD}ed to update 'client' Peer ${cBMAG}${DEVICE_NAME} $TAG"
+                                                                echo -e $cBWHT"\a\n\tWireGuard® 'server' Peer needs to be ${CMD}ed to update 'client' Peer ${cBMAG}${DEVICE_NAME} $TAG"
                                                                 echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer ($SERVER_PEER) or press$cBGRE [Enter] to SKIP."
                                                                 read -r "ANS"
                                                                 [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$SERVER_PEER"; Show_Peer_Status "show"; }  # v3.03
@@ -2012,7 +2019,7 @@ EOF
                                         # Need to Restart the 'server' Peer if it is UP
                                         if [ -n "$(wg show interfaces | grep "$SERVER_PEER")" ];then    # v4.16
                                             local CMD="restart"                                         # v4.16
-                                            echo -e $cBWHT"\a\n\tWireGuard 'server' Peer needs to be ${CMD}ed to allow 'client' Peer ${cBMAG}$DEVICE"
+                                            echo -e $cBWHT"\a\n\tWireGuard® 'server' Peer needs to be ${CMD}ed to allow 'client' Peer ${cBMAG}$DEVICE"
                                             echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer (${cBWHT}${SERVER_PEER}${cBRED}) or press$cBGRE [Enter] to SKIP."
                                             read -r "ANS"                                                                                       # v4.16
                                             [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$SERVER_PEER"; Show_Peer_Status "show"; }  # v4.16
@@ -2020,10 +2027,10 @@ EOF
 
 
                                     else
-                                        echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard 'device' Peer '$DEVICE'\n"$cRESET
+                                        echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard® 'device' Peer '$DEVICE'\n"$cRESET
                                     fi
                                 else
-                                    echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard 'server' Peer '$SERVER_PEER'\n"$cRESET
+                                    echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard® 'server' Peer '$SERVER_PEER'\n"$cRESET
                                 fi
                             ;;
                             *)
@@ -2031,7 +2038,7 @@ EOF
                             ;;
                         esac
                     else
-                        echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard Peer '$WG_INTERFACE'\n"$cRESET
+                        echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard® Peer '$WG_INTERFACE'\n"$cRESET
                     fi
                 else
 
@@ -2099,7 +2106,7 @@ Manage_Wireguard_Sessions() {
                 WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM clients WHERE auto='Y' OR auto='P' OR auto='W';" | tr '\n' ' ')                              # v4.15
                 WG_INTERFACE=$WG_INTERFACE" "$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers WHERE auto='Y' OR auto='P' OR auto='W' OR auto='S';" | tr '\n' ' ')  # v4.15
                 if [ -z "$WG_INTERFACE" ];then
-                    echo -e $cRED"\a\n\t***ERROR: No WireGuard Peers WHERE (${cBWHT}Auto='Y'${cBRED}) defined\n"$cRESET 2>&1
+                    echo -e $cRED"\a\n\t***ERROR: No WireGuard® Peers WHERE (${cBWHT}Auto='Y'${cBRED}) defined\n"$cRESET 2>&1
                     return 1
                 fi
             else
@@ -2107,7 +2114,7 @@ Manage_Wireguard_Sessions() {
                 WG_INTERFACE=$(wg show interfaces)                # v1.09
             fi
             WG_INTERFACE=$(echo "$WG_INTERFACE" | awk '{$1=$1};1')    # v4.15 Strip leading/trailing spaces/tabs
-            SayT "$VERSION Requesting WireGuard VPN Peer $ACTION ($WG_INTERFACE)"
+            SayT "$VERSION Requesting WireGuard® VPN Peer $ACTION ($WG_INTERFACE)"
     else
         echo -en $cBCYA
         # Allow category
@@ -2116,7 +2123,7 @@ Manage_Wireguard_Sessions() {
                 WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM clients WHERE auto='Y' OR auto='P' OR auto='W';" | tr '\n' ' ')  # v4.15
                 local CATEGORY=" for Category 'Clients'"
                 WG_INTERFACE=$(echo "$WG_INTERFACE" | awk '{$1=$1};1')    # v4.15 Strip leading/trailing spaces/tabs
-                SayT "$VERSION Requesting WireGuard VPN Peer ${ACTION}$CATEGORY ($WG_INTERFACE)"
+                SayT "$VERSION Requesting WireGuard® VPN Peer ${ACTION}$CATEGORY ($WG_INTERFACE)"
                 local TABLE="clients"
                 if [ -z "$WG_INTERFACE" ];then
                     echo -e $cRED"\a\n\t***ERROR: No Peers$CATEGORY WHERE (${cBWHT}Auto='Y' or 'P'${cBRED}) defined\n"$cRESET 2>&1
@@ -2127,7 +2134,7 @@ Manage_Wireguard_Sessions() {
                 WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers WHERE auto='Y' OR auto='P' OR auto='W' OR auto='S';" | tr '\n' ' ')  # v4.15
                 local CATEGORY=" for Category 'Servers'"
                 WG_INTERFACE=$(echo "$WG_INTERFACE" | awk '{$1=$1};1')    # v4.15 Strip leading/trailing spaces/tabs
-                SayT "$VERSION Requesting WireGuard VPN Peer ${ACTION}$CATEGORY ($WG_INTERFACE)"
+                SayT "$VERSION Requesting WireGuard® VPN Peer ${ACTION}$CATEGORY ($WG_INTERFACE)"
                 local TABLE="servers"
                 if [ -z "$WG_INTERFACE" ];then
                     echo -e $cRED"\a\n\t***ERROR: No Peers$CATEGORY WHERE (${cBWHT}Auto='Y'${cBRED}) defined\n"$cRESET 2>&1
@@ -2193,7 +2200,7 @@ Manage_Wireguard_Sessions() {
 
     WG_INTERFACE=$(echo "$WG_INTERFACE" | awk '{$1=$1};1')    # v4.13  strip leading/trailing spaces/tabs
 
-    [ -n "$WG_INTERFACE" ] && echo -e $cBWHT"\n\tRequesting WireGuard VPN Peer ${ACTION}$CATEGORY (${cBMAG}$WG_INTERFACE"$cRESET")" ${cWRED}${POLICY_MODE}$cRESET
+    [ -n "$WG_INTERFACE" ] && echo -e $cBWHT"\n\tRequesting WireGuard® VPN Peer ${ACTION}$CATEGORY (${cBMAG}$WG_INTERFACE"$cRESET")" ${cWRED}${POLICY_MODE}$cRESET
 
     case "$ACTION" in
         start|restart)                                  # v1.09
@@ -2222,8 +2229,8 @@ Manage_Wireguard_Sessions() {
                                        [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(client) FROM passthru WHERE client='$WG_INTERFACE';")" -gt 0 ];then # v4.12 v4.11 @ZebMcKayhan/@The Chief
                                         Route="policy"
                                     else
-                                        SayT "Warning: WireGuard '$Mode' Peer ('$WG_INTERFACE') defined as Policy mode but no RPDB Selective Routing/Passthru rules found?"
-                                        echo -e $cRED"\tWarning: WireGuard '$Mode' Peer (${cBWHT}$WG_INTERFACE${cBRED}) defined as Policy mode but no RPDB Selective Routing/Passthru rules found?\n"$cRESET 2>&1
+                                        SayT "Warning: WireGuard® '$Mode' Peer ('$WG_INTERFACE') defined as Policy mode but no RPDB Selective Routing/Passthru rules found?"
+                                        echo -e $cRED"\tWarning: WireGuard® '$Mode' Peer (${cBWHT}$WG_INTERFACE${cBRED}) defined as Policy mode but no RPDB Selective Routing/Passthru rules found?\n"$cRESET 2>&1
                                     fi
                                 else
                                     Route="default"
@@ -2246,8 +2253,8 @@ Manage_Wireguard_Sessions() {
                     echo -en $cBCYA
                     SayT "$VERSION Initialising Wireguard VPN '$Mode' Peer ($WG_INTERFACE) ${POLICY_MODE}"
                     if [ -n "$(ifconfig | grep -E "^$WG_INTERFACE")" ];then
-                        SayT "Warning: WireGuard '$Mode' Peer ('$WG_INTERFACE') ALREADY ACTIVE"
-                        echo -e $cRED"\tWarning: WireGuard '$Mode' Peer (${cBWHT}$WG_INTERFACE${cBRED}) ALREADY ACTIVE\n"$cRESET 2>&1
+                        SayT "Warning: WireGuard® '$Mode' Peer ('$WG_INTERFACE') ALREADY ACTIVE"
+                        echo -e $cRED"\tWarning: WireGuard® '$Mode' Peer (${cBWHT}$WG_INTERFACE${cBRED}) ALREADY ACTIVE\n"$cRESET 2>&1
                     else                                                                    # v3.04 Hotfix
                         if [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ];then
                             if [ "$Mode" == "server" ] ; then
@@ -2284,8 +2291,8 @@ Manage_Wireguard_Sessions() {
                             fi
                         else
                             [ -n "$Mode" ] && TXT="'$Mode' " || TXT=            # v1.09
-                            SayT "***ERROR: WireGuard VPN ${TXT}Peer ('$WG_INTERFACE') config NOT found?....skipping $ACTION request"
-                            echo -e $cBRED"\a\n\t***ERROR: WireGuard ${TXT}Peer (${cBWHT}$WG_INTERFACE${cBRED}) config NOT found?....skipping $ACTION request\n"$cRESET   2>&1  # v1.09
+                            SayT "***ERROR: WireGuard® VPN ${TXT}Peer ('$WG_INTERFACE') config NOT found?....skipping $ACTION request"
+                            echo -e $cBRED"\a\n\t***ERROR: WireGuard® ${TXT}Peer (${cBWHT}$WG_INTERFACE${cBRED}) config NOT found?....skipping $ACTION request\n"$cRESET   2>&1  # v1.09
                         fi
                     fi
                     # Reset the Policy flags/text
@@ -2301,11 +2308,11 @@ Manage_Wireguard_Sessions() {
                 WG_INTERFACE=$(wg show interfaces | sed s'/wgc[1-5] //g' | sed s'/wgs[1-5] //g')      # v4.12 ACTIVE Peers excluding firmware managed peers e.g. wgs1 or wgc5
                 if [ -n "$WG_INTERFACE" ];then
                     WG_INTERFACE=
-                    SayT "$VERSION Requesting termination of ACTIVE WireGuard VPN Peers ($WG_INTERFACE)"
-                    echo -e $cBWHT"\tRequesting termination of ACTIVE WireGuard VPN Peers ($WG_INTERFACE)"$cRESET 2>&1
+                    SayT "$VERSION Requesting termination of ACTIVE WireGuard® VPN Peers ($WG_INTERFACE)"
+                    echo -e $cBWHT"\tRequesting termination of ACTIVE WireGuard® VPN Peers ($WG_INTERFACE)"$cRESET 2>&1
                 else
-                    echo -e $cRED"\n\tNo WireGuard VPN Peers ACTIVE for Termination request\n" 2>&1
-                    SayT "No WireGuard VPN Peers ACTIVE for Termination request"
+                    echo -e $cRED"\n\tNo WireGuard® VPN Peers ACTIVE for Termination request\n" 2>&1
+                    SayT "No WireGuard® VPN Peers ACTIVE for Termination request"
                     echo -e 2>&1
                     return 0
                 fi
@@ -2326,10 +2333,10 @@ Manage_Wireguard_Sessions() {
                         fi
                         local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM $TABLE WHERE peer='$WG_INTERFACE';")
                         echo -en $cBCYA
-                        SayT "$VERSION Requesting termination of WireGuard VPN '$Mode' Peer ('$WG_INTERFACE')"
+                        SayT "$VERSION Requesting termination of WireGuard® VPN '$Mode' Peer ('$WG_INTERFACE')"
 
                         if [ -z "$(wg show interfaces | grep -w "$WG_INTERFACE")" ] && [ -z "$(ifconfig | grep -E "^$WG_INTERFACE")" ];then     # v4.12
-                            echo -e $cRED"\a\t";Say "WireGuard VPN '$Mode' Peer ('$WG_INTERFACE') NOT ACTIVE";echo -e
+                            echo -e $cRED"\a\t";Say "WireGuard® VPN '$Mode' Peer ('$WG_INTERFACE') NOT ACTIVE";echo -e
                         else
                             if [ "$Mode" == "server" ]; then
 
@@ -2355,17 +2362,17 @@ Manage_Wireguard_Sessions() {
                                 # Dump the stats
                                 Show_Peer_Status "generatestats" "$WG_INTERFACE" "ToFile"   # v4.16 v4.04
                                 if [ "$Mode" == "client" ] && [ "$Route" != "policy" ] ; then
-                                    wg show $WG_INTERFACE >/dev/null 2>&1 && ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" "$FORCE" "$SHOWCMDS" "$WG_QUICK" || Say "WireGuard $Mode service ('$WG_INTERFACE') NOT running."                       # v4.16
+                                    wg show $WG_INTERFACE >/dev/null 2>&1 && ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" "$FORCE" "$SHOWCMDS" "$WG_QUICK" || Say "WireGuard® $Mode service ('$WG_INTERFACE') NOT running."                       # v4.16
                                 else
-                                    wg show $WG_INTERFACE >/dev/null 2>&1 && ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" "policy" "$FORCE" "$SHOWCMDS" "$WG_QUICK" || Say "WireGuard $Mode (Policy) service ('$WG_INTERFACE') NOT running."     # v4.16
+                                    wg show $WG_INTERFACE >/dev/null 2>&1 && ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" "policy" "$FORCE" "$SHOWCMDS" "$WG_QUICK" || Say "WireGuard® $Mode (Policy) service ('$WG_INTERFACE') NOT running."     # v4.16
                                 fi
                                 [ -f /tmp/metrics.wg ] && { cat /tmp/metrics.wg; rm /tmp/metrics.wg ;}          # v4.16
                             fi
 
                         fi
                     else
-                        SayT "***ERROR: WireGuard VPN ${TXT}Peer ('$WG_INTERFACE') config NOT found?....skipping $ACTION request"
-                        echo -e $cBRED"\a\n\t***ERROR: WireGuard ${TXT}Peer (${cBWHT}$WG_INTERFACE${cBRED}) config NOT found?....skipping $ACTION request\n"$cRESET   2>&1  # v1.09
+                        SayT "***ERROR: WireGuard® VPN ${TXT}Peer ('$WG_INTERFACE') config NOT found?....skipping $ACTION request"
+                        echo -e $cBRED"\a\n\t***ERROR: WireGuard® ${TXT}Peer (${cBWHT}$WG_INTERFACE${cBRED}) config NOT found?....skipping $ACTION request\n"$cRESET   2>&1  # v1.09
                     fi
                 done
 
@@ -2689,6 +2696,13 @@ Manage_PASSTHRU_rules() {
 
     if [ -n "$CMD" ] && [ "$CMD" != "list" ];then
 
+        local Route=
+        if [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$IFACE';")" -gt 0 ] || \
+           [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM ipset WHERE peer='$IFACE';")" -gt 0 ] || \
+           [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(client) FROM passthru WHERE client='$IFACE';")" -gt 0 ];then
+            Route="policy"
+        fi
+
         case "$CMD" in
             add)
 
@@ -2730,7 +2744,7 @@ Manage_PASSTHRU_rules() {
                    # Need to Restart the 'server' Peer if it is UP
                     if [ -n "$(wg show interfaces | grep "$WG_INTERFACE")" ];then
                         CMD="restart"
-                        echo -e $cBWHT"\a\n\tWireGuard 'server' Peer needs to be ${CMD}ed to implement 'wan' passthru"
+                        echo -e $cBWHT"\a\n\tWireGuard® 'server' Peer needs to be ${CMD}ed to implement 'wan' passthru"
                         echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer ($WG_INTERFACE) or press$cBGRE [Enter] to SKIP."
                         read -r "ANS"
                         [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$WG_INTERFACE"; REDISPLAY=1; }  # v4.12
@@ -2738,11 +2752,17 @@ Manage_PASSTHRU_rules() {
                 else
                     # Need to Restart the 'client' Peer if it is UP
                     if [ -n "$(wg show interfaces | grep "$IFACE")" ];then
+                        local Route=
+                        if [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM policy WHERE peer='$IFACE';")" -gt 0 ] || \
+                           [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM ipset WHERE peer='$IFACE';")" -gt 0 ] || \
+                           [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(client) FROM passthru WHERE client='$IFACE';")" -gt 0 ];then
+                            Route="policy"
+                        fi
                         CMD="restart"
-                        echo -e $cBWHT"\a\n\tWireGuard 'client' Peer needs to be ${CMD}ed to implement '$IP_SUBNET' passthru"
+                        echo -e $cBWHT"\a\n\tWireGuard® 'client' Peer needs to be ${CMD}ed to implement '$IP_SUBNET' passthru RPDB rules"
                         echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'client' Peer ($IFACE) or press$cBGRE [Enter] to SKIP."
                         read -r "ANS"
-                        [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$IFACE"; REDISPLAY=1; }
+                        [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$IFACE" "$Route"; REDISPLAY=1; }
                     fi
                 fi
             ;;
@@ -2777,20 +2797,26 @@ Manage_PASSTHRU_rules() {
                         # Need to Restart the 'server' Peer if it is UP
                         if [ -n "$(wg show interfaces | grep "$WG_INTERFACE")" ];then
                             CMD="restart"
-                            echo -e $cBWHT"\a\n\tWireGuard 'server' Peer needs to be ${CMD}ed to remove 'wan' passthru"
+                            echo -e $cBWHT"\a\n\tWireGuard® 'server' Peer needs to be ${CMD}ed to remove 'wan' passthru"
                             echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer ($WG_INTERFACE) or press$cBGRE [Enter] to SKIP."
                             read -r "ANS"
                             [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$WG_INTERFACE"; REDISPLAY=1; }  # v4.12
                         fi
                     else
-                        # Need to Restart the 'client' Peer if it is UP
-                        if [ -n "$(wg show interfaces | grep "$IFACE")" ];then
-                            CMD="restart"
-                            echo -e $cBWHT"\a\n\tWireGuard 'client' Peer needs to be ${CMD}ed to remove '$IP_SUBNET' passthru"
-                            echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'client' Peer ($IFACE) or press$cBGRE [Enter] to SKIP."
-                            read -r "ANS"
-                            [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$IFACE"; REDISPLAY=1; }
-                        fi
+                        #if [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(server) FROM passthru WHERE server='$WG_INTERFACE' AND client='$IFACE';") -gt 0 ];then
+                            # Need to Restart the 'client' Peer if it is UP
+                            if [ -n "$(wg show interfaces | grep "$IFACE")" ];then
+                                CMD="restart"
+                                echo -e $cBWHT"\a\n\tWireGuard® 'client' Peer needs to be ${CMD}ed to remove '$IP_SUBNET' passthru RPDB rules"
+                                echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'client' Peer ($IFACE) or press$cBGRE [Enter] to SKIP."
+                                read -r "ANS"
+                                [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$IFACE" "$Route"; REDISPLAY=1; }
+                            fi
+                        #else
+                            # Delete ALL Passthru RPDB rules in flight.....
+                            #${INSTALL_DIR}wg_client $IFACE "passthru_rules" "del"
+                            #echo -e $cGRE"\a\n\tALL Passthru RPDB Routing rules for $WG_INTERFACE via $IFACE removed\n"$cRESET 2>&1
+                        #fi
                     fi
                 else
                     echo -e $cBCYA"\a\n\tDo you want to DELETE ALL Passthru Routing rules for ${cBMAG}$WG_INTERFACE?"$cRESET
@@ -2809,10 +2835,10 @@ Manage_PASSTHRU_rules() {
                                     # Need to Restart the 'client' Peer if it is UP
                                     if [ -n "$(wg show interfaces | grep "$CLIENT_PEER")" ];then
                                         CMD="restart"
-                                        echo -e $cBWHT"\a\n\tWireGuard 'client' Peer needs to be ${CMD}ed to remove 'passthru' rules"
+                                        echo -e $cBWHT"\a\n\tWireGuard® 'client' Peer needs to be ${CMD}ed to remove 'passthru' rules"
                                         echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'client' Peer ($CLIENT_PEER) or press$cBGRE [Enter] to SKIP."
                                         read -r "ANS"
-                                        [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$CLIENT_PEER"; REDISPLAY=1; }
+                                        [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$CLIENT_PEER" "$Route"; REDISPLAY=1; }
                                     fi
                                 done
                         else
@@ -3013,7 +3039,7 @@ EOF
             rm $SQL_DATABASE
             mv  ${SQL_DATABASE}.$TS $SQL_DATABASE 2>/dev/null                           # v4.14
         fi
-        echo -e $cBGRE"\n\t[✔] WireGuard Peer SQL Database $STATUS OK\n"$cRESET     # v4.12
+        echo -e $cBGRE"\n\t[✔] WireGuard® Peer SQL Database $STATUS OK\n"$cRESET     # v4.12
     fi
 
     Manage_Peer                                                                         # v4.14
@@ -3124,13 +3150,13 @@ EOF
 }
 Create_Sample_Config() {
     if [ -f ${INSTALL_DIR}WireguardVPN.conf ];then
-        echo -e $cBYEL"\a\n\tWarning: WireGuard configuration file '${INSTALL_DIR}WireguardVPN.conf' already exists!...renamed to 'WireguardVPN.conf$TS'"
+        echo -e $cBYEL"\a\n\tWarning: WireGuard® configuration file '${INSTALL_DIR}WireguardVPN.conf' already exists!...renamed to 'WireguardVPN.conf$TS'"
         mv ${INSTALL_DIR}WireguardVPN.conf ${INSTALL_DIR}WireguardVPN.conf.$TS
     fi
-    echo -e $cBCYA"\a\n\tCreating/Updating WireGuard configuration file '${INSTALL_DIR}WireguardVPN.conf'"
+    echo -e $cBCYA"\a\n\tCreating/Updating WireGuard® configuration file '${INSTALL_DIR}WireguardVPN.conf'"
 
     cat > ${INSTALL_DIR}WireguardVPN.conf << EOF
-# WireGuard Session Manager v4.12
+# WireGuard® Session Manager v4.12
 
 # Categories - Group several WireGuard peers for ease of starting/stopping
 #     NOTE: The default categories 'clients' and 'servers' represent ALL 'client' peers and 'server' peers respectively
@@ -3226,7 +3252,7 @@ Display_QRCode() {
 
     if [ -f $FN ];then                                          # v1.05
         if [ -z "$ANS" ];then
-            echo -e $cBWHT"\tPress$cBRED y$cRESET to Display QR Code for Scanning into WireGuard App on device $cBMAG'$DEVICE_NAME' ${cRESET}or press$cBGRE [Enter] to SKIP."
+            echo -e $cBWHT"\tPress$cBRED y$cRESET to Display QR Code for Scanning into WireGuard® App on device $cBMAG'$DEVICE_NAME' ${cRESET}or press$cBGRE [Enter] to SKIP."
             read -r "ANS"
         fi
         [ "$ANS" == "y" ] && { clear; qrencode -t ANSIUTF8 < $FN; }             # v1.05
@@ -3262,15 +3288,15 @@ Get_WAN_IF_Name() {
 
 WAN_IF=\$(Get_WAN_IF_Name)
 
-logger -st "(\$(basename "\$0"))" \$\$ "Checking if WireGuard VPN Peer KILL-Switch is required....."
+logger -st "(\$(basename "\$0"))" \$\$ "Checking if WireGuard® VPN Peer KILL-Switch is required....."
 if [ -n "\$(grep -E "^KILLSWITCH" /jffs/addons/wireguard/WireguardVPN.conf)" ];then
     iptables -D FORWARD -i br0 -o \$WAN_IF -j REJECT -m comment --comment "WireGuard KILL-Switch" 2>/dev/null
     iptables -I FORWARD -i br0 -o \$WAN_IF -j REJECT -m comment --comment "WireGuard KILL-Switch" 2>/dev/null
-    logger -st "(\$(basename "\$0"))" \$\$ "WireGuard VPN Peer KILL-Switch ENABLED"
+    logger -st "(\$(basename "\$0"))" \$\$ "WireGuard® VPN Peer KILL-Switch ENABLED"
 fi
 
 if [ -n "\$(wg show interfaces)" ];then
-    logger -st "(\$(basename "\$0"))" \$\$ "Restarting WireGuard to reinstate RPDB/firewall rules"
+    logger -st "(\$(basename "\$0"))" \$\$ "Restarting WireGuard® to reinstate RPDB/firewall rules"
     /jffs/addons/wireguard/wg_manager.sh stop
     /jffs/addons/wireguard/wg_manager.sh start
 
@@ -3279,12 +3305,12 @@ EOF
 
             chmod +x /jffs/addons/wireguard/wg_firewall
         fi
-        echo -e $cBCYA"\n\tfirewall-start updated to protect WireGuard firewall rules"$cRESET
-        SayT "firewall-start updated to protect WireGuard firewall rules"
+        echo -e $cBCYA"\n\tfirewall-start updated to protect WireGuard® firewall rules"$cRESET
+        SayT "firewall-start updated to protect WireGuard® firewall rules"
     else
         sed -i '/WireGuard/d' /jffs/scripts/firewall-start          # v4.11
-        echo -e $cBCYA"\n\tfirewall-start updated - no longer protecting WireGuard firewall rules"$cRESET
-        SayT "firewall-start updated - no longer protecting WireGuard firewall rules"
+        echo -e $cBCYA"\n\tfirewall-start updated - no longer protecting WireGuard® firewall rules"$cRESET
+        SayT "firewall-start updated - no longer protecting WireGuard® firewall rules"
     fi
 
 }
@@ -3350,9 +3376,9 @@ WG_show() {
 DNSmasq_Listening_WireGuard_Status() {
     # Check if DNSmasq is listening on ALL wg* interfaces               # v1.07
     if [ -z "$(grep -F "wg*" /etc/dnsmasq.conf)" ];then
-        echo -e $cBRED"\t[✖]${cBWHT} DNSmasq ${cRED}is not listening on any WireGuard interfaces 'wg*'\n"$cRESET 2>&1
+        echo -e $cBRED"\t[✖]${cBWHT} DNSmasq ${cRED}is not listening on any WireGuard® interfaces 'wg*'\n"$cRESET 2>&1
     else
-        echo -e $cBGRE"\t[✔]${cBWHT} DNSmasq ${cBGRE}is listening on ALL WireGuard interfaces 'wg*'\n"$cRESET 2>&1
+        echo -e $cBGRE"\t[✔]${cBWHT} DNSmasq ${cBGRE}is listening on ALL WireGuard® interfaces 'wg*'\n"$cRESET 2>&1
     fi
 }
 Edit_DNSMasq() {
@@ -3639,7 +3665,7 @@ Peer_Status_Summary() {
 }
 Show_credits() {
     printf '\n+======================================================================+\n'
-    printf '|  Welcome to the %bWireGuard Manager/Installer script (Asuswrt-Merlin)%b  |\n' "$cBGRE" "$cRESET"
+    printf '|  Welcome to the %bWireGuard® Manager/Installer script (Asuswrt-Merlin)%b |\n' "$cBGRE" "$cRESET"
     printf '|                                                                      |\n'
     local local CNT=23;VERSION_LENGTH=${#VERSION}
     [ $VERSION_LENGTH -gt 4 ] && CNT=$((CNT-(VERSION_LENGTH-4)))
@@ -3665,7 +3691,7 @@ Show_Info_HDR() {
         echo -e $cBRED"\n\t[✖] Entware Architecture unknown!\n"$cRESET
     fi
 
-    echo -e $cBMAG"\n\t${VERSION}$cBWHT WireGuard Session Manager" ${CHANGELOG}$cRESET  # v2.01
+    echo -e $cBMAG"\n\t${VERSION}$cBWHT WireGuard® Session Manager" ${CHANGELOG}$cRESET  # v2.01
 
     [ -d ${INSTALL_DIR} ] && Show_MD5 "script"
 
@@ -3676,9 +3702,9 @@ Show_Info() {
         local FPATH=$(modprobe --show-depends wireguard | awk '{print $2}')
         local FVERSION=$(strings $FPATH | grep "^version" | cut -d'=' -f2)  # v4.12 @ZebMcKayhan
         if [ "$(which wg)" != "/opt/bin/wg" ];then
-            echo -e $cBGRE"\n\t[✔]$cBWHT WireGuard Kernel module/User Space Tools included in Firmware"$cRED" ($FVERSION)\n"$cRESET    # v4.12
+            echo -e $cBGRE"\n\t[✔]$cBWHT WireGuard® Kernel module/User Space Tools included in Firmware"$cRED" ($FVERSION)\n"$cRESET    # v4.12
         else
-            echo -e $cBGRE"\n\t[ℹ ]$cBGRA WireGuard Kernel module/User Space Tools included in Firmware"$cBWHT" ($FVERSION)${cBGRA} but 3rd-Party modules installed...\n"$cRESET    # v4.12
+            echo -e $cBGRE"\n\t[ℹ ]$cBGRA WireGuard® Kernel module/User Space Tools included in Firmware"$cBWHT" ($FVERSION)${cBGRA} but 3rd-Party modules installed...\n"$cRESET    # v4.12
         fi
     fi
 
@@ -3689,12 +3715,12 @@ Show_Info() {
 
     if [ -f /jffs/scripts/firewall-start ];then
         if [ -z "$(grep -i "wireguard" /jffs/scripts/firewall-start)" ];then     # v1.11
-            echo -e $cBRED"\t[✖]${cBWHT} firewall-start$${cBRED} is NOT monitoring WireGuard Firewall rules - ${cBWHT}use 'firewallstart' to ENABLE\n"$cRESET   # v4.12
+            echo -e $cBRED"\t[✖]${cBWHT} firewall-start$${cBRED} is NOT monitoring WireGuard® Firewall rules - ${cBWHT}use 'firewallstart' to ENABLE\n"$cRESET   # v4.12
         else
-            echo -e $cBGRE"\t[✔]${cBWHT} firewall-start ${cBGRE}is monitoring WireGuard Firewall rules\n"$cRESET
+            echo -e $cBGRE"\t[✔]${cBWHT} firewall-start ${cBGRE}is monitoring WireGuard® Firewall rules\n"$cRESET
         fi
     else
-        echo -e $cBRED"\t[✖]${cBWHT} firewall-start${cBRED} is NOT monitoring WireGuard Firewall rules - ${cBWHT}use 'firewallstart' to ENABLE\n"$cRESET
+        echo -e $cBRED"\t[✖]${cBWHT} firewall-start${cBRED} is NOT monitoring WireGuard® Firewall rules - ${cBWHT}use 'firewallstart' to ENABLE\n"$cRESET
     fi
 
     if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOMENU" ${INSTALL_DIR}WireguardVPN.conf)" ];then     # v4.15
@@ -3772,7 +3798,7 @@ Show_Info() {
 
     [ $(cru l | grep ChkDDNS | wc -l) -gt 0 ] && echo -e $cBGRE"\t[✔] ${cBWHT}Endpoint DDNS$cBGRE re-fresh monitor ACTIVE\n$cRESET"        # v4.15
 
-    [ $(cru l | grep -E "wireguard_manager.*trimdb" | wc -l) -gt 0 ] && echo -e $cBGRE"\t[✔] ${cBWHT}Cron schedule ${cBGRE}$(cru l | awk '/wireguard_manager.sh trimdb/ {print $9}') ($(cru l | awk '/wireguard_manager.sh trimdb/ {print $1" "$2" "$3" "$4" "$5}'))$cBWHT to trim older than ${cBGRE}$(cru l | awk '/wireguard_manager.sh trimdb/ {print $8}') days$cBWHT from WireGuard SQL Database ${cBGRE}ENABLED\n"$cRESET
+    [ $(cru l | grep -E "wireguard_manager.*trimdb" | wc -l) -gt 0 ] && echo -e $cBGRE"\t[✔] ${cBWHT}Cron schedule ${cBGRE}$(cru l | awk '/wireguard_manager.sh trimdb/ {print $9}') ($(cru l | awk '/wireguard_manager.sh trimdb/ {print $1" "$2" "$3" "$4" "$5}'))$cBWHT to trim older than ${cBGRE}$(cru l | awk '/wireguard_manager.sh trimdb/ {print $8}') days$cBWHT from WireGuard® SQL Database ${cBGRE}ENABLED\n"$cRESET
 
     [ "$READLINE" == "ReadLine" ] && echo -e $cBGRE"\t[✔]$cBWHT Use of 'Pg-Up' Key ${cBGRE}for command retrieval is ENABLED\n$cRESET" || echo -e $cBRED"\t[✖]${cBWHT} Use of 'Pg-Up' Key for command retrieval is ${cBRED}DISABLED\n$cRESET" # v4.14
 
@@ -3806,16 +3832,16 @@ Install_WireGuard_Manager() {
 
     local NOPULL_SCRIPTS=$1
 
-    echo -en $cBWHT"\n\tInstalling WireGuard Manager - Router$cBMAG $HARDWARE_MODEL (v$BUILDNO)"
+    echo -en $cBWHT"\n\tInstalling WireGuard® Manager - Router$cBMAG $HARDWARE_MODEL (v$BUILDNO)"
     [ -f "$ENTWARE_INFO" ] && echo -e " $(grep -E "^arch" $ENTWARE_INFO)\n"$cRESET
 
     if [ "$(Is_AX)" == "N" ] && [ "$(Is_HND)" == "N" ];then
-        echo -e $cBRED"\a\n\t***ERROR: Router$cRESET $HARDWARE_MODEL (v$BUILDNO)$cBRED is not currently compatible with WireGuard!\n"
+        echo -e $cBRED"\a\n\t***ERROR: Router$cRESET $HARDWARE_MODEL (v$BUILDNO)$cBRED is not currently compatible with WireGuard®!\n"
         exit 93
     else
         if [ ! -f "$ENTWARE_INFO" ] || [ "$(grep  "^arch" $ENTWARE_INFO | awk -F'=' '{print $2}' )" != "aarch64" ];then     # v4.12 v4.11 Hotfix
             if [ ! -f /usr/sbin/wg ];then
-                echo -e $cBRED"\a\n\n\t***ERROR: ${cRESET}3rd-Party Entware${cBRED} version not compatible with ${cRESET}WireGuard!\n"       # v4.13 v4.11
+                echo -e $cBRED"\a\n\n\t***ERROR: ${cRESET}3rd-Party Entware${cBRED} version not compatible with ${cRESET}WireGuard®!\n"       # v4.13 v4.11
                 exit 94        # v4.12
             fi
         fi
@@ -3828,8 +3854,8 @@ Install_WireGuard_Manager() {
     if [ -d /opt/etc/ ];then
         # Legacy pre v2.03 install?
         if [ -d /opt/etc/wireguard ];then
-            echo -e $cRED"\a\n\tWarning: obsolete WireGuard Session Manager v1.xx config directory Found!!! (${cBWHT}'/opt/etc/wireguard'{$cBRED})\n"$cRESET
-            SayT "Warning obsolete WireGuard Session Manager config directory Found!!! ('/opt/etc/wireguard')"
+            echo -e $cRED"\a\n\tWarning: obsolete WireGuard® Session Manager v1.xx config directory Found!!! (${cBWHT}'/opt/etc/wireguard'{$cBRED})\n"$cRESET
+            SayT "Warning obsolete WireGuard® Session Manager config directory Found!!! ('/opt/etc/wireguard')"
         fi
         [ ! -d ${CONFIG_DIR} ] && mkdir -p ${CONFIG_DIR}
     else
@@ -3859,7 +3885,7 @@ Install_WireGuard_Manager() {
         ROUTER_COMPATIBLE="Y"                   # v4.13
     else
         # SEe if 3rd-Party Entware Kernel module exists
-        echo -e $cBCYA"\tDownloading Wireguard Kernel module for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
+        echo -e $cBCYA"\tDownloading Wireguard® Kernel module for $HARDWARE_MODEL (v$BUILDNO)"$cRESET
 
         ROUTER_COMPATIBLE="Y"
 
@@ -3878,12 +3904,12 @@ Install_WireGuard_Manager() {
         Initialise_SQL
 
         # Create 'Server' Peer
-        echo -e $cBCYA"\tCreating WireGuard 'Server' Peer ${cBMAG}(wg21)${cBCYA}'"$cRESET
+        echo -e $cBCYA"\tCreating WireGuard® 'Server' Peer ${cBMAG}(wg21)${cBCYA}'"$cRESET
 
         # Create Server template
         local PEER_LIST="1"
 
-        echo -e $cBCYA"\tCreating WireGuard Private/Public key-pairs for ${cBMAG}$HARDWARE_MODEL (v$BUILDNO)"$cRESET
+        echo -e $cBCYA"\tCreating WireGuard® Private/Public key-pairs for ${cBMAG}$HARDWARE_MODEL (v$BUILDNO)"$cRESET
         if [ -n "$(which wg)" ];then
 
                 # do
@@ -3928,10 +3954,10 @@ EOF
         if  [ -n "$(which wg)" ] && [ "$ROUTER_COMPATIBLE" == "Y" ];then
 
             # Test 'wg' and this script - (well actually the one used @BOOT) against the 'server' Peers e.g. wg21
-            echo -e $cBCYA"\tInitialising WireGuard VPN 'server' Peer"$cRESET
+            echo -e $cBCYA"\tInitialising WireGuard® VPN 'server' Peer"$cRESET
             Manage_Wireguard_Sessions "start" "wg21"
         else
-            echo -e $cBRED"\a\n\t***ERROR: WireGuard install FAILED!\n"$cRESET
+            echo -e $cBRED"\a\n\t***ERROR: WireGuard® install FAILED!\n"$cRESET
             exit 96
         fi
     else
@@ -3988,16 +4014,16 @@ EOF
             Create_RoadWarrior_Device "create" "$ANS"         # v4.01 v3.01
         fi
     else
-        echo -e $cBCYA"\tWireGuard Peer Status"
+        echo -e $cBCYA"\tWireGuard® Peer Status"
         Show_Peer_Status
     fi
 
-    echo -e $cBGRE"\n\t${aREVERSE}$VERSION WireGuard Session Manager install COMPLETED.\n"$cRESET
+    echo -e $cBGRE"\n\t${aREVERSE}$VERSION WireGuard® Session Manager install COMPLETED.\n"$cRESET
 
 }
 Uninstall_WireGuard() {
 
-    echo -e $cBCYA"\n\tUninstalling WireGuard Session Manager"$cRESET
+    echo -e $cBCYA"\n\tUninstalling WireGuard® Session Manager"$cRESET
     [ -n "$(wg show interfaces)" ] && Manage_Wireguard_Sessions "stop"      # v4.14
     echo -en $cBRED
     [ -f ${INSTALL_DIR}WireguardVPN.conf ] && rm ${INSTALL_DIR}WireguardVPN.conf
@@ -4005,13 +4031,13 @@ Uninstall_WireGuard() {
         [ -f ${CONFIG_DIR}WireguardVPN_map ] && rm ${CONFIG_DIR}WireguardVPN_map
 
     # Only remove WireGuard Entware packages if user DELETES '/opt/etc/wireguard'
-    echo -e "\n\tPress$cBRED Y$cRESET to$cBRED delete ALL WireGuard DATA files (Peer *.config etc.) $cRESET('${CONFIG_DIR}') or press$cBGRE [Enter] to keep custom WireGuard DATA files."
+    echo -e "\n\tPress$cBRED Y$cRESET to$cBRED delete ALL WireGuard® DATA files (Peer *.config etc.) $cRESET('${CONFIG_DIR}') or press$cBGRE [Enter] to keep custom WireGuard DATA files."
     read -r "ANS"
     if [ "$ANS" == "Y" ];then
        echo -e $cBCYA"\n\tDeleting $cRESET'${CONFIG_DIR}'"
        [ -d "${CONFIG_DIR}" ] && rm -rf ${CONFIG_DIR}
 
-       echo -e $cBCYA"\tUninstalling Wireguard Kernel module and Userspace Tool for $HARDWARE_MODEL (v$BUILDNO)"$cBGRA
+       echo -e $cBCYA"\tUninstalling Wireguard® Kernel module and Userspace Tool for $HARDWARE_MODEL (v$BUILDNO)"$cBGRA
        opkg remove wireguard-kernel wireguard-tools
        rm -rf /opt/etc/wireguard/
     else
@@ -4041,7 +4067,7 @@ Uninstall_WireGuard() {
 
     Unmount_WebUI $SCRIPT_NAME".asp"    # v4.15
 
-    echo -e $cBGRE"\n\tWireGuard Uninstall complete for $HARDWARE_MODEL (v$BUILDNO)\n"$cRESET
+    echo -e $cBGRE"\n\tWireGuard® Uninstall complete for $HARDWARE_MODEL (v$BUILDNO)\n"$cRESET
 
     exit 0
 }
@@ -4383,7 +4409,7 @@ Show_Peer_Config_Entry() {
         *)
             local Mode=$(Server_or_Client "$WG_INTERFACE")
 
-            [ "$Mode" == "**ERROR**" ] && { echo -e $cBRED"\n\a\t***ERROR Invalid WireGuard Peer '$WG_INTERFACE'";return;  }    # v4.14
+            [ "$Mode" == "**ERROR**" ] && { echo -e $cBRED"\n\a\t***ERROR Invalid WireGuard® Peer '$WG_INTERFACE'";return;  }    # v4.14
 
             case "$Mode" in
                 server)
@@ -4478,7 +4504,7 @@ Diag_Dump() {
 
     if [ -z "$TYPE" ] || [ "$TYPE" == "route" ] || [ "$TYPE" == "rpdb" ];then
 
-        echo -e $cBYEL"\n\tWireGuard VPN Peers"$cRESET
+        echo -e $cBYEL"\n\tWireGuard® VPN Peers"$cRESET
         Show_Peer_Config_Entry
 
         [ "$IPV6ONLY" == "N" ] && Diag_Routes "4"
@@ -4778,7 +4804,7 @@ Check_Version_Update() {
         echo -e "${BEL}\n\t"$UPDATE_SCRIPT_ALERT"\n"
         [ -n "$(echo "$UPDATE_SCRIPT_ALERT" | grep -o "Push to Github")" ] && return 2 || return 1 # v1.03
     else
-        echo -e $cBGRE"\n\t$VERSION - No WireGuard Manager updates available - you have the latest version\n"              # v1.03
+        echo -e $cBGRE"\n\t$VERSION - No WireGuard® Manager updates available - you have the latest version\n"              # v1.03
         return 0
     fi
 
@@ -5249,7 +5275,7 @@ Create_Site2Site() {
             local VPN_POOL=$VPN_POOL6                   # v4.15
             local IPV6_TXT="(IPv6) "                    # v4.15
         else
-            echo -e $cBRED"\a\n\t***ERROR Create new WireGuard ${IPV6_TXT}'server' Peer has missing ${cRESET}IPv6 Private subnet${cBRED} - use $cRESET'ipv6[=]'$cBRED arg\n"$cRESET
+            echo -e $cBRED"\a\n\t***ERROR Create new WireGuard® ${IPV6_TXT}'server' Peer has missing ${cRESET}IPv6 Private subnet${cBRED} - use $cRESET'ipv6[=]'$cBRED arg\n"$cRESET
             return 1
         fi
     fi
@@ -5328,7 +5354,7 @@ Create_Site2Site() {
     fi
 
     [ -n "$NAME_ONE" ] && local SLASH="/" || local SLASH=
-    echo -e $cBCYA"\n\tCreating WireGuard Private/Public key-pair for Site-to-Site ${IPV6_TXT}Peers ${cBMAG}${NAME_ONE}/${NAME_TWO}${cBCYA}"$cRESET
+    echo -e $cBCYA"\n\tCreating WireGuard® Private/Public key-pair for Site-to-Site ${IPV6_TXT}Peers ${cBMAG}${NAME_ONE}/${NAME_TWO}${cBCYA}"$cRESET
 
     for SITE in $NAME_ONE $NAME_TWO
         do
@@ -5534,25 +5560,25 @@ Build_Menu() {
         if [ "$(WireGuard_Installed)" == "Y" ];then
             # Currently using 3rd-Party/Entware Kernel module or intention in 'WireguardVPN.conf' to do so? then Highlight 'Update' option...
             if [ -n "$(opkg list-installed | grep "wireguard-kernel")" ] || [ -n "$(grep -oE "^USE_ENTWARE_KERNEL_MODULE" ${INSTALL_DIR}WireguardVPN.conf)" ];then  # v4.12
-                MENU_I="$(printf '%b1 %b = %bUpdate%b WireGuard modules' "${cBYEL}" "${cRESET}" "${cBGRE}" "${cRESET}")"
+                MENU_I="$(printf '%b1 %b = %bUpdate%b WireGuard® modules' "${cBYEL}" "${cRESET}" "${cBGRE}" "${cRESET}")"
             else
                 # lowlight but don't disable option if firmware contains WireGuard module.
-                MENU_I="$(printf '%b1 %b = %bUpdate%b WireGuard modules' "${cBYEL}" "${cRESET}" "${cBGRA}" "${cBGRA}")"
+                MENU_I="$(printf '%b1 %b = %bUpdate%b WireGuard® modules' "${cBYEL}" "${cRESET}" "${cBGRA}" "${cBGRA}")"
             fi
 
             if [ -n "$(opkg list-installed | grep "wireguard-kernel")" ] || [ -n "$(opkg status wireguard-kernel | awk '/^Installed/ {print $2}')" ];then   # v4.12
-                MENU_Z="$(printf '%b2 %b = %bRemove%b WireGuard/(wg_manager)\n' "${cBYEL}" "${cRESET}" "${cBRED}" "${cRESET}")"
+                MENU_Z="$(printf '%b2 %b = %bRemove%b WireGuard®/(wg_manager)\n' "${cBYEL}" "${cRESET}" "${cBRED}" "${cRESET}")"
             else
-                MENU_Z="$(printf '%b2 %b = %bRemove%b WireGuard/%b(wg_manager)\n' "${cBYEL}" "${cRESET}" "${cBRED}" "${cBGRA}" "${cRESET}")"
+                MENU_Z="$(printf '%b2 %b = %bRemove%b WireGuard®/%b(wg_manager)\n' "${cBYEL}" "${cRESET}" "${cBRED}" "${cBGRA}" "${cRESET}")"
             fi
         else
-            MENU_I="$(printf '%b1 %b = %bBegin%b WireGuard Installation Process' "${cBYEL}" "${cRESET}" "${cBGRE}" "${cRESET}")"
+            MENU_I="$(printf '%b1 %b = %bBegin%b WireGuard® Installation Process' "${cBYEL}" "${cRESET}" "${cBGRE}" "${cRESET}")"
         fi
 
         if [ "$(WireGuard_Installed)" == "Y" ];then
 
             MENU_VX="$(printf '%bv %b = View %b%s\n' "${cBYEL}" "${cRESET}" "$cBGRE" "('${INSTALL_DIR}WireguardVPN.conf')")"
-            MENU_RS="$(printf '%brs%b = %bRestart%b (or %bStart%b) WireGuard Sessions(%b)\n' "${cBYEL}" "${cRESET}" "$cBGRE" "${cRESET}" "$cBGRE" "${cRESET}" )"
+            MENU_RS="$(printf '%brs%b = %bRestart%b (or %bStart%b) WireGuard® Sessions(%b)\n' "${cBYEL}" "${cRESET}" "$cBGRE" "${cRESET}" "$cBGRE" "${cRESET}" )"
 
             if [ -n "$(wg show interfaces)" ];then
                 MENU_S="$(printf '%b4 %b = %bStart%b   [ [Peer [nopolicy]...] | category ] e.g. start clients \n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"        # v2.02
@@ -5568,7 +5594,7 @@ Build_Menu() {
             MENU_P="$(printf '%b8 %b = %bPeer%b management [ "help" | "list" | "new" ] | [ {Peer | category} [ 'del' | 'show' | 'add' [{"auto="[y|n|p]}] ]%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
             MENU_C="$(printf '%b9 %b = %bCreate[split]%b Road-Warrior 'device' Peer for 'server' Peer {device [server]} e.g. create myPhone wg21%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
             MENU_IPS="$(printf '%b10 %b= %bIPSet%b management [ "upd" { ipset [ "fwmark" {fwmark} ] | [ "enable" {"y"|"n"}] | [ "dstsrc"] {src} ] }] %b' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
-            MENU_ISPIMP="$(printf '%b11 %b= %bImport%b WireGuard configuration { [ "?" | [ "dir" directory ] | [/path/]config_file [ "name="rename_as ] ]} %b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
+            MENU_ISPIMP="$(printf '%b11 %b= %bImport%b WireGuard® configuration { [ "?" | [ "dir" directory ] | [/path/]config_file [ "name="rename_as ] ]} %b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
             MENU_VPNDIR="$(printf '%b12 %b= %bvpndirector%b Clone VPN Director rules [ "clone" [ "wan" | "ovpn"n [ changeto_wg1n ]] | "delete" | "list" ] %b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")" # v4.14
         fi
 
@@ -5691,13 +5717,13 @@ Process_User_Choice() {
 
                     if [ "$ACTION" == "diag" ];then
                         #[ -z "$ARG" ] && Show_Peer_Status "full"             # v3.04 Hotfix
-                        [ -z "$ARG" ] && { echo -e $cBYEL"\n\tWireGuard VPN Peer Status"$cRESET; wg show all; }
+                        [ -z "$ARG" ] && { echo -e $cBYEL"\n\tWireGuard® VPN Peer Status"$cRESET; wg show all; }
                         Diag_Dump ${menu1#* }
                     else
                         Show_Peer_Status                    # v3.04 Hotfix
                     fi
                 else
-                    echo -en $cRED"\a\n\t";Say "Wireguard VPN module 'wg' NOT installed\n"$cRESET
+                    echo -en $cRED"\a\n\t";Say "Wireguard® VPN module 'wg' NOT installed\n"$cRESET
                     echo -e
                 fi
                 ;;
@@ -5880,7 +5906,7 @@ Process_User_Choice() {
                         #PRE_MD5="$(md5sum $FN | awk '{print $1}')"
                         nano $ACCESS $FN
                     else
-                        echo -e $cBRED"\a\n\t***ERROR WireGuard Peer Configuration '$FN' NOT found\n"$cRESET
+                        echo -e $cBRED"\a\n\t***ERROR WireGuard® Peer Configuration '$FN' NOT found\n"$cRESET
                     fi
 
             ;;
@@ -5904,7 +5930,7 @@ Process_User_Choice() {
             ;;
             wg|wg" "*)                                              # v4.04
                 # Expose the WireGuard Userspace Tool
-                echo -e $cBWHT"\n\tWireGuard Userspace Tool:\n"
+                echo -e $cBWHT"\n\tWireGuard® Userspace Tool:\n"
                 $menu1
             ;;
             killsw*)
@@ -5916,7 +5942,7 @@ Process_User_Choice() {
 
                 Parse "$(Manage_KILL_Switch "$ARG")" "_" RC TEMP_PERM
 
-                [ "$RC" == "Y" ] && echo -e $cBGRE"\n\t[✔] WireGuard WAN KILL-Switch "${cBGRE}${aREVERSE}"${TEMP_PERM} ENABLED"$cRESET" (use 'vx' command for info)" || echo -e $cBRED"\n\t[✖] ${cBGRE}WireGuard WAN KILL-Switch "${cBRED}${aREVERSE}"${TEMP_PERM} DISABLED"$cRESET" (use 'vx' command for info)"
+                [ "$RC" == "Y" ] && echo -e $cBGRE"\n\t[✔] WireGuard® WAN KILL-Switch "${cBGRE}${aREVERSE}"${TEMP_PERM} ENABLED"$cRESET" (use 'vx' command for info)" || echo -e $cBRED"\n\t[✖] ${cBGRE}WireGuard WAN KILL-Switch "${cBRED}${aREVERSE}"${TEMP_PERM} DISABLED"$cRESET" (use 'vx' command for info)"
             ;;
             ip)
 
@@ -6314,9 +6340,9 @@ Process_User_Choice() {
                     cru d WireGuard_DB 2>/dev/null                  # v4.16
                     if [ $DAYS -gt 0 ];then
                         cru a WireGuard_DB "0 7 * * 6 /jffs/addons/wireguard/wireguard_manager.sh trimdb $DAYS"     # v4.16
-                        echo -e $cBGRE"\n\t[✔] Cron schedule to trim WireGuard SQL Database created $cBWHT(07:00 every Sunday)$cBGRE older than ${cBWHT}$DAYS${cBGRE} days)\n"$cRESET   # v4.16
+                        echo -e $cBGRE"\n\t[✔] Cron schedule to trim WireGuard® SQL Database created $cBWHT(07:00 every Sunday)$cBGRE older than ${cBWHT}$DAYS${cBGRE} days)\n"$cRESET   # v4.16
                     else
-                        echo -e $cBRED"\n\t[✖] ${cBGRE}Cron schedule to trim WireGuard SQL Database ${cBRED}DELETED\n"$cRESET
+                        echo -e $cBRED"\n\t[✖] ${cBGRE}Cron schedule to trim WireGuard® SQL Database ${cBRED}DELETED\n"$cRESET
                     fi
                 else
                     Purge_Database $menu1   # v4.15
@@ -6651,7 +6677,7 @@ Show_Main_Menu() {
                 HDR="N"
             fi
 
-            local STATUS_LINE="WireGuard ACTIVE Peer Status: "$(Peer_Status_Summary)                  # v3.04 v2.01
+            local STATUS_LINE="WireGuard® ACTIVE Peer Status: "$(Peer_Status_Summary)                  # v3.04 v2.01
             [ -n "$(echo "$(Manage_KILL_Switch)" | grep -F "Y_")" ] && local KILL_STATUS="${cBGRE}${aREVERSE}KILL-Switch ACTIVE$cRESET" || local KILL_STATUS="                 " # v4.12
             echo -e $cRESET"\n"${KILL_STATUS}"\t${cRESET}${cBMAG}${STATUS_LINE}"$cRESET
 
@@ -6767,7 +6793,7 @@ Create_RoadWarrior_Device() {
             if [ -f ${CONFIG_DIR}${SERVER_PEER}.conf ];then         # v4.14
                 continue
             else
-                echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard 'server' Peer '$SERVER_PEER'\n"$cRESET
+                echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard® 'server' Peer '$SERVER_PEER'\n"$cRESET
                 return 1
             fi
         done
@@ -6839,7 +6865,7 @@ Create_RoadWarrior_Device() {
 
                 local CREATE_DEVICE_CONFIG="Y"
                 if [ -f ${CONFIG_DIR}${DEVICE_NAME}.conf ];then
-                    echo -e $cRED"\a\tWarning: Peer device '${cBMAG}${DEVICE_NAME}${cRED}' WireGuard config already EXISTS!"
+                    echo -e $cRED"\a\tWarning: Peer device '${cBMAG}${DEVICE_NAME}${cRED}' WireGuard® config already EXISTS!"
                     echo -e $cRESET"\tPress$cBRED y$cRESET to$cBRED ${aBOLD}CONFIRM${cRESET}${cBRED} Overwriting Peer device '${cBMAG}$DEVICE_NAME.config${cRESET}' or press$cBGRE [Enter] to SKIP."
                     read -r "ANS"
                     [ "$ANS" != "y" ] && CREATE_DEVICE_CONFIG="N"
@@ -7016,7 +7042,7 @@ EOF
                     if [ "$SITE2SITE_PEER_LAN" != "remoteonly" ];then
                         sqlite3 $SQL_DATABASE "INSERT into devices values('$DEVICE_NAME','X','$VPN_POOL_IP','$DNS_RESOLVER','$ALLOWED_IPS','$PUB_KEY','$PRI_KEY','# $DEVICE_NAME $TAG','0');"
 
-                        echo -e $cBGRE"\n\tWireGuard config for $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBGRE}' (${cBWHT}${VPN_POOL_IP}${cBGRE}) created ${cBWHT}(Allowed IP's ${ALLOWED_IPS} ${SPLIT_TXT})\n"$cRESET
+                        echo -e $cBGRE"\n\tWireGuard® config for $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBGRE}' (${cBWHT}${VPN_POOL_IP}${cBGRE}) created ${cBWHT}(Allowed IP's ${ALLOWED_IPS} ${SPLIT_TXT})\n"$cRESET
                     fi
                 fi
                 if [ "$SITE2SITE_PEER_LAN" != "remoteonly" ];then
@@ -7042,7 +7068,7 @@ PresharedKey = $PRE_SHARED_KEY
 EOF
                         for SERVER_PEER in $SERVER_PEER                                         # v3.03
                             do
-                                 echo -e $cBCYA"\tAdded $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBCYA}' ${cBWHT}${VPN_POOL_IP}${cBCYA} to $HARDWARE_MODEL 'server' (${cBMAG}$SERVER_PEER${cBCYA}) and WireGuard config\n"
+                                 echo -e $cBCYA"\tAdded $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBCYA}' ${cBWHT}${VPN_POOL_IP}${cBCYA} to $HARDWARE_MODEL 'server' (${cBMAG}$SERVER_PEER${cBCYA}) and WireGuard® config\n"
                             done
 
                         Display_QRCode "${CONFIG_DIR}${DEVICE_NAME}.conf"
@@ -7091,7 +7117,7 @@ EOF
                 if [ "$SITE2SITE_PEER_LAN" != "remoteonly" ];then           # v4.15
                     # Need to Restart the Peer (if it is UP) or Start it so it can listen for new 'client' Peer device/site-2-site
                     [ -n "$(wg show interfaces | grep "$SERVER_PEER")" ] && CMD="restart" ||  CMD="start"   # v1.08
-                    echo -e $cBWHT"\a\n\tWireGuard 'server' Peer needs to be ${CMD}ed to listen for 'client' $PEER_TOPOLOGY Peer ${cBMAG}$DEVICE_NAME $TAG"
+                    echo -e $cBWHT"\a\n\tWireGuard® 'server' Peer needs to be ${CMD}ed to listen for 'client' $PEER_TOPOLOGY Peer ${cBMAG}$DEVICE_NAME $TAG"
                     echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer (${cBMAG}${SERVER_PEER}${cRESET}) or press$cBGRE [Enter] to SKIP."
                     read -r "ANS"
                     [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$SERVER_PEER"; Show_Peer_Status "show"; }  # v3.03
@@ -7203,7 +7229,7 @@ if [ "$1" != "install" ];then   # v2.01
 
         if [ -d /opt/etc/wireguard ] && [ "$(ls -1 /opt/etc/wireguard | wc -l)" -gt "5" ];then
 
-            echo -e $cBRED"\a\n\tWireGuard Session Manager v3.0 requires '${CONFIG_DIR}'\n\n\t${cBWHT}Do you want to rename '/opt/etc/wireguard' to '${CONFIG_DIR}' ?"
+            echo -e $cBRED"\a\n\tWireGuard® Session Manager v3.0 requires '${CONFIG_DIR}'\n\n\t${cBWHT}Do you want to rename '/opt/etc/wireguard' to '${CONFIG_DIR}' ?"
             echo -e "\tPress$cBRED y$cRESET to$cBRED auto-migrate to WireGuard Session Manager v3.0${cRESET} or press$cBGRE [Enter] to SKIP."
                 read -r "ANS"
                 if [ "$ANS" == "y" ];then
@@ -7315,7 +7341,7 @@ if [ "$1" != "install" ];then   # v2.01
             ;;
             show|list)
                 # Force verbose detail if active Peers
-                [ -n "$(wg show interfaces)" ] && Show_Peer_Status "full" || { echo -e; Say "WireGuard ACTIVE Peer Status: Clients 0, Servers 0" ;}     # v4.16                       # Force verbose detail
+                [ -n "$(wg show interfaces)" ] && Show_Peer_Status "full" || { echo -e; Say "WireGuard® ACTIVE Peer Status: Clients 0, Servers 0" ;}     # v4.16                       # Force verbose detail
                 echo -e $cRESET
                 exit_message
             ;;
@@ -7402,7 +7428,7 @@ if [ "$1" != "install" ];then   # v2.01
     else
         if [ "$1" != "init" ];then              # v4.11
             SayT "***ERROR WireGuard Manager/WireGuard Tool module 'wg' NOT installed"
-            echo -e $cBRED"\a\n\t***ERROR WireGuard Tool module 'wg' NOT installed\n"$cRESET
+            echo -e $cBRED"\a\n\t***ERROR WireGuard® Tool module 'wg' NOT installed\n"$cRESET
             exit_message
         fi
     fi
