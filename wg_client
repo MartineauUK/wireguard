@@ -1,10 +1,10 @@
 #!/bin/sh
-VERSION="v4.16.19"
-#============================================================================================ © 2021-2022 Martineau v4.16.19
+VERSION="v4.17.1"
+#============================================================================================ © 2021-2022 Martineau v4.17.1
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 29-Apr-2022
+# Last Updated Date: 01-May-2022
 #
 # Description:
 #
@@ -235,22 +235,25 @@ purge_client_list(){
             cmd ip rule del prio $PRIO
             [ "$USE_IPV6" == "Y" ] && cmd ip -6 rule del prio $PRIO         # v4.14.8 @ZebMcKayhan
             #echo -en $cBCYA"\t"
-            logger -t "WireGuard-${MODE}${VPN_NAME}" "Removing WireGuard 'client' Peer rule $PRIO from routing policy"
+            logger -t "WireGuard-${MODE}${VPN_NAME}" "Removing WireGuard® 'client' Peer rule $PRIO from routing policy"
             echo -en $cRESET
         fi
     done
     }
 Manage_Passthru(){
 
-    local SERVER_DEVICEPEERS=$(sqlite3 /opt/etc/wireguard.d/WireGuard.db "SELECT server,ip_subnet FROM passthru where client='$WG_INTERFACE';" | tr '\n' ' ')
+    local SERVER_DEVICEPEERS=$(sqlite3 $SQL_DATABASE "SELECT server,ip_subnet FROM passthru where client='$WG_INTERFACE';" | tr '\n' ' ')
 
-    local PASSTHRU_SERVER
-    local PASSTHRU
+    local PASSTHRU_SERVER=
+    local PASSTHRU=
 
     local ACTION="add"
     [ -n "$1" ] && ACTION=$1        # "del" or "add"
 
     if [ -n "$SERVER_DEVICEPEERS" ];then
+
+        unset DONE;while [ -z ${DONE+x} ];do ip    rule del prio 998${VPN_NUM} 2>/dev/null;[ $? -gt 0 ] && DONE=1;done  # v4.17.1 v4.16.19
+        unset DONE;while [ -z ${DONE+x} ];do ip -6 rule del prio 998${VPN_NUM} 2>/dev/null;[ $? -gt 0 ] && DONE=1;done  # v4.17.1 v4.16.19
 
         for ITEM in $SERVER_DEVICEPEERS     # wg21|all or wg22|SGS8 or wg21|10.0.0.0/27
             do
@@ -276,8 +279,6 @@ Manage_Passthru(){
                 if [ -n "$IP_ADDR" ];then
                     for PASSTHRU_IP in $(echo "$IP_ADDR" | tr ',' ' ')
                         do
-                            unset DONE;while [ -z ${DONE+x} ];do ip    rule del prio 998${VPN_NUM} 2>/dev/null;[ $? -gt 0 ] && DONE=1;done  # v4.16.19
-                            unset DONE;while [ -z ${DONE+x} ];do ip -6 rule del prio 998${VPN_NUM} 2>/dev/null;[ $? -gt 0 ] && DONE=1;done  # v4.16.19
                             if [ "$PASSTHRU_ONLY" != "Y" ];then         # Called from wg_manager ?
                                 iptables  -t nat -D POSTROUTING -s  $IP_ADDR -o wg1$VPN_NUM -j MASQUERADE 2> /dev/null  # v4.16.14
                                 ip6tables -t nat -D POSTROUTING -s  $IP_ADDR -o wg1$VPN_NUM -j MASQUERADE 2> /dev/null  # v4.16.14
@@ -356,7 +357,7 @@ Process_Pre_Post_Commands() {
             local CMDTYPE=$1
             local CMD="$(echo "$LINE" | sed "s/\%wan/$WAN_IF/g;s/\%net/$SUBNET_PREFIX4/g;s/\%lan/$LAN_SUBNET/g;s/\%pos/$POS/g;s/\%p/$LISTEN_PORT/g;s/\%i/$WG_INTERFACE/g")"    # v4.16.3 v4.14.1
             if [ -n "$CMD" ];then
-                logger -t "WireGuard-${MODE}${VPN_NAME}" "Xxecuting $CMDTYPE: '$CMD'"
+                logger -t "WireGuard-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"   # v4.17
                 [ "$SHOWCMDS" == "Y" ] && echo -e "[>] ${CMDTYPE}" >&2
                 if [ -n "$(echo "$CMDTYPE" | grep "Up")" ];then             # v4.4.4
                     cmd $CMD                                            # v4.15.2
@@ -562,7 +563,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
     Firewall_delete
 
     if [ -n "$LOCALIP" ] || [ "$MODE" == "client" ];then                                # v1.03
-        logger -t "WireGuard-${MODE}${VPN_NAME}" "Initialising WireGuard VPN $MODE Peer ($VPN_ID) ${POLICY_MODE}${TXT} $SOCKET ($DESC)"
+        logger -t "WireGuard-${MODE}${VPN_NAME}" "Initialising WireGuard® VPN $MODE Peer ($VPN_ID) ${POLICY_MODE}${TXT} $SOCKET ($DESC)"
         echo -e $cBCYA"\tWireGuard-${MODE}${VPN_NAME}: Initialising WireGuard VPN '$MODE' Peer (${cBMAG}$VPN_ID${cBCYA}) ${POLICY_MODE}${TXT} $SOCKET (${cBMAG}$DESC${cBCYA}) ${cBWHT}DNS=$PEER_DNS_LIST"$cRESET        # v4.16
 
         if [ -n "$PEER_DNS_LIST" ];then            # v4.16 v4.05
@@ -1179,9 +1180,9 @@ else
 
     rm /tmp/$VPN_ID.* 2>/dev/null
 
-    logger -t "WireGuard-${MODE}${VPN_NAME}" "WireGuard VPN '$MODE' Peer ($VPN_ID) $TXT $SOCKET ($DESC) $TERMINATED_TXT"
+    logger -t "WireGuard-${MODE}${VPN_NAME}" "WireGuard® VPN '$MODE' Peer ($VPN_ID) $TXT $SOCKET ($DESC) $TERMINATED_TXT"
     echo -en ${cRESET}"\n"
-    echo -e $cBGRE"\tWireGuard-${MODE}${VPN_NAME}: WireGuard VPN '$MODE' Peer (${cBMAG}$VPN_ID${cBGRE}) $TXT $SOCKET (${cBMAG}$DESC${cBGRE}) ${cRED}$TERMINATED_TXT"${cRESET}
+    echo -e $cBGRE"\tWireGuard-${MODE}${VPN_NAME}: WireGuard® VPN '$MODE' Peer (${cBMAG}$VPN_ID${cBGRE}) $TXT $SOCKET (${cBMAG}$DESC${cBGRE}) ${cRED}$TERMINATED_TXT"${cRESET}
 
 fi
 
