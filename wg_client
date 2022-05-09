@@ -1,11 +1,11 @@
 #!/bin/sh
 # shellcheck disable=SC2039,SC2155,SC2124,SC2046
-VERSION="v4.17.2"
-#============================================================================================ © 2021-2022 Martineau v4.17.2
+VERSION="v4.17.3"
+#============================================================================================ © 2021-2022 Martineau v4.17.3
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 08-May-2022
+# Last Updated Date: 09-May-2022
 #
 # Description:
 #
@@ -555,6 +555,12 @@ if [ "$2" == "passthru_rules" ];then
     PASSTHRU_ONLY="Y"
     Manage_Passthru $3
     exit 0
+fi
+
+# 'AllowedIPs = 0.0.0.0/0 # ALL Traffic' is INVALID; interpreted as 'AllowedIPs = (none)' by wg i.e. Comment is ILLEGAL!!!!
+if [ $(grep -cE "^AllowedIPs.*#.*" ${CONFIG_DIR}${VPN_ID}.conf) -eq 1 ];then        # v4.17.3
+    echo -e $cBRED"\a\t***ERROR: Directive $cBWHT'$(grep -oE "^AllowedIPs.*#.*" ${CONFIG_DIR}${VPN_ID}.conf)'$cBRED cannot contain comments (use command 'formatwg-quick'); Initialisation ABORTed!\n"$cRESET   # v4.17.3
+    exit 86     # v4.17.3 @chongnt
 fi
 
 if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
