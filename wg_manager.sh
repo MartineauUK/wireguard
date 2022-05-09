@@ -1,7 +1,7 @@
 #!/bin/sh
 # shellcheck disable=SC2039,SC2155,SC2124,SC2046,SC2027
-VERSION="v4.17b2"
-#============================================================================================ © 2021-2022 Martineau v4.17b2
+VERSION="v4.17b3"
+#============================================================================================ © 2021-2022 Martineau v4.17b3
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -25,7 +25,7 @@ VERSION="v4.17b2"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 08-May-2022
+# Last Updated Date: 09-May-2022
 
 #
 # Description:
@@ -3375,6 +3375,11 @@ STATS
 #     (You can temporarily override this by using menu command 'trimdb cron xx')
 TrimDB 99
 
+# Auto delete the rogue RPDB PRIO 220 rules
+#     Use command 'vx' to edit this setting
+#ROUGE220IGNORE
+#ROGUE220DELETE
+
 EOF
 
     return 0
@@ -4121,7 +4126,7 @@ EOF
     # Auto start ALL defined WireGuard Peers @BOOT
     # Use post-mount
     echo -e $cBCYA"\tAdding Peer Auto-start @BOOT"$cRESET
-    if [ -z "$(grep -i "WireGuard" /jffs/scripts/post-mount)" ];then
+    if [ -z "$(grep -iF "wg_manager.sh init" /jffs/scripts/post-mount)" ];then      # v4.17
         # shellcheck disable=SC2145
         echo -e "/jffs/addons/wireguard/wg_manager.sh init \"$@\" & # WireGuard Manager" >> /jffs/scripts/post-mount
     fi
@@ -6337,11 +6342,11 @@ Process_User_Choice() {
 
                 if [ -n "$(ls ${CONFIG_DIR}${WG_INTERFACE}*)" ];then
 
-                    [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ]        && { echo -e "\n\t================Config==============="; cat ${CONFIG_DIR}${WG_INTERFACE}.conf | grep .; }
+                    [ -f ${CONFIG_DIR}${WG_INTERFACE}.conf ] && { echo -e "\n\t================Config==============="; cat ${CONFIG_DIR}${WG_INTERFACE}.conf | grep .; }
 
                     echo -e
 
-                    if [ "$(Server_or_Client "$WG_INTERFACE")" != "device" ] && [ -n "$(ls /tmp/${WG_INTERFACE}.*)" ];then  # v4.17
+                    if [ "$(Server_or_Client "$WG_INTERFACE")" != "device" ] && [ -n "$(ls /tmp/$WG_INTERFACE.* 2>/dev/null )" ];then  # v4.17
                         echo -e "\t================Active==============="
                         cat /tmp/${WG_INTERFACE}.* | grep .;
                     fi
@@ -6603,6 +6608,11 @@ Process_User_Choice() {
                                     read -r "ANS"
                                     [ "$ANS" == "y" ] && { sed -i 's/^#Post/Post/; s/^#PreU/PreU/; s/^#PreD/PreD/' $FN; local CONVERTED="Y" ;}
                                 fi
+                            fi
+
+                            # 'AllowedIPs = 0.0.0.0/0 # ALL Traffic' is INVALID; interpreted as 'AllowedIPs = (none)' by wg i.e. Comment is ILLEGAL!!!!
+                            if [ $(grep -cE "^AllowedIPs.*#.*" $FN) -eq 1 ];then
+                                sed -i '/^AllowedIPs/ s/#.*$//' $FN; local CONVERTED="Y"        #v 4.17 @chongnt
                             fi
 
                             [ "$CONVERTED" == "Y" ] && { local CONVERTED="N"; echo -e $cBGRE"\t[✔] $cBCYA'$CONF'$cBGRE converted to $cBWHT'wg/wg-quick' format"$cRESET  ;}
@@ -7191,7 +7201,7 @@ DNS = $DNS_RESOLVER
 # $HARDWARE_MODEL ${IPV6_TXT}'server' ($SERVER_PEER)
 [Peer]
 PublicKey = $PUB_SERVER_KEY
-AllowedIPs = $ALLOWED_IPS     ${SPLIT_TXT}
+AllowedIPs = $ALLOWED_IPS
 # DDNS $ROUTER_DDNS
 Endpoint = $ROUTER_DDNS:$LISTEN_PORT
 PresharedKey = $PRE_SHARED_KEY
@@ -7246,7 +7256,7 @@ EOF
 # $DEVICE_NAME $PEER_TOPOLOGY
 [Peer]
 PublicKey = $PUB_KEY
-AllowedIPs = $ALLOWED_IPS     ${SPLIT_TXT}
+AllowedIPs = $ALLOWED_IPS
 #PresharedKey = $PRE_SHARED_KEY
 PersistentKeepalive = 25
 # $DEVICE_NAME End
@@ -7619,37 +7629,49 @@ fi
 
 clear
 #####################################DEBUG===============================================
-if [ -n "$(ip rule | grep -E "^220:")" ] || [ -n "$(ip -6 rule | grep -E "^220:")" ];then
-    echo -e "\a"
-    Say "DEBUG= *********************************WTF!? Rogue RPDB rule 220 FOUND?????!!!!!*******************************"
+if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -z "$(grep -E "^ROGUE220IGNORE" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+    if [ -n "$(ip rule | grep -E "^220:")" ] || [ -n "$(ip -6 rule | grep -E "^220:")" ];then
+        echo -e "\a"
+        Say "DEBUG= *********************************WTF!? Rogue RPDB rule 220 FOUND?????!!!!!*******************************"
 
-    if [ -n "$(ip rule | grep -E "^220:")" ];then
-        TABLE=$(ip rule | awk '/^220:/ {print $5}' )
-        echo -e "\n\tIPv4 RPDB\n"$cBRED
-        ip rule
-        echo -e $cRESET"\n\tIPv4 Route Table $TABLE\n"$cBRED
-        ip route show table $TABLE
 
-    fi
+        if [ -n "$(ip rule | grep -E "^220:")" ];then
+            TABLE=$(ip rule | awk '/^220:/ {print $5}' )
+            echo -e "\n\tIPv4 RPDB\n"$cBRED
+            ip rule
+            ip rule >> /tmp/syslog.log
+            echo -e $cRESET"\n\tIPv4 Route Table $TABLE\n"$cBRED
+            ip route show table $TABLE
+            ip route show table $TABLE >> /tmp/syslog.log
 
-    if [ -n "$(ip -6 rule | grep -E "^220:")" ];then
-        TABLE=$(ip -6 rule | awk '/^220:/ {print $5}' )
-        echo -e $cRESET"\n\tIPv6 RPDB\n"$cBRED
-        ip -6 rule
-        echo -e $cRESET"\n\tIPv6 Route Table $TABLE\n"$cBRED
-        ip -6 route show table $TABLE
-    fi
+        fi
 
-    echo -e $cRESET"\n\tPress$cBRED y$cRESET to$cBRED Delete rogue RPDB PRIO 220 rules${cRESET} or press$cBGRE [Enter] to SKIP."
-    read -r "ANS"
-    if [ "$ANS" == "y" ];then
-        ip rule del prio 220
-        ip -6 rule del prio 220
+        if [ -n "$(ip -6 rule | grep -E "^220:")" ];then
+            TABLE=$(ip -6 rule | awk '/^220:/ {print $5}' )
+            echo -e $cRESET"\n\tIPv6 RPDB\n"$cBRED
+            ip -6 rule
+            ip -6 rule >> /tmp/syslog.log
+            echo -e $cRESET"\n\tIPv6 Route Table $TABLE\n"$cBRED
+            ip -6 route show table $TABLE
+            ip -6 route show table $TABLE >> /tmp/syslog.log
+        fi
+
+        if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^ROGUE220DELETE" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+            ANS="y"
+        else
+            echo -e $cRESET"\n\tPress$cBRED y$cRESET to$cBRED Delete rogue RPDB PRIO 220 rules${cRESET} or press$cBGRE [Enter] to SKIP."
+            read -r "ANS"
+        fi
+
+        if [ "$ANS" == "y" ];then
+            SayT "Rogue RPDB PRIO 220 rules DELETED"
+            ip rule del prio 220
+            ip -6 rule del prio 220
+        fi
+
         clear
-    else
-        exit 99
-    fi
 
+    fi
 fi
 #########################################################################################
 
