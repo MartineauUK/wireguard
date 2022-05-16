@@ -1,7 +1,7 @@
 #!/bin/sh
 # shellcheck disable=SC2039,SC2155,SC2124,SC2046,SC2027
-VERSION="v4.17b3"
-#============================================================================================ © 2021-2022 Martineau v4.17b3
+VERSION="v4.17b4"
+#============================================================================================ © 2021-2022 Martineau v4.17b4
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -25,7 +25,7 @@ VERSION="v4.17b3"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 09-May-2022
+# Last Updated Date: 16-May-2022
 
 #
 # Description:
@@ -3299,7 +3299,7 @@ Create_Sample_Config() {
     echo -e $cBCYA"\a\n\tCreating/Updating WireGuard® configuration file '${INSTALL_DIR}WireguardVPN.conf'"
 
     cat > ${INSTALL_DIR}WireguardVPN.conf << EOF
-# WireGuard® Session Manager v4.12
+# WireGuard® Session Manager $VERSION
 
 # Categories - Group several WireGuard peers for ease of starting/stopping
 #     NOTE: The default categories 'clients' and 'servers' represent ALL 'client' peers and 'server' peers respectively
@@ -3379,6 +3379,10 @@ TrimDB 99
 #     Use command 'vx' to edit this setting
 #ROUGE220IGNORE
 #ROGUE220DELETE
+
+# During Boot 'init' request process, specify a delay period e.g. INITDELAY 90s
+#     Use command 'vx' to edit this setting
+INITDELAY 20s
 
 EOF
 
@@ -7466,6 +7470,27 @@ if [ "$1" != "install" ];then   # v2.01
 
                 if [ "$1" == "init" ];then
 
+                    # Prevent script from running twice at boot up ('237' == 'wg')
+                    LOCKFILE="/tmp/$(basename $0)-flock"                                                                                            # v4.17
+                    FD=237                                                                                                                          # v4.17
+                    eval exec "$FD>$LOCKFILE"                                                                                                       # v4.17
+                    flock -n $FD || { SayT "${cRED}WireGuard® Session Manager INITialisation request ALREADY pending...ABORTing${cRESET}"; exit; }  # v4.17
+
+                    if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^INITDELAY" ${INSTALL_DIR}WireguardVPN.conf)" ];then              # v4.17
+                        INITDELAY=$(awk '/^INITDELAY/ {print $2}' ${INSTALL_DIR}WireguardVPN.conf)                                                  # v4.17
+                    fi
+
+                    if [ -n "$INITDELAY" ];then                                                                                                     # v4.17
+                        # Allow skipping of defined INITDELAY config directive
+                        if [ -z "$(echo "$@" | grep -iw "noinitdelay")" ];then                                                                      # v4.17
+                            SayT "${cRED}WireGuard® Session Manager INITialisation request delayed for '$INITDELAY'${cRESET}"                       # v4.17
+                            sleep $INITDELAY                                                                                                        # v4.17 @chongnt
+                            SayT "${cGRE}WireGuard® Session Manager INITialisation delay request for '$INITDELAY' expired - resume INITialisation request.....${cRESET}"    # v4.17
+                        else
+                            SayT "${cBRED}WireGuard® Session Manager INITialisation request '$INITDELAY' skipped. ${cRESET}"                        # v4.17
+                        fi
+                    fi
+
                     [ -f /opt/etc/init.d/S50wireguard ] && SayT "${cBRED}Warning '/opt/etc/init.d/S50wireguard' detected! ***MAY*** conflict with wireguard_manager!${cRESET}"  # v4.17
 
                     if [ "$(nvram get ntp_ready)" = "0" ];then              # v4.01 Ensure event 'restart_diskmon' triggers the actual start of WireGuard Session Manager
@@ -7504,6 +7529,10 @@ if [ "$1" != "install" ];then   # v2.01
                 fi
 
                 Manage_Wireguard_Sessions "start" "$PEER" "$NOPOLICY"
+
+                # Delete the locking semaphore file
+                flock -u $FD    # v4.17
+
                 echo -e $cRESET
                 exit_message
             ;;
@@ -7631,12 +7660,11 @@ clear
 #####################################DEBUG===============================================
 if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -z "$(grep -E "^ROGUE220IGNORE" ${INSTALL_DIR}WireguardVPN.conf)" ];then
     if [ -n "$(ip rule | grep -E "^220:")" ] || [ -n "$(ip -6 rule | grep -E "^220:")" ];then
-        echo -e "\a"
-        Say "DEBUG= *********************************WTF!? Rogue RPDB rule 220 FOUND?????!!!!!*******************************"
-
 
         if [ -n "$(ip rule | grep -E "^220:")" ];then
             TABLE=$(ip rule | awk '/^220:/ {print $5}' )
+            echo -e "\a"
+            Say "DEBUG= *********************************WTF!? Rogue RPDB IPv4 rule 220 FOUND?????!!!!!*******************************"
             echo -e "\n\tIPv4 RPDB\n"$cBRED
             ip rule
             ip rule >> /tmp/syslog.log
@@ -7646,14 +7674,18 @@ if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -z "$(grep -E "^ROGUE220IGNORE" $
 
         fi
 
-        if [ -n "$(ip -6 rule | grep -E "^220:")" ];then
-            TABLE=$(ip -6 rule | awk '/^220:/ {print $5}' )
-            echo -e $cRESET"\n\tIPv6 RPDB\n"$cBRED
-            ip -6 rule
-            ip -6 rule >> /tmp/syslog.log
-            echo -e $cRESET"\n\tIPv6 Route Table $TABLE\n"$cBRED
-            ip -6 route show table $TABLE
-            ip -6 route show table $TABLE >> /tmp/syslog.log
+        if [ "$USE_IPV6" == "Y" ];then
+            if [ -n "$(ip -6 rule | grep -E "^220:")" ];then
+                TABLE=$(ip -6 rule | awk '/^220:/ {print $5}' )
+                echo -e "\a"
+                Say "DEBUG= *********************************WTF!? Rogue RPDB IPv6 rule 220 FOUND?????!!!!!*******************************"
+                echo -e $cRESET"\n\tIPv6 RPDB\n"$cBRED
+                ip -6 rule
+                ip -6 rule >> /tmp/syslog.log
+                echo -e $cRESET"\n\tIPv6 Route Table $TABLE\n"$cBRED
+                ip -6 route show table $TABLE
+                ip -6 route show table $TABLE >> /tmp/syslog.log
+            fi
         fi
 
         if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^ROGUE220DELETE" ${INSTALL_DIR}WireguardVPN.conf)" ];then
@@ -7665,8 +7697,8 @@ if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -z "$(grep -E "^ROGUE220IGNORE" $
 
         if [ "$ANS" == "y" ];then
             SayT "Rogue RPDB PRIO 220 rules DELETED"
-            ip rule del prio 220
-            ip -6 rule del prio 220
+            ip rule del prio 220 2>/dev/null
+            ip -6 rule del prio 220 2>/dev/null
         fi
 
         clear
