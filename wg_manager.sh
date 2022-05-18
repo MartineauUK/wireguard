@@ -1,7 +1,7 @@
 #!/bin/sh
     # shellcheck disable=SC2039,SC2155,SC2124,SC2046,SC2027
-VERSION="v4.17b5"
-#============================================================================================ © 2021-2022 Martineau v4.17b5
+VERSION="v4.17b6"
+#============================================================================================ © 2021-2022 Martineau v4.17b6
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -1268,13 +1268,14 @@ Import_Peer() {
                             local KEYWORD="${STRIPPED%%=*}"; KEYWORD="${KEYWORD##*([[:space:]])}"; KEYWORD="${KEYWORD%%*([[:space:]])}"     # © Copyright 2015-2022 Jason A. Donenfeld
                             local VALUE="${STRIPPED#*=}"; VALUE="${VALUE##*([[:space:]])}"; VALUE="${VALUE%%*([[:space:]])}"                # © Copyright 2015-2022 Jason A. Donenfeld
 
+                            local KEYWORD=$(echo "$KEYWORD" | awk '{$1=$1};1')      # Strip leading/trailing spaces/tabs
                             local VALUE=$(echo "$VALUE" | awk '{$1=$1};1')          # Strip leading/trailing spaces/tabs
 
                             case "$KEYWORD" in
 
-                                PrivateKey) local PRI_KEY=$VALUE;;                  # v4.17
-                                PublicKey) local PUB_KEY=$VALUE;;                   # v4.17
-                                ListenPort) local LISTEN_PORT=$VALUE                # v4.17
+                                PrivateKey) local PRI_KEY="$VALUE";;                  # v4.17
+                                PublicKey) local PUB_KEY="$VALUE";;                   # v4.17
+                                ListenPort) local LISTEN_PORT="$VALUE"                # v4.17
 
                                     # Torguard profile defines 51820 which will conflict with the wg21 'server' Peer default 51820
                                     # Check if port is already in use by a 'server' Peer; if so comment it out
@@ -1282,9 +1283,9 @@ Import_Peer() {
                                     [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM servers WHERE port='$LISTEN_PORT';") -gt 0 ] && COMMENT_OUT="Y"  # v4.17
 
                                 ;;
-                                AllowedIPs) local ALLOWIP=$VALUE    # v4.17
+                                AllowedIPs) local ALLOWIP="$VALUE"    # v4.17
                                 ;;
-                                Endpoint) local SOCKET=$VALUE       # v4.17
+                                Endpoint) local SOCKET="$VALUE"       # v4.17
                                 ;;
                                 PreUp)                              # v4.14
                                     # This must be commented out!
@@ -1325,11 +1326,11 @@ Import_Peer() {
                                     # fi
                                     :
                                 ;;
-                                MTU) local MTU=$VALUE                       # v4.17
+                                MTU) local MTU="$VALUE"                       # v4.17
                                 ;;
-                                DNS) local DNS=$VALUE                       # v4.17
+                                DNS) local DNS="$VALUE"                       # v4.17
                                 ;;
-                                Address) local SUBNET=$VALUE                # v4.17
+                                Address) local SUBNET="$VALUE"                # v4.17
                                 ;;
                             esac
                         done < ${IMPORT_DIR}${WG_INTERFACE}.conf
