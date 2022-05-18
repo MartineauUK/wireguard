@@ -1,7 +1,7 @@
 #!/bin/sh
-# shellcheck disable=SC2039,SC2155,SC2124,SC2046,SC2027
-VERSION="v4.17b4"
-#============================================================================================ © 2021-2022 Martineau v4.17b4
+    # shellcheck disable=SC2039,SC2155,SC2124,SC2046,SC2027
+VERSION="v4.17b5"
+#============================================================================================ © 2021-2022 Martineau v4.17b5
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -25,14 +25,14 @@ VERSION="v4.17b4"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 16-May-2022
+# Last Updated Date: 18-May-2022
 
 #
 # Description:
 #
 # Acknowledgement:
 #
-# Contributors: odkrys,Torson,ZebMcKayhan,jobhax,elorimer,Sh0cker54,here1310,defung,The Chief,abir1909,JGrana,heysoundude,archiel,Cam
+# Contributors: odkrys,Torson,ZebMcKayhan,jobhax,elorimer,Sh0cker54,here1310,defung,The Chief,abir1909,JGrana,heysoundude,archiel,Cam,endiz,Meshkoff
 
 GIT_REPO="wireguard"
 GITHUB_MARTINEAU="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/main"
@@ -866,7 +866,7 @@ Create_Peer() {
     fi
 
     # User specified VPN Tunnel subnet?
-    if [ -z "$VPN_POOL4" ] || [ -z "$VPN_POOL6" ];then
+    if [ "$VPN_POOL_USER" != "Y" ];then                                 # v4.17 @Meshkoff
         [ -z "$AUTO_VPN_POOL" ] && local AUTO_VPN_POOL="10.50.1.1/24"
         local ONE_OCTET=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f1)
         local TWO_OCTET=$(echo "$AUTO_VPN_POOL" | cut -d'.' -f2)
@@ -1261,61 +1261,75 @@ Import_Peer() {
 
                         while IFS='' read -r LINE || [ -n "$LINE" ]; do
 
-                            case "${LINE%% *}" in
+                            # v4.17 Allow compressed (non-space delimetered) directives and comments as used by Unraid generated .conf - @endiz
+                            # e.g. 'AllowedIPs=0.0.0.0/0        # ALL Traffic'
+                            # Courtesy of wg-quick© Copyright 2015-2022 Jason A. Donenfeld
+                            local STRIPPED="${LINE%%\#*}"                                                                                   # © Copyright 2015-2022 Jason A. Donenfeld
+                            local KEYWORD="${STRIPPED%%=*}"; KEYWORD="${KEYWORD##*([[:space:]])}"; KEYWORD="${KEYWORD%%*([[:space:]])}"     # © Copyright 2015-2022 Jason A. Donenfeld
+                            local VALUE="${STRIPPED#*=}"; VALUE="${VALUE##*([[:space:]])}"; VALUE="${VALUE%%*([[:space:]])}"                # © Copyright 2015-2022 Jason A. Donenfeld
 
-                                PrivateKey) local PRI_KEY=${LINE##* };;
-                                PublicKey) local PUB_KEY=${LINE##* };;
-                                ListenPort) local LISTEN_PORT=${LINE##* }               # v4.17 v4.14
+                            local VALUE=$(echo "$VALUE" | awk '{$1=$1};1')          # Strip leading/trailing spaces/tabs
+
+                            case "$KEYWORD" in
+
+                                PrivateKey) local PRI_KEY=$VALUE;;                  # v4.17
+                                PublicKey) local PUB_KEY=$VALUE;;                   # v4.17
+                                ListenPort) local LISTEN_PORT=$VALUE                # v4.17
+
                                     # Torguard profile defines 51820 which will conflict with the wg21 'server' Peer default 51820
                                     # Check if port is already in use by a 'server' Peer; if so comment it out
                                     [ "$LISTEN_PORT" == "51820" ] && COMMENT_OUT="Y"    # v4.17
                                     [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM servers WHERE port='$LISTEN_PORT';") -gt 0 ] && COMMENT_OUT="Y"  # v4.17
 
                                 ;;
-                                AllowedIPs) local ALLOWIP=$(echo "$LINE" | sed 's/^AllowedIPs.*=//' | awk '{$1=$1};1')  # v4.12 strip leading/trailing spaces/tabs
+                                AllowedIPs) local ALLOWIP=$VALUE    # v4.17
                                 ;;
-                                Endpoint) local SOCKET=${LINE##* }
-                                    local SOCKET=$(echo "$SOCKET" | awk '{$1=$1};1')    # v4.12  strip leading/trailing spaces/tabs
+                                Endpoint) local SOCKET=$VALUE       # v4.17
                                 ;;
-                                PreUp)                                          # v4.14
+                                PreUp)                              # v4.14
                                     # This must be commented out!
-                                    if [ "$MODE" != "device" ];then
-                                        COMMENT_OUT="Y"
-                                    fi
+                                    # if [ "$MODE" != "device" ];then
+                                        # COMMENT_OUT="Y"
+                                    # fi
+                                    :
                                 ;;
                                 "#"PostUp);;                                    # v4.14
                                 PostUp)                                         # v4.14
                                     # This must be commented out!
-                                    if [ "$MODE" != "device" ];then
-                                        COMMENT_OUT="Y"
-                                    fi
+                                    # if [ "$MODE" != "device" ];then
+                                        # COMMENT_OUT="Y"
+                                    # fi
+                                    :
                                 ;;
                                 "#"PreDown);;                                   # v4.14
                                 PreDown)                                        # v4.14
                                     # This must be commented out!
-                                    if [ "$MODE" != "device" ];then
-                                        COMMENT_OUT="Y"
-                                    fi
+                                    # if [ "$MODE" != "device" ];then
+                                        # COMMENT_OUT="Y"
+                                    # fi
+                                    :
                                 ;;
                                 "#"PostDown);;                                  # v4.14
                                 PostDown)                                       # v4.14
                                     # This must be commented out!
-                                    if [ "$MODE" != "device" ];then
-                                        COMMENT_OUT="Y"
-                                    fi
+                                    # if [ "$MODE" != "device" ];then
+                                        # COMMENT_OUT="Y"
+                                    # fi
+                                    :
                                 ;;
-                                "#"SaveConfig);;                                  # v4.14
-                                SaveConfig)                                       # v4.14
+                                "#"SaveConfig);;                            # v4.14
+                                SaveConfig)                                 # v4.14
                                     # This must be commented out!
-                                    if [ "$MODE" != "device" ];then
-                                        COMMENT_OUT="Y"
-                                    fi
+                                    # if [ "$MODE" != "device" ];then
+                                        # COMMENT_OUT="Y"
+                                    # fi
+                                    :
                                 ;;
-                                MTU) local MTU=${LINE##* }                      # v4.09
+                                MTU) local MTU=$VALUE                       # v4.17
                                 ;;
-                                DNS) local DNS=$(echo "$LINE" | sed 's/^DNS.*=//' | awk '{$1=$1};1')                # HOTFIX v4.16
+                                DNS) local DNS=$VALUE                       # v4.17
                                 ;;
-                                Address) local SUBNET=$(echo "$LINE" | sed 's/^Address.*=//' | awk '{$1=$1};1')     # HOTFIX v4.16
+                                Address) local SUBNET=$VALUE                # v4.17
                                 ;;
                             esac
                         done < ${IMPORT_DIR}${WG_INTERFACE}.conf
@@ -1323,8 +1337,14 @@ Import_Peer() {
                         [ -f ${IMPORT_DIR}${WG_INTERFACE}_public.key ] && local PUB_KEY=$(awk 'NR=1{print $0}' ${IMPORT_DIR}${WG_INTERFACE}_public.key)
 
                         [ -z "$DNS" ] && local DNS=$COMMENT_DNS             # v4.03
-                        [ -z "$SUBNET" ] && local SUBNET=$COMMENT_SUBNET    # v4.03
+
                         [ -z "$MTU" ] && local MTU="Auto"                   # v4.17
+
+                        if [ -z "$SUBNET" ];then
+                            SayT "***ERROR: WireGuard® VPN 'client' Peer ('${IMPORT_DIR}$WG_INTERFACE.conf') NO valid 'Address =' directive?....skipping import request"   # v4.17 v4.12
+                            echo -e $cBRED"\a\n\t***ERROR: WireGuard® 'client' Peer (${cBWHT}${IMPORT_DIR}$WG_INTERFACE.conf${cBRED}) NO valid ${cBWHT}'Address ='${cBRED} directive?....skipping import request\n"$cRESET   2>&1   # v4.17
+                            return 1
+                        fi
 
                         if [ -d ${CONFIG_DIR} ];then
                             if [ "$MODE" != "device" ];then
