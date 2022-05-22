@@ -1,11 +1,11 @@
 #!/bin/sh
 # shellcheck disable=SC2039,SC2155,SC2124,SC2046
-VERSION="v4.17.4"
-#============================================================================================ © 2021-2022 Martineau v4.17.4
+VERSION="v4.17.5"
+#============================================================================================ © 2021-2022 Martineau v4.17.5
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 18-May-2022
+# Last Updated Date: 22-May-2022
 #
 # Description:
 #
@@ -356,7 +356,13 @@ Process_Pre_Post_Commands() {
     # v4.14.1
     while read LINE; do
             local CMDTYPE=$1
-            local CMD="$(echo "$LINE" | sed "s/\%wan/$WAN_IF/g;s/\%net/$SUBNET_PREFIX4/g;s/\%lan/$LAN_SUBNET/g;s/\%pos/$POS/g;s/\%p/$LISTEN_PORT/g;s/\%i/$WG_INTERFACE/g")"    # v4.16.3 v4.14.1
+            #   %p   - Listen Port                      ONLY recognised by Martineau's WireGuard Manager/wg-quick2
+            #   %wan - WAN Interface                    ONLY recognised by Martineau's WireGuard Manager/wg-quick2
+            #   %net - Network Tunnel Subnet            ONLY recognised by Martineau's WireGuard Manager/wg-quick2
+            #   %lan - LAN Subnet                       ONLY recognised by Martineau's WireGuard Manager/wg-quick2
+            #   %pos - Firewall insert point            ONLY recognised by Martineau's WireGuard Manager/wg-quick2
+            #   %num - Peer instance e.g. 1             ONLY recognised by Martineau's WireGuard Manager/wg-quick2
+            local CMD="$(echo "$LINE" | sed "s/\%wan/$WAN_IF/g;s/\%net/$SUBNET_PREFIX4/g;s/\%lan/$LAN_SUBNET/g;s/\%pos/$POS/g;s/\%num/$VPN_NUM/g;s/\%p/$LISTEN_PORT/g;s/\%i/$WG_INTERFACE/g")"    # v4.17.5 v4.16.3 v4.14.1
             if [ -n "$CMD" ];then
                 logger -t "wg_manager-${MODE}${VPN_NAME}" "Executing $CMDTYPE: '$CMD'"   # v4.17
                 [ "$SHOWCMDS" == "Y" ] && echo -e "[>] ${CMDTYPE}" >&2
@@ -589,7 +595,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         # v4.17.4 now allows .conf to contain comments in directives e.g. Unraid generates
         #         'AllowedIPs=0.0.0.0/0     # ALL Traffic'
         # so strip them and delete completely empty lines from the .conf executed by wg
-        grep -vE "^#" ${CONFIG_DIR}$VPN_ID.conf | sed '/^DNS/d; /^MTU/d; /^Address/d; /^PreU/d; /^PreD/d; /^Post/d; /^Table/d; /^SaveC/d; /^FWmark/d; s/#.*$//g; /^\s*$/d' > /tmp/$VPN_ID.$$   # v4.17.4 @endiz v4.16.2
+        grep -vE "^#" ${CONFIG_DIR}$VPN_ID.conf | sed '/^[Dd][Nn][Ss]/d; /^MTU/d; /^Address/d; /^PreU/d; /^PreD/d; /^Post/d; /^Table/d; /^SaveC/d; /^FWmark/d; s/#.*$//g; /^\s*$/d' > /tmp/$VPN_ID.$$   # v4.17.5 @johndoe85 v4.17.4 @endiz v4.16.2
 
         [ "$SHOWCMDS" == "Y" ] && echo -e "[#] wg setconf $VPN_ID /tmp/$VPN_ID.$$ #(${CONFIG_DIR}$VPN_ID.conf)"    # v4.16.2 v4.14.13
 
