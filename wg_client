@@ -1,7 +1,7 @@
 #!/bin/sh
 # shellcheck disable=SC2039,SC2155,SC2124,SC2046
-VERSION="v4.17.5"
-#============================================================================================ © 2021-2022 Martineau v4.17.5
+VERSION="v4.17.6"
+#============================================================================================ © 2021-2022 Martineau v4.17.6
 #
 
 # Maintainer: Martineau
@@ -1014,7 +1014,7 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
         #      fi
         #
         # see /jffs/addons/wireguard/wg_ChkEndpointDDNS.sh
-        ENDPOINTS=$(awk '/^Endpoint/ {print $3}' ${CONFIG_DIR}${WG_INTERFACE}.conf | tr '\n' ' ')           # v4.15.3
+        ENDPOINTS=$(awk -F'=' '/^Endpoint/ {print $2}' ${CONFIG_DIR}${WG_INTERFACE}.conf | sed 's/#.*//' | tr '\n' ' ') # v4.17.6 v4.15.3
         DDNS_FOUND=0
         for ENDPOINT in $ENDPOINTS
             do
