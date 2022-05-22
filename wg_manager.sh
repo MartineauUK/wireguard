@@ -1,7 +1,7 @@
 #!/bin/sh
     # shellcheck disable=SC2039,SC2155,SC2124,SC2046,SC2027
-VERSION="v4.17b6"
-#============================================================================================ © 2021-2022 Martineau v4.17b6
+VERSION="v4.17b7"
+#============================================================================================ © 2021-2022 Martineau v4.17b7
 #
 #       wg_manager   {start|stop|restart|show|create|peer} [ [client [policy|nopolicy] |server]} [wg_instance] ]
 #
@@ -25,14 +25,14 @@ VERSION="v4.17b6"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 18-May-2022
+# Last Updated Date: 22-May-2022
 
 #
 # Description:
 #
 # Acknowledgement:
 #
-# Contributors: odkrys,Torson,ZebMcKayhan,jobhax,elorimer,Sh0cker54,here1310,defung,The Chief,abir1909,JGrana,heysoundude,archiel,Cam,endiz,Meshkoff
+# Contributors: odkrys,Torson,ZebMcKayhan,jobhax,elorimer,Sh0cker54,here1310,defung,The Chief,abir1909,JGrana,heysoundude,archiel,Cam,endiz,Meshkoff,johndoe85
 
 GIT_REPO="wireguard"
 GITHUB_MARTINEAU="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/main"
@@ -1283,7 +1283,7 @@ Import_Peer() {
                                     [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(peer) FROM servers WHERE port='$LISTEN_PORT';") -gt 0 ] && COMMENT_OUT="Y"  # v4.17
 
                                 ;;
-                                AllowedIPs) local ALLOWIP="$VALUE"    # v4.17
+                                AllowedIPs) local ALLOWIP="$(echo "$VALUE" | tr -d ' ')"    # v4.17
                                 ;;
                                 Endpoint) local SOCKET="$VALUE"       # v4.17
                                 ;;
@@ -1326,11 +1326,11 @@ Import_Peer() {
                                     # fi
                                     :
                                 ;;
-                                MTU) local MTU="$VALUE"                       # v4.17
+                                [Mm][Tt][Uu]) local MTU="$VALUE"                        # v4.17
                                 ;;
-                                DNS) local DNS="$VALUE"                       # v4.17
+                                [Dd][Nn][Ss]) local DNS="$(echo "$VALUE" | tr -d ' ')"  # v4.17 @johndoe85
                                 ;;
-                                Address) local SUBNET="$VALUE"                # v4.17
+                                Address) local SUBNET="$(echo "$VALUE" | tr -d ' ')"    # v4.17
                                 ;;
                             esac
                         done < ${IMPORT_DIR}${WG_INTERFACE}.conf
@@ -1940,8 +1940,8 @@ Manage_Peer() {
 
                                 if [ "$Mode" != "server" ];then
                                     sqlite3 $SQL_DATABASE "UPDATE $TABLE SET dns='$DNS' WHERE $ID='$WG_INTERFACE';"
-                                    if [ -n "$(grep -E "^DNS" ${CONFIG_DIR}${WG_INTERFACE}.conf )" ];then       # v4.16
-                                        sed -i "/^DNS/ s~[^ ]*[^ ]~$DNS~3" ${CONFIG_DIR}${WG_INTERFACE}.conf
+                                    if [ -n "$(grep -E "^[Dd][Nn][Ss]" ${CONFIG_DIR}${WG_INTERFACE}.conf )" ];then      # HOTFIX v4.17 @johndoe85 v4.16
+                                        sed -i "/^[Dd][Nn][Ss]/ s~[^ ]*[^ ]~$DNS~3" ${CONFIG_DIR}${WG_INTERFACE}.conf   # HOTFIX v4.17 @johndoe85
                                     else
                                         sed -i "/^Address/a DNS = $DNS" ${CONFIG_DIR}${WG_INTERFACE}.conf           # v4.16
                                     fi
@@ -3313,13 +3313,10 @@ EOF
     fi
 }
 Create_Sample_Config() {
-    if [ -f ${INSTALL_DIR}WireguardVPN.conf ];then
-        echo -e $cBYEL"\a\n\tWarning: WireGuard® configuration file '${INSTALL_DIR}WireguardVPN.conf' already exists!...renamed to 'WireguardVPN.conf$TS'"
-        mv ${INSTALL_DIR}WireguardVPN.conf ${INSTALL_DIR}WireguardVPN.conf.$TS
-    fi
-    echo -e $cBCYA"\a\n\tCreating/Updating WireGuard® configuration file '${INSTALL_DIR}WireguardVPN.conf'"
 
-    cat > ${INSTALL_DIR}WireguardVPN.conf << EOF
+    [ -n "$1" ] && local FORCE=$1                   # v4.17
+
+    cat > /tmp/WireguardVPN.conf << EOF
 # WireGuard® Session Manager $VERSION
 
 # Categories - Group several WireGuard peers for ease of starting/stopping
@@ -3406,6 +3403,18 @@ TrimDB 99
 INITDELAY 20s
 
 EOF
+
+    if [ -f ${INSTALL_DIR}WireguardVPN.conf ];then
+        # Do the last directives in the files match?                    # v4.17
+        if [ -n "$FORCE" ] || [ "$(sed '/^$/d' ${INSTALL_DIR}WireguardVPN.conf | tail -n 1 | sed 's/#//' | awk '{print $1}')" != "$(sed '/^$/d' /tmp/WireguardVPN.conf | tail -n 1 | sed 's/#//' | awk '{print $1}')" ];then    # v4.17
+            echo -e $cBYEL"\a\n\tWarning: WireGuard® configuration file '${INSTALL_DIR}WireguardVPN.conf' already exists!...renamed to 'WireguardVPN.conf$TS'"
+            mv ${INSTALL_DIR}WireguardVPN.conf ${INSTALL_DIR}WireguardVPN.conf.$TS
+        fi
+    fi
+    if [ ! -f ${INSTALL_DIR}WireguardVPN.conf ];then                    # v4.17
+        echo -e $cBCYA"\a\n\tCreating/Updating WireGuard® configuration file '${INSTALL_DIR}WireguardVPN.conf' ($VERSION)"
+        mv /tmp/WireguardVPN.conf ${INSTALL_DIR}WireguardVPN.conf       # v4.17
+    fi
 
     return 0
 }
@@ -3992,6 +4001,9 @@ exit_message() {
 
         local CODE=0
         [ -n "$1" ] && local CODE=$1
+
+        # Delete the locking semaphore file
+        [ -n "$FD" ] && flock -u $FD    # v4.17
 
         rm -rf /tmp/wg.lock
 
@@ -5957,9 +5969,13 @@ Process_User_Choice() {
                 DNSmasq_Listening_WireGuard_Status
 
                 ;;
-            createconfig)
+            createconfig|createconfig" "*)                          # [ force ]
 
-                Create_Sample_Config
+                local ARG=
+                if [ "$(echo "$menu1" | wc -w)" -ge 2 ];then
+                    local ARG="$(printf "%s" "$menu1" | cut -d' ' -f2)"
+                fi
+                Create_Sample_Config "$ARG"                             # v4.17
 
                 ;;
             qrcode*)                                                    # {interface[.conf]}
@@ -6061,6 +6077,9 @@ Process_User_Choice() {
                             Get_scripts "$DEV"
 
                             Manage_Addon "wgmExpo.sh"       # v4.15 @ZeMcKayhan's Addon
+
+                            # Ensure any new Configuration options are now available...
+                            Create_Sample_Config                    # v4.17
 
                             [ -f ${INSTALL_DIR}$SCRIPT_NAME ] && { rm $0.u; sleep 1; exec "$0"; } || mv $0.u $0     # v4.14
 
@@ -7550,9 +7569,6 @@ if [ "$1" != "install" ];then   # v2.01
                 fi
 
                 Manage_Wireguard_Sessions "start" "$PEER" "$NOPOLICY"
-
-                # Delete the locking semaphore file
-                flock -u $FD    # v4.17
 
                 echo -e $cRESET
                 exit_message
