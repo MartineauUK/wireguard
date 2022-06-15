@@ -155,7 +155,7 @@ function change_wgc_unit(unit){
 <tr>
 <th>Description</th>
 <td>
-<input type="text" maxlength="40" name="wgc_desc" id="wgc_desc" class="input_32_table" value="<% nvram_get("wgmc_desc"); %>" autocorrect="off" autocapitalize="off"></input>
+<input type="text" readonly maxlength="40" name="wgc_desc" id="wgc_desc" class="input_32_table" value="<% nvram_get("wgmc_desc"); %>" autocorrect="off" autocapitalize="off"></input>
 </td>
 </tr>
 <tr id="wgc_auto" value="<% nvram_get("wgmc_auto"); %>">
@@ -187,19 +187,19 @@ function change_wgc_unit(unit){
 <tr>
 <th>Private Key</th>
 <td>
-<input type="text" maxlength="63" name="wgc_priv" id="wgc_priv" class="input_32_table" value="<% nvram_get("wgmc_priv"); %>" autocorrect="off" autocapitalize="off"></input>
+<input type="text" readonly maxlength="63" name="wgc_priv" id="wgc_priv" class="input_32_table" value="<% nvram_get("wgmc_priv"); %>" autocorrect="off" autocapitalize="off"></input>
 </td>
 </tr>
 <tr>
 <th>Address</th>
 <td>
-<input type="text" maxlength="39" name="wgc_addr" id="wgc_addr" class="input_32_table" value="<% nvram_get("wgmc_addr"); %>" autocorrect="off" autocapitalize="off"></input>
+<input type="text" readonly maxlength="39" name="wgc_addr" id="wgc_addr" class="input_32_table" value="<% nvram_get("wgmc_addr"); %>" autocorrect="off" autocapitalize="off"></input>
 </td>
 </tr>
 <tr>
 <th>DNS Server (Optional)</th>
 <td>
-<input type="text" maxlength="39" name="wgc_dns" id="wgc_dns" class="input_32_table" value="<% nvram_get("wgmc_dns"); %>" autocorrect="off" autocapitalize="off"></input>
+<input type="text" readonly maxlength="39" name="wgc_dns" id="wgc_dns" class="input_32_table" value="<% nvram_get("wgmc_dns"); %>" autocorrect="off" autocapitalize="off"></input>
 </td>
 </tr>
 </table>
@@ -212,32 +212,32 @@ function change_wgc_unit(unit){
 <tr>
 <th>Server Public Key</th>
 <td>
-<input type="text" maxlength="63" name="wgc_ppub" id="wgc_ppub" class="input_32_table" value="<% nvram_get("wgmc_ppub"); %>" autocorrect="off" autocapitalize="off"></input>
+<input type="text" readonly maxlength="63" name="wgc_ppub" id="wgc_ppub" class="input_32_table" value="<% nvram_get("wgmc_ppub"); %>" autocorrect="off" autocapitalize="off"></input>
 </td>
 </tr>
 <tr>
 <th>Preshared Key (Optional)</th>
 <td>
-<input type="text" maxlength="63" name="wgc_psk" id="wgc_psk" class="input_32_table" value="<% nvram_get("wgmc_psk"); %>" autocorrect="off" autocapitalize="off"></input>
+<input type="text" readonly maxlength="63" name="wgc_psk" id="wgc_psk" class="input_32_table" value="<% nvram_get("wgmc_psk"); %>" autocorrect="off" autocapitalize="off"></input>
 </td>
 </tr>
 <tr>
 <th>Allowed IPs</th>
 <td>
-<input type="text" maxlength="1023" name="wgc_aips" id="wgc_aips" class="input_32_table" value="<% nvram_get("wgmc_aips"); %>" autocorrect="off" autocapitalize="off"></input>
+<input type="text" readonly maxlength="1023" name="wgc_aips" id="wgc_aips" class="input_32_table" value="<% nvram_get("wgmc_aips"); %>" autocorrect="off" autocapitalize="off"></input>
 </td>
 </tr>
 <tr>
 <th>Endpoint Address:Port</th>
 <td>
-<input type="text" maxlength="39" name="wgc_ep_addr" id="wgc_ep_addr" class="input_32_table" value="<% nvram_get("wgmc_ep_addr"); %>" autocorrect="off" autocapitalize="off"></input> :
-<input type="text" maxlength="5" name="wgc_ep_port" id="wgc_ep_port" class="input_6_table" onKeyPress="return validator.isNumber(this,event);" value="<% nvram_get("wgmc_ep_port"); %>" autocorrect="off" autocapitalize="off"></input>
+<input type="text" readonly maxlength="39" name="wgc_ep_addr" id="wgc_ep_addr" class="input_32_table" value="<% nvram_get("wgmc_ep_addr"); %>" autocorrect="off" autocapitalize="off"></input> :
+<input type="text" readonly maxlength="5" name="wgc_ep_port" id="wgc_ep_port" class="input_6_table" onKeyPress="return validator.isNumber(this,event);" value="<% nvram_get("wgmc_ep_port"); %>" autocorrect="off" autocapitalize="off"></input>
 </td>
 </tr>
 <tr>
 <th>Persistent Keepalive</th>
 <td>
-<input type="text" maxlength="5" name="wgc_alive" id="wgc_alive" class="input_6_table" onKeyPress="return validator.isNumber(this,event);" value="<% nvram_get("wgmc_alive"); %>" autocorrect="off" autocapitalize="off"></input>
+<input type="text" readonly maxlength="5" name="wgc_alive" id="wgc_alive" class="input_6_table" onKeyPress="return validator.isNumber(this,event);" value="<% nvram_get("wgmc_alive"); %>" autocorrect="off" autocapitalize="off"></input>
 </td>
 </tr>
 </table>
