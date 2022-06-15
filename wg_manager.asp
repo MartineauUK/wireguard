@@ -16,6 +16,9 @@
 <script src="/popup.js"></script>
 <script src="/validator.js"></script>
 <script src="/js/jquery.js"></script>
+<script language="JavaScript" type="text/javascript" src="/ext/shared-jy/jquery.js"></script>
+<script language="JavaScript" type="text/javascript" src="/client_function.js"></script>
+<script language="JavaScript" type="text/javascript" src="/validator.js"></script>
 <script>
 
 <% get_wgc_parameter(); %>
@@ -124,7 +127,8 @@ function change_wgc_unit(unit){
 
 <table id="WgcBasicTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable">
 <thead>
-<td>
+
+<td colspan="2" class="execbutton">
 <input type="text" maxlength="100" class="input_32_table" id="wgm_Execute">
 <input type="button" class="button_gen" onclick="CMDExecute();" value="Execute" id="btnCMDExecute">
 </td>
@@ -237,6 +241,9 @@ function change_wgc_unit(unit){
 </td>
 </tr>
 </table>
+
+
+
 <div class="apply_gen" id="apply_btn">
 <input class="button_gen" onclick="applyRule();" type="button" value="<#1784#>"/>
 </div>
