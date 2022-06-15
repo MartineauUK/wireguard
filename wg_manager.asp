@@ -114,13 +114,13 @@ function change_wgc_unit(unit){
 <tr>
 <th>WireGuard® Manager Version</th>
 <td>
-<input type="text" readonly maxlength="6" class="input_25_table" id="wgm_version">
+<input type="text" readonly maxlength="7" class="input_6_table" id="wgm_version">
 </td>
 </tr>
 <tr>
 <th>WireGuard® Kernel Module version</th>
 <td>
-<input type="text" readonly maxlength="30" class="input_25_table" id="wgm_Kernel">
+<input type="text" readonly maxlength="30" class="input_12_table" id="wgm_Kernel">
 </td>
 </table>
 <div class="formfonttitle">WireGuard® Manager© Command</div>
@@ -137,7 +137,7 @@ function change_wgc_unit(unit){
 </tr>
 </thead>
 <tr id="wgc_unit_field" class="rept ew" value="<% nvram_get("wgmc_unit"); %>">
-<th>Client Index</th>
+<th>Select Client Index</th>
 <td>
 <select name="wgc_unit" class="input_option" onChange="change_wgc_unit(this.value);">
 <option class="content_input_fd" value="1" <% nvram_match("wgmc_unit", "1","selected"); %>>1</option>
