@@ -129,6 +129,7 @@ function change_wgc_unit(unit){
 <thead>
 
 <td colspan="2" class="execbutton">
+<lable>wgm </lable>
 <input type="text" maxlength="100" class="input_32_table" id="wgm_Execute">
 <input type="button" class="button_gen" onclick="CMDExecute();" value="Execute" id="btnCMDExecute">
 </td>
