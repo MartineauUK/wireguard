@@ -10,6 +10,21 @@
 <title><#833#> - WireGuard® Client</title>
 <link rel="stylesheet" href="index_style.css">
 <link rel="stylesheet" href="form_style.css">
+<style>
+p{
+font-weight: bolder;
+}
+
+.collapsible {
+  color: white;
+  padding: 0px;
+  width: 100%;
+  border: none;
+  text-align: left;
+  outline: none;
+  cursor: pointer;
+}
+</style>
 <script src="/state.js"></script>
 <script src="/general.js"></script>
 <script src="/help.js"></script>
@@ -40,6 +55,20 @@ else
         document.getElementById('wgm_Kernel').value = custom_settings.wgm_Kernel;
 
 document.getElementById('wgm_Execute').value = "";
+
+if (custom_settings.wgm_Execute_Result == undefined)
+        document.getElementById("textarea").innerHTML = "N/A"
+else
+        document.getElementById("textarea").innerHTML = decodeURIComponent(custom_settings.wgm_Execute_Result);
+
+/*custom_settings.wgm_Execute_Result = "Cleared"; */
+/*document.getElementById('amng_custom').value = JSON.stringify(custom_settings); */
+
+    $("thead").click(function(){
+        $(this).siblings().toggle("fast");
+    })
+
+    $(".default-collapsed").trigger("click");
 
 }
 function CMDExecute(){
@@ -90,101 +119,122 @@ function change_wgc_unit(unit){
 <input type="hidden" name="amng_custom" id="amng_custom" value="">
 
 <table class="content" align="center" cellpadding="0" cellspacing="0">
-<tr>
-<td width="17">&nbsp;</td>
-<td valign="top" width="202">
-<div id="mainMenu"></div>
-<div id="subMenu"></div>
-</td>
-<td valign="top">
-<div id="tabMenu" class="submenuBlock"></div>
-<table width="98%" border="0" align="left" cellpadding="0" cellspacing="0">
-<tr>
-<td valign="top" >
-<table width="760px" border="0" cellpadding="4" cellspacing="0" class="FormTitle" id="FormTitle">
-<tbody>
-<tr>
-<td bgcolor="#4D595D" valign="top" >
+    <tr>
+        <td width="17">&nbsp;</td>
+        <td valign="top" width="202">
+        <div id="mainMenu"></div>
+        <div id="subMenu"></div>
+        </td>
+        <td valign="top">
+        <div id="tabMenu" class="submenuBlock"></div>
+        <table width="98%" border="0" align="left" cellpadding="0" cellspacing="0">
+            <tr>
+                <td valign="top" >
+                <table width="760px" border="0" cellpadding="4" cellspacing="0" class="FormTitle" id="FormTitle">
+                    <tbody>
+                        <tr>
+                            <td bgcolor="#4D595D" valign="top" >
+                            <div>&nbsp;</div>
+                            <div class="formfonttitle">VPN - WireGuard® Client</div>
+                            <div id="divSwitchMenu" style="margin-top:-40px;float:right;"></div
+                            <div style="margin:10px 0 10px 5px;" class="splitLine"></div>
+
+                            <table width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#6b8fa3" class="FormTable">
+                                    <tr>
+                                        <th>WireGuard® Manager Version</th>
+                                            <td>
+                                                <input type="text" readonly maxlength="7" class="input_6_table" id="wgm_version">
+                                            </td>
+                                    </tr>
+                                    <tr>
+                                        <th>WireGuard® Kernel Module version</th>
+                                            <td>
+                                                <input type="text" readonly maxlength="30" class="input_12_table" id="wgm_Kernel">
+                                            </td>
+                            </table>
+
 <div>&nbsp;</div>
-<div class="formfonttitle">VPN - WireGuard® Client</div>
-<div id="divSwitchMenu" style="margin-top:-40px;float:right;"></div
-<div style="margin:10px 0 10px 5px;" class="splitLine"></div>
-
-<table width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#6b8fa3" class="FormTable">
-<tr>
-<th>WireGuard® Manager Version</th>
-<td>
-<input type="text" readonly maxlength="7" class="input_6_table" id="wgm_version">
-</td>
-</tr>
-<tr>
-<th>WireGuard® Kernel Module version</th>
-<td>
-<input type="text" readonly maxlength="30" class="input_12_table" id="wgm_Kernel">
-</td>
-</table>
-<div class="formfonttitle">WireGuard® Manager© Command</div>
-
+<div class="formfonttitle">WireGuard® Manager© Command Interface</div>
 <table id="WgcBasicTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable">
-<thead>
-
-<td colspan="2" class="execbutton">
-<lable>wgm </lable>
-<input type="text" maxlength="100" class="input_32_table" id="wgm_Execute">
-<input type="button" class="button_gen" onclick="CMDExecute();" value="Execute" id="btnCMDExecute">
-</td>
-<tr>
-<td colspan="2"><Client></td>
-</tr>
+<thead class="collapsible">
+        <tr>
+            <td colspan="2">WireGuard® Manager© Command</td>
+        </tr>
+        <td colspan="2" class="execbutton">
+            <lable>wgm </lable>
+            <input type="text" maxlength="100" class="input_32_table" id="wgm_Execute">
+            <input type="button" class="button_gen" onclick="CMDExecute();" value="Execute" id="btnCMDExecute">
+        </td>
+        <tr>
+            <td colspan="2">Command Execute Output</td>
+        </tr>
+        <tr>
+            <td style="padding: 0px;">
+            <textarea cols="75" rows="35" wrap="off" readonly="readonly" id="wgm_output1" class="textarea_log_table" style="font-family:'Courier New', Courier, mono; font-size:11px;border: none;padding: 0px;">Empty</textarea>
+            </td>
+        </tr>
 </thead>
-<tr id="wgc_unit_field" class="rept ew" value="<% nvram_get("wgmc_unit"); %>">
-<th>Select Client Index</th>
-<td>
-<select name="wgc_unit" class="input_option" onChange="change_wgc_unit(this.value);">
-<option class="content_input_fd" value="1" <% nvram_match("wgmc_unit", "1","selected"); %>>1</option>
-<option class="content_input_fd" value="2" <% nvram_match("wgmc_unit", "2","selected"); %>>2</option>
-<option class="content_input_fd" value="3" <% nvram_match("wgmc_unit", "3","selected"); %>>3</option>
-<option class="content_input_fd" value="4" <% nvram_match("wgmc_unit", "4","selected"); %>>4</option>
-<option class="content_input_fd" value="5" <% nvram_match("wgmc_unit", "5","selected"); %>>5</option>
-<option class="content_input_fd" value="6" <% nvram_match("wgmc_unit", "5","selected"); %>>6</option>
-<option class="content_input_fd" value="7" <% nvram_match("wgmc_unit", "5","selected"); %>>7</option>
-<option class="content_input_fd" value="8" <% nvram_match("wgmc_unit", "5","selected"); %>>8</option>
-<option class="content_input_fd" value="9" <% nvram_match("wgmc_unit", "5","selected"); %>>9</option>
-</select>
-</td>
-</tr>
-<tr>
-<th>Description</th>
-<td>
-<input type="text" readonly maxlength="40" name="wgc_desc" id="wgc_desc" class="input_32_table" value="<% nvram_get("wgmc_desc"); %>" autocorrect="off" autocapitalize="off"></input>
-</td>
-</tr>
-<tr id="wgc_auto" value="<% nvram_get("wgmc_auto"); %>">
-<th>Auto start Type</th>
-<td>
-  <select name="AUTO_Start" >
-    <option value="Y">Auto Start</option>
-    <option value="N">DISABLED</option>
-    <option value="P">Policy Mode</option>
-    <option value="S">Site to Site</option>
-    <option value="W">WG-Quick</option>
-  </select>
-  <legend></legend> </td>
-</tr>
-<tr id="wgmc_status">
-<th><#3179#></th>
-<td>
-<input type="radio" value="1" name="wgmc_enable" class="input" <% nvram_match("wgmc_enable", "1", "checked"); %>><#188#></input>
-<input type="radio" value="0" name="wgmc_enable" class="input" <% nvram_match("wgmc_enable", "0", "checked"); %>><#216#></input>
-</td>
-</tr>
 </table>
-<table id="WgcInterfaceTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable">
+
+
+<div style="line-height:10px;">&nbsp;</div>
+<table width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#4D595D" class="FormTable">
 <thead>
-<tr>
-<td colspan="2">Interface</td>
-</tr>
+    <tr>
+        <td colspan="2">Client Configuration</td>
+    </tr>
 </thead>
+    <tr id="wgc_unit_field" class="rept ew" value="<% nvram_get("wgmc_unit"); %>">
+
+        <th>Select Client Index</th>
+        <td>
+            <select name="wgc_unit" class="input_option" onChange="change_wgc_unit(this.value);">
+            <option class="content_input_fd" value="1" <% nvram_match("wgmc_unit", "1","selected"); %>>1</option>
+            <option class="content_input_fd" value="2" <% nvram_match("wgmc_unit", "2","selected"); %>>2</option>
+            <option class="content_input_fd" value="3" <% nvram_match("wgmc_unit", "3","selected"); %>>3</option>
+            <option class="content_input_fd" value="4" <% nvram_match("wgmc_unit", "4","selected"); %>>4</option>
+            <option class="content_input_fd" value="5" <% nvram_match("wgmc_unit", "5","selected"); %>>5</option>
+            <option class="content_input_fd" value="6" <% nvram_match("wgmc_unit", "5","selected"); %>>6</option>
+            <option class="content_input_fd" value="7" <% nvram_match("wgmc_unit", "5","selected"); %>>7</option>
+            <option class="content_input_fd" value="8" <% nvram_match("wgmc_unit", "5","selected"); %>>8</option>
+            <option class="content_input_fd" value="9" <% nvram_match("wgmc_unit", "5","selected"); %>>9</option>
+            </select>
+        </td>
+    </tr>
+    <tr>
+        <th>Description</th>
+        <td>
+            <input type="text" readonly maxlength="40" name="wgc_desc" id="wgc_desc" class="input_32_table" value="<% nvram_get("wgmc_desc"); %>" autocorrect="off" autocapitalize="off"></input>
+        </td>
+    </tr>
+    <tr id="wgc_auto" value="<% nvram_get("wgmc_auto"); %>">
+        <th>Auto start Type</th>
+        <td>
+            <select name="AUTO_Start" >
+                <option value="Y">Auto Start</option>
+                <option value="N">DISABLED</option>
+                <option value="P">Policy Mode</option>
+                <option value="S">Site to Site</option>
+                <option value="W">WG-Quick</option>
+             </select>
+            <legend></legend>
+        </td>
+    </tr>
+    <tr id="wgmc_status">
+        <th><#3179#></th>
+        <td>
+            <input type="radio" value="1" name="wgmc_enable" class="input" <% nvram_match("wgmc_enable", "1", "checked"); %>><#188#></input>
+            <input type="radio" value="0" name="wgmc_enable" class="input" <% nvram_match("wgmc_enable", "0", "checked"); %>><#216#></input>
+        </td>
+    </tr>
+</table>
+
+<table id="WgcInterfaceTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable">
+    <thead>
+        <tr>
+            <td colspan="2">Interface</td>
+        </tr>
+    </thead>
 <tr>
 <th>Private Key</th>
 <td>
@@ -244,6 +294,82 @@ function change_wgc_unit(unit){
 </table>
 
 
+<table width="100%" border="1" align="center" cellpadding="2" cellspacing="0" bordercolor="#6b8fa3" class="FormTable SettingsTable" style="border:0px;" id="table_config">
+<thead class="collapsible" id="scriptconfig">
+    <tr><td colspan="2">WireGuard® Manager© Configuration Options (click to expand/collapse)</td></tr>
+</thead>
+<tbody style="">
+    <tr class="even" id="wgm_row_opt_noipv6">
+        <td class="settingname">NOIPV6 - Disable IPv6<br></td>
+        <td class="settingvalue">
+            <input type="radio" name="wgm_NOIPV6" id="wgm_NOIPV6_enabled" class="input" value="enable">
+            <label for="XNOIPV6 - Disable IPv6">Yes</label>
+            <input type="radio" name="wgm_NOIPV6"" id="wgm_NOIPV6_enabled" class="input" value="disable" checked="">
+            <label for="XNOIPV6 - Allow IPv6">No</label>
+        </td>
+    </tr>
+        <tr class="even" id="wgm_row_opt_nocolor">
+        <td class="settingname">NOCOLOUR (Disable ANSI colours)<br></td>
+        <td class="settingvalue">
+            <input type="radio" name="wgm_NOCOLOR" id="wgm_NOCOLOR_enabled" class="input" value="enable">
+            <label for="XNOCOLOR - Disable ANSI colour">Yes</label>
+            <input type="radio" name="wgm_NOCOLOR"" id="wgm_NOCOLOR_enabled" class="input" value="disable" checked="">
+            <label for="XNOCOLOR - Allow ANSI colour">No</label>
+        </td>
+    </tr>
+    </tr>
+        <tr class="even" id="wgm_row_opt_killswitch">
+        <td class="settingname">KILLSWITCH (Activate)<br></td>
+        <td class="settingvalue">
+            <input type="radio" name="wgm_KILLSWITCH" id="wgm_KILLSWITCH_enabled" class="input" value="enable">
+            <label for="XKILLSWITCH">Yes</label>
+            <input type="radio" name="wgm_KILLSWITCH" id="wgm_KILLSWITCH_enabled" class="input" value="disable" checked="">
+            <label for="XKILLSWITCH">No</label>
+        </td>
+    </tr>
+    </tr>
+        <tr class="even" id="wgm_row_opt_killswitch">
+        <td class="settingname">USE_ENTWARE_KERNEL_MODULE (Activate)<br></td>
+        <td class="settingvalue">
+            <input type="radio" name="wgm_USE_ENTWARE_KERNEL_MODULE" id="wgm_USE_ENTWARE_KERNEL_MODULE_enabled" class="input" value="enable">
+            <label for="XUSE_ENTWARE_KERNEL_MODULE">Yes</label>
+            <input type="radio" name="wgm_USE_ENTWARE_KERNEL_MODULE" id="wgm_USE_ENTWARE_KERNEL_MODULE_enabled" class="input" value="disable" checked="">
+            <label for="XUSE_ENTWARE_KERNEL_MODULE">No</label>
+        </td>
+    </tr>
+    </tr>
+        <tr class="even" id="wgm_row_opt_disable_fc">
+        <td class="settingname">DISABLE_FLOW_CACHE (Activate)<br></td>
+        <td class="settingvalue">
+            <input type="radio" name="wgm_DISABLE_FLOW_CACHE" id="wgm_DISABLE_FLOW_CACHE_enabled" class="input" value="enable">
+            <label for="XDISABLE_FLOW_CACHE">Yes</label>
+            <input type="radio" name="wgm_DISABLE_FLOW_CACHE" id="wgm_DISABLE_FLOW_CACHE_enabled" class="input" value="disable" checked="">
+            <label for="XDISABLE_FLOW_CACHE">No</label>
+        </td>
+    </tr>
+
+    <tr class="apply_gen" valign="top" height="35px">
+        <td colspan="2" class="savebutton">
+        <input type="button" onclick="SaveConfig();" value="Save" class="button_gen savebutton" name="button">
+        </td>
+    </tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+<div style="line-height:10px;">&nbsp;</div>
+
+<div style="margin-top: 5px; text-align: center;"><input class="button_gen" onclick="applySettings();" type="button" value="<#195#>" /></div>
+<div style="color:#FFCC00;"><input type="checkbox" checked id="auto_refresh">Auto refresh</div>
+<div style="margin-top:8px">
+<textarea cols="190" rows="27" wrap="off" readonly="readonly" id="textarea" class="textarea_ssh_table" spellcheck="false" maxlength="4095" style="width:99%; font-family:'Courier New', Courier, mono; font-size:11px;"></textarea>
+</div>
+
 
 <div class="apply_gen" id="apply_btn">
 <input class="button_gen" onclick="applyRule();" type="button" value="<#1784#>"/>
@@ -271,6 +397,11 @@ function change_wgc_unit(unit){
 <td width="10" align="center" valign="top">&nbsp;</td>
 </tr>
 </table>
+
+
+
+
+
 </form>
 <form method="post" name="chg_wgc" action="apply.cgi" target="hidden_frame">
 <input type="hidden" name="action_mode" value="chg_wgc_unit">
