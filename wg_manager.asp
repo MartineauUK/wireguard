@@ -34,6 +34,7 @@ font-weight: bolder;
 <script language="JavaScript" type="text/javascript" src="/ext/shared-jy/jquery.js"></script>
 <script language="JavaScript" type="text/javascript" src="/client_function.js"></script>
 <script language="JavaScript" type="text/javascript" src="/validator.js"></script>
+<script language="JavaScript" type="text/javascript" src="/ext/wireguard/ExecuteResults.js"></script>
 <script>
 
 <% get_wgc_parameter(); %>
@@ -59,7 +60,7 @@ document.getElementById('wgm_Execute').value = "";
 if (custom_settings.wgm_Execute_Result == undefined)
         document.getElementById("textarea").innerHTML = "N/A"
 else
-        document.getElementById("textarea").innerHTML = decodeURIComponent(custom_settings.wgm_Execute_Result);
+        document.getElementById("textarea").innerHTML = atob(custom_settings.wgm_Execute_Result);
 
 /*custom_settings.wgm_Execute_Result = "Cleared"; */
 /*document.getElementById('amng_custom').value = JSON.stringify(custom_settings); */
@@ -69,6 +70,8 @@ else
     })
 
     $(".default-collapsed").trigger("click");
+
+    ShowExecuteResults();
 
 }
 function CMDExecute(){
@@ -82,7 +85,13 @@ function CMDExecute(){
     if(validForm()){
         showLoading();
         document.form.submit();
+
+        sleepThenAct();
+
+        ShowExecuteResults();
     }
+
+
 }
 function applyRule(){
 
@@ -98,6 +107,20 @@ function change_wgc_unit(unit){
     document.chg_wgc.wgc_unit.value=unit.toString();
     document.chg_wgc.submit();
 }
+
+function sleepFor(sleepDuration){
+    var now = new Date().getTime();
+    while(new Date().getTime() < now + sleepDuration){
+        /* Do nothing */
+    }
+}
+
+function sleepThenAct(){
+    sleepFor(2000);
+    console.log("Hello, JavaScript sleep!");
+}
+
+
 </script>
 </head>
 <body onload="initial();" onunLoad="return unload_body();" class="bg">
@@ -170,7 +193,7 @@ function change_wgc_unit(unit){
         </tr>
         <tr>
             <td style="padding: 0px;">
-            <textarea cols="75" rows="35" wrap="off" readonly="readonly" id="wgm_output1" class="textarea_log_table" style="font-family:'Courier New', Courier, mono; font-size:11px;border: none;padding: 0px;">Empty</textarea>
+            <textarea cols="75" rows="35" wrap="off" readonly="readonly" id="wgm_ExecuteResults" class="textarea_log_table" style="font-family:'Courier New', Courier, mono; font-size:11px;border: none;padding: 0px;">Empty</textarea>
             </td>
         </tr>
 </thead>
