@@ -93,7 +93,7 @@ function CMDExecute(){
         showLoading();
         document.form.submit();
 
-        sleepThenAct();
+        /*sleepThenAct();*/
 
         ShowExecutedTS();
         ShowExecuteResults();
@@ -112,9 +112,9 @@ custom_settings.wgm_Execute = command;
         showLoading();
         document.form.submit();
 
-        sleepThenAct();
+        /*sleepThenAct();*/
 
-        ShowExecutedTS();
+        /*ShowExecutedTS();*/
         ShowExecuteResults();
     }
 
@@ -134,7 +134,6 @@ function change_wgc_unit(unit){
     document.chg_wgc.wgc_unit.value=unit.toString();
     document.chg_wgc.submit();
 }
-
 function sleepFor(sleepDuration){
     var now = new Date().getTime();
     while(new Date().getTime() < now + sleepDuration){
@@ -214,15 +213,17 @@ function sleepThenAct(){
             <lable>wgm </lable>
             <input type="text" maxlength="100" class="input_32_table" id="wgm_Execute">
             <input type="button" class="button_gen" onclick="CMDExecute();" value="Execute" id="btnCMDExecute">
-            <input type="button" onClick="location.href=location.href" value="Show Results" class="button_gen">
+            <input type="button" onClick="location.href=location.href" value="Refresh Results" class="button_gen">
         </td>
         <tr>
             <td colspan="2">Command Execute Output</td>
         </tr>
         <tr>
             <td style="padding: 0px;">
-            <textarea cols="75" rows="35" wrap="off" readonly="readonly" id="wgm_ExecuteResults" class="textarea_log_table" style="font-family:'Courier New', Courier, mono; font-size:11px;border: none;padding: 0px;">Empty</textarea>
-            </td>
+            <div style="color:#FFCC00;"><input type="checkbox" checked id="auto_refresh">Auto refresh</div>
+            <!--<textarea cols="190" rows="27" wrap="off" readonly="readonly" id="wgm_ExecuteResults" class="textarea_log_table" style="font-family:'Courier New', Courier, mono; font-size:11px;border: none;padding: 0px;">Empty</textarea>-->
+            <!--<textarea cols="190" rows="27" wrap="off" readonly="readonly" id="textarea" class="scrollabletextbox" spellcheck="false" maxlength="8192" style="width:99%; font-family:'Courier New', Courier, mono; font-size:11px;"></textarea>-->
+            <div overflow: scroll><textarea cols="190" rows="27" wrap="off" readonly="readonly" id="textarea" class="textarea_ssh_table" spellcheck="false" maxlength="16384" style="width:99%; font-family:'Courier New', Courier, mono; font-size:11px;"></textarea></div>
         </tr>
 </thead>
 </table>
@@ -234,6 +235,18 @@ function sleepThenAct(){
 </thead>
 <tbody>
 
+        <tr>
+            <td class="settingname">Peers defined</td>
+            <td>
+                <input type="button" class="button_gen" onclick="CMDExecuteARG('diag peers');" value="Show ALL" id="btnDiagPeers">
+            </td>
+        </tr>
+        <tr>
+            <td class="settingname">ACTIVE Peers</td>
+            <td>
+                <input type="button" class="button_gen" onclick="CMDExecuteARG('list');" value="Show ALL" id="btnListPeers">
+            </td>
+        </tr>
         <tr>
             <td class="settingname">ALL Peers </td>
             <td>
@@ -315,7 +328,7 @@ function sleepThenAct(){
                 <option value="S">Site to Site</option>
                 <option value="W">WG-Quick</option>
              </select>
-            <legend></legend>
+            <legend>LEG END</legend>
         </td>
     </tr>
     <tr id="wgmc_status">
@@ -334,62 +347,63 @@ function sleepThenAct(){
             <td colspan="2">Interface</td>
         </tr>
     </thead>
-<tr>
-<th>Private Key</th>
-<td>
-<input type="text" readonly maxlength="63" name="wgc_priv" id="wgc_priv" class="input_32_table" value="<% nvram_get("wgmc_priv"); %>" autocorrect="off" autocapitalize="off"></input>
-</td>
-</tr>
-<tr>
-<th>Address</th>
-<td>
-<input type="text" readonly maxlength="39" name="wgc_addr" id="wgc_addr" class="input_32_table" value="<% nvram_get("wgmc_addr"); %>" autocorrect="off" autocapitalize="off"></input>
-</td>
-</tr>
-<tr>
-<th>DNS Server (Optional)</th>
-<td>
-<input type="text" readonly maxlength="39" name="wgc_dns" id="wgc_dns" class="input_32_table" value="<% nvram_get("wgmc_dns"); %>" autocorrect="off" autocapitalize="off"></input>
-</td>
-</tr>
+    <tr>
+        <th>Private Key</th>
+        <td>
+            <input type="text" readonly maxlength="63" name="wgc_priv" id="wgc_priv" class="input_32_table" value="<% nvram_get("wgmc_priv"); %>" autocorrect="off" autocapitalize="off"></input>
+        </td>
+    </tr>
+    <tr>
+        <th>Address</th>
+        <td>
+            <input type="text" readonly maxlength="39" name="wgc_addr" id="wgc_addr" class="input_32_table" value="<% nvram_get("wgmc_addr"); %>" autocorrect="off" autocapitalize="off"></input>
+        </td>
+    </tr>
+    <tr>
+        <th>DNS Server (Optional)</th>
+        <td>
+            <input type="text" readonly maxlength="39" name="wgc_dns" id="wgc_dns" class="input_32_table" value="<% nvram_get("wgmc_dns"); %>" autocorrect="off" autocapitalize="off"></input>
+        </td>
+    </tr>
+
 </table>
 <table id="WgcPeerTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable">
-<thead>
-<tr>
-<td colspan="2">Peer</td>
-</tr>
-</thead>
-<tr>
-<th>Server Public Key</th>
-<td>
-<input type="text" readonly maxlength="63" name="wgc_ppub" id="wgc_ppub" class="input_32_table" value="<% nvram_get("wgmc_ppub"); %>" autocorrect="off" autocapitalize="off"></input>
-</td>
-</tr>
-<tr>
-<th>Preshared Key (Optional)</th>
-<td>
-<input type="text" readonly maxlength="63" name="wgc_psk" id="wgc_psk" class="input_32_table" value="<% nvram_get("wgmc_psk"); %>" autocorrect="off" autocapitalize="off"></input>
-</td>
-</tr>
-<tr>
-<th>Allowed IPs</th>
-<td>
-<input type="text" readonly maxlength="1023" name="wgc_aips" id="wgc_aips" class="input_32_table" value="<% nvram_get("wgmc_aips"); %>" autocorrect="off" autocapitalize="off"></input>
-</td>
-</tr>
-<tr>
-<th>Endpoint Address:Port</th>
-<td>
-<input type="text" readonly maxlength="39" name="wgc_ep_addr" id="wgc_ep_addr" class="input_32_table" value="<% nvram_get("wgmc_ep_addr"); %>" autocorrect="off" autocapitalize="off"></input> :
-<input type="text" readonly maxlength="5" name="wgc_ep_port" id="wgc_ep_port" class="input_6_table" onKeyPress="return validator.isNumber(this,event);" value="<% nvram_get("wgmc_ep_port"); %>" autocorrect="off" autocapitalize="off"></input>
-</td>
-</tr>
-<tr>
-<th>Persistent Keepalive</th>
-<td>
-<input type="text" readonly maxlength="5" name="wgc_alive" id="wgc_alive" class="input_6_table" onKeyPress="return validator.isNumber(this,event);" value="<% nvram_get("wgmc_alive"); %>" autocorrect="off" autocapitalize="off"></input>
-</td>
-</tr>
+    <thead>
+        <tr>
+            <td colspan="2">Peer</td>
+        </tr>
+    </thead>
+    <tr>
+        <th>Server Public Key</th>
+            <td>
+                <input type="text" readonly maxlength="63" name="wgc_ppub" id="wgc_ppub" class="input_32_table" value="<% nvram_get("wgmc_ppub"); %>" autocorrect="off" autocapitalize="off"></input>
+            </td>
+    </tr>
+    <tr>
+        <th>Preshared Key (Optional)</th>
+        <td>
+            <input type="text" readonly maxlength="63" name="wgc_psk" id="wgc_psk" class="input_32_table" value="<% nvram_get("wgmc_psk"); %>" autocorrect="off" autocapitalize="off"></input>
+        </td>
+    </tr>
+    <tr>
+        <th>Allowed IPs</th>
+        <td>
+            <input type="text" readonly maxlength="1023" name="wgc_aips" id="wgc_aips" class="input_32_table" value="<% nvram_get("wgmc_aips"); %>" autocorrect="off" autocapitalize="off"></input>
+        </td>
+    </tr>
+    <tr>
+        <th>Endpoint Address:Port</th>
+        <td>
+            <input type="text" readonly maxlength="39" name="wgc_ep_addr" id="wgc_ep_addr" class="input_32_table" value="<% nvram_get("wgmc_ep_addr"); %>" autocorrect="off" autocapitalize="off"></input> :
+            <input type="text" readonly maxlength="5" name="wgc_ep_port" id="wgc_ep_port" class="input_6_table" onKeyPress="return validator.isNumber(this,event);" value="<% nvram_get("wgmc_ep_port"); %>" autocorrect="off" autocapitalize="off"></input>
+        </td>
+    </tr>
+    <tr>
+        <th>Persistent Keepalive</th>
+        <td>
+            <input type="text" readonly maxlength="5" name="wgc_alive" id="wgc_alive" class="input_6_table" onKeyPress="return validator.isNumber(this,event);" value="<% nvram_get("wgmc_alive"); %>" autocorrect="off" autocapitalize="off"></input>
+        </td>
+    </tr>
 </table>
 
 
@@ -398,6 +412,18 @@ function sleepThenAct(){
     <tr><td colspan="2">WireGuard® Manager© Configuration Options (click to expand/collapse)</td></tr>
 </thead>
 <tbody style="">
+    <tr>
+        <td class="settingname">WireGuard® Manager© Configuration</td>
+        <td>
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('?');" value="Show Configuration" id="btnShowConfig">
+        </td>
+    </tr>
+    <tr>
+    <td class="settingname">WireGuard® Manager© Diagnostics... RPDB/Firewall rules etc.</td>
+    <td>
+        <input type="button" class="button_gen" onclick="CMDExecuteARG('diag');" value="Show Diagnostics" id="btnShowDiags">
+    </td>
+    </tr>
     <tr class="even" id="wgm_row_opt_noipv6">
         <td class="settingname">NOIPV6 - Disable IPv6<br></td>
         <td class="settingvalue">
@@ -455,38 +481,35 @@ function sleepThenAct(){
 </tbody>
 </table>
 
-
-
-
-
-
-
-<div style="line-height:10px;">&nbsp;</div>
-
-<div style="margin-top: 5px; text-align: center;"><input class="button_gen" onclick="applySettings();" type="button" value="<#195#>" /></div>
-<div style="color:#FFCC00;"><input type="checkbox" checked id="auto_refresh">Auto refresh</div>
-<div style="margin-top:8px">
-<input type="text" readonly maxlength="30" class="input_32_table" id="wgm_ExecuteTS">
-<textarea cols="190" rows="27" wrap="off" readonly="readonly" id="textarea" class="textarea_ssh_table" spellcheck="false" maxlength="4095" style="width:99%; font-family:'Courier New', Courier, mono; font-size:11px;"></textarea>
-</div>
-
+<!--
+<table width="100%" border="1" align="center" cellpadding="2" cellspacing="0" bordercolor="#6b8fa3" class="FormTable SettingsTable" style="border:0px;" id="table_config">
+<thead class="collapsible" id="Base64Results">
+    <tr><td colspan="2">Base64 -</td></tr>
+</thead>
+        <tr>
+            <td colspan="2">Command Execute Output (Base64)</td>
+            <input type="text" readonly maxlength="30" class="input_32_table" id="wgm_ExecuteTS">
+            <textarea cols="190" rows="27" wrap="off" readonly="readonly" id="textarea" class="textarea_ssh_table" spellcheck="false" maxlength="4095" style="width:99%; font-family:'Courier New', Courier, mono; font-size:11px;"></textarea>
+        </tr>
+</table>-->
 
 <div class="apply_gen" id="apply_btn">
-<input class="button_gen" onclick="applyRule();" type="button" value="<#1784#>"/>
+    <input class="button_gen" onclick="applyRule();" type="button" value="<#1784#>"/>
 </div>
 <table id="WgcLogTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable" style="display:none">
-<tr>
-<td>
-<div style="margin-top:8px">
-<textarea class="textarea_ssh_table" style="width:99%; font-family:'Courier New', Courier, mono; font-size:13px;" cols="63" rows="25" readonly="readonly" wrap=off><% nvram_dump("wgc.log",""); %></textarea>
-</div>
-<div class="apply_gen">
-<input type="button" onClick="location.href=location.href" value="<#1636#>" class="button_gen">
-</div>
-</td>
-</tr>
-</table>
-</td>
+    <tr>
+        <td>
+            <div style="margin-top:8px">
+            <textarea class="textarea_ssh_table" style="width:99%; font-family:'Courier New', Courier, mono; font-size:13px;" cols="63" rows="25" readonly="readonly" wrap=off><% nvram_dump("wgc.log",""); %></textarea>
+            </div>
+            <div class="apply_gen">
+                <input type="button" onClick="location.href=location.href" value="<#1636#>" class="button_gen">
+            </div>
+        </td>
+    </tr>
+
+    </table>
+    </td>
 </tr>
 </tbody>
 </table>
