@@ -35,6 +35,7 @@ font-weight: bolder;
 <script language="JavaScript" type="text/javascript" src="/client_function.js"></script>
 <script language="JavaScript" type="text/javascript" src="/validator.js"></script>
 <script language="JavaScript" type="text/javascript" src="/ext/wireguard/ExecuteResults.js"></script>
+<script language="JavaScript" type="text/javascript" src="/ext/wireguard/ExecutedTS.js"></script>
 <script>
 
 <% get_wgc_parameter(); %>
@@ -42,25 +43,30 @@ font-weight: bolder;
 var custom_settings = <% get_custom_settings(); %>;
 
 function initial(){
-show_menu();
+    show_menu();
 
-/* As per RMerlin Wiki https://github.com/RMerl/asuswrt-merlin.ng/wiki/Addons-API */
-if (custom_settings.wgm_version == undefined)
-        document.getElementById('wgm_version').value = "N/A";
-else
-        document.getElementById('wgm_version').value = custom_settings.wgm_version;
+    /* As per RMerlin Wiki https://github.com/RMerl/asuswrt-merlin.ng/wiki/Addons-API */
+    if (custom_settings.wgm_version == undefined)
+            document.getElementById('wgm_version').value = "N/A";
+    else
+            document.getElementById('wgm_version').value = custom_settings.wgm_version;
 
-if (custom_settings.wgm_Kernel == undefined)
-        document.getElementById('wgm_Kernel').value = "N/A";
-else
-        document.getElementById('wgm_Kernel').value = custom_settings.wgm_Kernel;
+    if (custom_settings.wgm_Kernel == undefined)
+            document.getElementById('wgm_Kernel').value = "N/A";
+    else
+            document.getElementById('wgm_Kernel').value = custom_settings.wgm_Kernel;
 
-document.getElementById('wgm_Execute').value = "";
+    document.getElementById('wgm_Execute').value = "";
 
-if (custom_settings.wgm_Execute_Result == undefined)
-        document.getElementById("textarea").innerHTML = "N/A"
-else
-        document.getElementById("textarea").innerHTML = atob(custom_settings.wgm_Execute_Result);
+    if (custom_settings.wgm_Execute_Result == undefined)
+            document.getElementById("textarea").innerHTML = "N/A"
+    else
+            document.getElementById("textarea").innerHTML = atob(custom_settings.wgm_Execute_Result);
+
+    /*if (custom_settings.wgm_ExecutedTS == undefined)
+            document.getElementById("wgm_ExecutedTS").value = "N/A"
+    else
+            document.getElementById("wgm_ExecutedTS").value = atob(custom_settings.wgm_ExecutedTS);*/
 
 /*custom_settings.wgm_Execute_Result = "Cleared"; */
 /*document.getElementById('amng_custom').value = JSON.stringify(custom_settings); */
@@ -71,6 +77,7 @@ else
 
     $(".default-collapsed").trigger("click");
 
+    /*ShowExecutedTS();*/
     ShowExecuteResults();
 
 }
@@ -88,6 +95,26 @@ function CMDExecute(){
 
         sleepThenAct();
 
+        ShowExecutedTS();
+        ShowExecuteResults();
+    }
+
+
+}
+function CMDExecuteARG(command){
+
+custom_settings.wgm_Execute = command;
+
+   /* Store object as a string in the amng_custom hidden input field */
+   document.getElementById('amng_custom').value = JSON.stringify(custom_settings);
+
+    if(validForm()){
+        showLoading();
+        document.form.submit();
+
+        sleepThenAct();
+
+        ShowExecutedTS();
         ShowExecuteResults();
     }
 
@@ -187,6 +214,7 @@ function sleepThenAct(){
             <lable>wgm </lable>
             <input type="text" maxlength="100" class="input_32_table" id="wgm_Execute">
             <input type="button" class="button_gen" onclick="CMDExecute();" value="Execute" id="btnCMDExecute">
+            <input type="button" onClick="location.href=location.href" value="Show Results" class="button_gen">
         </td>
         <tr>
             <td colspan="2">Command Execute Output</td>
@@ -200,13 +228,60 @@ function sleepThenAct(){
 </table>
 
 
+<table width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#4D595D" class="FormTable">
+<thead class="collapsible">
+    <tr><td colspan="2">Peer control Commands (click to expand/collapse)</td></tr>
+</thead>
+<tbody>
+
+        <tr>
+            <td class="settingname">ALL Peers </td>
+            <td>
+                <input type="button" class="button_gen" onclick="CMDExecuteARG('stop');" value="Stop" id="btnStopPeers">
+            </td>
+            <td>
+                <input type="button" class="button_gen" onclick="CMDExecuteARG('start');" value="Start" id="btnStartPeers">
+            </td>
+            <td>
+                <input type="button" class="button_gen" onclick="CMDExecuteARG('restart');" value="Restart" id="btnRestartPeers">
+            </td>
+        </tr>
+        <tr>
+            <td class="settingname">Category: 'clients'</td>
+            <td>
+                <input type="button" class="button_gen" onclick="CMDExecuteARG('stop clients');" value="Stop" id="btnStopCategoryClients">
+            </td>
+            <td>
+                <input type="button" class="button_gen" onclick="CMDExecuteARG('start clients');" value="Start" id="btnStartCategoryClients">
+            </td>
+            <td>
+                <input type="button" class="button_gen" onclick="CMDExecuteARG('restart clients');" value="Restart" id="btnRestartCategoryClients">
+            </td>
+        </tr>
+            <tr>
+            <td class="settingname">Category: 'servers'</td>
+            <td>
+                <input type="button" class="button_gen" onclick="CMDExecuteARG('stop servers');" value="Stop" id="btnStopCategoryServers">
+            </td>
+            <td>
+                <input type="button" class="button_gen" onclick="CMDExecuteARG('start servers');" value="Start" id="btnStartCategoryServers">
+            </td>
+            <td>
+                <input type="button" class="button_gen" onclick="CMDExecuteARG('restart servers');" value="Restart" id="btnRestartCategoryServers">
+            </td>
+        </tr>
+</tbody>
+</table>
+
+
 <div style="line-height:10px;">&nbsp;</div>
 <table width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#4D595D" class="FormTable">
-<thead>
+<thead class="collapsible">
     <tr>
         <td colspan="2">Client Configuration</td>
     </tr>
 </thead>
+<tbody>
     <tr id="wgc_unit_field" class="rept ew" value="<% nvram_get("wgmc_unit"); %>">
 
         <th>Select Client Index</th>
@@ -250,6 +325,7 @@ function sleepThenAct(){
             <input type="radio" value="0" name="wgmc_enable" class="input" <% nvram_match("wgmc_enable", "0", "checked"); %>><#216#></input>
         </td>
     </tr>
+</tbody>
 </table>
 
 <table id="WgcInterfaceTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable">
@@ -390,6 +466,7 @@ function sleepThenAct(){
 <div style="margin-top: 5px; text-align: center;"><input class="button_gen" onclick="applySettings();" type="button" value="<#195#>" /></div>
 <div style="color:#FFCC00;"><input type="checkbox" checked id="auto_refresh">Auto refresh</div>
 <div style="margin-top:8px">
+<input type="text" readonly maxlength="30" class="input_32_table" id="wgm_ExecuteTS">
 <textarea cols="190" rows="27" wrap="off" readonly="readonly" id="textarea" class="textarea_ssh_table" spellcheck="false" maxlength="4095" style="width:99%; font-family:'Courier New', Courier, mono; font-size:11px;"></textarea>
 </div>
 
