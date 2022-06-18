@@ -184,7 +184,7 @@ function sleepThenAct(){
                         <tr>
                             <td bgcolor="#4D595D" valign="top" >
                             <div>&nbsp;</div>
-                            <div class="formfonttitle">VPN - WireGuard® Client</div>
+                            <div style="color: red;" class="formfonttitle">VPN - WireGuard® Client ***** EXPERIMENTAL Beta v0.1 *****</div>
                             <div id="divSwitchMenu" style="margin-top:-40px;float:right;"></div
                             <div style="margin:10px 0 10px 5px;" class="splitLine"></div>
 
