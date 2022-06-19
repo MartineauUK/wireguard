@@ -132,6 +132,28 @@ function CMDExecuteARG(command){
 
 
 }
+function CMDExecutePeerImport(command){
+
+    custom_settings.wgm_Execute = "import "+document.getElementById('wgm_PeerImport').value;;
+
+   /* Store object as a string in the amng_custom hidden input field */
+   document.getElementById('amng_custom').value = JSON.stringify(custom_settings);
+
+    if(validForm()){
+        showLoading();
+        document.form.submit();
+
+        /*sleepThenAct();*/
+
+        /*ShowExecutedTS();
+        ShowExecuteResults();*/
+
+        document.getElementById("textarea").innerHTML = atob(custom_settings.wgm_Execute_Result);
+        wgm_Execute_Length = custom_settings.wgm_Execute_Len;
+    }
+
+
+}
 function applyRule(){
 
     if(validForm()){
@@ -196,7 +218,7 @@ function sleepThenAct(){
                         <tr>
                             <td bgcolor="#4D595D" valign="top" >
                             <div>&nbsp;</div>
-                            <div style="color: red;" class="formfonttitle">VPN - WireGuard® Client ***** EXPERIMENTAL Beta v0.2 *****</div>
+                            <div style="color: red;" class="formfonttitle">VPN - WireGuard® Client ***** EXPERIMENTAL Beta v0.3 *****</div>
                             <div id="divSwitchMenu" style="margin-top:-40px;float:right;"></div
                             <div style="margin:10px 0 10px 5px;" class="splitLine"></div>
 
@@ -249,6 +271,23 @@ function sleepThenAct(){
     <tr><td colspan="2">Peer control Commands (click to expand/collapse)</td></tr>
 </thead>
 <tbody>
+
+    </tr>
+        <td colspan="2" class="execbutton">
+            <lable>Peer Profile</lable>
+            <input type="text" maxlength="30" class="input_32_table" id="wgm_PeerImport">
+        </td>
+        <td>
+            <input type="radio" name="wgm_IMPORT" id="wgm_ImportClient_enabled" class="input" value="enable" checked="">
+            <label for="XIMPORT_PEER">Client</label>
+            <input type="radio" name="wgm_IMPORT" id="wgm_ImportServer_enabled" class="input" value="disable">
+            <label for="XIMPORT_PEER">Server</label>
+        </td>
+        <td>
+            <input type="button" class="button_gen" onclick="CMDExecutePeerImport();" value="Import" id="btnClientImport">
+        </td>
+    </tr>
+
 
         <tr>
             <td class="settingname">Peers defined</td>
@@ -364,6 +403,7 @@ function sleepThenAct(){
             <input type="button" class="button_gen" onclick="CMDExecuteARG('stop wg1'+wgcindex);" value="Stop" id="btnStopWGClient">
             <input type="button" class="button_gen" onclick="CMDExecuteARG('start wg1'+wgcindex);" value="Start" id="btnStartWGClient">
             <input type="button" class="button_gen" onclick="CMDExecuteARG('restart wg1'+wgcindex);" value="Restart" id="btnRestartWGClient">
+            <input type="button" style="color: red;" onclick="CMDExecuteARG('peer wg1'+wgcindex+' del');" value="Delete" id="btnDeleteWGClient">
         </td>
     </tr>
 </tbody>
