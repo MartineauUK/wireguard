@@ -218,7 +218,7 @@ function sleepThenAct(){
                         <tr>
                             <td bgcolor="#4D595D" valign="top" >
                             <div>&nbsp;</div>
-                            <div style="color: red;" class="formfonttitle">VPN - WireGuard® Client ***** EXPERIMENTAL Beta v0.3 *****</div>
+                            <div style="color: red;" class="formfonttitle">VPN - WireGuard® Client ***** EXPERIMENTAL Beta v0.4 *****</div>
                             <div id="divSwitchMenu" style="margin-top:-40px;float:right;"></div
                             <div style="margin:10px 0 10px 5px;" class="splitLine"></div>
 
@@ -396,7 +396,7 @@ function sleepThenAct(){
 </table>
 
 
-<table id="WgcBasicTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable">
+<table id="WgcStateTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable">
 <tbody>
     <tr>
         <td colspan="2">
@@ -548,6 +548,57 @@ function sleepThenAct(){
         <input type="button" onclick="SaveConfig();" value="Dummy SAVE Button" class="button_gen savebutton" name="button">
         </td>
     </tr>
+</tbody>
+</table>
+
+<div style="line-height:10px;">&nbsp;</div>
+<table id="WgcVPNDirectorTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable">
+<thead class="collapsible">
+    <tr><td colspan="2">VPN Director Rule Management (click to expand/collapse)</td></tr>
+</thead>
+
+<tbody style="">
+    <tr>
+        <td class="settingname">VPN Director rules</td>
+        <td>
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('vpndirector list');" value="Show" id="btnVPNDirectorList">
+        </td>
+        <td>
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('vpndirector delete autoreply=Y');" value="Delete" id="btnVPNDirectorDelete">
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <select name="VPNDirectorFilter" >
+            <option value="wan">No Source Filter</option>
+                <option value="wan">WAN</option>
+                <option value="ovpnc1">OVPN Client 1</option>
+                <option value="ovpnc2">OVPN Client 2</option>
+                <option value="ovpnc3">OVPN Client 3</option>
+                <option value="ovpnc4">OVPN Client 4</option>
+                <option value="ovpnc5">OVPN Client 5</option>
+             </select>
+            <!--<legend>Legend Descriptions goes here</legend>-->
+            <legend>Default Source: ALL</legend>
+        </td>
+        <td>
+            <select name="VPNDirectorWGTarget" >
+                <option value="">Default mapping</option>
+                <option value="wg11">WG Peer 1</option>
+                <option value="wg12">WG Peer 2</option>
+                <option value="wg13">WG Peer 3</option>
+                <option value="wg14">WG Peer 4</option>
+                <option value="wg15">WG Peer 5</option>
+             </select>
+            <!--<legend>Legend Descriptions goes here</legend>-->
+            <legend>Default Destination Mapping: ovpnc1 to wg11 etc.</legend>
+        </td>
+
+        <td>
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('vpndirector clone');" value="Clone" id="btnVPNDirectorClone">
+        </td>
+    </tr>
+
 </tbody>
 </table>
 
