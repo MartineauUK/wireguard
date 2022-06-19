@@ -545,7 +545,7 @@ function sleepThenAct(){
 
     <tr class="apply_gen" valign="top" height="35px">
         <td colspan="2" class="savebutton">
-        <input type="button" onclick="SaveConfig();" value="Save" class="button_gen savebutton" name="button">
+        <input type="button" onclick="SaveConfig();" value="Dummy SAVE Button" class="button_gen savebutton" name="button">
         </td>
     </tr>
 </tbody>
