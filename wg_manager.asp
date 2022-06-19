@@ -34,13 +34,18 @@ font-weight: bolder;
 <script language="JavaScript" type="text/javascript" src="/ext/shared-jy/jquery.js"></script>
 <script language="JavaScript" type="text/javascript" src="/client_function.js"></script>
 <script language="JavaScript" type="text/javascript" src="/validator.js"></script>
-<script language="JavaScript" type="text/javascript" src="/ext/wireguard/ExecuteResults.js"></script>
-<script language="JavaScript" type="text/javascript" src="/ext/wireguard/ExecutedTS.js"></script>
+<!--<script language="JavaScript" type="text/javascript" src="/ext/wireguard/ExecuteResults.js"></script>
+<script language="JavaScript" type="text/javascript" src="/ext/wireguard/ExecutedTS.js"></script>-->
 <script>
 
 <% get_wgc_parameter(); %>
 
 var custom_settings = <% get_custom_settings(); %>;
+
+var wgcindex = "1"
+document.getElementById('wgc_unit_field').value = wgcindex
+
+var wgm_Execute_Length = custom_settings.wgm_Execute_Len
 
 function initial(){
     show_menu();
@@ -61,7 +66,8 @@ function initial(){
     if (custom_settings.wgm_Execute_Result == undefined)
             document.getElementById("textarea").innerHTML = "N/A"
     else
-            document.getElementById("textarea").innerHTML = atob(custom_settings.wgm_Execute_Result);
+            {document.getElementById("textarea").innerHTML = atob(custom_settings.wgm_Execute_Result)
+            wgm_Execute_Length = atob(custom_settings.wgm_Execute_Len);}
 
     /*if (custom_settings.wgm_ExecutedTS == undefined)
             document.getElementById("wgm_ExecutedTS").value = "N/A"
@@ -77,8 +83,8 @@ function initial(){
 
     $(".default-collapsed").trigger("click");
 
-    /*ShowExecutedTS();*/
-    ShowExecuteResults();
+    /*ShowExecutedTS();
+    ShowExecuteResults();*/
 
 }
 function CMDExecute(){
@@ -93,17 +99,20 @@ function CMDExecute(){
         showLoading();
         document.form.submit();
 
-        /*sleepThenAct();*/
+        sleepThenAct();
 
-        ShowExecutedTS();
-        ShowExecuteResults();
+        /*ShowExecutedTS();
+        ShowExecuteResults();*/
+
+        document.getElementById("textarea").innerHTML = atob(custom_settings.wgm_Execute_Result);
+        wgm_Execute_Length = custom_settings.wgm_Execute_Len;
     }
 
 
 }
 function CMDExecuteARG(command){
 
-custom_settings.wgm_Execute = command;
+    custom_settings.wgm_Execute = command;
 
    /* Store object as a string in the amng_custom hidden input field */
    document.getElementById('amng_custom').value = JSON.stringify(custom_settings);
@@ -114,8 +123,11 @@ custom_settings.wgm_Execute = command;
 
         /*sleepThenAct();*/
 
-        /*ShowExecutedTS();*/
-        ShowExecuteResults();
+        /*ShowExecutedTS();
+        ShowExecuteResults();*/
+
+        document.getElementById("textarea").innerHTML = atob(custom_settings.wgm_Execute_Result);
+        wgm_Execute_Length = custom_settings.wgm_Execute_Len;
     }
 
 
@@ -184,7 +196,7 @@ function sleepThenAct(){
                         <tr>
                             <td bgcolor="#4D595D" valign="top" >
                             <div>&nbsp;</div>
-                            <div style="color: red;" class="formfonttitle">VPN - WireGuard® Client ***** EXPERIMENTAL Beta v0.1 *****</div>
+                            <div style="color: red;" class="formfonttitle">VPN - WireGuard® Client ***** EXPERIMENTAL Beta v0.2 *****</div>
                             <div id="divSwitchMenu" style="margin-top:-40px;float:right;"></div
                             <div style="margin:10px 0 10px 5px;" class="splitLine"></div>
 
@@ -203,12 +215,15 @@ function sleepThenAct(){
                             </table>
 
 <div>&nbsp;</div>
-<div class="formfonttitle">WireGuard® Manager© Command Interface</div>
+<div class="formfonttitle">WireGuard® Manager©</div>
 <table id="WgcBasicTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable">
 <thead class="collapsible">
-        <tr>
+    <tr><td colspan="2">Command Interface (click to expand/collapse)</td></tr>
+</thead>
+<tbody>
+        <!--<tr>
             <td colspan="2">WireGuard® Manager© Command</td>
-        </tr>
+        </tr>-->
         <td colspan="2" class="execbutton">
             <lable>wgm </lable>
             <input type="text" maxlength="100" class="input_32_table" id="wgm_Execute">
@@ -225,10 +240,10 @@ function sleepThenAct(){
             <!--<textarea cols="190" rows="27" wrap="off" readonly="readonly" id="textarea" class="scrollabletextbox" spellcheck="false" maxlength="8192" style="width:99%; font-family:'Courier New', Courier, mono; font-size:11px;"></textarea>-->
             <div overflow: scroll><textarea cols="190" rows="27" wrap="off" readonly="readonly" id="textarea" class="textarea_ssh_table" spellcheck="false" maxlength="16384" style="width:99%; font-family:'Courier New', Courier, mono; font-size:11px;"></textarea></div>
         </tr>
-</thead>
+</tbody>
 </table>
 
-
+<div style="line-height:10px;">&nbsp;</div>
 <table width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#4D595D" class="FormTable">
 <thead class="collapsible">
     <tr><td colspan="2">Peer control Commands (click to expand/collapse)</td></tr>
@@ -271,7 +286,7 @@ function sleepThenAct(){
                 <input type="button" class="button_gen" onclick="CMDExecuteARG('restart clients');" value="Restart" id="btnRestartCategoryClients">
             </td>
         </tr>
-            <tr>
+        <tr>
             <td class="settingname">Category: 'servers'</td>
             <td>
                 <input type="button" class="button_gen" onclick="CMDExecuteARG('stop servers');" value="Stop" id="btnStopCategoryServers">
@@ -289,7 +304,7 @@ function sleepThenAct(){
 
 <div style="line-height:10px;">&nbsp;</div>
 <table width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#4D595D" class="FormTable">
-<thead class="collapsible">
+<thead>
     <tr>
         <td colspan="2">Client Configuration</td>
     </tr>
@@ -328,7 +343,7 @@ function sleepThenAct(){
                 <option value="S">Site to Site</option>
                 <option value="W">WG-Quick</option>
              </select>
-            <legend>LEG END</legend>
+            <!--<legend>Legend Descriptions goes here</legend>-->
         </td>
     </tr>
     <tr id="wgmc_status">
@@ -336,6 +351,19 @@ function sleepThenAct(){
         <td>
             <input type="radio" value="1" name="wgmc_enable" class="input" <% nvram_match("wgmc_enable", "1", "checked"); %>><#188#></input>
             <input type="radio" value="0" name="wgmc_enable" class="input" <% nvram_match("wgmc_enable", "0", "checked"); %>><#216#></input>
+        </td>
+    </tr>
+</tbody>
+</table>
+
+
+<table id="WgcBasicTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable">
+<tbody>
+    <tr>
+        <td colspan="2">
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('stop wg1'+wgcindex);" value="Stop" id="btnStopWGClient">
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('start wg1'+wgcindex);" value="Start" id="btnStartWGClient">
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('restart wg1'+wgcindex);" value="Restart" id="btnRestartWGClient">
         </td>
     </tr>
 </tbody>
@@ -406,23 +434,17 @@ function sleepThenAct(){
     </tr>
 </table>
 
-
+<div style="line-height:10px;">&nbsp;</div>
 <table width="100%" border="1" align="center" cellpadding="2" cellspacing="0" bordercolor="#6b8fa3" class="FormTable SettingsTable" style="border:0px;" id="table_config">
 <thead class="collapsible" id="scriptconfig">
-    <tr><td colspan="2">WireGuard® Manager© Configuration Options (click to expand/collapse)</td></tr>
+    <tr><td colspan="2">Configuration Options (click to expand/collapse)</td></tr>
 </thead>
 <tbody style="">
     <tr>
-        <td class="settingname">WireGuard® Manager© Configuration</td>
+        <td class="settingname">Current Configuration</td>
         <td>
             <input type="button" class="button_gen" onclick="CMDExecuteARG('?');" value="Show Configuration" id="btnShowConfig">
         </td>
-    </tr>
-    <tr>
-    <td class="settingname">WireGuard® Manager© Diagnostics... RPDB/Firewall rules etc.</td>
-    <td>
-        <input type="button" class="button_gen" onclick="CMDExecuteARG('diag');" value="Show Diagnostics" id="btnShowDiags">
-    </td>
     </tr>
     <tr class="even" id="wgm_row_opt_noipv6">
         <td class="settingname">NOIPV6 - Disable IPv6<br></td>
@@ -472,10 +494,52 @@ function sleepThenAct(){
             <label for="XDISABLE_FLOW_CACHE">No</label>
         </td>
     </tr>
+    </tr>
+        <tr class="even" id="wgm_row_opt_webui">
+        <td class="settingname">WebUI Enabled<br></td>
+        <td class="settingvalue">
+            <input type="radio" name="wgm_WEBUI" id="wgm_WEBUI_enabled" class="input" value="enable" checked="">
+            <label for="XWEBUI">Yes</label>
+        </td>
+    </tr>
 
     <tr class="apply_gen" valign="top" height="35px">
         <td colspan="2" class="savebutton">
         <input type="button" onclick="SaveConfig();" value="Save" class="button_gen savebutton" name="button">
+        </td>
+    </tr>
+</tbody>
+</table>
+
+<div style="line-height:10px;">&nbsp;</div>
+<table width="100%" border="1" align="center" cellpadding="2" cellspacing="0" bordercolor="#6b8fa3" class="FormTable SettingsTable" style="border:0px;" id="table_config">
+<thead class="collapsible" id="scriptconfig">
+    <tr><td colspan="2">Diagnostic Tools (click to expand/collapse)</td></tr>
+</thead>
+<tbody style="">
+    <tr>
+        <td class="settingname">Diagnostics: Firewall rules</td>
+        <td>
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('diag firewall');" value="Show Firewall" id="btnShowDiagsFirewall">
+        </td>
+    </tr>
+    <tr>
+        <td class="settingname">Diagnostics: Selective Routing rules</td>
+        <td>
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('diag rpdb');" value="Show RPDB" id="btnShowDiagsRPDB">
+        </td>
+    </tr>
+    <tr>
+        <td class="settingname">Diagnostics: Routing</td>
+        <td>
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('diag route');" value="Show Routes" id="btnShowDiagsRoute">
+        </td>
+    </tr>
+    </tr>
+        <tr>
+        <td class="settingname">Diagnostics: Miscellaneous</td>
+        <td>
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('diag misc');" value="Show Misc" id="btnShowDiagsMisc">
         </td>
     </tr>
 </tbody>
