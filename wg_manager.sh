@@ -1,7 +1,7 @@
 #!/bin/sh
     # shellcheck disable=SC2039,SC2155,SC2124,SC2046,SC2027
-VERSION="v4.17b8"
-#============================================================================================ © 2021-2022 Martineau v4.17b8
+VERSION="v4.17b9"
+#============================================================================================ © 2021-2022 Martineau v4.17b9
 #
 #       wgm   [ help | -h ]
 #       wgm   [ { start | stop | restart } [wg_interface]... ]
@@ -33,14 +33,14 @@ VERSION="v4.17b8"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 08-Jun-2022
+# Last Updated Date: 19-Jun-2022
 
 #
 # Description:
 #
 # Acknowledgement:
 #
-# Contributors: odkrys,Torson,ZebMcKayhan,jobhax,elorimer,Sh0cker54,here1310,defung,The Chief,abir1909,JGrana,heysoundude,archiel,Cam,endiz,Meshkoff,johndoe85
+# Contributors: odkrys,Torson,ZebMcKayhan,jobhax,elorimer,Sh0cker54,here1310,defung,The Chief,abir1909,JGrana,heysoundude,archiel,Cam,endiz,Meshkoff,johndoe85,Juched
 
 GIT_REPO="wireguard"
 GITHUB_MARTINEAU="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/main"
@@ -62,9 +62,10 @@ INSTALL_MIGRATE="N"                                # Migration from v3.0 to v4.0
 IMPORTED_PEER_NAME=                                # Global tacky!                  # v4.15
 
 readonly SCRIPT_WEBPAGE_DIR="$(readlink /www/user)"
-readonly SCRIPT_WEB_DIR="$SCRIPT_WEBPAGE_DIR/wireguard.d"
+readonly SCRIPT_WEB_DIR="$SCRIPT_WEBPAGE_DIR/wireguard"                             # v4.17
 readonly SCRIPT_DIR="/jffs/addons/wireguard"
 installedMD5File="${INSTALL_DIR}www-installed.md5"  # Save md5 of last installed www ASP file so you can find it again later (in case of www ASP update)
+WEBUI_COLOUR_REINSTATE=                             # WebUI Service Events temporarily suppresses ANSI color Escape sequences # v4.17
 
 Say() {
   # shellcheck disable=SC2068
@@ -1254,7 +1255,7 @@ Import_Peer() {
                             [ -n "$(grep -E "^Endpoint" ${IMPORT_DIR}${WG_INTERFACE}.conf)" ] && AUTO="S"   # v.4.15 Site-to-Site
                         ;;
                         *)
-                            SayT "***ERROR: WireGuard Peer TYPE ('$FORCE_TYPE') must be 'client'/'server' or 'device'....skipping import request"
+                            SayT "***ERROR: WireGuard® Peer TYPE ('$FORCE_TYPE') must be 'client'/'server' or 'device'....skipping import request"
                             echo -e $cBRED"\a\n\t***ERROR: WireGuard® Peer TYPE (${cBWHT}$FORCE_TYPE${cBRED}) must be 'client'/'server' or 'device'....skipping import Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
                             return 1
                         ;;
@@ -1487,8 +1488,8 @@ Import_Peer() {
                         echo -e $cBRED"\a\n\t***ERROR: WireGuard® 'client' Peer (${cBWHT}$WG_INTERFACE${cBRED}) ALREADY exists in database?....skipping import Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
                     fi
                 #else
-                    #SayT "***ERROR: WireGuard VPN Peer ('$WG_INTERFACE') must be 'client'....skipping import request"
-                    #echo -e $cBRED"\a\n\t***ERROR: WireGuard Peer (${cBWHT}$WG_INTERFACE${cBRED}) must be 'client'....skipping import Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
+                    #SayT "***ERROR: WireGuard® VPN Peer ('$WG_INTERFACE') must be 'client'....skipping import request"
+                    #echo -e $cBRED"\a\n\t***ERROR: WireGuard® Peer (${cBWHT}$WG_INTERFACE${cBRED}) must be 'client'....skipping import Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
                 #fi
             else
                 if [ ! -f ${IMPORT_DIR}${WG_INTERFACE}.conf ];then
@@ -1550,8 +1551,8 @@ Export_Peer(){
 
                 echo -e $cBGRE"\n\t[✔] Config ${cBMAG}${WG_INTERFACE}${cBGRE} export '${cRESET}${CONFIG_DIR}${FN}${cBGRE}' success"$cRESET 2>&1
             else
-                SayT "***ERROR: WireGuard VPN GI Peer ('${IMPORT_DIR}$WG_INTERFACE.conf') NVRAM configuration NOT found?....skipping export request"   # v4.12
-                echo -e $cBRED"\a\n\t***ERROR: WireGuard GUI Peer NVRAM configuration NOT found?....skipping export Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
+                SayT "***ERROR: WireGuard® VPN GI Peer ('${IMPORT_DIR}$WG_INTERFACE.conf') NVRAM configuration NOT found?....skipping export request"   # v4.12
+                echo -e $cBRED"\a\n\t***ERROR: WireGuard® GUI Peer NVRAM configuration NOT found?....skipping export Peer '${cBMAG}${WG_INTERFACE}${cBRED}' request\n"$cRESET   2>&1
             fi
         ;;
         wg[12]*)
@@ -1570,21 +1571,46 @@ Export_Peer(){
             local PUB_KEY=$(sqlite3 $SQL_DATABASE "SELECT pubkey FROM clients where peer='$WG_INTERFACE';")
             local PRI_KEY=$(sqlite3 $SQL_DATABASE "SELECT prikey FROM clients where peer='$WG_INTERFACE';")
             local ALLOWIP=$(awk '/^Allow/ {$1="";$2="";print $0}' ${CONFIG_DIR}${WG_INTERFACE}.conf | awk '{$1=$1};1')
+            local AUTO=$(sqlite3 $SQL_DATABASE "SELECT auto FROM clients where peer='$WG_INTERFACE';")
+            [ -n "$(wg show interfaces | grep "$WG_INTERFACE")" ] && local CONNECTED=1 || local CONNECTED=0
 
+            eval "nvram set wgm${TYPE}${INDEX}_unit='$INDEX'"
+            eval "nvram set wgm${TYPE}${INDEX}_desc='$DESC'"
+            eval "nvram set wgm${TYPE}${INDEX}_auto='$AUTO'"
+            eval "nvram set wgm${TYPE}${INDEX}_addr='$SUBNET'"
+            eval "nvram set wgm${TYPE}${INDEX}_aips='$ALLOWIP'"
+            eval "nvram set wgm${TYPE}${INDEX}_alive=25"
+            eval "nvram set wgm${TYPE}${INDEX}_dns='$DNS'"
 
-            eval "nvram set wg${TYPE}${INDEX}_addr='$SUBNET'"
-            eval "nvram set wg${TYPE}${INDEX}_aips='$ALLOWIP'"
-            eval "nvram set wg${TYPE}${INDEX}_alive=25"
-            eval "nvram set wg${TYPE}${INDEX}_dns='$DNS'"
-            eval "nvram set wg${TYPE}${INDEX}_enable=0"
+            eval "nvram set wgm${TYPE}${INDEX}_enable='$CONNECTED'"
             # Split  Endpoint 'ip:port' for separate GUI fields
             local SOCKET_IP=${SOCKET%:*}        # Endpoint IP address
             local SOCKET_PORT=${SOCKET##*:}     # Endpoint Port
-            eval "nvram set wg${TYPE}${INDEX}_ep_addr='$SOCKET_IP'"
-            eval "nvram set wg${TYPE}${INDEX}_ep_port='$SOCKET_PORT'"
-            eval "nvram set wg${TYPE}${INDEX}_nat=1"
-            eval "nvram set wg${TYPE}${INDEX}_ppub='$PUB_KEY'"
-            eval "nvram set wg${TYPE}${INDEX}_priv='$PRI_KEY'"
+            eval "nvram set wgm${TYPE}${INDEX}_ep_addr='$SOCKET_IP'"
+            eval "nvram set wgm${TYPE}${INDEX}_ep_port='$SOCKET_PORT'"
+            eval "nvram set wgm${TYPE}${INDEX}_nat=1"
+            eval "nvram set wgm${TYPE}${INDEX}_ppub='$PUB_KEY'"
+            eval "nvram set wgm${TYPE}${INDEX}_priv='$PRI_KEY'"
+
+            # WebUI Hack
+            eval "nvram set wgm${TYPE}_unit='$INDEX'"
+            eval "nvram set wgm${TYPE}_desc='$DESC'"
+            eval "nvram set wgm${TYPE}_auto='$AUTO'"
+            eval "nvram set wgm${TYPE}_addr='$SUBNET'"
+            eval "nvram set wgm${TYPE}_aips='$ALLOWIP'"
+            eval "nvram set wgm${TYPE}_alive=25"
+            eval "nvram set wgm${TYPE}_dns='$DNS'"
+
+            eval "nvram set wgm${TYPE}_enable='$CONNECTED'"
+            # Split  Endpoint 'ip:port' for separate GUI fields
+            local SOCKET_IP=${SOCKET%:*}        # Endpoint IP address
+            local SOCKET_PORT=${SOCKET##*:}     # Endpoint Port
+            eval "nvram set wgm${TYPE}_ep_addr='$SOCKET_IP'"
+            eval "nvram set wgm${TYPE}_ep_port='$SOCKET_PORT'"
+            eval "nvram set wgm${TYPE}_nat=1"
+            eval "nvram set wgm${TYPE}_ppub='$PUB_KEY'"
+            eval "nvram set wgm${TYPE}_priv='$PRI_KEY'"
+
 
             #vpnc_clientlist=Mullvad_USA_Los_Angeles>WireGuard>5>>>1>5>><Mullvad_Oz_Melbourne>WireGuard>4>>>1>6>>
             local PREV=$(nvram get vpnc_clientlist)
@@ -1662,9 +1688,11 @@ Manage_Peer() {
 
                     echo -e "\tpeer peer_name [add] subnet {IPSubnet[...]}\t\t\t\t- Configure downstream subnets e.g. peer wg13 add subnet 192.168.5.0/24"
 
-                    echo -e "\tpeer peer_name {rule [del {id_num} |add [wan] rule_def]}\t\t- Manage Policy rules e.g. peer wg13 rule add 172.16.1.0/24 comment All LAN"
+                    echo -e "\tpeer peer_name {rule [del [all|id_num]|add [wan] rule_def]}\t\t- Manage Policy rules e.g. peer wg13 rule add 172.16.1.0/24 comment All LAN"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg13 rule add wan 52.97.133.162 comment smtp.office365.com"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg13 rule add wan 172.16.1.100 9.9.9.9 comment Quad9 DNS"
+                    echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg17 rule del 10"
+                    echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg17 rule del all"
                     echo -e "\tpeer serv_peer_name {passthru client_peer {[add|del] [device|IP/CIDR]}} - Manage Passthu rules; 'server' peer devices/IPs/CIDR outbound via 'client' peer"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru add wg11 SGS8"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru add wg15 all"
@@ -1673,6 +1701,7 @@ Manage_Peer() {
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru del SGS8"
                     echo -e "\t\t\t\t\t\t\t\t\t\t\t\t\t   peer wg21 passthru del all"
                     echo -e "\tpeer serv_peer_name {bind device_peer}\t\t\t\t\t- Bind a Road Warrior 'device' Peer to a 'server' Peer e.g. peer wg21 bind SGS20"
+                    echo -e $cBYEL"\n\tVisit @ZebMcKayhan's Hint's and Tips Guide https://github.com/ZebMcKayhan/WireguardManager/blob/main/README.md#table-of-content"$cRESET
 
                     return
                 fi
@@ -2382,6 +2411,11 @@ Manage_Wireguard_Sessions() {
                     Route=                                  # v2.02
                     local FORCEPOLICY=                      # v4.14
                     local POLICY_MODE=                      # v4.14
+
+                    # Temporary WebUI hack
+                    Export_Peer "export" "wg11"
+                    nvram commit
+
                 done
             WG_show
             ;;
@@ -2458,6 +2492,10 @@ Manage_Wireguard_Sessions() {
                         echo -e $cBRED"\a\n\t***ERROR: WireGuard® ${TXT}Peer (${cBWHT}$WG_INTERFACE${cBRED}) config NOT found?....skipping $ACTION request\n"$cRESET   2>&1  # v1.09
                     fi
                 done
+
+                # Temporary WebUI hack
+                Export_Peer "export" "wg11"
+                nvram commit
 
             WG_show
             ;;
@@ -2651,14 +2689,14 @@ Manage_RPDB_rules() {
             fi
         fi
 
-        [ -z "$IFACE" ] && IFACE="VPN"
-        [ -z "$SRC" ] && SRC="Any"
-        [ -z "$DST" ] && DST="Any"
+        [ -z "$IFACE" ] && local IFACE="VPN"
+        [ -z "$SRC" ] && local SRC="Any"
+        [ -z "$DST" ] && local DST="Any"
     else
         #Check if valid SRC/DST format
-        [ -z "$IFACE" ] && IFACE="VPN"
-        [ -z "$SRC" ] && SRC="Any"
-        [ -z "$DST" ] && DST="Any"
+        [ -z "$IFACE" ] && local IFACE="VPN"
+        [ -z "$SRC" ] && local SRC="Any"
+        [ -z "$DST" ] && local DST="Any"
 
         case $SRC in
             Any)
@@ -2732,6 +2770,7 @@ Manage_RPDB_rules() {
             fi
         ;;
         del)
+            [ -z "$ROW" ] && local ROW="all"                    #v4.17
             if [ "$ROW" != "all" ];then
                 sqlite3 $SQL_DATABASE "DELETE FROM policy WHERE rowid='$ROW';"
                 echo -e $cBGRE"\n\t[✔] RPDB Selective Routing rule for $WG_INTERFACE DELETED\n"$cRESET  2>&1
@@ -3125,7 +3164,7 @@ Manage_VPNDirector_rules() {
                 echo -e $cBCYA"\n\tVPN Director Selective Routing RPDB rules\n"$cRESET 2>&1
                 sqlite3 $SQL_DATABASE "SELECT rowid,peer,iface,srcip,dstip,tag FROM policy WHERE tag LIKE 'VPN Director:%' ORDER BY iface DESC;" |column -t  -s '|' --table-columns ID,Peer,Interface,Source,Destination,Description 2>&1 # v4.13
             else
-                echo -en $cRED"\a\n\tNo WirGuard VPN Director Policy rules found\n"$cRESET 2>&1
+                echo -en $cRED"\a\n\tNo WireGuard® VPN Director Policy rules found\n"$cRESET 2>&1
             fi
         ;;
         delete|flush)
@@ -3433,6 +3472,11 @@ TrimDB 99
 #     Use command 'vx' to edit this setting
 INITDELAY 20s
 
+# Enable WebUI
+#     Use command 'vx' to edit this setting
+WEBUI
+
+
 EOF
 
     if [ -f ${INSTALL_DIR}WireguardVPN.conf ];then
@@ -3680,6 +3724,7 @@ Get_scripts() {
     download_file ${INSTALL_DIR} wg_server martineau $BRANCH dos2unix 777
     download_file ${INSTALL_DIR} UDP_Updater.sh martineau $BRANCH dos2unix 777
     download_file ${INSTALL_DIR} wg_ChkEndpointDDNS.sh martineau $BRANCH dos2unix 777           # v4.15
+    download_file ${INSTALL_DIR} wg_manager.asp martineau $BRANCH dos2unix              # v4.17
 
     chmod +x ${INSTALL_DIR}wg_manager.sh
     chmod +x ${INSTALL_DIR}wg_client
@@ -3924,6 +3969,10 @@ Show_Info() {
 
     [ "$(which wg)" == "/opt/bin/wg" ] && Check_Module_Versions "report"
 
+    if [ -f /tmp/menuTree.js ] && [ -n "$(grep -i "WireGuard® Manager" /tmp/menuTree.js)" ];then
+        echo -e $cBGRE"\n\t[✔]${cBWHT} WebUI Addon Enabled"$cRESET          # v4.17
+    fi
+
     echo -e $cRESET
     DNSmasq_Listening_WireGuard_Status
 
@@ -3985,7 +4034,7 @@ Show_Info() {
     local WAN_IF=$(Get_WAN_IF_Name)                                             # v4.11
     local VAL=$(cat /proc/sys/net/ipv4/conf/$WAN_IF/rp_filter)                  # v4.11
     [ "$VAL" == "1" ] && STATE="ENABLED" || STATE="${cBRED}DISABLED${cBGRE}"    # v4.11
-    echo -e $cBGRE"\n\t[ℹ ] ${cBWHT}Reverse Path Filtering${cBGRE} $STATE\n"$cRESET            # v4.11
+    echo -e $cBGRE"\n\t[✔] ${cBWHT}Reverse Path Filtering${cBGRE} $STATE\n"$cRESET            # v4.11
 
     if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOTCPMSS" ${INSTALL_DIR}WireguardVPN.conf)" ];then   # v4.12 v4.11
         echo -e $cBRED"\t[✖]${cBWHT} 'NOTCPMSS' specified, TCP clamping to PMTU (-t mangle '--tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu')$cBRED DISABLED$cRESET" # v4.12
@@ -4043,6 +4092,14 @@ exit_message() {
             echo -e $cBWHT"Bye!"
         fi
         echo -e $cRESET
+
+        if [ -n "$WEBUI_COLOUR_REINSTATE" ];then                            # v4.17
+            if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOCOLOUR|NOCOLOR" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                sed -i 's/^NOCOLOR/#NOCOLOR/' ${INSTALL_DIR}WireguardVPN.conf   # v4.17
+                SayT "***DEBUG Service_Event: Execution - ANSI colour Escape sequences ENABLED ($CALL_REQUEST)"
+            fi
+        fi
+
         exit $CODE
 }
 Install_WireGuard_Manager() {
@@ -4068,6 +4125,9 @@ Install_WireGuard_Manager() {
 
     # Amtm
     # mkdir -p /jffs/addons/wireguard
+
+    mkdir -p /www/user/wireguard        # WebUI v4.17
+
     if [ -d /opt/etc/ ];then
         # Legacy pre v2.03 install?
         if [ -d /opt/etc/wireguard ];then
@@ -4284,6 +4344,7 @@ Uninstall_WireGuard() {
     Edit_DNSMasq "del"                  # v1.12
 
     Unmount_WebUI $SCRIPT_NAME".asp"    # v4.15
+    rm -rf /www/user/wireguard          # WebUI v4.17
 
     echo -e $cBGRE"\n\tWireGuard® Uninstall complete for $HARDWARE_MODEL (v$BUILDNO)\n"$cRESET
 
@@ -4720,18 +4781,23 @@ Diag_Dump() {
     local TABLE=$2;shift 2
     local REST=$@
 
-    if [ -z "$TYPE" ] || [ "$TYPE" == "route" ] || [ "$TYPE" == "rpdb" ];then
-
+    if [ -z "$TYPE" ] || [ "$TYPE" == "peers" ];then     # v4.17
         echo -e $cBYEL"\n\tWireGuard® VPN Peers"$cRESET
         Show_Peer_Config_Entry
+    fi
 
+    if [ -z "$TYPE" ] || [ "$TYPE" == "route" ];then                  # v4.17
         [ "$IPV6ONLY" == "N" ] && Diag_Routes "4"
         [ "$(nvram get ipv6_service)" != "disabled" ] && Diag_Routes "6"
+    fi
 
+    if [ -z "$TYPE" ] || [ "$TYPE" == "rpdb" ];then                  # v4.17
         [ "$IPV6ONLY" == "N" ] && Diag_Rules "4"
         [ "$(nvram get ipv6_service)" != "disabled" ] && Diag_Rules "6"
 
+    fi
 
+    if [ -z "$TYPE" ] || [ "$TYPE" == "misc" ];then  # v4.17
         echo -e $cBYEL"\n\tDEBUG: Netstat\n"$cRESET
         netstat -rn | grep -E "wg.|Kernel|irtt"
         [ "$(nvram get ipv6_service)" != "disabled" ] && netstat -arn | grep -F ":"
@@ -4741,7 +4807,6 @@ Diag_Dump() {
             netstat -lnp | grep -e "^udp\s.*\s-$"
         fi
     fi
-
 
     if [ -z "$TYPE" ] || [ "$TYPE" == "firewall" ];then
         [ "$IPV6ONLY" == "N" ] && Diag_IPTables "4"
@@ -4795,7 +4860,7 @@ Diag_Dump() {
                     pol*)
                         TABLE="policy"
                         echo -e $cBYEL"\tTable:$TABLE"$cBCYA 2>&1
-                        sqlite3 $SQL_DATABASE "SELECT * FROM $TABLE;" | column -t  -s '|' --table-columns Peer,Interface,Source,Destination,Description
+                        sqlite3 $SQL_DATABASE "SELECT * FROM $TABLE ORDER BY peer ASC;" | column -t  -s '|' --table-columns Peer,Interface,Source,Destination,Description
                     ;;
                     dev*)
                         TABLE="devices"
@@ -4805,7 +4870,7 @@ Diag_Dump() {
                     ips*)
                         TABLE="ipset"
                         echo -e $cBYEL"\tTable:$TABLE"$cBCYA 2>&1
-                        sqlite3 $SQL_DATABASE "SELECT * FROM $TABLE;" | column -t  -s '|' --table-columns IPSet,Use,Peer,FWMark,DST/SRC
+                        sqlite3 $SQL_DATABASE "SELECT * FROM $TABLE  ORDER BY ipset ASC;" | column -t  -s '|' --table-columns IPSet,Use,Peer,FWMark,DST/SRC
                     ;;
                     fwm*)
                         TABLE="fwmark"
@@ -4815,17 +4880,17 @@ Diag_Dump() {
                     serv*)
                         TABLE="servers"
                         echo -e $cBYEL"\tTable:$TABLE"$cBCYA 2>&1
-                        sqlite3 $SQL_DATABASE "SELECT * FROM $TABLE;" | column -t  -s '|' --table-columns Peer,Auto,Subnet,Port,Public,Private,Description  # v4.12
+                        sqlite3 $SQL_DATABASE "SELECT * FROM $TABLE ORDER BY peer ASC;" | column -t  -s '|' --table-columns Peer,Auto,Subnet,Port,Public,Private,Description  # v4.12
                     ;;
                     client*)
                         TABLE="clients"
                         echo -e $cBYEL"\tTable:$TABLE"$cBCYA 2>&1
-                        sqlite3 $SQL_DATABASE "SELECT * FROM $TABLE;" | column -t  -s '|' --table-columns Peer,Auto,IP,Endpoint,DNS,MTU,Public,Private,Description  # v4.12
+                        sqlite3 $SQL_DATABASE "SELECT * FROM $TABLE ORDER BY peer ASC;" | column -t  -s '|' --table-columns Peer,Auto,IP,Endpoint,DNS,MTU,Public,Private,Description  # v4.12
                     ;;
                     passthru*)                                      # v4.12
                         TABLE="passthru"
                         echo -e $cBYEL"\tTable:$TABLE"$cBCYA 2>&1
-                        sqlite3 $SQL_DATABASE "SELECT * FROM $TABLE;" | column -t  -s '|' --table-columns Server,Client,Passthru    # v4.12
+                        sqlite3 $SQL_DATABASE "SELECT * FROM $TABLE ORDER BY peer ASC;" | column -t  -s '|' --table-columns Server,Client,Passthru    # v4.12
                     ;;
                     *)
                         [ "$TABLE" != "?" ] && echo -en $cBRED"\a\tInvalid SQL table ${cBWHT}'$TABLE'\n\n"
@@ -4930,7 +4995,8 @@ Diag_Routes() {
     fi
 
     echo -e $cBYEL"\n\tDEBUG: $IPVER Routing info MTU etc.\n"$cBCYA 2>&1      # v1.07
-    ip $DASH6 a l $WG_INTERFACE                                # v1.07
+    #ip $DASH6 a l $WG_INTERFACE                                # v1.07
+    ip $DASH6 a | grep -E "wg."
 
     echo -e $cBYEL"\n\tDEBUG: $IPVER Routing Table main\n"$cBCYA 2>&1
     ip $DASH6 route | grep -E "wg."
@@ -5754,7 +5820,7 @@ EOF
         done
 
     [ -n "$NAME_ONE" ] && local JOIN_TXT=" and " || JOIN_TXT=
-    echo -e $cBGRE"\n\tWireGuard Site-to-Site Peers ${cBMAG}${NAME_ONE}${JOIN_TXT}${NAME_TWO}${cBGRE} created\n"$cRESET
+    echo -e $cBGRE"\n\tWireGuard® Site-to-Site Peers ${cBMAG}${NAME_ONE}${JOIN_TXT}${NAME_TWO}${cBGRE} created\n"$cRESET
 
     echo -en "\n\tCopy ${cBMAG}${NAME_TWO}/${NAME_ONE}${cRESET} files: "$cBCYA
 
@@ -6046,7 +6112,7 @@ Process_User_Choice() {
             z|uninstall)
 
                 local ANS=
-                local WG_TXT="WireGuard/WireGuard Manager"
+                local WG_TXT="WireGuard®/WireGuard Manager"
                 [ -f /usr/sbin/wg ] && local WG_TXT="WireGuard Manager"     # WireGuard's in firmware; can't be removed
                 echo -e "\n\tPress$cBRED Y$cRESET to$cBRED Remove $WG_TXT ${cRESET}or press$cBGRE [Enter] to cancel request." # v4.14  @ZebMcKayhan
                 read -r "ANS"
@@ -6477,8 +6543,6 @@ Process_User_Choice() {
             ;;
             www" "*|www)                        # v4.15       www [ [ {on | off | mount | unmount} ] [rom] ]
 
-                local PAGE=$SCRIPT_NAME".asp"
-
                 local ACTION=$2
                 local PAGES=$3
 
@@ -6486,15 +6550,35 @@ Process_User_Choice() {
 
                 [ "$PAGES" == "rom" ] && { local PAGES="Advanced_WireguardClient_Content.asp Advanced_WireguardServer_Content.asp Advanced_VPN_OpenVPN.asp"; local INTERNAL_PAGE="internal ROM"; }
 
+                [ -z "$PAGES" ] && local PAGES=${SCRIPT_NAME%.*}".asp"
+
+                [ -z "$(echo $PAGES | grep -E ".asp$")" ] && PAGES=$PAGES".asp"
+
                 case "$ACTION" in
-                    mount|on)
+                    mount|mountX|on|m)
                         echo -e $cBGRE
                         if [ -z "$INTERNAL_PAGE" ];then
-                            Mount_WebUI "${PAGE}"
+                            if [ "$PAGES" == "${SCRIPT_NAME%.*}.asp" ];then
+                                if [ ! -f /tmp/menuTree.js ] || { [ -f /tmp/menuTree.js ] && [ -z "$(grep -i "WireGuard® Manager" /tmp/menuTree.js)" ] ;} ;then
+                                    Mount_WebUI "${PAGES}"
+                                    [ -z "$(grep -i wireguard /jffs/scripts/service-event)" ] && echo -e "if echo \"\$2\" | /bin/grep -q \"wg_manager\"; then { /jffs/addons/wireguard/wg_manager.sh service_event \"\$@\" & }; fi # WireGuard WebUI" >> /jffs/scripts/service-event    # v4.17
+                                else
+                                    echo -en $cRED"\a\n\t***ERROR: WebUI TAB (${cBWT}'$PAGES') ${cBRED}already mounted!\n"$cRESET
+                                fi
+                            fi
+
+                                Manage_WebUI_API "INIT"          # v4.17
+
+                            if [ "$ACTION" == "mountX" ] || [ "$ACTION" == "mX" ];then
+                                service restart_httpd >/dev/null        # WebUI v4.17
+                                echo -e $cBGRE"\t[✔]${cBWHT} Restarted service_httpd for WebUI"$cRESET
+                                SayT "Restarted service_httpd"
+                            fi
+
                         else
 
-                            LOCKFILE=/tmp/addonwebui.lock
-                            FD=386
+                            local LOCKFILE=/tmp/addonwebui.lock
+                            local FD=386
                             eval exec "$FD>$LOCKFILE"
                             flock -x "$FD"
 
@@ -6510,23 +6594,26 @@ Process_User_Choice() {
                                 done
 
                             # ************************************** Temporary *********************************************
-                            sed -i '/Advanced_WireguardClient_Content.asp/s~__INHERIT__.*$~WireGuard© Client"},\t/\*Martineau Hack\*/~' /tmp/menuTree.js
-                            sed -i '/Advanced_WireguardServer_Content.asp/s~__INHERIT__.*$~WireGuard© Server"},\t/\*Martineau Hack\*/~'  /tmp/menuTree.js
-                            echo -e $cBRED"\tAdvancedWireGuard[Client|Server] /tmp/menuTree.js Martineau Hack!"$cRESET
-                            SayT "AdvancedWireGuard[Client|Server] /tmp/menuTree.js Martineau Hack!"
+                            if [ "$INTERNAL_PAGE" = "internal ROM" ];then
+                                sed -i '/Advanced_WireguardClient_Content.asp/s~__INHERIT__.*$~WireGuard Client"},\t/\*Martineau Hack\*/~' /tmp/menuTree.js
+                                sed -i '/Advanced_WireguardServer_Content.asp/s~__INHERIT__.*$~WireGuard Server"},\t/\*Martineau Hack\*/~'  /tmp/menuTree.js
+                                echo -e $cBRED"\tAdvancedWireGuard®[Client|Server] /tmp/menuTree.js Martineau Hack!"$cRESET
+                                SayT "AdvancedWireGuard®[Client|Server] /tmp/menuTree.js Martineau Hack!"
+                            fi
                             # ************************************** Temporary *********************************************
 
                             flock -u "$FD"
                         fi
+
                         echo -e $cRESET
                     ;;
-                    unmount|off)
+                    unmount|off|u)
                         echo -e $cBGRE
                         if [ -z "$INTERNAL_PAGE" ];then
-                            Unmount_WebUI "${PAGE}"
+                            Unmount_WebUI "${PAGES}"
                         else
-                            LOCKFILE=/tmp/addonwebui.lock
-                            FD=386
+                            local LOCKFILE=/tmp/addonwebui.lock
+                            local FD=386
                             eval exec "$FD>$LOCKFILE"
                             flock -x "$FD"
 
@@ -6538,24 +6625,29 @@ Process_User_Choice() {
                                         SayT "Custom '${INSTALL_DIR}${PAGE}' page unmounted"
                                     fi
                                 done
-
-                            sed -i '/Advanced_WireguardClient_Content.asp/s/WireGuard© Client\"\},.*$/__INHERIT__\"},/' /tmp/menuTree.js
-                            sed -i '/Advanced_WireguardServer_Content.asp/s/WireGuard© Server\"\},.*$/__INHERIT__\"},/' /tmp/menuTree.js
-                            echo -e $cBGRE"\tAdvancedWireGuard[Client|Server] /tmp/menuTree.js Martineau Hack ${cBRED}DELETED!"$cRESET
-                            SayT "AdvancedWireGuard[Client|Server] /tmp/menuTree.js Martineau Hack DELETED"
+                            if [ "$INTERNAL_PAGE" = "internal ROM" ];then
+                                sed -i '/Advanced_WireguardClient_Content.asp/s/WireGuard Client\"\},.*$/__INHERIT__\"},/' /tmp/menuTree.js
+                                sed -i '/Advanced_WireguardServer_Content.asp/s/WireGuard Server\"\},.*$/__INHERIT__\"},/' /tmp/menuTree.js
+                                echo -e $cBGRE"\tAdvancedWireGuard®[Client|Server] /tmp/menuTree.js Martineau Hack ${cBRED}DELETED!"$cRESET
+                                SayT "AdvancedWireGuard®[Client|Server] /tmp/menuTree.js Martineau Hack DELETED"
+                            fi
 
                             flock -u "$FD"
                         fi
+
+                        [ -n "$(grep -i wireguard /jffs/scripts/service-event)" ] && sed -i '/WireGuard/d' /jffs/scripts/service-event      # v4.17
+
                         echo -e $cRESET
                     ;;
                     debug)
                         echo -e $cRESET
+                        [ -f $installedMD5File ] && echo -e $cBGRE"\t[✔]${cBWHT}WebUI installed $cBMAG'$installedMD5File' ($(cat $installedMD5File))\n"$cRESET
                         df | grep -E "/www/|File"
                         echo -e $cBCYA
-                        ls -lh /www/ext/user*.* | sort -k 8 ;echo -e $cRESET;grep -THE "user[1-9]\." /tmp/menuTree.js | sort -k 3
+                        ls -lh /www/ext/user*.* | sort -k 9 ;echo -e $cRESET;grep -THE "user[1-9]\." /tmp/menuTree.js | sort -k 3
                     ;;
                     *)
-                        echo -en $cRED"\a\n\t***ERROR: Invalid arg $cBWHT'"$ACTION"'$cBRED for GUI TAB - valid 'mount' or 'unmount' only!\n"$cRESET
+                        echo -en $cRED"\a\n\t***ERROR: Invalid arg $cBWHT'"$ACTION"'$cBRED for WebUI TAB - valid 'mount' or 'unmount' only!\n"$cRESET
                     ;;
                 esac
 
@@ -6844,36 +6936,45 @@ Purge_Database() {
 
 }
 Get_WebUI_Installed() {
-    md5_installed="0"
+    local md5_installed="0"
     if [ -f $installedMD5File ]; then
-        md5_installed="$(cat $installedMD5File)"
+        local md5_installed="$(cat $installedMD5File)"
     fi
+    echo $md5_installed
 }
 Get_WebUI_Page(){
-    MyPage="none"
+    local MyPage="none"
     for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
         page="/www/user/user$i.asp"
-        if [ -f "$page" ] && [ "$(md5sum < "$1")" = "$(md5sum < "$page")" ]; then
-            MyPage="user$i.asp"
-            return
+        #if [ -f "$page" ] && [ "$(md5sum < "$1")" = "$(md5sum < "$page")" ]; then
+        if [ -f "$page" ] && [ "$2" = "$(md5sum < "$page")" ]; then
+            local MyPage="user$i.asp"
+            #return
         elif [ "$MyPage" = "none" ] && [ ! -f "$page" ]; then
-            MyPage="user$i.asp"
+            local MyPage="user$i.asp"
         fi
     done
+
+    echo $MyPage
 }
 Mount_WebUI(){
     if nvram get rc_support | grep -qF "am_addons"; then
 
         local PAGE=$1                                                       # Martineau Hack
 
+        if [ ! -f ${SCRIPT_DIR}/$PAGE ];then
+            echo -e $cBRED"\a\tUnable to mount WebUI page; $cBWHT'${SCRIPT_DIR}/$PAGE' ${cBRED}doesn't exist!"$cRESET
+            return 1
+        fi
+
         ### locking mechanism code credit to Martineau (@MartineauUK) ###
-        LOCKFILE=/tmp/addonwebui.lock
-        FD=386
+        local LOCKFILE=/tmp/addonwebui.lock
+        local FD=386
         eval exec "$FD>$LOCKFILE"
         flock -x "$FD"
 
-        Get_WebUI_Installed
-        Get_WebUI_Page "$SCRIPT_DIR/$PAGE" "$md5_installed"                         # Martineau Hack
+        local md5_installed=$(Get_WebUI_Installed)
+        local MyPage=$(Get_WebUI_Page "$SCRIPT_DIR/$PAGE" "$md5_installed")         # Martineau Hack
         if [ "$MyPage" = "none" ]; then
             echo -e $cBRED"\aUnable to mount $SCRIPT_NAME WebUI page, exiting"$cRESET
             flock -u "$FD"
@@ -6883,8 +6984,9 @@ Mount_WebUI(){
         echo -en $cBRED                                                             # Martineau Hack
 
         cp -f "$SCRIPT_DIR/$PAGE" "$SCRIPT_WEBPAGE_DIR/$MyPage"                     # Martineau Hack
+        sed -i "s/${SCRIPT_NAME%.*}.asp/$MyPage/g" $SCRIPT_WEBPAGE_DIR/$MyPage      # Martineau Hack
         #echo "Saving MD5 of installed file $SCRIPT_DIR/$PAGE to $installedMD5File" # Martineau Hack
-        md5sum < "$SCRIPT_DIR/$PAGE" > $installedMD5File                            # Martineau Hack
+        md5sum < /www/user/$MyPage > $installedMD5File                              # Martineau Hack
 
         if [ ! -f "/tmp/index_style.css" ]; then
             cp -f "/www/index_style.css" "/tmp/"
@@ -6914,15 +7016,18 @@ Mount_WebUI(){
         if ! grep -q "javascript:var helpwindow=window.open('/ext/shared-jy/redirect.htm'" /tmp/menuTree.js ; then
             sed -i "s~ext/shared-jy/redirect.htm~javascript:var helpwindow=window.open('/ext/shared-jy/redirect.htm','_blank')~" /tmp/menuTree.js
         fi
-        sed -i "/url: \"javascript:var helpwindow=window.open('\/ext\/shared-jy\/redirect.htm'/i {url: \"$MyPage\", tabName: \"WireGuard Manager\"}," /tmp/menuTree.js
+        sed -i "/url: \"javascript:var helpwindow=window.open('\/ext\/shared-jy\/redirect.htm'/i {url: \"$MyPage\", tabName: \"WireGuard® Manager\"}," /tmp/menuTree.js
 
         umount /www/require/modules/menuTree.js 2>/dev/null
         mount -o bind /tmp/menuTree.js /www/require/modules/menuTree.js
 
-        echo -e $cBGRE"\t$SCRIPT_NAME WebUI page mounted as $cRESET'"$MyPage"'"     # Martineau Hack
-        SayT "$SCRIPT_NAME WebUI page mounted as $cRESET'"$MyPage"'"                # Martineau Hack
+        echo -e $cBGRE"\tWebUI page ('$PAGE') mounted as $cRESET'"$MyPage"'"     # Martineau Hack
+        SayT "WebUI page ('$PAGE') mounted as $cRESET'"$MyPage"'"    # Martineau Hack
 
         flock -u "$FD"
+
+        [ -z "$(grep -i wireguard /jffs/scripts/service-event)" ] && echo -e "if echo \"\$2\" | /bin/grep -q \"wg_manager\"; then { /jffs/addons/wireguard/wg_manager.sh service_event \"\$@\" & }; fi # WireGuard WebUI" >> /jffs/scripts/service-event    # v4.17
+        Manage_WebUI_API "INIT"                 # v4.17
     fi
 }
 Unmount_WebUI(){
@@ -6930,14 +7035,14 @@ Unmount_WebUI(){
     local PAGE=$1                                                       # Martineau Hack
 
     ### locking mechanism code credit to Martineau (@MartineauUK) ###
-    LOCKFILE=/tmp/addonwebui.lock
-    FD=386
+    local LOCKFILE=/tmp/addonwebui.lock
+    local FD=386
     eval exec "$FD>$LOCKFILE"
     flock -x "$FD"
 
-    Get_WebUI_Installed
-    Get_WebUI_Page "$SCRIPT_DIR/$PAGE" "$md5_installed"                 # Martineau Hack
-    if [ "$md5_installed" != "0" ];then                                 # Martineau Hack
+    [ -f $installedMD5File ] && local md5_installed=$(cat $installedMD5File)
+    local MyPage=$(Get_WebUI_Page "$SCRIPT_DIR/$PAGE" "$md5_installed") # Martineau Hack
+    if [ -f $installedMD5File ] && [ "$md5_installed" != "0" ];then     # Martineau Hack
         #echo "$MyPage"                                                 # Martineau Hack
         if [ -n "$MyPage" ] && [ "$MyPage" != "none" ] && [ -f "/tmp/menuTree.js" ]; then
             sed -i "\\~$MyPage~d" /tmp/menuTree.js
@@ -6947,12 +7052,12 @@ Unmount_WebUI(){
             rm -rf "$SCRIPT_WEBPAGE_DIR/$MyPage"
             #rm -rf "${SCRIPT_WEBPAGE_DIR:?}/$MyPage"
 
-            rm -rf "$SCRIPT_WEB_DIR"
-            echo -e $cBGRE"\t$SCRIPT_NAME WebUI page $cRESET'"$MyPage"'${cBGRE} unmounted${cRESET}"     # Martineau Hack
-            SayT "$SCRIPT_NAME WebUI page $cRESET'"$MyPage"' unmounted" # Martineau Hack
+            rm -rf "${SCRIPT_WEB_DIR}"
+            echo -e $cBGRE"\tWebUI page $cRESET'"$MyPage"' ${cBGRE}('$PAGE') unmounted${cRESET}"     # Martineau Hack
+            SayT "WebUI page $cRESET'"$MyPage"' '$PAGE') unmounted" # Martineau Hack
         fi
     else
-        echo -e $cRED"\a\t$SCRIPT_NAME WebUI page not mounted! $cRESET" # Martineau Hack
+        echo -e $cRED"\a\tWebUI page '$PAGE' not mounted! $cRESET" # Martineau Hack
     fi
 
     rm "$installedMD5File" 2>/dev/null                                  # Martineau Hack
@@ -7460,6 +7565,40 @@ Raw_config() {
     fi
 
 }
+
+# Function to create Javascript function to pass data between WebUI and script; courtesy of @Juched's '/jffs/addons/unbound/unbound_stats.sh'       # v4.17
+# For small data, it can be passed as a Base64 string using RMerlins API https://github.com/RMerl/asuswrt-merlin.ng/wiki/Addons-API
+#    e.g. 'am_settings_set setting_name new_value'
+# but this method will/should handle multiple lines totalling more than the 2999 char limit?
+WriteFile_ToJS(){
+    # e.g.
+    [ -f $2 ] && rm -f "$2"
+    echo "function $3(){" >> "$2"                                   # FunctionName()
+    local html='document.getElementById("'"$4"'").innerHTML="'      # id=
+    while IFS='' read -r line || [ -n "$line" ]; do
+        local html="$html""$line""\\r\\n"
+    done < "$1"                                                     # Filename to be encoded
+    local html="$html"'"'
+    printf "%s\\r\\n}\\r\\n" "$html" >> "$2"                        # FunctionFile.js
+}
+Manage_WebUI_API() {
+
+    local FN="/tmp/wgm_Data.txt"                            # v4.17
+
+    if [ "$1" == "INIT" ];then
+        echo "Responses from wgm will be displayed HERE" > $FN
+    else
+        echo "Reset" > $FN
+    fi
+
+    mkdir -p /www/user/wireguard                            # WebUI v4.17
+
+    local ENCODEDBASE64=$(cat $FN | openssl base64 -e -A)   # Best for <2999 chars  # v4.17
+    am_settings_set wgm_Execute_Result $ENCODEDBASE64       # v4.17
+    WriteFile_ToJS "$FN" "${SCRIPT_WEB_DIR}/ExecuteResults.js" "ShowExecuteResults" "wgm_ExecuteResults"    # v4.17
+    WriteFile_ToJS "$FN" "${SCRIPT_WEB_DIR}/ExecutedTS.js"     "ShowExecutedTS"     "wgm_ExecutedTS"        # v4.17
+
+}
 #For verbose debugging, uncomment the following two lines, and uncomment the last line of this script
 #set -x
 #(
@@ -7471,6 +7610,24 @@ PATH=/opt/sbin:/opt/bin:/opt/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/u
 if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -z "$(grep -E "^NOCOLOR|^NOCOLOUR" ${INSTALL_DIR}WireguardVPN.conf)" ];then     # v4.15
     ANSIColours
 fi
+
+# Service_event initiated request call?
+if [ "$1" == "nocolour_output" ] || [ "$1" == "service_event" ];then            # v4.17
+    CALL_REQUEST=$1
+    [ "$1" == "nocolour_output" ] && shift
+    # Remember to reinstate ANSI colour Escape sequences if they are currently ENABLED
+    if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^#NOCOLOUR|#NOCOLOR" ${INSTALL_DIR}WireguardVPN.conf)" ];then # v4.17
+        WEBUI_COLOUR_REINSTATE="$CALL_REQUEST"  # v4.17
+        SayT "***DEBUG Service_Event: Execution - ANSI colour Escape sequences will be RENABLED on script ($CALL_REQUEST) Termination"
+    fi
+
+    # THis execution request MUST run without ANSI colour Escape sequences
+    # Ensure wg_client/wg_server also suppress the ANSI colour Escape sequences
+    sed -i 's/^#NOCOLOR/NOCOLOR/' ${INSTALL_DIR}WireguardVPN.conf   # v4.17
+    ANSIColours "disable"
+    SayT "***DEBUG Service_Event: Execution - ANSI colour Escape sequences DISABLED"
+fi
+
 # shellcheck disable=SC2034
 FIRMWARE=$(echo $(nvram get buildno) | awk 'BEGIN { FS = "." } {printf("%03d%02d",$1,$2)}')
 HARDWARE_MODEL=$(Get_Router_Model)
@@ -7507,6 +7664,33 @@ TS=$(date +"%Y%m%d-%H%M%S")    # current date and time 'yyyymmdd-hhmmss'
 ACTION=$1
 PEER=$2
 NOPOLICY=$3
+
+# Update GUI variables if the firmware support addons?
+source /usr/sbin/helper.sh
+
+# As per RMerlin Wiki https://github.com/RMerl/asuswrt-merlin.ng/wiki/Addons-API    #
+nvram get rc_support | grep -q am_addons                                            # v4.17
+if [ $? != 0 ];then
+    echo -e $cRED"\n\t[✖] $HARDWARE_MODEL firmware $FIRMWARE $BUILDNO doesn't support Addons"$cRESET    # v4.17
+    SayT "${cBRED}[✖] $HARDWARE_MODEL firmware $FIRMWARE $BUILDNO doesn't support Addons${cRESET}"      # v4.17
+    exit 5
+else
+    WGKERNEL=$(opkg list-installed | grep "wireguard-kernel" | awk '{print $3}' | sed 's/\-.*$//')      # v4.17
+    WGTOOLS=$(opkg list-installed | grep "wireguard-tools" | awk '{print $3}' | sed 's/\-.*$//')        # v4.17
+    USE_ENTWARE_KERNEL_MODULE="N"                                     # v4.12
+    if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -oE "^USE_ENTWARE_KERNEL_MODULE" ${INSTALL_DIR}WireguardVPN.conf)" ];then     # v4.17
+        USE_ENTWARE_KERNEL_MODULE="Y"                                       # v4.17
+    fi
+
+    if [ -f /usr/sbin/wg ] && [ "$USE_ENTWARE_KERNEL_MODULE" == "N" ];then  # v4.17
+        FPATH=$(modprobe --show-depends wireguard | awk '{print $2}')       # v4.17
+        WGKERNEL=$(strings $FPATH | grep "^version" | cut -d'=' -f2)        # v4.17
+    fi
+
+    am_settings_set wgm_version $VERSION                                    # v4.17
+    am_settings_set wgm_Kernel $WGKERNEL                                    # v4.17
+
+fi
 
 #[ -f /usr/sbin/helper.sh ] && source /usr/sbin/helper.sh                                  # v 4.12 v2.07 Required for external 'am_settings_set()/am_settings_get()'
 #Say $SHELL
@@ -7554,7 +7738,7 @@ if [ "$1" != "install" ];then   # v2.01
         if [ -d /opt/etc/wireguard ] && [ "$(ls -1 /opt/etc/wireguard | wc -l)" -gt "5" ];then
 
             echo -e $cBRED"\a\n\tWireGuard® Session Manager v3.0 requires '${CONFIG_DIR}'\n\n\t${cBWHT}Do you want to rename '/opt/etc/wireguard' to '${CONFIG_DIR}' ?"
-            echo -e "\tPress$cBRED y$cRESET to$cBRED auto-migrate to WireGuard Session Manager v3.0${cRESET} or press$cBGRE [Enter] to SKIP."
+            echo -e "\tPress$cBRED y$cRESET to$cBRED auto-migrate to WireGuard® Session Manager v3.0${cRESET} or press$cBGRE [Enter] to SKIP."
                 read -r "ANS"
                 if [ "$ANS" == "y" ];then
 
@@ -7602,6 +7786,82 @@ if [ "$1" != "install" ];then   # v2.01
         echo -e $cRESET                     # v4.15
         exit 0                              # v4.15
     fi
+
+    if [ "$1" == "service_event" ];then     # v4.17
+#set -x
+#(
+        SayT "WebUI Service_Event Request: $@"
+
+        # As per RMerlin Wiki https://github.com/RMerl/asuswrt-merlin.ng/wiki/Addons-API
+        nvram get rc_support | grep -q am_addons                                        # v4.17
+        if [ $? != 0 ];then
+            echo -e $cRED"\n\t[✖] $HARDWARE_MODEL firmware $FIRMWARE $BUILDNO doesn't support Addons"$cRESET    # v4.17
+            SayT "${cBRED}[✖] $HARDWARE_MODEL firmware $FIRMWARE $BUILDNO doesn't support Addons${cRESET}"      # v4.17
+            exit 5
+        else
+            WEBUI_CMD=$(am_settings_get wgm_Execute)                                    # v4.17
+
+
+
+            if [ -n "$WEBUI_CMD" ];then
+                if [ "${WEBUI_CMD:0:1}" != "#" ];then
+                    SayT "${cBGRE}[✔] WebUI Execute: wgm '$WEBUI_CMD'${cRESET}"     # v4.17
+                    am_settings_set wgm_Execute "#"$WEBUI_CMD                           # v4.17
+
+                    FN="/tmp/wgm_Data.txt"
+
+                    case $WEBUI_CMD in
+                        "?"|list|stop|start|restart|start*|stop*|restart*|trimdb*|import*|diag|diag*|export*)
+                            TS=$(date)
+                            echo -e "$TS" > $FN
+                            am_settings_set wgm_Execute_TS $TS                               # v4.17
+                            WriteFile_ToJS "$FN" "${SCRIPT_WEB_DIR}/ExecutedTS.js" "ShowExecutedTS" "wgm_ExecutedTS"
+
+                            echo -e "$TS\n============================" > $FN
+
+                            # WebUI doesn't interpret ANSI Colour Escape sequences , so suppress them
+                            #SayT "***DEBUG Service_Event: '${INSTALL_DIR}$SCRIPT_NAME $WEBUI_CMD' executing......"  # v4.17
+                            sh ${INSTALL_DIR}$SCRIPT_NAME "nocolour_output" $WEBUI_CMD >> $FN   # v4.17
+                            #SayT "***DEBUG Service_Event: '${INSTALL_DIR}$SCRIPT_NAME $WEBUI_CMD' Terminated."  # v4.17
+                            #SayT "***DEBUG Service_Event: $(wc -c <$FN) characters for 'am_settings_set' API"  # v4.17
+                            am_settings_set wgm_Execute_Len "$(wc -c <$FN)"                         # v4.17
+                            # WebUI - cosmetic, but remove indent i.e. first leading TAB char '\t' from each of the result lines
+                            sed -i -e 's/^\t//' $FN
+
+                            # WebUI - cosmetic, but change to HTML compatible
+                            sed -i 's/✔/\&#10004;/g' $FN
+                            sed -i 's/✖/\X/g' $FN
+                            sed -i 's/®/\&#174;/g' $FN
+                            sed -i 's/©/\&#169;/g' $FN
+                            sed -i 's/ℹ./\&#8226;/g' $FN
+                            sed -i -e 's/\a\n/\n\n/g' $FN
+
+                            ENCODEDBASE64=$(cat $FN| openssl base64 -e -A)  # Best for <2999 chars  # v4.17
+                            am_settings_set wgm_Execute_Result $ENCODEDBASE64                       # v4.17
+                            #SayT "***DEBUG Service_Event: am_settings_set wgm_Execute_Result"      # v4.17
+                            WriteFile_ToJS "$FN" "${SCRIPT_WEB_DIR}/ExecuteResults.js" "ShowExecuteResults" "wgm_ExecuteResults"    # v4.17
+                            #SayT "***DEBUG Service_Event: Function ShowExecuteResult() '${SCRIPT_WEB_DIR}/ExecuteResults.js' created."  # v4.17
+                        ;;
+                        *)
+                            #sh ${INSTALL_DIR}$SCRIPT_NAME $WEBUI_CMD                       # v4.17
+                            SayT "***ERROR Unrecognised command line command via WebUI: '$WEBUI_CMD'...ignored"
+                            echo -e "\n***ERROR Unrecognised command line command via WebUI: '$WEBUI_CMD'...ignored" > $FN
+                            am_settings_set wgm_Execute_Len "$(wc -c <$FN)"                         # v4.17
+                            ENCODEDBASE64=$(cat $FN| openssl base64 -e -A)  # Best for <2999 chars  # v4.17
+                            am_settings_set wgm_Execute_Result $ENCODEDBASE64                       # v4.17
+                            #SayT "***DEBUG Service_Event: am_settings_set wgm_Execute_Result"      # v4.17
+                            WriteFile_ToJS "$FN" "${SCRIPT_WEB_DIR}/ExecuteResults.js" "ShowExecuteResults" "wgm_ExecuteResults"    # v4.17
+                        ;;
+                    esac
+                fi
+            fi
+        fi
+        exit_message
+#) 2>&1 | logger -t $(basename $0)"[$$_***DEBUG]"
+
+    exit 0
+    fi
+
 
     if [ "$NOCHK" == "Y" ] || [ "$(WireGuard_Installed)" == "Y" ];then # v4.12 v2.01
 
@@ -7664,6 +7924,13 @@ if [ "$1" != "install" ];then   # v2.01
                         cru a WireGuard_DB "0 7 * * 6 /jffs/addons/wireguard/wg_manager.sh trimdb $DAYS"        # v4.17 @Cam v4.16
                         SayT "Cron job scheduled 07:00 every Sunday to purge SQL Session/traffic statistics metrics records older than $DAYS days"  # v4.16
                     fi
+
+                    if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^WEBUI" ${INSTALL_DIR}WireguardVPN.conf)" ];then              # v4.17
+                        Mount_WebUI "${SCRIPT_NAME%.*}.asp"     # v4.17
+                    else
+                        Unmount_WebUI "${SCRIPT_NAME%.*}.asp"   # v4.17
+                        Manage_WebUI_API "FLUSH"                # v4.17
+                    fi
                 fi
 
                 # http://www.snbforums.com/threads/beta-wireguard-session-manager.70787/post-688282
@@ -7697,7 +7964,7 @@ if [ "$1" != "install" ];then   # v2.01
                 echo -e $cRESET
                 exit_message
             ;;
-            diag)
+            diag*)
                 Diag_Dump $2                        # Force verbose detail
                 echo -e $cRESET
                 exit_message
@@ -7778,10 +8045,45 @@ if [ "$1" != "install" ];then   # v2.01
                 echo -e $cRESET
                 exit_message
             ;;
+            qrcode*|peer*|create*|ipset*|vpndirector*)
+                echo -e $cBRED"\a\n\tSorry, WireGuard® Manager© WebUI feature command '$1' not yet available.......!\n"$cRESET
+                echo -e $cRESET
+                exit_message
+            ;;
+            export*)                            #v4.17
+                Export_Peer $@
+                echo -e $cRESET
+                exit_message
+            ;;
+            www*)
+
+                ACTION=$2
+
+                echo -e
+
+                case $ACTION in
+                    mount)
+                        Mount_WebUI "${SCRIPT_NAME%.*}.asp"     # v4.17
+                    ;;
+                    unmount)
+                        Unmount_WebUI "${SCRIPT_NAME%.*}.asp"   # v4.17
+                    ;;
+                esac
+                echo -e $cRESET
+                exit_message
+            ;;
+            "")
+            ;;
+            *)
+                # Prevent showing the menu by default for unrecognised reuest!
+                echo -e $cBRED"\a\n\t***ERROR WireGuard® Manager© command request '$1' not recognised!\n"$cRESET
+                echo -e $cRESET     # v4.17
+                exit_message
+            ;;
         esac
     else
         if [ "$1" != "init" ];then              # v4.11
-            SayT "***ERROR WireGuard Manager/WireGuard Tool module 'wg' NOT installed"
+            SayT "***ERROR WireGuard® Tool module 'wg' NOT installed"
             echo -e $cBRED"\a\n\t***ERROR WireGuard® Tool module 'wg' NOT installed\n"$cRESET
             exit_message
         fi
