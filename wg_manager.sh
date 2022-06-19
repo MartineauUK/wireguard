@@ -1,7 +1,7 @@
 #!/bin/sh
     # shellcheck disable=SC2039,SC2155,SC2124,SC2046,SC2027
-VERSION="v4.17bA"
-#============================================================================================ © 2021-2022 Martineau v4.17bA
+VERSION="v4.17b9"
+#============================================================================================ © 2021-2022 Martineau v4.17b9
 #
 #       wgm   [ help | -h ]
 #       wgm   [ { start | stop | restart } [wg_interface]... ]
@@ -3098,22 +3098,15 @@ Manage_VPNDirector_rules() {
 
     local REDISPLAY=0
 
-    local ACTION=$2             # vpndirector [ clone [ 'wan' | 'ovpnc'n [ changeto_vpn_num]] | list | delete [autoreply=y]]
+    local ACTION=$2             # vpndirector [ clone [ 'wan' | 'ovpnc'n [ changeto_vpn_num]]| delete | list]
 
     local FILTER=$3
-
-    local ANS="$(echo "$@" | sed -n "s/^.*autoreply=//p" | awk '{print $1}')"   # v4.17
-
-    [ "$FILTER" == "autoreply=y" ] && local FILTER=
-
     if [ -n "$FILTER" ];then
         local FILTER=$(echo "$FILTER" | tr 'a-z' 'A-Z')
         [ "$FILTER" != "WAN" ] && local FILTER="OVPN"$FILTER
     fi
 
     local WG_INTERFACE=$4
-
-    [ "$WG_INTERFACE" == "autoreply=y" ] && local WG_INTERFACE=
 
     [ -z "$ACTION"  ] && local ACTION="list"
 
@@ -3175,16 +3168,10 @@ Manage_VPNDirector_rules() {
             fi
         ;;
         delete|flush)
-
             if [ "$(sqlite3 $SQL_DATABASE "SELECT COUNT(tag) FROM policy WHERE tag LIKE 'VPN Director:%';")" -gt 0 ];then
                 echo -e $cBCYA"\a\n\tDo you want to DELETE ALL VPN Director Policy rules?"$cRESET 2>&1
                 echo -e "\tPress$cBRED y$cRESET to$cBRED CONFIRM${cRESET} or press$cBGRE [Enter] to SKIP." 2>&1
-
-                if [ -z "$ANS" ];then
-                    read -r "ANS"
-                else
-                    local ANS="y"
-                fi
+                read -r "ANS"
                 if [ "$ANS" == "y" ];then
                     sqlite3 $SQL_DATABASE "DELETE FROM policy WHERE tag LIKE 'VPN Director:%';"
                     echo -e $cBGRE"\n\t[✔] Deleted ALL VPN Director Policy rules\n"$cRESET  2>&1
@@ -7151,8 +7138,6 @@ set +x
 }
 Create_RoadWarrior_Device() {
 
-    [ -n "$(echo "$@" | sed -n "s/^.*autoreply=//p" | awk '{print $1}')"] && local AUTOREPLY="Y"    # v4.17
-
     local DEVICE_NAME=$2
 
     local DEVICE_USE_IPV6="N"                      # v4.16
@@ -7203,9 +7188,6 @@ Create_RoadWarrior_Device() {
                 # Ensure IPv6 address is in standard compressed format
                 #[ -n "$VPN_POOL6" ] && VPN_POOL6="$(IPv6_RFC "$VPN_POOL6")" # v4.15
                 local DEVICE_USE_IPV6="Y"                      # v4.16
-            ;;
-            autoreply*)
-                local AUTOREPLY="Y"             # v4.17
             ;;
         esac
         shift
@@ -7276,8 +7258,8 @@ Create_RoadWarrior_Device() {
                 if [ -z "$ROUTER_DDNS" ];then
                     echo -e $cRED"\a\tWarning: No DDNS is configured!"
                     echo -e $cRESET"\tPress$cBRED y$cRESET to$cBRED use the current WAN IP or enter DDNS name or press$cBGRE [Enter] to SKIP."
-
-                    if [ "$AUTOREPLY" = "Y" ] || [ "$ANS" == "y" ];then             # v4.17
+                    read -r "ANS"
+                    if [ "$ANS" == "y" ];then
                         if [ -z "$(ip route show table main | grep -E "^0\.|^128\.")" ];then
                             ROUTER_DDNS=$(curl -${SILENT} ipecho.net/plain)                     # v3.01
                         else
@@ -7289,15 +7271,15 @@ Create_RoadWarrior_Device() {
                             ROUTER_DDNS="$ANS"
                         fi
                     fi
+
                 fi
 
                 local CREATE_DEVICE_CONFIG="Y"
                 if [ -f ${CONFIG_DIR}${DEVICE_NAME}.conf ];then
                     echo -e $cRED"\a\tWarning: Peer device '${cBMAG}${DEVICE_NAME}${cRED}' WireGuard® config already EXISTS!"
                     echo -e $cRESET"\tPress$cBRED y$cRESET to$cBRED ${aBOLD}CONFIRM${cRESET}${cBRED} Overwriting Peer device '${cBMAG}$DEVICE_NAME.config${cRESET}' or press$cBGRE [Enter] to SKIP."
-                    [ "$AUTOREPLY" != "Y" ] && read -r "ANS"                                    #v4.17
-                        [ "$AUTOREPLY" = "Y" ] || [ "$ANS" != "y" ] && CREATE_DEVICE_CONFIG="N" # v4.17
-                    fi
+                    read -r "ANS"
+                    [ "$ANS" != "y" ] && CREATE_DEVICE_CONFIG="N"
                 fi
 
                 #[ -z "$VPN_POOL_IP" ] && local VPN_POOLS=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM servers WHERE peer='$SERVER_PEER';")
@@ -7476,9 +7458,8 @@ EOF
                 fi
                 if [ "$SITE2SITE_PEER_LAN" != "remoteonly" ];then
                     echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED ADD $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBRED}' ${cRESET}to 'server' Peer (${cBMAG}${SERVER_PEER}${cRESET}) or press$cBGRE [Enter] to SKIP."
-
-                    [ -z "$AUTOREPLY" ] && read -r "ANS"                    # v4.17
-                    if [ "$AUTOREPLY" == "Y" ] || [ "$ANS" == "y" ];then    # v4.17
+                    read -r "ANS"
+                    if [ "$ANS" == "y" ];then
 
                         local PUB_KEY=$(Convert_Key "$PUB_KEY")
                         sed -i -e :a -e '/^\n*$/{$d;N;};/\n$/ba' ${CONFIG_DIR}${SERVER_PEER}.conf       # v4.15 Delete all trailing blank lines from file
@@ -7518,9 +7499,8 @@ PersistentKeepalive = 25
 EOF
 
                     echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED ADD $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBRED}' ${cRESET}to remote 'server' Peer (${cBMAG}${SITE_PEER}${cRESET}) or press$cBGRE [Enter] to SKIP."
-
-                    [ -z "$AUTOREPLY" ] && read -r "ANS"                    # v4.17
-                    if [ "$AUTOREPLY" == "Y" ] || [ "$ANS" == "y" ];then    # v4.17
+                    read -r "ANS"
+                    if [ "$ANS" == "y" ];then
                         sed -i -e :a -e '/^\n*$/{$d;N;};/\n$/ba' ${CONFIG_DIR}${SITE_PEER}.conf     # v4.15 Delete all trailing blank lines from file
                         echo -e >> ${CONFIG_DIR}${SITE_PEER}.conf
                         cat /tmp/${DEVICE_NAME}${SITE_PEER}.conf >> ${CONFIG_DIR}${SITE_PEER}.conf
@@ -7550,12 +7530,8 @@ EOF
                     [ -n "$(wg show interfaces | grep "$SERVER_PEER")" ] && CMD="restart" ||  CMD="start"   # v1.08
                     echo -e $cBWHT"\a\n\tWireGuard® 'server' Peer needs to be ${CMD}ed to listen for 'client' $PEER_TOPOLOGY Peer ${cBMAG}$DEVICE_NAME $TAG"
                     echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer (${cBMAG}${SERVER_PEER}${cRESET}) or press$cBGRE [Enter] to SKIP."
-
-                    [ -z "$AUTOREPLY" ] && read -r "ANS"                    # v4.17
-                    if [ "$AUTOREPLY" == "Y" ] || [ "$ANS" == "y" ];then    # v4.17
-                        Manage_Wireguard_Sessions "$CMD" "$SERVER_PEER"
-                        Show_Peer_Status "show"  # v3.03
-                    fi
+                    read -r "ANS"
+                    [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$SERVER_PEER"; Show_Peer_Status "show"; }  # v3.03
                 fi
 
                 if [ "$SITE2SITE" == "Y" ];then
@@ -7835,7 +7811,7 @@ if [ "$1" != "install" ];then   # v2.01
                     FN="/tmp/wgm_Data.txt"
 
                     case $WEBUI_CMD in
-                        "?"|list|stop|start|restart|start*|stop*|restart*|trimdb*|import*|diag|diag*|export*|vpndirector*)
+                        "?"|list|stop|start|restart|start*|stop*|restart*|trimdb*|import*|diag|diag*|export*)
                             TS=$(date)
                             echo -e "$TS" > $FN
                             am_settings_set wgm_Execute_TS $TS                               # v4.17
@@ -7859,9 +7835,6 @@ if [ "$1" != "install" ];then   # v2.01
                             sed -i 's/©/\&#169;/g' $FN
                             sed -i 's/ℹ./\&#8226;/g' $FN
                             sed -i -e 's/\a\n/\n\n/g' $FN
-                            awk '{sub(/\x07/, "")}1' $FN > /tmp/wgm_txt     # sed can't remove it?
-                            rm $FN
-                            mv /tmp/wgm_txt $FN
 
                             ENCODEDBASE64=$(cat $FN| openssl base64 -e -A)  # Best for <2999 chars  # v4.17
                             am_settings_set wgm_Execute_Result $ENCODEDBASE64                       # v4.17
@@ -8072,7 +8045,7 @@ if [ "$1" != "install" ];then   # v2.01
                 echo -e $cRESET
                 exit_message
             ;;
-            qrcode*|peer*|create*|ipset*)
+            qrcode*|peer*|create*|ipset*|vpndirector*)
                 echo -e $cBRED"\a\n\tSorry, WireGuard® Manager© WebUI feature command '$1' not yet available.......!\n"$cRESET
                 echo -e $cRESET
                 exit_message
@@ -8096,13 +8069,6 @@ if [ "$1" != "install" ];then   # v2.01
                         Unmount_WebUI "${SCRIPT_NAME%.*}.asp"   # v4.17
                     ;;
                 esac
-                echo -e $cRESET
-                exit_message
-            ;;
-            vpndirector*)
-
-                Manage_VPNDirector_rules "$@"               # vpndirector [ clone [ 'wan' | 'ovpnc'n [ changeto_vpn_num]]| list | delete [autoreply=Y]] []
-
                 echo -e $cRESET
                 exit_message
             ;;
