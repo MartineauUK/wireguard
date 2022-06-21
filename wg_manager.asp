@@ -8,7 +8,7 @@
 <link rel="shortcut icon" href="images/favicon.png">
 <link rel="icon" href="images/favicon.png">
 <title><#833#> - WireGuard® Client</title>
-<link rel="stylesheet" href="index_style.css">a
+<link rel="stylesheet" href="index_style.css">
 <link rel="stylesheet" href="form_style.css">
 
 <style>
@@ -199,7 +199,7 @@ function sleepThenAct(){
                         <tr>
                             <td bgcolor="#4D595D" valign="top" >
                             <div>&nbsp;</div>
-                            <div style="color: indianred;" class="formfonttitle">VPN - WireGuard® Client ***** EXPERIMENTAL Beta v0.5 *****</div>
+                            <div style="color: indianred;" class="formfonttitle">VPN - WireGuard® Client ***** EXPERIMENTAL Beta v0.6 *****</div>
                             <div id="divSwitchMenu" style="margin-top:-40px;float:right;"></div
                             <div style="margin:10px 0 10px 5px;" class="splitLine"></div>
 
@@ -253,7 +253,7 @@ function sleepThenAct(){
 <div style="line-height:10px;">&nbsp;</div>
 <table width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#4D595D" class="FormTable">
 <thead class="collapsible">
-    <tr><td colspan="2">Peer control Commands (click to expand/collapse)</td></tr>
+    <tr><td colspan="4">Peer control Commands (click to expand/collapse)</td></tr>
 </thead>
 <tbody>
 
@@ -273,16 +273,39 @@ function sleepThenAct(){
         </td>
     </tr>
 
+    <!--https://www.geeksforgeeks.org/how-to-read-a-local-text-file-using-javascript/-->
+    <tr>
+        <td colspan="4" class="execbutton">
+            <label>Upload from local PC </label>
+            <input type="file" name="inputfile" id="inputfile">
+            <!--<legend>Upload from local PC<legend>-->
+            <br>
 
+            <pre id="output"></pre>
+
+            <script type="text/javascript">
+                document.getElementById('inputfile').addEventListener('change', function() {
+
+                    var fr=new FileReader();
+                    fr.onload=function(){
+                        document.getElementById('output')
+                                .textContent=fr.result;
+                    }
+
+                    fr.readAsText(this.files[0]);
+                })
+            </script>
+        </td>
+    </tr>
         <tr>
-            <td class="settingname">Peers defined</td>
-            <td>
+            <td class="settingname">Peers defined"</td>
+            <td colspan="3">
                 <input type="button" class="button_gen" onclick="CMDExecuteARG('diag peers');" value="Show ALL" id="btnDiagPeers" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
             </td>
         </tr>
         <tr>
             <td class="settingname">ACTIVE Peers</td>
-            <td>
+            <td colspan="3">
                 <input type="button" class="button_gen" onclick="CMDExecuteARG('list');" value="Show ALL" id="btnListPeers" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
             </td>
         </tr>
@@ -539,7 +562,7 @@ function sleepThenAct(){
 <div style="line-height:10px;">&nbsp;</div>
 <table width="100%" border="1" align="center" cellpadding="2" cellspacing="0" bordercolor="#6b8fa3" class="FormTable SettingsTable" style="border:0px;" id="table_config">
 <thead class="collapsible" id="scriptconfig">
-    <tr><td colspan="2">VPN Director Management Tools (click to expand/collapse)</td></tr>
+    <tr><td colspan="3">VPN Director Management Tools (click to expand/collapse)</td></tr>
 </thead>
 
 <tbody style="">
