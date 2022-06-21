@@ -8,13 +8,13 @@
 <link rel="shortcut icon" href="images/favicon.png">
 <link rel="icon" href="images/favicon.png">
 <title><#833#> - WireGuard® Client</title>
-<link rel="stylesheet" href="index_style.css">
+<link rel="stylesheet" href="index_style.css">a
 <link rel="stylesheet" href="form_style.css">
+
 <style>
 p{
 font-weight: bolder;
 }
-
 .collapsible {
   color: white;
   padding: 0px;
@@ -25,27 +25,23 @@ font-weight: bolder;
   cursor: pointer;
 }
 </style>
-<script src="/state.js"></script>
-<script src="/general.js"></script>
-<script src="/help.js"></script>
-<script src="/popup.js"></script>
-<script src="/validator.js"></script>
-<script src="/js/jquery.js"></script>
-<script language="JavaScript" type="text/javascript" src="/ext/shared-jy/jquery.js"></script>
-<script language="JavaScript" type="text/javascript" src="/client_function.js"></script>
+<!--<script src="/js/jquery.js"></script>-->
+<script language="JavaScript" type="text/javascript" src="/state.js"></script>
+<script language="JavaScript" type="text/javascript" src="/general.js"></script>
+<script language="JavaScript" type="text/javascript" src="/popup.js"></script>
+<script language="JavaScript" type="text/javascript" src="/help.js"></script>
 <script language="JavaScript" type="text/javascript" src="/validator.js"></script>
-<!--<script language="JavaScript" type="text/javascript" src="/ext/wireguard/ExecuteResults.js"></script>
-<script language="JavaScript" type="text/javascript" src="/ext/wireguard/ExecutedTS.js"></script>-->
+<script language="JavaScript" type="text/javascript" src="/client_function.js"></script>
+<script language="JavaScript" type="text/javascript" src="/js/jquery.js"></script>
+<script language="JavaScript" type="text/javascript" src="/switcherplugin/jquery.iphone-switch.js"></script>
+<script language="JavaScript" type="text/javascript" src="/js/httpApi.js"></script>
+<script language="JavaScript" type="text/javascript" src="/ext/shared-jy/jquery.js"></script>
+<script language="JavaScript" type="text/javascript" src="/ext/wireguard/ExecuteResults.js"></script>
+<!--<script language="JavaScript" type="text/javascript" src="/ext/wireguard/ExecutedTS.js"></script>-->
 <script>
-
 <% get_wgc_parameter(); %>
-
 var custom_settings = <% get_custom_settings(); %>;
-
-var wgcindex = "1"
-document.getElementById('wgc_unit_field').value = wgcindex
-
-var wgm_Execute_Length = custom_settings.wgm_Execute_Len
+/*openvpn_unit = '<% nvram_get("wgmc_unit"); %>';*/
 
 function initial(){
     show_menu();
@@ -64,31 +60,25 @@ function initial(){
     document.getElementById('wgm_Execute').value = "";
 
     if (custom_settings.wgm_Execute_Result == undefined)
-            document.getElementById("textarea").innerHTML = "N/A"
+            document.getElementById("wgm_ExecuteResultsBase64").innerHTML = "N/A"
     else
-            {document.getElementById("textarea").innerHTML = atob(custom_settings.wgm_Execute_Result)
-            wgm_Execute_Length = atob(custom_settings.wgm_Execute_Len);}
-
-    /*if (custom_settings.wgm_ExecutedTS == undefined)
-            document.getElementById("wgm_ExecutedTS").value = "N/A"
-    else
-            document.getElementById("wgm_ExecutedTS").value = atob(custom_settings.wgm_ExecutedTS);*/
-
-/*custom_settings.wgm_Execute_Result = "Cleared"; */
-/*document.getElementById('amng_custom').value = JSON.stringify(custom_settings); */
+           document.getElementById("wgm_ExecuteResultsBase64").innerHTML = atob(custom_settings.wgm_Execute_Result);
 
     $("thead").click(function(){
         $(this).siblings().toggle("fast");
     })
 
     $(".default-collapsed").trigger("click");
+}
+function UpdateResults(){
 
-    /*ShowExecutedTS();
-    ShowExecuteResults();*/
+    document.getElementById("wgm_ExecuteResultsBase64").innerHTML = atob(custom_settings.wgm_Execute_Result);
 
+    /*ShowExecutedTS();*/
+    ShowExecuteResults();
 }
 function CMDExecute(){
-/* As per RMerlin Wiki https://github.com/RMerl/asuswrt-merlin.ng/wiki/Addons-API */
+   /* As per RMerlin Wiki https://github.com/RMerl/asuswrt-merlin.ng/wiki/Addons-API */
    /* Retrieve value from input fields, and store in object */
    custom_settings.wgm_Execute = document.getElementById('wgm_Execute').value;
 
@@ -97,18 +87,15 @@ function CMDExecute(){
 
     if(validForm()){
         showLoading();
+
+        /*alert("Confirmation prompts such as\n\t\t'Are you sure you want to DELETE a Peer?\nobviously cannot be manually answered, so an affirmative auto reply\n\t\t'Y'\nwill be used'.\n\nSimilarly if you create a new Road-Warrior 'device' Peer, the Parent 'server' Peer will be automatically restarted so it can listen for the new Road-Warrior 'device' Peer, which may interrupt other Road-Warrior 'device' connections");*/
+
         document.form.submit();
 
-        sleepThenAct();
+        /*sleepThenAct();*/
 
-        /*ShowExecutedTS();
-        ShowExecuteResults();*/
-
-        document.getElementById("textarea").innerHTML = atob(custom_settings.wgm_Execute_Result);
-        wgm_Execute_Length = custom_settings.wgm_Execute_Len;
+        UpdateResults();
     }
-
-
 }
 function CMDExecuteARG(command){
 
@@ -123,14 +110,8 @@ function CMDExecuteARG(command){
 
         /*sleepThenAct();*/
 
-        /*ShowExecutedTS();
-        ShowExecuteResults();*/
-
-        document.getElementById("textarea").innerHTML = atob(custom_settings.wgm_Execute_Result);
-        wgm_Execute_Length = custom_settings.wgm_Execute_Len;
+        UpdateResults();
     }
-
-
 }
 function CMDExecutePeerImport(command){
 
@@ -145,14 +126,8 @@ function CMDExecutePeerImport(command){
 
         /*sleepThenAct();*/
 
-        /*ShowExecutedTS();
-        ShowExecuteResults();*/
-
-        document.getElementById("textarea").innerHTML = atob(custom_settings.wgm_Execute_Result);
-        wgm_Execute_Length = custom_settings.wgm_Execute_Len;
+        UpdateResults();
     }
-
-
 }
 function applyRule(){
 
@@ -162,29 +137,35 @@ function applyRule(){
     }
 }
 function validForm(){
-return true;
+
+    return true;
 }
 function change_wgc_unit(unit){
     document.chg_wgc.wgc_unit.value=unit.toString();
     document.chg_wgc.submit();
 }
+/*function change_vpn_unit(val){
+    document.form.action_mode.value = "change_vpn_client_unit";
+    document.form.action = "apply.cgi";
+    document.form.target = "";
+    document.form.submit();
+}*/
 function sleepFor(sleepDuration){
     var now = new Date().getTime();
     while(new Date().getTime() < now + sleepDuration){
         /* Do nothing */
     }
 }
-
 function sleepThenAct(){
     sleepFor(2000);
     console.log("Hello, JavaScript sleep!");
 }
 
-
 </script>
+
 </head>
 <body onload="initial();" onunLoad="return unload_body();" class="bg">
-<div id="TopBanner"></div>
+    <div id="TopBanner"></div>
 <div id="Loading" class="popup_bg"></div>
 <iframe name="hidden_frame" id="hidden_frame" src="" width="0" height="0" frameborder="0"></iframe>
 <form method="post" name="form" id="ruleForm" action="/start_apply.htm" target="hidden_frame">
@@ -195,7 +176,7 @@ function sleepThenAct(){
 <input type="hidden" name="first_time" value="">
 <input type="hidden" name="action_mode" value="apply">
 <input type="hidden" name="action_script" value="restart_wg_manager|serviceevent">
-<input type="hidden" name="action_wait" value="1">
+<input type="hidden" name="action_wait" value="5">
 <input type="hidden" name="preferred_lang" id="preferred_lang" value="<% nvram_get("preferred_lang"); %>">
 <input type="hidden" name="firmver" value="<% nvram_get("firmver"); %>">
 
@@ -218,7 +199,7 @@ function sleepThenAct(){
                         <tr>
                             <td bgcolor="#4D595D" valign="top" >
                             <div>&nbsp;</div>
-                            <div style="color: red;" class="formfonttitle">VPN - WireGuard® Client ***** EXPERIMENTAL Beta v0.4 *****</div>
+                            <div style="color: indianred;" class="formfonttitle">VPN - WireGuard® Client ***** EXPERIMENTAL Beta v0.5 *****</div>
                             <div id="divSwitchMenu" style="margin-top:-40px;float:right;"></div
                             <div style="margin:10px 0 10px 5px;" class="splitLine"></div>
 
@@ -227,6 +208,8 @@ function sleepThenAct(){
                                         <th>WireGuard® Manager Version</th>
                                             <td>
                                                 <input type="text" readonly maxlength="7" class="input_6_table" id="wgm_version">
+
+                                                <button type="button" class="button_gen navbutton" onclick="Help" id="btnHelp" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">Help</button>
                                             </td>
                                     </tr>
                                     <tr>
@@ -238,7 +221,7 @@ function sleepThenAct(){
 
 <div>&nbsp;</div>
 <div class="formfonttitle">WireGuard® Manager©</div>
-<table id="WgcBasicTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable">
+<table id="WgcBasicTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable SettingsTable">
 <thead class="collapsible">
     <tr><td colspan="2">Command Interface (click to expand/collapse)</td></tr>
 </thead>
@@ -247,10 +230,10 @@ function sleepThenAct(){
             <td colspan="2">WireGuard® Manager© Command</td>
         </tr>-->
         <td colspan="2" class="execbutton">
-            <lable>wgm </lable>
+            <label>wgm </label>
             <input type="text" maxlength="100" class="input_32_table" id="wgm_Execute">
-            <input type="button" class="button_gen" onclick="CMDExecute();" value="Execute" id="btnCMDExecute">
-            <input type="button" onClick="location.href=location.href" value="Refresh Results" class="button_gen">
+            <input type="button" class="button_gen" onclick="CMDExecute();" value="Execute" id="btnCMDExecute" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
+            <input type="button" onClick="location.href=location.href" value="Refresh Results" class="button_gen" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
         </td>
         <tr>
             <td colspan="2">Command Execute Output</td>
@@ -258,9 +241,11 @@ function sleepThenAct(){
         <tr>
             <td style="padding: 0px;">
             <div style="color:#FFCC00;"><input type="checkbox" checked id="auto_refresh">Auto refresh</div>
-            <!--<textarea cols="190" rows="27" wrap="off" readonly="readonly" id="wgm_ExecuteResults" class="textarea_log_table" style="font-family:'Courier New', Courier, mono; font-size:11px;border: none;padding: 0px;">Empty</textarea>-->
-            <!--<textarea cols="190" rows="27" wrap="off" readonly="readonly" id="textarea" class="scrollabletextbox" spellcheck="false" maxlength="8192" style="width:99%; font-family:'Courier New', Courier, mono; font-size:11px;"></textarea>-->
-            <div overflow: scroll><textarea cols="190" rows="27" wrap="off" readonly="readonly" id="textarea" class="textarea_ssh_table" spellcheck="false" maxlength="16384" style="width:99%; font-family:'Courier New', Courier, mono; font-size:11px;"></textarea></div>
+            <!--<div class="web_frame"><textarea cols="190" rows="27" wrap="off" readonly="readonly" id="wgm_ExecuteResultsBase64" class="textarea_log_table" style="font-family:'Courier New', Courier, mono; font-size:12px;border: none;padding: 0px;">Empty</textarea></div>-->
+            <div class="web_frame"><textarea cols="190" rows="27" wrap="off" readonly="readonly" id="wgm_ExecuteResultsBase64" class="textarea_log_table" style="font-family:'Courier New', Helvetica, MS UI Gothic, MS P Gothic, Microsoft Yahei UI, sans-serif; font-size:12px;border: none;padding: 0px;">Empty</textarea></div>
+            <!--<textarea cols="190" rows="27" wrap="off" readonly="readonly" id="wgm_ExecuteResultsBase64" class="scrollabletextbox" spellcheck="false" maxlength="8192" style="width:99%; font-family:'Courier New', Courier, mono; font-size:11px;"></textarea>-->
+            <!--<div class="web_frame" style="height:600px;overflow:auto;margin:5px><textarea cols="190" rows="27" wrap="off" readonly="readonly" id="wgm_ExecuteResultsBase64" class="textarea_ssh_table" spellcheck="false" maxlength="16384" style="width:99%; font-family:'Courier New', Courier, mono; font-size:11px;"></textarea></div>-->
+
         </tr>
 </tbody>
 </table>
@@ -274,8 +259,8 @@ function sleepThenAct(){
 
     </tr>
         <td colspan="2" class="execbutton">
-            <lable>Peer Profile</lable>
             <input type="text" maxlength="30" class="input_32_table" id="wgm_PeerImport">
+            <legend>Import from Directory /opt/etc/wireguard.d/<legend>
         </td>
         <td>
             <input type="radio" name="wgm_IMPORT" id="wgm_ImportClient_enabled" class="input" value="enable" checked="">
@@ -292,49 +277,49 @@ function sleepThenAct(){
         <tr>
             <td class="settingname">Peers defined</td>
             <td>
-                <input type="button" class="button_gen" onclick="CMDExecuteARG('diag peers');" value="Show ALL" id="btnDiagPeers">
+                <input type="button" class="button_gen" onclick="CMDExecuteARG('diag peers');" value="Show ALL" id="btnDiagPeers" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
             </td>
         </tr>
         <tr>
             <td class="settingname">ACTIVE Peers</td>
             <td>
-                <input type="button" class="button_gen" onclick="CMDExecuteARG('list');" value="Show ALL" id="btnListPeers">
+                <input type="button" class="button_gen" onclick="CMDExecuteARG('list');" value="Show ALL" id="btnListPeers" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
             </td>
         </tr>
         <tr>
             <td class="settingname">ALL Peers </td>
             <td>
-                <input type="button" class="button_gen" onclick="CMDExecuteARG('stop');" value="Stop" id="btnStopPeers">
+                <input type="button" class="button_gen" onclick="CMDExecuteARG('stop');" value="Stop" id="btnStopPeers" style="color: indianred; background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
             </td>
             <td>
-                <input type="button" class="button_gen" onclick="CMDExecuteARG('start');" value="Start" id="btnStartPeers">
+                <input type="button" class="button_gen" onclick="CMDExecuteARG('start');" value="Start" id="btnStartPeers" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
             </td>
             <td>
-                <input type="button" class="button_gen" onclick="CMDExecuteARG('restart');" value="Restart" id="btnRestartPeers">
+                <input type="button" class="button_gen" onclick="CMDExecuteARG('restart');" value="Restart" id="btnRestartPeers" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
             </td>
         </tr>
         <tr>
             <td class="settingname">Category: 'clients'</td>
             <td>
-                <input type="button" class="button_gen" onclick="CMDExecuteARG('stop clients');" value="Stop" id="btnStopCategoryClients">
+                <input type="button" class="button_gen" onclick="CMDExecuteARG('stop clients');" value="Stop" id="btnStopCategoryClients" style="color: indianred; background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
             </td>
             <td>
-                <input type="button" class="button_gen" onclick="CMDExecuteARG('start clients');" value="Start" id="btnStartCategoryClients">
+                <input type="button" class="button_gen" onclick="CMDExecuteARG('start clients');" value="Start" id="btnStartCategoryClients" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
             </td>
             <td>
-                <input type="button" class="button_gen" onclick="CMDExecuteARG('restart clients');" value="Restart" id="btnRestartCategoryClients">
+                <input type="button" class="button_gen" onclick="CMDExecuteARG('restart clients');" value="Restart" id="btnRestartCategoryClients" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
             </td>
         </tr>
         <tr>
             <td class="settingname">Category: 'servers'</td>
             <td>
-                <input type="button" class="button_gen" onclick="CMDExecuteARG('stop servers');" value="Stop" id="btnStopCategoryServers">
+                <input type="button" class="button_gen" onclick="CMDExecuteARG('stop servers');" value="Stop" id="btnStopCategoryServers" style="color: indianred; background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
             </td>
             <td>
-                <input type="button" class="button_gen" onclick="CMDExecuteARG('start servers');" value="Start" id="btnStartCategoryServers">
+                <input type="button" class="button_gen" onclick="CMDExecuteARG('start servers');" value="Start" id="btnStartCategoryServers" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
             </td>
             <td>
-                <input type="button" class="button_gen" onclick="CMDExecuteARG('restart servers');" value="Restart" id="btnRestartCategoryServers">
+                <input type="button" class="button_gen" onclick="CMDExecuteARG('restart servers');" value="Restart" id="btnRestartCategoryServers" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
             </td>
         </tr>
 </tbody>
@@ -349,11 +334,11 @@ function sleepThenAct(){
     </tr>
 </thead>
 <tbody>
-    <tr id="wgc_unit_field" class="rept ew" value="<% nvram_get("wgmc_unit"); %>">
+    <tr id="vpn_unit_field" class="rept ew" value=openvpn_unit>
 
         <th>Select Client Index</th>
         <td>
-            <select name="wgc_unit" class="input_option" onChange="change_wgc_unit(this.value);">
+            <select name="vpn_client_unit" class="input_option" onChange="change_vpn_unit(this.value);">
             <option class="content_input_fd" value="1" <% nvram_match("wgmc_unit", "1","selected"); %>>1</option>
             <option class="content_input_fd" value="2" <% nvram_match("wgmc_unit", "2","selected"); %>>2</option>
             <option class="content_input_fd" value="3" <% nvram_match("wgmc_unit", "3","selected"); %>>3</option>
@@ -400,10 +385,10 @@ function sleepThenAct(){
 <tbody>
     <tr>
         <td colspan="2">
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('stop wg1'+wgcindex);" value="Stop" id="btnStopWGClient">
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('start wg1'+wgcindex);" value="Start" id="btnStartWGClient">
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('restart wg1'+wgcindex);" value="Restart" id="btnRestartWGClient">
-            <input type="button" style="color: red;" onclick="CMDExecuteARG('peer wg1'+wgcindex+' del');" value="Delete" id="btnDeleteWGClient">
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('stop wg1'+wgcindex);" value="Stop" id="btnStopWGClient" style="color: indianred; background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('start wg1'+wgcindex);" value="Start" id="btnStartWGClient" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('restart wg1'+wgcindex);" value="Restart" id="btnRestartWGClient" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('peer wg1'+wgcindex+' del');" value="Delete" id="btnDeleteWGClient" style="background: linear-gradient(rgb(234, 45, 8) 0%, rgb(234, 45, 8) 100%);">
         </td>
     </tr>
 </tbody>
@@ -483,7 +468,7 @@ function sleepThenAct(){
     <tr>
         <td class="settingname">Current Configuration</td>
         <td>
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('?');" value="Show Configuration" id="btnShowConfig">
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('?');" value="Show Infomation" id="btnShowConfig" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
         </td>
     </tr>
     <tr class="even" id="wgm_row_opt_noipv6">
@@ -552,19 +537,19 @@ function sleepThenAct(){
 </table>
 
 <div style="line-height:10px;">&nbsp;</div>
-<table id="WgcVPNDirectorTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable">
-<thead class="collapsible">
-    <tr><td colspan="2">VPN Director Rule Management (click to expand/collapse)</td></tr>
+<table width="100%" border="1" align="center" cellpadding="2" cellspacing="0" bordercolor="#6b8fa3" class="FormTable SettingsTable" style="border:0px;" id="table_config">
+<thead class="collapsible" id="scriptconfig">
+    <tr><td colspan="2">VPN Director Management Tools (click to expand/collapse)</td></tr>
 </thead>
 
 <tbody style="">
     <tr>
         <td class="settingname">VPN Director rules</td>
         <td>
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('vpndirector list');" value="Show" id="btnVPNDirectorList">
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('vpndirector list');" value="Show" id="btnVPNDirectorList" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
         </td>
         <td>
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('vpndirector delete autoreply=Y');" value="Delete" id="btnVPNDirectorDelete">
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('vpndirector delete');" value="Delete" id="btnVPNDirectorDelete" style="background: linear-gradient(rgb(234, 45, 8) 0%, rgb(234, 45, 8) 100%);">
         </td>
     </tr>
     <tr>
@@ -584,18 +569,18 @@ function sleepThenAct(){
         <td>
             <select name="VPNDirectorWGTarget" >
                 <option value="">Default mapping</option>
-                <option value="wg11">WG Peer 1</option>
-                <option value="wg12">WG Peer 2</option>
-                <option value="wg13">WG Peer 3</option>
-                <option value="wg14">WG Peer 4</option>
-                <option value="wg15">WG Peer 5</option>
+                <option value="wg11">WG 'client' Peer 1</option>
+                <option value="wg12">WG 'client' Peer 2</option>
+                <option value="wg13">WG 'client' Peer 3</option>
+                <option value="wg14">WG 'client' Peer 4</option>
+                <option value="wg15">WG 'client' Peer 5</option>
              </select>
             <!--<legend>Legend Descriptions goes here</legend>-->
-            <legend>Default Destination Mapping: ovpnc1 to wg11 etc.</legend>
+            <legend>Default Destination Mapping: tun11 to wg11 etc.</legend>
         </td>
 
         <td>
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('vpndirector clone');" value="Clone" id="btnVPNDirectorClone">
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('vpndirector clone');" value="Clone" id="btnVPNDirectorClone" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
         </td>
     </tr>
 
@@ -611,26 +596,26 @@ function sleepThenAct(){
     <tr>
         <td class="settingname">Diagnostics: Firewall rules</td>
         <td>
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('diag firewall');" value="Show Firewall" id="btnShowDiagsFirewall">
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('diag firewall');" value="Show Firewall" id="btnShowDiagsFirewall" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
         </td>
     </tr>
     <tr>
         <td class="settingname">Diagnostics: Selective Routing rules</td>
         <td>
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('diag rpdb');" value="Show RPDB" id="btnShowDiagsRPDB">
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('diag rpdb');" value="Show RPDB" id="btnShowDiagsRPDB" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
         </td>
     </tr>
     <tr>
         <td class="settingname">Diagnostics: Routing</td>
         <td>
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('diag route');" value="Show Routes" id="btnShowDiagsRoute">
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('diag route');" value="Show Routes" id="btnShowDiagsRoute" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
         </td>
     </tr>
     </tr>
         <tr>
         <td class="settingname">Diagnostics: Miscellaneous</td>
         <td>
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('diag misc');" value="Show Misc" id="btnShowDiagsMisc">
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('diag misc');" value="Show Misc" id="btnShowDiagsMisc" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
         </td>
     </tr>
 </tbody>
@@ -691,4 +676,6 @@ function sleepThenAct(){
 <div id="footer"></div>
 </body>
 </html>
+
+
 
