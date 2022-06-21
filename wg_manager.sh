@@ -1,7 +1,7 @@
 #!/bin/sh
     # shellcheck disable=SC2039,SC2155,SC2124,SC2046,SC2027
-VERSION="v4.17bA"
-#============================================================================================ © 2021-2022 Martineau v4.17bA
+VERSION="v4.17bB"
+#============================================================================================ © 2021-2022 Martineau v4.17bB
 #
 #       wgm   [ help | -h ]
 #       wgm   [ { start | stop | restart } [wg_interface]... ]
@@ -33,7 +33,7 @@ VERSION="v4.17bA"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 19-Jun-2022
+# Last Updated Date: 21-Jun-2022
 
 #
 # Description:
@@ -66,6 +66,7 @@ readonly SCRIPT_WEB_DIR="$SCRIPT_WEBPAGE_DIR/wireguard"                         
 readonly SCRIPT_DIR="/jffs/addons/wireguard"
 installedMD5File="${INSTALL_DIR}www-installed.md5"  # Save md5 of last installed www ASP file so you can find it again later (in case of www ASP update)
 WEBUI_COLOUR_REINSTATE=                             # WebUI Service Events temporarily suppresses ANSI color Escape sequences # v4.17
+WEBUI_AUTOREPLY=                                    # WebUI Service Events must not prompt for reply by a Human!
 
 Say() {
   # shellcheck disable=SC2068
@@ -629,8 +630,8 @@ Load_UserspaceTool() {
     if [ ! -d "${INSTALL_DIR}" ];then
         echo -e $cRED"\a\n\tNo modules found - '/${INSTALL_DIR} doesn't exist'\n"
         echo -e "\tPress$cBRED y$cRESET to$cBRED DOWNLOAD WireGuard® Kernel and Userspace Tool modules ${cRESET} or press$cBGRE [Enter] to SKIP."
-            read -r "ANS"
-            if [ "$ANS" == "y" ];then
+            [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+            if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
                 Download_Modules $HARDWARE_MODEL
             fi
     fi
@@ -778,12 +779,12 @@ Check_Module_Versions() {
         if [ "$UPDATES" == "Y" ];then
             if [ "$ACTION" != "force" ];then            # v4.12
                 echo -e $cRESET"\n\tPress$cBRED y$cRESET to$cBRED Update WireGuard® Kernel and Userspace Tool${cRESET} or press$cBGRE [Enter] to SKIP."
-                read -r "ANS"
+                [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
             else
                 local ANS="y"                           # v4.12
             fi
 
-            if [ "$ANS" == "y" ];then
+            if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
                 Download_Modules $HARDWARE_MODEL
                 #Load_UserspaceTool
             else
@@ -944,8 +945,11 @@ Create_Peer() {
     local WANIPADDR=$(nvram get wan0_ipaddr)
     [ -n "$(echo "$WANIPADDR" | Is_Private_IPv4)" ] && echo -e ${cRESET}${cBRED}${aBOLD}"\a\n\t*** Ensure Upstream router Port Foward entry for port:${cBMAG}${LISTEN_PORT}${cRESET}${cBRED}${aBOLD} ***"$cRESET
     echo -e $cBWHT"\n\tPress$cBGRE y$cRESET to$cBGRE Create ${cBCYA}${IPV6_TXT}${cBGRE}'server' Peer (${cBMAG}${SERVER_PEER}${cBGRE}) ${cBCYA}${VPN_POOL}:${LISTEN_PORT}${cRESET} or press$cBGRE [Enter] to SKIP." # v4.15
-    read -r "ANS"
-    [ "$ANS" == "y" ] || return 1
+    [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+
+    if [ -z "$WEBUI_AUTOREPLY" ] && [ "$ANS" != "y" ];then
+        return 1
+    fi
 
     echo -e $cBCYA"\tCreating WireGuard® Private/Public key-pair for ${IPV6_TXT}'server' Peer ${cBMAG}${SERVER_PEER}${cBCYA} on $HARDWARE_MODEL (v$BUILDNO)"$cRESET
     if [ -n "$(which wg)" ];then
@@ -982,8 +986,11 @@ EOF
     fi
     # shellcheck disable=SC1087
     echo -e $cBWHT"\tPress$cBGRE y$cRESET to$cBGRE Start ${cBCYA}${IPV6_TXT}${cBGRE}'server' Peer (${cBMAG}${SERVER_PEER}$cBGRE)$cRESET or press $cBGRE[Enter] to SKIP."
-    read -r "ANS"
-    [ "$ANS" == "y" ] && Manage_Wireguard_Sessions "start" "$SERVER_PEER"
+    [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+
+    if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
+        Manage_Wireguard_Sessions "start" "$SERVER_PEER"
+    fi
     Show_Peer_Status "show" # v3.03
 
     # Firewall rule to listen on multiple ports?
@@ -1030,9 +1037,9 @@ Delete_Peer() {
                     fi
 
                     echo -e $cBWHT"\tPress$cBRED y$cRESET to ${aBOLD}CONFIRM${cRESET}${cBRED} or press$cBGRE [Enter] to SKIP."
-                    read -r "ANS"
+                    [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
 
-                    if [ "$ANS" == "y" ];then
+                    if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
 
                         [ -n "$(wg show $WG_INTERFACE 2>/dev/null)" ] && Manage_Wireguard_Sessions "stop" "$WG_INTERFACE"
                         sqlite3 $SQL_DATABASE "DELETE FROM $TABLE WHERE $SQL_COL='$WG_INTERFACE';"
@@ -1125,8 +1132,11 @@ Delete_Peer() {
                                     CMD="restart"
                                     echo -e $cBWHT"\a\n\tWireGuard® 'server' Peer needs to be ${CMD}ed to remove 'client' Peer ${cBMAG}$DEVICE_NAME $TAG"
                                     echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer ($SERVER_PEER) or press$cBGRE [Enter] to SKIP."
-                                    read -r "ANS"
-                                    [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$SERVER_PEER"; Show_Peer_Status "show"; }  # v3.03
+                                    [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+                                    if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
+                                        Manage_Wireguard_Sessions "$CMD" "$SERVER_PEER"
+                                        Show_Peer_Status "show"  # v3.03
+                                    fi
                                 fi
                             done
                     fi
@@ -1883,8 +1893,11 @@ Manage_Peer() {
                                         local TAG=$cBWHT"("${cBMAG}$(sqlite3 $SQL_DATABASE "select tag FROM $TABLE WHERE $ID='$WG_INTERFACE';")${cBWHT}")"
                                         echo -e $cBWHT"\a\n\tWireGuard® 'client' Peer ${cBMAG}${WG_INTERFACE} ${TAG}$cBWHT needs to be ${CMD}ed"
                                         echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'client' Peer ($WG_INTERFACE) or press$cBGRE [Enter] to SKIP."
-                                        read -r "ANS"
-                                        [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$WG_INTERFACE"; Show_Peer_Status "show"; }
+                                        [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+                                        if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
+                                            Manage_Wireguard_Sessions "$CMD" "$WG_INTERFACE"
+                                            Show_Peer_Status "show"
+                                        fi
                                     fi
                                 fi
 
@@ -1956,8 +1969,11 @@ Manage_Peer() {
                                                                 local TAG=$cBWHT"("${cBMAG}$(sqlite3 $SQL_DATABASE "select tag FROM devices WHERE $ID='$DEVICE_NAME';")${cBWHT}")"
                                                                 echo -e $cBWHT"\a\n\tWireGuard® 'server' Peer needs to be ${CMD}ed to update 'client' Peer ${cBMAG}${DEVICE_NAME} $TAG"
                                                                 echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer ($SERVER_PEER) or press$cBGRE [Enter] to SKIP."
-                                                                read -r "ANS"
-                                                                [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$SERVER_PEER"; Show_Peer_Status "show"; }  # v3.03
+                                                                [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+                                                                if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
+                                                                    Manage_Wireguard_Sessions "$CMD" "$SERVER_PEER"
+                                                                    Show_Peer_Status "show"  # v3.03
+                                                                fi
                                                             fi
                                                         done
                                                 fi
@@ -2115,10 +2131,12 @@ EOF
                                             local CMD="restart"                                         # v4.16
                                             echo -e $cBWHT"\a\n\tWireGuard® 'server' Peer needs to be ${CMD}ed to allow 'client' Peer ${cBMAG}$DEVICE"
                                             echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer (${cBWHT}${SERVER_PEER}${cBRED}) or press$cBGRE [Enter] to SKIP."
-                                            read -r "ANS"                                                                                       # v4.16
-                                            [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$SERVER_PEER"; Show_Peer_Status "show"; }  # v4.16
+                                            [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2                                                                                       # v4.16
+                                            if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
+                                                Manage_Wireguard_Sessions "$CMD" "$SERVER_PEER"
+                                                Show_Peer_Status "show"  # v4.16
+                                            fi
                                         fi
-
 
                                     else
                                         echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard® 'device' Peer '$DEVICE'\n"$cRESET
@@ -2761,8 +2779,11 @@ Manage_RPDB_rules() {
                     CMD="restart"
                     echo -e $cBWHT"\a\n\tWireGuard® 'client' Peer needs to be ${CMD}ed to implement RPDB rules"
                     echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'client' Peer ($IFACE) or press$cBGRE [Enter] to SKIP."
-                    read -r "ANS"
-                    [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$IFACE" "$Route"; REDISPLAY=1; }
+                    [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+                    if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
+                        Manage_Wireguard_Sessions "$CMD" "$IFACE" "$Route"
+                        REDISPLAY=1
+                    fi
                 fi
             else
                 echo -e $cRED"\a\n\t***ERROR Peer ${cBCYA}${WG_INTERFACE} ${cRESET}$IFACE${cRED} rule already exists!\n"$cRESET
@@ -2777,8 +2798,8 @@ Manage_RPDB_rules() {
             else
                 echo -e $cBCYA"\a\n\tDo you want to DELETE ALL Selective Routing RPDB rules for ${cBMAG}$WG_INTERFACE?"$cRESET
                 echo -e "\tPress$cBRED y$cRESET to$cBRED CONFIRM${cRESET} or press$cBGRE [Enter] to SKIP."
-                read -r "ANS"
-                if [ "$ANS" == "y" ];then
+                [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+                if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
                     sqlite3 $SQL_DATABASE "DELETE FROM policy WHERE peer='$WG_INTERFACE';"
                     echo -e $cBGRE"\n\t[✔] ALL RPDB Selective Routing rules for $WG_INTERFACE DELETED\n"$cRESET  2>&1
                     # Is the 'client' Peer UP?
@@ -2786,8 +2807,11 @@ Manage_RPDB_rules() {
                         CMD="restart"
                         echo -e $cBWHT"\a\n\tWireGuard® 'client' Peer needs to be ${CMD}ed to implement RPDB rules"
                         echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'client' Peer ($IFACE) or press$cBGRE [Enter] to SKIP."
-                        read -r "ANS"
-                        [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$IFACE" "$Route"; REDISPLAY=1; }
+                        [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+                        if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
+                            Manage_Wireguard_Sessions "$CMD" "$IFACE" "$Route"
+                            REDISPLAY=1
+                        fi
                     fi
                 else
                     REDISPLAY=0
@@ -2978,8 +3002,11 @@ _Passthru_rules() {
                         CMD="restart"
                         echo -e $cBWHT"\a\n\tWireGuard® 'server' Peer needs to be ${CMD}ed to implement 'wan' passthru"
                         echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer ($WG_INTERFACE) or press$cBGRE [Enter] to SKIP."
-                        read -r "ANS"
-                        [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$WG_INTERFACE"; REDISPLAY=1; }  # v4.12
+                        [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+                        if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
+                            Manage_Wireguard_Sessions "$CMD" "$WG_INTERFACE"
+                            REDISPLAY=1  # v4.12
+                        fi
                     fi
                 else
                     # Is the Passthru 'client' Peer UP?
@@ -3031,8 +3058,11 @@ _Passthru_rules() {
                             CMD="restart"
                             echo -e $cBWHT"\a\n\tWireGuard® 'server' Peer needs to be ${CMD}ed to remove 'wan' passthru"
                             echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer ($WG_INTERFACE) or press$cBGRE [Enter] to SKIP."
-                            read -r "ANS"
-                            [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$WG_INTERFACE"; REDISPLAY=1; }  # v4.12
+                            [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+                            if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
+                                Manage_Wireguard_Sessions "$CMD" "$WG_INTERFACE"
+                                REDISPLAY=1  # v4.12
+                            fi
                         fi
                     else
                         #if [ $(sqlite3 $SQL_DATABASE "SELECT COUNT(server) FROM passthru WHERE server='$WG_INTERFACE' AND client='$IFACE';") -gt 0 ];then
@@ -3055,8 +3085,8 @@ _Passthru_rules() {
                 else
                     echo -e $cBCYA"\a\n\tDo you want to DELETE ALL Passthru Routing rules for ${cBMAG}$WG_INTERFACE?"$cRESET
                     echo -e "\tPress$cBRED y$cRESET to$cBRED CONFIRM${cRESET} or press$cBGRE [Enter] to SKIP."
-                    read -r "ANS"
-                    if [ "$ANS" == "y" ];then
+                    [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+                    if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
                         local RESTART_CLIENTS=$(sqlite3 $SQL_DATABASE "SELECT client FROM passthru WHERE server='$WG_INTERFACE';")  # v4.16
                         local RESTART_CLIENTS=$(echo "$RESTART_CLIENTS" | xargs -n1 | sort -u | xargs)  # Remove duplicates from the restart list
 
@@ -3071,8 +3101,11 @@ _Passthru_rules() {
                                         CMD="restart"
                                         echo -e $cBWHT"\a\n\tWireGuard® 'client' Peer needs to be ${CMD}ed to remove 'passthru' rules"
                                         echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'client' Peer ($CLIENT_PEER) or press$cBGRE [Enter] to SKIP."
-                                        read -r "ANS"
-                                        [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$CLIENT_PEER" "$Route"; REDISPLAY=1; }
+                                        [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+                                        if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
+                                            Manage_Wireguard_Sessions "$CMD" "$CLIENT_PEER" "$Route"
+                                            REDISPLAY=1
+                                        fi
                                     fi
                                 done
                         else
@@ -3101,8 +3134,6 @@ Manage_VPNDirector_rules() {
     local ACTION=$2             # vpndirector [ clone [ 'wan' | 'ovpnc'n [ changeto_vpn_num]] | list | delete [autoreply=y]]
 
     local FILTER=$3
-
-    local ANS="$(echo "$@" | sed -n "s/^.*autoreply=//p" | awk '{print $1}')"   # v4.17
 
     [ "$FILTER" == "autoreply=y" ] && local FILTER=
 
@@ -3180,12 +3211,8 @@ Manage_VPNDirector_rules() {
                 echo -e $cBCYA"\a\n\tDo you want to DELETE ALL VPN Director Policy rules?"$cRESET 2>&1
                 echo -e "\tPress$cBRED y$cRESET to$cBRED CONFIRM${cRESET} or press$cBGRE [Enter] to SKIP." 2>&1
 
-                if [ -z "$ANS" ];then
-                    read -r "ANS"
-                else
-                    local ANS="y"
-                fi
-                if [ "$ANS" == "y" ];then
+                [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+                if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
                     sqlite3 $SQL_DATABASE "DELETE FROM policy WHERE tag LIKE 'VPN Director:%';"
                     echo -e $cBGRE"\n\t[✔] Deleted ALL VPN Director Policy rules\n"$cRESET  2>&1
                 fi
@@ -3297,8 +3324,8 @@ EOF
         if [ $CCNT -gt 0 ];then
             echo -e $cBCYA"\tDo you want to auto-migrate the ${cBWHT}${CCNT}${cBCYA} Peer entries?"
             echo -e "\n\tPress$cBRED y$cRESET to$cBRED migrate${cRESET} or press$cBGRE [Enter] to skip"
-            read -r "ANS"
-            if [ "$ANS" == "y" ];then
+            [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+            if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
 
                 for WG_INTERFACE in $(grep -E "^wg2" ${INSTALL_DIR}WireguardVPN.conf | awk '{print $1}' | tr '\n' ' ')
                     do
@@ -4106,10 +4133,11 @@ exit_message() {
         fi
         echo -e $cRESET
 
-        if [ -n "$WEBUI_COLOUR_REINSTATE" ];then                            # v4.17
+        if [ "$WEBUI_COLOUR_REINSTATE" != "" ];then                            # v4.17
             if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOCOLOUR|NOCOLOR" ${INSTALL_DIR}WireguardVPN.conf)" ];then
                 sed -i 's/^NOCOLOR/#NOCOLOR/' ${INSTALL_DIR}WireguardVPN.conf   # v4.17
-                SayT "***DEBUG Service_Event: Execution - ANSI colour Escape sequences ENABLED ($CALL_REQUEST)"
+                sed -i 's/^NOCOLOUR/#NOCOLOUR/' ${INSTALL_DIR}WireguardVPN.conf   # v4.17
+                #SayT "***DEBUG ($CALL_REQUEST): ANSI colour Escape sequences ENABLED"
             fi
         fi
 
@@ -4297,11 +4325,11 @@ EOF
 
     # Create a sample Road-Warrior device and QR code for import into WireGuard App on the say an iPhone
     echo -e $cBWHT"\tDo you want to create a 'device' Peer for 'server' Peer (${cBMAG}wg21${cBWHT}) ?\n\t${cBWHT}Press ${cBGRE}y$cRESET to ${cBWHT}create 'device' Peer ${cRESET}or press$cBGRE [Enter] to skip"
-    read -r "ANS"
-    if [ "$ANS" == "y" ];then
+    [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+    if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
         echo -e $cBWHT"Enter the device name e.g. ${cBGRE}iPhone"$cBWHT
-        read -r "ANS"
-        if [ -n "$ANS" ];then
+        [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS"|| echo -e "$WEBUI_AUTOREPLY" >&2
+        if [ -n "$WEBUI_AUTOREPLY" ] || [ -n "$ANS" ];then
             Create_RoadWarrior_Device "create" "$ANS"         # v4.01 v3.01
         fi
     else
@@ -4323,8 +4351,8 @@ Uninstall_WireGuard() {
 
     # Only remove WireGuard Entware packages if user DELETES '/opt/etc/wireguard'
     echo -e "\n\tPress$cBRED Y$cRESET to$cBRED delete ALL WireGuard® DATA files (Peer *.config etc.) $cRESET('${CONFIG_DIR}') or press$cBGRE [Enter] to keep custom WireGuard DATA files."
-    read -r "ANS"
-    if [ "$ANS" == "Y" ];then
+    [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+    if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "Y" ];then
        echo -e $cBCYA"\n\tDeleting $cRESET'${CONFIG_DIR}'"
        [ -d "${CONFIG_DIR}" ] && rm -rf ${CONFIG_DIR}
 
@@ -5683,7 +5711,7 @@ Create_Site2Site() {
     local SITE_TWO_PUB_KEY=$(cat ${CONFIG_DIR}${NAME_TWO}_public.key)
 
     echo -e $cRESET"\a\n\tEnter ${cBMAG}${NAME_TWO} ${cRESET}Endpoint remote IP, or ${cBMAG}${NAME_TWO}$cRESET DDNS name or press$cBGRE [Enter] to SKIP."
-    read -r "ANS"
+    [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
 
     [ -n "$ANS" ] && local DDNS=$ANS || local DDNS=$NAME_TWO".DDNS"
 
@@ -5710,7 +5738,7 @@ EOF
     if [ -n "$ADD_SITE" ];then
         # Determine WG interface if user doesn't explicitly specify the 'server' Peer
         echo -e $cRESET"\tEnter the name of interface or descriptive name e.g. ${cBMAG}'Home'${cRESET} to bind site '${cBMAG}${NAME_TWO}${cRESET}' or press$cBGRE [Enter] to SKIP."
-        read -r "ANS"
+        [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
         if [ -n "$ANS" ];then
             if [ "${ANS:0:3}" == "wg2" ];then
                 local WG_INTERFACE=$ANS
@@ -5735,8 +5763,8 @@ EOF
     if [ -z "$ROUTER_DDNS" ];then
         echo -e $cRED"\n\a\tWarning: No DDNS is configured! to reach local ${cBMAG}${NAME_ONE}${cRED} Endpoint from remote ${cBMAG}$NAME_TWO"$cRESET
         echo -e $cRESET"\tPress$cBRED y$cRESET to use the current ${cBRED}WAN IP ${cRESET}or enter ${cBMAG}$NAME_ONE${cRESET} Endpoint IP or DDNS name or press$cBGRE [Enter] to SKIP."
-        read -r "ANS"
-        if [ "$ANS" == "y" ];then
+        [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+        if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
             if [ -z "$(ip route show table main | grep -E "^0\.|^128\.")" ];then
                 local ROUTER_DDNS=$(curl -${SILENT} ipecho.net/plain)                     # v3.01
             else
@@ -5862,8 +5890,8 @@ EOF
     echo -e ${cBCYA}${cRESET}"\n\tImport ${cBMAG}${NAME_ONE}.conf${cRESET} on remote site using 'import ${NAME_ONE} type=device'\n\n"    # v4.15
 
     echo -e $cRESET"\tPress$cBRED y$cRESET to import ${cBMAG}$NAME_ONE${cRESET} or press$cBGRE [Enter] to SKIP."
-    read -r "ANS"
-    if [ "$ANS" == "y" ];then
+    [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+    if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
         Import_Peer "import" $NAME_ONE "type=server"
         sqlite3 $SQL_DATABASE "UPDATE servers SET auto='S' WHERE peer='$IMPORTED_PEER_NAME';"   # v4.15
         # Create a 'device' for SiteB so the IP is recorded
@@ -6128,8 +6156,8 @@ Process_User_Choice() {
                 local WG_TXT="WireGuard®/WireGuard Manager"
                 [ -f /usr/sbin/wg ] && local WG_TXT="WireGuard Manager"     # WireGuard's in firmware; can't be removed
                 echo -e "\n\tPress$cBRED Y$cRESET to$cBRED Remove $WG_TXT ${cRESET}or press$cBGRE [Enter] to cancel request." # v4.14  @ZebMcKayhan
-                read -r "ANS"
-                if [ "$ANS" == "Y" ];then       # v4.14 @ZebMcKayhan
+                [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+                if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "Y" ];then       # v4.14 @ZebMcKayhan
                     Uninstall_WireGuard
                 else
                     echo -e $cBYEL"\n\a\tUninstall...request ABORTED (${cBRED}'Y'$cRESET response not confirmed.)"$cRESET
@@ -6281,8 +6309,11 @@ Process_User_Choice() {
                             local TAG=$cBWHT"("${cBMAG}$(sqlite3 $SQL_DATABASE "select tag FROM $TABLE WHERE peer='$WG_INTERFACE';")${cBWHT}")"         # v4.17
                             echo -e $cBWHT"\a\n\tWireGuard® 'client' Peer ${cBMAG}${WG_INTERFACE} ${TAG}$cBWHT needs to be ${CMD}ed for modified '$FN'" # v4.17
                             echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'client' Peer ($WG_INTERFACE) or press$cBGRE [Enter] to SKIP."          # v4.17
-                            read -r "ANS"                                                                                                               # v4.17
-                            [ "$ANS" == "y" ] && { Manage_Wireguard_Sessions "$CMD" "$WG_INTERFACE"; Show_Peer_Status "show"; }                         # v4.17
+                            [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2                                                                                                               # v4.17
+                            if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
+                                Manage_Wireguard_Sessions "$CMD" "$WG_INTERFACE"
+                                Show_Peer_Status "show"                         # v4.17
+                            fi
                         fi
                     fi
                 fi
@@ -6568,19 +6599,22 @@ Process_User_Choice() {
                 [ -z "$(echo $PAGES | grep -E ".asp$")" ] && PAGES=$PAGES".asp"
 
                 case "$ACTION" in
-                    mount|mountX|on|m)
+                    mount|mountX|on|m|refresh)              # v4.17
                         echo -e $cBGRE
                         if [ -z "$INTERNAL_PAGE" ];then
                             if [ "$PAGES" == "${SCRIPT_NAME%.*}.asp" ];then
+
+                                [ "$ACTION" == "refresh" ] && Unmount_WebUI "${PAGES}"
+
                                 if [ ! -f /tmp/menuTree.js ] || { [ -f /tmp/menuTree.js ] && [ -z "$(grep -i "WireGuard® Manager" /tmp/menuTree.js)" ] ;} ;then
                                     Mount_WebUI "${PAGES}"
                                     [ -z "$(grep -i wireguard /jffs/scripts/service-event)" ] && echo -e "if echo \"\$2\" | /bin/grep -q \"wg_manager\"; then { /jffs/addons/wireguard/wg_manager.sh service_event \"\$@\" & }; fi # WireGuard WebUI" >> /jffs/scripts/service-event    # v4.17
                                 else
-                                    echo -en $cRED"\a\n\t***ERROR: WebUI TAB (${cBWT}'$PAGES') ${cBRED}already mounted!\n"$cRESET
+                                    echo -en $cBRED"\a\n\t***ERROR: WebUI TAB (${cBWT}'$PAGES') ${cBRED}already mounted!\n"$cRESET
                                 fi
                             fi
 
-                                Manage_WebUI_API "INIT"          # v4.17
+                            Manage_WebUI_API "INIT"          # v4.17
 
                             if [ "$ACTION" == "mountX" ] || [ "$ACTION" == "mX" ];then
                                 service restart_httpd >/dev/null        # WebUI v4.17
@@ -6660,7 +6694,7 @@ Process_User_Choice() {
                         ls -lh /www/ext/user*.* | sort -k 9 ;echo -e $cRESET;grep -THE "user[1-9]\." /tmp/menuTree.js | sort -k 3
                     ;;
                     *)
-                        echo -en $cRED"\a\n\t***ERROR: Invalid arg $cBWHT'"$ACTION"'$cBRED for WebUI TAB - valid 'mount' or 'unmount' only!\n"$cRESET
+                        echo -en $cRED"\a\n\t***ERROR: Invalid arg $cBWHT'"$ACTION"'$cBRED for WebUI TAB - valid 'mount' or 'unmount' or refresh only!\n"$cRESET
                     ;;
                 esac
 
@@ -6685,15 +6719,17 @@ Process_User_Choice() {
                 case "$ACTION" in
                     show|on)
                         ANSIColours
-                        if [ -f ${INSTALL_DIR}WireguardVPN.conf ] &&  [ -n "$(grep -oE "^NOCOLOUR" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                        #if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^#NOCOLOUR|#NOCOLOR" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                            sed -i 's/^NOCOLOR/#NOCOLOR/' ${INSTALL_DIR}WireguardVPN.conf
                             sed -i 's/^NOCOLOUR/#NOCOLOUR/' ${INSTALL_DIR}WireguardVPN.conf
-                        fi
+                        #fi
                     ;;
                     hide|off)
                         ANSIColours "disable"
-                        if [ -f ${INSTALL_DIR}WireguardVPN.conf ] &&  [ -n "$(grep -oE "^#NOCOLOUR" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                        #if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOCOLOUR|NOCOLOR" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                            sed -i 's/^#NOCOLOR/NOCOLOR/' ${INSTALL_DIR}WireguardVPN.conf
                             sed -i 's/^#NOCOLOUR/NOCOLOUR/' ${INSTALL_DIR}WireguardVPN.conf
-                        fi
+                        #fi
                     ;;
                 esac
             ;;
@@ -6812,8 +6848,10 @@ Process_User_Choice() {
                             else
                                 if [ $(grep -cE "^#Address" $FN) -gt 1 ];then
                                     echo -en $cRESET"\tPress$cBRED y$cRESET to$cBRED convert $cBCYA'$CONF' multiple $cBRED'#Address' ${cBWHT}directives${cRESET} or press$cBGRE [Enter] to SKIP: "
-                                    read -r "ANS"
-                                    [ "$ANS" == "y" ] && sed -i 's/^#Address/Address/' $FN; local CONVERTED="Y"
+                                    [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+                                    if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
+                                        sed -i 's/^#Address/Address/' $FN; local CONVERTED="Y"
+                                    fi
                                 fi
                             fi
                             if [ $(grep -cE "^#DNS" $FN) -eq 1 ];then
@@ -6821,8 +6859,10 @@ Process_User_Choice() {
                             else
                                 if [ $(grep -cE "^#DNS" $FN) -gt 1 ];then
                                     echo -en $cRESET"\tPress$cBRED y$cRESET to$cBRED convert $cBCYA'$CONF' multiple $cBRED'#DNS' ${cBWHT}directives${cRESET} or press$cBGRE [Enter] to SKIP: "
-                                    read -r "ANS"
-                                    [ "$ANS" == "y" ] && sed -i 's/^#DNS/DNS/' $FN; local CONVERTED="Y"
+                                    [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+                                    if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
+                                        sed -i 's/^#DNS/DNS/' $FN; local CONVERTED="Y"
+                                    fi
                                 fi
                             fi
 
@@ -6831,8 +6871,11 @@ Process_User_Choice() {
                             else
                                 if [ $(grep -cE "^#Pre[UD]" $FN) -gt 1 ] || [ $(grep -cE "^#Post" $FN) -gt 1 ];then
                                     echo -en $cRESET"\tPress$cBRED y$cRESET to$cBRED convert $cBCYA'$CONF' multiple $cBRED'#Pre/#Post' ${cBWHT}directives${cRESET} or press$cBGRE [Enter] to SKIP: "
-                                    read -r "ANS"
-                                    [ "$ANS" == "y" ] && { sed -i 's/^#Post/Post/; s/^#PreU/PreU/; s/^#PreD/PreD/' $FN; local CONVERTED="Y" ;}
+                                    [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+                                    if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
+                                        sed -i 's/^#Post/Post/; s/^#PreU/PreU/; s/^#PreD/PreD/' $FN
+                                        local CONVERTED="Y"
+                                    fi
                                 fi
                             fi
 
@@ -6877,7 +6920,6 @@ Purge_Database() {
     # trimdb { '?' | days [ 'traffic' | 'sessions'] ['auto']  }
 
     local ANS=
-    [ -n "$(echo "$@" | grep -io "auto")" ] && local AUTOREPLY="Y"
 
     local DAYS=$2
 
@@ -6926,14 +6968,11 @@ Purge_Database() {
         echo -e "\n\t$TABLES_TXT statistics Records older than "${cBCYA}$(date -d @"$OLDEST_EPOCH_SECS" "+%c")${cRESET}" will be erased from SQL database"
         [ "$TABLE" == "All" ] && TABLE="traffic session"
 
-        if [ -z "$AUTOREPLY" ];then
-            echo -e "\tPress$cBRED y$cRESET to$cBRED DELETE database records${cRESET} or press$cBGRE [Enter] to SKIP."
-            read -r "ANS"
-        else
-            local ANS="y"
-        fi
+        echo -e "\tPress$cBRED y$cRESET to$cBRED DELETE database records${cRESET} or press$cBGRE [Enter] to SKIP."
 
-        if [ "$ANS" == "y" ];then
+        [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+
+        if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
             echo -e
             for THIS in $TABLE
                 do
@@ -7034,7 +7073,7 @@ Mount_WebUI(){
         umount /www/require/modules/menuTree.js 2>/dev/null
         mount -o bind /tmp/menuTree.js /www/require/modules/menuTree.js
 
-        echo -e $cBGRE"\tWebUI page ('$PAGE') mounted as $cRESET'"$MyPage"'"     # Martineau Hack
+        echo -e $cBGRE"\tWebUI page (${cBWHT}'${PAGE}'${cBGRE}) mounted as $cRESET'"$MyPage"'"     # Martineau Hack
         SayT "WebUI page ('$PAGE') mounted as $cRESET'"$MyPage"'"    # Martineau Hack
 
         flock -u "$FD"
@@ -7066,7 +7105,7 @@ Unmount_WebUI(){
             #rm -rf "${SCRIPT_WEBPAGE_DIR:?}/$MyPage"
 
             rm -rf "${SCRIPT_WEB_DIR}"
-            echo -e $cBGRE"\tWebUI page $cRESET'"$MyPage"' ${cBGRE}('$PAGE') unmounted${cRESET}"     # Martineau Hack
+            echo -e $cBGRE"\tWebUI page $cRESET'"$MyPage"' ${cBGRE}($cBWHT'$PAGE'$cBGRE) unmounted${cRESET}"     # Martineau Hack
             SayT "WebUI page $cRESET'"$MyPage"' '$PAGE') unmounted" # Martineau Hack
         fi
     else
@@ -7151,8 +7190,6 @@ set +x
 }
 Create_RoadWarrior_Device() {
 
-    [ -n "$(echo "$@" | sed -n "s/^.*autoreply=//p" | awk '{print $1}')" ] && local AUTOREPLY="Y"    # v4.17
-
     local DEVICE_NAME=$2
 
     local DEVICE_USE_IPV6="N"                      # v4.16
@@ -7203,9 +7240,6 @@ Create_RoadWarrior_Device() {
                 # Ensure IPv6 address is in standard compressed format
                 #[ -n "$VPN_POOL6" ] && VPN_POOL6="$(IPv6_RFC "$VPN_POOL6")" # v4.15
                 local DEVICE_USE_IPV6="Y"                      # v4.16
-            ;;
-            autoreply*)
-                local AUTOREPLY="Y"             # v4.17
             ;;
         esac
         shift
@@ -7276,8 +7310,8 @@ Create_RoadWarrior_Device() {
                 if [ -z "$ROUTER_DDNS" ];then
                     echo -e $cRED"\a\tWarning: No DDNS is configured!"
                     echo -e $cRESET"\tPress$cBRED y$cRESET to$cBRED use the current WAN IP or enter DDNS name or press$cBGRE [Enter] to SKIP."
-
-                    if [ "$AUTOREPLY" = "Y" ] || [ "$ANS" == "y" ];then             # v4.17
+                    [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+                    if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then             # v4.17
                         if [ -z "$(ip route show table main | grep -E "^0\.|^128\.")" ];then
                             ROUTER_DDNS=$(curl -${SILENT} ipecho.net/plain)                     # v3.01
                         else
@@ -7295,8 +7329,8 @@ Create_RoadWarrior_Device() {
                 if [ -f ${CONFIG_DIR}${DEVICE_NAME}.conf ];then
                     echo -e $cRED"\a\tWarning: Peer device '${cBMAG}${DEVICE_NAME}${cRED}' WireGuard® config already EXISTS!"
                     echo -e $cRESET"\tPress$cBRED y$cRESET to$cBRED ${aBOLD}CONFIRM${cRESET}${cBRED} Overwriting Peer device '${cBMAG}$DEVICE_NAME.config${cRESET}' or press$cBGRE [Enter] to SKIP."
-                    [ "$AUTOREPLY" != "Y" ] && read -r "ANS"                                    #v4.17
-                        if [ "$AUTOREPLY" = "Y" ] || [ "$ANS" != "y" ];then
+                    [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2                                    #v4.17
+                        if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" != "y" ];then
                             CREATE_DEVICE_CONFIG="N" # v4.17
                         fi
                 fi
@@ -7478,8 +7512,8 @@ EOF
                 if [ "$SITE2SITE_PEER_LAN" != "remoteonly" ];then
                     echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED ADD $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBRED}' ${cRESET}to 'server' Peer (${cBMAG}${SERVER_PEER}${cRESET}) or press$cBGRE [Enter] to SKIP."
 
-                    [ -z "$AUTOREPLY" ] && read -r "ANS"                    # v4.17
-                    if [ "$AUTOREPLY" == "Y" ] || [ "$ANS" == "y" ];then    # v4.17
+                    [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2                   # v4.17
+                    if [ "$WEBUI_AUTOREPLY" == "Y" ] || [ "$ANS" == "y" ];then    # v4.17
 
                         local PUB_KEY=$(Convert_Key "$PUB_KEY")
                         sed -i -e :a -e '/^\n*$/{$d;N;};/\n$/ba' ${CONFIG_DIR}${SERVER_PEER}.conf       # v4.15 Delete all trailing blank lines from file
@@ -7502,7 +7536,8 @@ EOF
                                  echo -e $cBCYA"\tAdded $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBCYA}' ${cBWHT}${VPN_POOL_IP}${cBCYA} to $HARDWARE_MODEL 'server' (${cBMAG}$SERVER_PEER${cBCYA}) and WireGuard® config\n"
                             done
 
-                        Display_QRCode "${CONFIG_DIR}${DEVICE_NAME}.conf"
+                        # TBA WebUI needs it to be passed back?
+                        [ -z "$WEBUI_AUTOREPLY" ] && Display_QRCode "${CONFIG_DIR}${DEVICE_NAME}.conf" # v4.17
                     fi
                 fi
 
@@ -7520,8 +7555,8 @@ EOF
 
                     echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED ADD $PEER_TOPOLOGY Peer '${cBMAG}${DEVICE_NAME}${cBRED}' ${cRESET}to remote 'server' Peer (${cBMAG}${SITE_PEER}${cRESET}) or press$cBGRE [Enter] to SKIP."
 
-                    [ -z "$AUTOREPLY" ] && read -r "ANS"                    # v4.17
-                    if [ "$AUTOREPLY" == "Y" ] || [ "$ANS" == "y" ];then    # v4.17
+                    [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2                    # v4.17
+                    if [ "$WEBUI_AUTOREPLY" == "Y" ] || [ "$ANS" == "y" ];then    # v4.17
                         sed -i -e :a -e '/^\n*$/{$d;N;};/\n$/ba' ${CONFIG_DIR}${SITE_PEER}.conf     # v4.15 Delete all trailing blank lines from file
                         echo -e >> ${CONFIG_DIR}${SITE_PEER}.conf
                         cat /tmp/${DEVICE_NAME}${SITE_PEER}.conf >> ${CONFIG_DIR}${SITE_PEER}.conf
@@ -7552,8 +7587,8 @@ EOF
                     echo -e $cBWHT"\a\n\tWireGuard® 'server' Peer needs to be ${CMD}ed to listen for 'client' $PEER_TOPOLOGY Peer ${cBMAG}$DEVICE_NAME $TAG"
                     echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'server' Peer (${cBMAG}${SERVER_PEER}${cRESET}) or press$cBGRE [Enter] to SKIP."
 
-                    [ -z "$AUTOREPLY" ] && read -r "ANS"                    # v4.17
-                    if [ "$AUTOREPLY" == "Y" ] || [ "$ANS" == "y" ];then    # v4.17
+                    [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2                    # v4.17
+                    if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then    # v4.17
                         Manage_Wireguard_Sessions "$CMD" "$SERVER_PEER"
                         Show_Peer_Status "show"  # v3.03
                     fi
@@ -7611,9 +7646,9 @@ Manage_WebUI_API() {
     local FN="/tmp/wgm_Data.txt"                            # v4.17
 
     if [ "$1" == "INIT" ];then
-        echo "Responses from wgm will be displayed HERE" > $FN
+        echo -e "Responses from wgm will be displayed HERE" > $FN
     else
-        echo "Reset" > $FN
+        echo -e "Reset" > $FN
     fi
 
     mkdir -p /www/user/wireguard                            # WebUI v4.17
@@ -7632,25 +7667,30 @@ Main() { true; }            # Syntax that is Atom Shellchecker compatible!
 
 PATH=/opt/sbin:/opt/bin:/opt/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
+CALL_REQUEST=$1
+
 if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -z "$(grep -E "^NOCOLOR|^NOCOLOUR" ${INSTALL_DIR}WireguardVPN.conf)" ];then     # v4.15
     ANSIColours
 fi
 
 # Service_event initiated request call?
-if [ "$1" == "nocolour_output" ] || [ "$1" == "service_event" ];then            # v4.17
-    CALL_REQUEST=$1
-    [ "$1" == "nocolour_output" ] && shift
+if [ "$CALL_REQUEST" == "webui" ];then            # v4.17
+    shift
     # Remember to reinstate ANSI colour Escape sequences if they are currently ENABLED
     if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^#NOCOLOUR|#NOCOLOR" ${INSTALL_DIR}WireguardVPN.conf)" ];then # v4.17
-        WEBUI_COLOUR_REINSTATE="$CALL_REQUEST"  # v4.17
-        SayT "***DEBUG Service_Event: Execution - ANSI colour Escape sequences will be RENABLED on script ($CALL_REQUEST) Termination"
+        # This execution request MUST run without ANSI colour Escape sequences
+        # Ensure wg_client/wg_server also suppress the ANSI colour Escape sequences
+        sed -i 's/^#NOCOLOR/NOCOLOR/' ${INSTALL_DIR}WireguardVPN.conf   # v4.17
+        sed -i 's/^#NOCOLOUR/NOCOLOUR/' ${INSTALL_DIR}WireguardVPN.conf   # v4.17
+
+        ANSIColours "disable"
+        #SayT "***DEBUG ($CALL_REQUEST): ANSI colour Escape sequences DISABLED"
+
+        WEBUI_COLOUR_REINSTATE="WebUI_Colour_Reinstate"  # v4.17
+        #SayT "***DEBUG ($CALL_REQUEST): ANSI colour Escape sequences will be RENABLED on script ($CALL_REQUEST) Termination"
     fi
 
-    # THis execution request MUST run without ANSI colour Escape sequences
-    # Ensure wg_client/wg_server also suppress the ANSI colour Escape sequences
-    sed -i 's/^#NOCOLOR/NOCOLOR/' ${INSTALL_DIR}WireguardVPN.conf   # v4.17
-    ANSIColours "disable"
-    SayT "***DEBUG Service_Event: Execution - ANSI colour Escape sequences DISABLED"
+    WEBUI_AUTOREPLY="Automated "$CALL_REQUEST" Reply"   # v4.17
 fi
 
 # shellcheck disable=SC2034
@@ -7764,8 +7804,8 @@ if [ "$1" != "install" ];then   # v2.01
 
             echo -e $cBRED"\a\n\tWireGuard® Session Manager v3.0 requires '${CONFIG_DIR}'\n\n\t${cBWHT}Do you want to rename '/opt/etc/wireguard' to '${CONFIG_DIR}' ?"
             echo -e "\tPress$cBRED y$cRESET to$cBRED auto-migrate to WireGuard® Session Manager v3.0${cRESET} or press$cBGRE [Enter] to SKIP."
-                read -r "ANS"
-                if [ "$ANS" == "y" ];then
+                [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+                if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
 
                     mv /opt/etc/wireguard ${CONFIG_DIR}
 
@@ -7780,6 +7820,86 @@ if [ "$1" != "install" ];then   # v2.01
                     exit 99
                 fi
         fi
+    fi
+
+    if [ "$CALL_REQUEST" == "service_event" ];then     # v4.17
+
+        SayT "($CALL_REQUEST): Request: $@"
+        #SayT "***DEBUG Colour status=$(grep -E "^NOCOLOUR|^NOCOLOR" ${INSTALL_DIR}WireguardVPN.conf)"
+
+        # As per RMerlin Wiki https://github.com/RMerl/asuswrt-merlin.ng/wiki/Addons-API
+        nvram get rc_support | grep -q am_addons                                        # v4.17
+        if [ $? != 0 ];then
+            echo -e $cRED"\n\t[✖] $HARDWARE_MODEL firmware $FIRMWARE $BUILDNO doesn't support Addons"$cRESET    # v4.17
+            SayT "${cBRED}[✖] $HARDWARE_MODEL firmware $FIRMWARE $BUILDNO doesn't support Addons${cRESET}"      # v4.17
+            exit 5
+        else
+            WEBUI_CMD=$(am_settings_get wgm_Execute)                                    # v4.17
+
+            if [ -n "$WEBUI_CMD" ];then
+                if [ "${WEBUI_CMD:0:1}" != "#" ];then
+                    SayT "${cBGRE}[✔] WebUI Execute: wgm '$WEBUI_CMD'${cRESET}"     # v4.17
+                    WEBUI_AUTOREPLY="WebUI Request"
+
+                    am_settings_set wgm_Execute "#"$WEBUI_CMD                           # v4.17
+
+                    FN="/tmp/wgm_Data.txt"
+
+                    case $WEBUI_CMD in
+                        "?"|list|stop|start|restart|start*|stop*|restart*|trimdb*|import*|diag|diag*|export*|vpndirector*|qrcode*|peer*|create*|ipset*)
+                            TS=$(date)
+                            echo -e "$TS" > $FN
+                            am_settings_set wgm_Execute_TS $TS                               # v4.17
+                            WriteFile_ToJS "$FN" "${SCRIPT_WEB_DIR}/ExecutedTS.js" "ShowExecutedTS" "wgm_ExecutedTS"
+
+                            echo -e "$TS\n============================" > $FN
+
+                            SayT "***DEBUG ($CALL_REQUEST): '${INSTALL_DIR}$SCRIPT_NAME $WEBUI_CMD' request for execution......"  # v4.17
+
+                            #sh ${INSTALL_DIR}$SCRIPT_NAME "webui" $WEBUI_CMD >> $FN   # v4.17
+                            ${INSTALL_DIR}$SCRIPT_NAME "webui" $WEBUI_CMD >> $FN   # v4.17
+
+                            #SayT "***DEBUG ($CALL_REQUEST): '${INSTALL_DIR}$SCRIPT_NAME $WEBUI_CMD' Terminated."  # v4.17
+                            SayT "***DEBUG ($CALL_REQUEST): $(wc -c <$FN) characters for 'am_settings_set' API"  # v4.17
+                            am_settings_set wgm_Execute_Len "$(wc -c <$FN)"                         # v4.17
+
+                            # WebUI - cosmetic, but remove indent i.e. first leading TAB char '\t' from each of the result lines
+                            sed -i -e 's/^\t//' $FN
+
+                            # WebUI doesn't interpret ANSI Colour Escape sequences , so suppress them
+                            # WebUI - cosmetic, but change to HTML compatible
+                            sed -i 's/✔/\&#10004;/g' $FN
+                            sed -i 's/✖/\X/g' $FN
+                            sed -i 's/®/\&#174;/g' $FN
+                            sed -i 's/©/\&#169;/g' $FN
+                            sed -i 's/ℹ./\&#8226;/g' $FN
+                            sed -i -e 's/\a\n/\n\n/g' $FN
+                            awk '{sub(/\x07/, "")}1' $FN > /tmp/wgm_txt     # sed seemingly can't remove it?
+                            rm $FN
+                            mv /tmp/wgm_txt $FN
+
+                            ENCODEDBASE64=$(cat $FN| openssl base64 -e -A)  # Best for <2999 chars  # v4.17
+                            am_settings_set wgm_Execute_Result $ENCODEDBASE64                       # v4.17
+                            #SayT "***DEBUG ($CALL_REQUEST): am_settings_set wgm_Execute_Result"      # v4.17
+                            WriteFile_ToJS "$FN" "${SCRIPT_WEB_DIR}/ExecuteResults.js" "ShowExecuteResults" "wgm_ExecuteResults"    # v4.17
+                            #SayT "***DEBUG ($CALL_REQUEST): Function ShowExecuteResult() '${SCRIPT_WEB_DIR}/ExecuteResults.js' created."  # v4.17
+                        ;;
+                        *)
+                            #sh ${INSTALL_DIR}$SCRIPT_NAME $WEBUI_CMD                       # v4.17
+                            SayT "***ERROR ($CALL_REQUEST): Unrecognised command line command via WebUI: '$WEBUI_CMD'...ignored"
+                            echo -e "\n***ERROR ($CALL_REQUEST): Unrecognised command line command via WebUI: '$WEBUI_CMD'...ignored" > $FN
+                            am_settings_set wgm_Execute_Len "$(wc -c <$FN)"                         # v4.17
+                            ENCODEDBASE64=$(cat $FN| openssl base64 -e -A)  # Best for <2999 chars  # v4.17
+                            am_settings_set wgm_Execute_Result $ENCODEDBASE64                       # v4.17
+                            SayT "***DEBUG ($CALL_REQUEST): am_settings_set wgm_Execute_Result"      # v4.17
+                            WriteFile_ToJS "$FN" "${SCRIPT_WEB_DIR}/ExecuteResults.js" "ShowExecuteResults" "wgm_ExecuteResults"    # v4.17
+                        ;;
+                    esac
+                fi
+            fi
+        fi
+        exit_message
+        exit 0
     fi
 
     if [ "$1" == "import" ];then
@@ -7811,85 +7931,6 @@ if [ "$1" != "install" ];then   # v2.01
         echo -e $cRESET                     # v4.15
         exit 0                              # v4.15
     fi
-
-    if [ "$1" == "service_event" ];then     # v4.17
-#set -x
-#(
-        SayT "WebUI Service_Event Request: $@"
-
-        # As per RMerlin Wiki https://github.com/RMerl/asuswrt-merlin.ng/wiki/Addons-API
-        nvram get rc_support | grep -q am_addons                                        # v4.17
-        if [ $? != 0 ];then
-            echo -e $cRED"\n\t[✖] $HARDWARE_MODEL firmware $FIRMWARE $BUILDNO doesn't support Addons"$cRESET    # v4.17
-            SayT "${cBRED}[✖] $HARDWARE_MODEL firmware $FIRMWARE $BUILDNO doesn't support Addons${cRESET}"      # v4.17
-            exit 5
-        else
-            WEBUI_CMD=$(am_settings_get wgm_Execute)                                    # v4.17
-
-
-
-            if [ -n "$WEBUI_CMD" ];then
-                if [ "${WEBUI_CMD:0:1}" != "#" ];then
-                    SayT "${cBGRE}[✔] WebUI Execute: wgm '$WEBUI_CMD'${cRESET}"     # v4.17
-                    am_settings_set wgm_Execute "#"$WEBUI_CMD                           # v4.17
-
-                    FN="/tmp/wgm_Data.txt"
-
-                    case $WEBUI_CMD in
-                        "?"|list|stop|start|restart|start*|stop*|restart*|trimdb*|import*|diag|diag*|export*|vpndirector*)
-                            TS=$(date)
-                            echo -e "$TS" > $FN
-                            am_settings_set wgm_Execute_TS $TS                               # v4.17
-                            WriteFile_ToJS "$FN" "${SCRIPT_WEB_DIR}/ExecutedTS.js" "ShowExecutedTS" "wgm_ExecutedTS"
-
-                            echo -e "$TS\n============================" > $FN
-
-                            # WebUI doesn't interpret ANSI Colour Escape sequences , so suppress them
-                            #SayT "***DEBUG Service_Event: '${INSTALL_DIR}$SCRIPT_NAME $WEBUI_CMD' executing......"  # v4.17
-                            sh ${INSTALL_DIR}$SCRIPT_NAME "nocolour_output" $WEBUI_CMD >> $FN   # v4.17
-                            #SayT "***DEBUG Service_Event: '${INSTALL_DIR}$SCRIPT_NAME $WEBUI_CMD' Terminated."  # v4.17
-                            #SayT "***DEBUG Service_Event: $(wc -c <$FN) characters for 'am_settings_set' API"  # v4.17
-                            am_settings_set wgm_Execute_Len "$(wc -c <$FN)"                         # v4.17
-                            # WebUI - cosmetic, but remove indent i.e. first leading TAB char '\t' from each of the result lines
-                            sed -i -e 's/^\t//' $FN
-
-                            # WebUI - cosmetic, but change to HTML compatible
-                            sed -i 's/✔/\&#10004;/g' $FN
-                            sed -i 's/✖/\X/g' $FN
-                            sed -i 's/®/\&#174;/g' $FN
-                            sed -i 's/©/\&#169;/g' $FN
-                            sed -i 's/ℹ./\&#8226;/g' $FN
-                            sed -i -e 's/\a\n/\n\n/g' $FN
-                            awk '{sub(/\x07/, "")}1' $FN > /tmp/wgm_txt     # sed can't remove it?
-                            rm $FN
-                            mv /tmp/wgm_txt $FN
-
-                            ENCODEDBASE64=$(cat $FN| openssl base64 -e -A)  # Best for <2999 chars  # v4.17
-                            am_settings_set wgm_Execute_Result $ENCODEDBASE64                       # v4.17
-                            #SayT "***DEBUG Service_Event: am_settings_set wgm_Execute_Result"      # v4.17
-                            WriteFile_ToJS "$FN" "${SCRIPT_WEB_DIR}/ExecuteResults.js" "ShowExecuteResults" "wgm_ExecuteResults"    # v4.17
-                            #SayT "***DEBUG Service_Event: Function ShowExecuteResult() '${SCRIPT_WEB_DIR}/ExecuteResults.js' created."  # v4.17
-                        ;;
-                        *)
-                            #sh ${INSTALL_DIR}$SCRIPT_NAME $WEBUI_CMD                       # v4.17
-                            SayT "***ERROR Unrecognised command line command via WebUI: '$WEBUI_CMD'...ignored"
-                            echo -e "\n***ERROR Unrecognised command line command via WebUI: '$WEBUI_CMD'...ignored" > $FN
-                            am_settings_set wgm_Execute_Len "$(wc -c <$FN)"                         # v4.17
-                            ENCODEDBASE64=$(cat $FN| openssl base64 -e -A)  # Best for <2999 chars  # v4.17
-                            am_settings_set wgm_Execute_Result $ENCODEDBASE64                       # v4.17
-                            #SayT "***DEBUG Service_Event: am_settings_set wgm_Execute_Result"      # v4.17
-                            WriteFile_ToJS "$FN" "${SCRIPT_WEB_DIR}/ExecuteResults.js" "ShowExecuteResults" "wgm_ExecuteResults"    # v4.17
-                        ;;
-                    esac
-                fi
-            fi
-        fi
-        exit_message
-#) 2>&1 | logger -t $(basename $0)"[$$_***DEBUG]"
-
-    exit 0
-    fi
-
 
     if [ "$NOCHK" == "Y" ] || [ "$(WireGuard_Installed)" == "Y" ];then # v4.12 v2.01
 
@@ -8052,17 +8093,19 @@ if [ "$1" != "install" ];then   # v2.01
 
                 case "$ACTION" in
                     hide|off)
-                        if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^#NOCOLOUR|#NOCOLOR" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                        #if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^#NOCOLOR" ${INSTALL_DIR}WireguardVPN.conf)" ];then
                             sed -i 's/^#NOCOLOR/NOCOLOR/' ${INSTALL_DIR}WireguardVPN.conf                                 # v4.15
+                            sed -i 's/^#NOCOLOUR/NOCOLOUR/' ${INSTALL_DIR}WireguardVPN.conf                                 # v4.15
                             ANSIColours "disable"
-                        fi
+                        #fi
                         echo -e $cRED"\n\t[✖]${cBWHT} Display colour attributes ${cBGRE}is ${cBRED}${ALERT}DISABLED"$cRESET
                     ;;
                     show|on)
-                        if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOCOLOUR|NOCOLOR" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                        #if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^NOCOLOR" ${INSTALL_DIR}WireguardVPN.conf)" ];then
                             sed -i 's/^NOCOLOR/#NOCOLOR/' ${INSTALL_DIR}WireguardVPN.conf                                 # v4.15
+                            sed -i 's/^NOCOLOUR/#NOCOLOUR/' ${INSTALL_DIR}WireguardVPN.conf                                 # v4.15
                             ANSIColours
-                        fi
+                        #fi
                         echo -e $cBGRE"\n\t[✔]${cBWHT} Display colour attributes ${cBGRE}is ENABLED"$cRESET
                     ;;
                     *)
@@ -8070,11 +8113,6 @@ if [ "$1" != "install" ];then   # v2.01
                     ;;
                 esac
 
-                echo -e $cRESET
-                exit_message
-            ;;
-            qrcode*|peer*|create*|ipset*)
-                echo -e $cBRED"\a\n\tSorry, WireGuard® Manager© WebUI feature command '$1' not yet available.......!\n"$cRESET
                 echo -e $cRESET
                 exit_message
             ;;
@@ -8096,6 +8134,13 @@ if [ "$1" != "install" ];then   # v2.01
                     unmount)
                         Unmount_WebUI "${SCRIPT_NAME%.*}.asp"   # v4.17
                     ;;
+                    refresh)
+                        Unmount_WebUI "${SCRIPT_NAME%.*}.asp"   # v4.17
+                        Mount_WebUI "${SCRIPT_NAME%.*}.asp"     # v4.17
+                    ;;
+                    *)
+                        echo -en $cBRED"\a\n\t***ERROR: Invalid arg $cBWHT'"$ACTION"'$cBRED for WebUI TAB - valid 'mount','unmount' or refresh only!\n"$cRESET
+                    ;;
                 esac
                 echo -e $cRESET
                 exit_message
@@ -8107,11 +8152,36 @@ if [ "$1" != "install" ];then   # v2.01
                 echo -e $cRESET
                 exit_message
             ;;
+            qrcode*)
+
+                ARG=$2
+
+                [ -z "$(echo "$ARG" | grep -E "\.conf$")" ] && SUFFIX=".conf"
+                [ -f  ${CONFIG_DIR}${ARG}${SUFFIX} ] && Display_QRCode "${CONFIG_DIR}${ARG}${SUFFIX}" "y" || echo -e $cBRED"\a\n\t***ERROR Invalid Peer config '${CONFIG_DIR}${ARG}${SUFFIX}'\n"
+
+                echo -e $cRESET
+                exit_message
+            ;;
+            create*)
+                Create_RoadWarrior_Device "$@"
+                echo -e $cRESET
+                exit_message
+            ;;
+            peer*)
+                Manage_Peer "$@"
+                echo -e $cRESET
+                exit_message
+            ;;
+            ipset*)
+                Manage_IPSET "$@"
+                echo -e $cRESET
+                exit_message
+            ;;
             "")
             ;;
             *)
                 # Prevent showing the menu by default for unrecognised reuest!
-                echo -e $cBRED"\a\n\t***ERROR WireGuard® Manager© command request '$1' not recognised!\n"$cRESET
+                echo -e $cBRED"\a\n\t***ERROR WireGuard® Manager© command request '$1' not recognised!\n"
                 echo -e $cRESET     # v4.17
                 exit_message
             ;;
