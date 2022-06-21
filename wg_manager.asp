@@ -42,7 +42,9 @@ font-weight: bolder;
 <% get_wgc_parameter(); %>
 var custom_settings = <% get_custom_settings(); %>;
 /*openvpn_unit = '<% nvram_get("wgmc_unit"); %>';*/
-
+window.onresize = function() {
+cal_panel_block("wgs_QRCode_block", 0.18);
+}
 function initial(){
     show_menu();
 
@@ -161,6 +163,13 @@ function sleepThenAct(){
     console.log("Hello, JavaScript sleep!");
 }
 
+function showQRCode() {
+$('#wgs_QRCode_block').show();
+cal_panel_block("wgs_QRCode_block", 0.18);
+}
+function hideQRCode(){
+$('#wgs_QRCode_block').hide();
+}
 </script>
 
 </head>
@@ -199,7 +208,7 @@ function sleepThenAct(){
                         <tr>
                             <td bgcolor="#4D595D" valign="top" >
                             <div>&nbsp;</div>
-                            <div style="color: indianred;" class="formfonttitle">VPN - WireGuard® Client ***** EXPERIMENTAL Beta v0.6 *****</div>
+                            <div style="color: indianred;" class="formfonttitle">VPN - WireGuard® Client ***** EXPERIMENTAL Beta v0.7 *****</div>
                             <div id="divSwitchMenu" style="margin-top:-40px;float:right;"></div
                             <div style="margin:10px 0 10px 5px;" class="splitLine"></div>
 
@@ -208,7 +217,8 @@ function sleepThenAct(){
                                         <th>WireGuard® Manager Version</th>
                                             <td>
                                                 <input type="text" readonly maxlength="7" class="input_6_table" id="wgm_version">
-
+                                            </td>
+                                            <td  style="text-align: right;">
                                                 <button type="button" class="button_gen navbutton" onclick="Help" id="btnHelp" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">Help</button>
                                             </td>
                                     </tr>
@@ -260,7 +270,7 @@ function sleepThenAct(){
     </tr>
         <td colspan="2" class="execbutton">
             <input type="text" maxlength="30" class="input_32_table" id="wgm_PeerImport">
-            <legend>Import from Directory /opt/etc/wireguard.d/<legend>
+            <legend>Import from <% nvram_get("productid"); %> Directory '/opt/etc/wireguard.d/'<legend>
         </td>
         <td>
             <input type="radio" name="wgm_IMPORT" id="wgm_ImportClient_enabled" class="input" value="enable" checked="">
@@ -269,13 +279,14 @@ function sleepThenAct(){
             <label for="XIMPORT_PEER">Server</label>
         </td>
         <td>
-            <input type="button" class="button_gen" onclick="CMDExecutePeerImport();" value="Import" id="btnClientImport">
+            <input type="button" class="button_gen" onclick="CMDExecutePeerImport();" value="Import" id="btnClientImport" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
         </td>
     </tr>
 
     <!--https://www.geeksforgeeks.org/how-to-read-a-local-text-file-using-javascript/-->
+    <div style="line-height:10px;">&nbsp;</div>
     <tr>
-        <td colspan="4" class="execbutton">
+        <td colspan="4" class="buttongen">
             <label>Upload from local PC </label>
             <input type="file" name="inputfile" id="inputfile">
             <!--<legend>Upload from local PC<legend>-->
@@ -296,6 +307,14 @@ function sleepThenAct(){
                 })
             </script>
         </td>
+
+        <tr id="wg_export_setting">
+            <th>Export configuration file</th>
+            <td colspan="3">
+            <input class="button_gen" type="button" value="<#1509#>" onClick="exportConfig();" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);"/>
+            </td>
+        </tr>
+
     </tr>
         <tr>
             <td class="settingname">Peers defined"</td>
@@ -407,11 +426,23 @@ function sleepThenAct(){
 <table id="WgcStateTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable">
 <tbody>
     <tr>
-        <td colspan="2">
+        <td>
             <input type="button" class="button_gen" onclick="CMDExecuteARG('stop wg1'+wgcindex);" value="Stop" id="btnStopWGClient" style="color: indianred; background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
             <input type="button" class="button_gen" onclick="CMDExecuteARG('start wg1'+wgcindex);" value="Start" id="btnStartWGClient" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
             <input type="button" class="button_gen" onclick="CMDExecuteARG('restart wg1'+wgcindex);" value="Restart" id="btnRestartWGClient" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
             <input type="button" class="button_gen" onclick="CMDExecuteARG('peer wg1'+wgcindex+' del');" value="Delete" id="btnDeleteWGClient" style="background: linear-gradient(rgb(234, 45, 8) 0%, rgb(234, 45, 8) 100%);">
+            <input type="button" class="button_gen" onClick="showQRCode('wg11');"value="QR Code" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);"/>
+
+
+<div id="wgs_QRCode_block" style="display:none">
+<div style="display:flex; align-items: center;">
+<div style="width:28px;height:28px;background-image:url('images/New_ui/disable.svg');cursor:pointer" onclick="hideQRCode();"></div>
+</div>
+<img src='wgs_client.png'></img>
+</div>
+
+
+
         </td>
     </tr>
 </tbody>
