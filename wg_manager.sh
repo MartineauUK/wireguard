@@ -1,7 +1,7 @@
 #!/bin/sh
     # shellcheck disable=SC2039,SC2155,SC2124,SC2046,SC2027
-VERSION="v4.17bB"
-#============================================================================================ © 2021-2022 Martineau v4.17bB
+VERSION="v4.17bC"
+#============================================================================================ © 2021-2022 Martineau v4.17bC
 #
 #       wgm   [ help | -h ]
 #       wgm   [ { start | stop | restart } [wg_interface]... ]
@@ -33,7 +33,7 @@ VERSION="v4.17bB"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 21-Jun-2022
+# Last Updated Date: 22-Jun-2022
 
 #
 # Description:
@@ -6284,7 +6284,6 @@ Process_User_Choice() {
                 if [ -f $FN ];then
                     [ "$ACCESS" == "--unix" ] && local PRE_MD5="$(md5sum $FN | awk '{print $1}')"
                     nano $ACCESS $FN
-
                 else
                     echo -e $cBRED"\a\n\t***ERROR WireGuard® Peer Configuration ${cBWHT}'$FN'${cBRED} NOT found\n"$cRESET
                 fi
@@ -6293,26 +6292,34 @@ Process_User_Choice() {
                     local POST_MD5="$(md5sum $FN | awk '{print $1}')"
                     local WG_INTERFACE=${FN##*/}
                     local WG_INTERFACE=${WG_INTERFACE%.*}
-                    if [ "$POST_MD5" != "$PRE_MD5" ] && [ -n "$(wg show interfaces | grep -ow "$WG_INTERFACE")" ];then  # v4.17
-                        local Mode=$(Server_or_Client "$WG_INTERFACE")
-                        if [ "$Mode" == "client" ] || [ "$Mode" == "server" ];then
-                            case $Mode in
-                                client)
-                                local TABLE="clients"
-                            ;;
-                                server)
-                                local TABLE="servers"
-                            ;;
-                            esac
 
-                            CMD="restart"                                                                                                               # v4.17
-                            local TAG=$cBWHT"("${cBMAG}$(sqlite3 $SQL_DATABASE "select tag FROM $TABLE WHERE peer='$WG_INTERFACE';")${cBWHT}")"         # v4.17
-                            echo -e $cBWHT"\a\n\tWireGuard® 'client' Peer ${cBMAG}${WG_INTERFACE} ${TAG}$cBWHT needs to be ${CMD}ed for modified '$FN'" # v4.17
-                            echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'client' Peer ($WG_INTERFACE) or press$cBGRE [Enter] to SKIP."          # v4.17
-                            [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2                                                                                                               # v4.17
-                            if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
-                                Manage_Wireguard_Sessions "$CMD" "$WG_INTERFACE"
-                                Show_Peer_Status "show"                         # v4.17
+                    [ -d /www/user/wireguard ] && awk '!/^ *#/ && NF' /jffs/addons/wireguard/WireguardVPN.conf >/www/user/wireguard/config.htm  # v4.17
+
+                    if [ "$POST_MD5" != "$PRE_MD5" ];then
+
+                        echo -e $cBGRE"\n\t[✔] WireGuard® Manager Configuration updated"$cRESET                     # v4.17
+
+                        if [ -n "$(wg show interfaces | grep -ow "$WG_INTERFACE")" ];then  # v4.17
+                            local Mode=$(Server_or_Client "$WG_INTERFACE")
+                            if [ "$Mode" == "client" ] || [ "$Mode" == "server" ];then
+                                case $Mode in
+                                    client)
+                                    local TABLE="clients"
+                                ;;
+                                    server)
+                                    local TABLE="servers"
+                                ;;
+                                esac
+
+                                CMD="restart"                                                                                                               # v4.17
+                                local TAG=$cBWHT"("${cBMAG}$(sqlite3 $SQL_DATABASE "select tag FROM $TABLE WHERE peer='$WG_INTERFACE';")${cBWHT}")"         # v4.17
+                                echo -e $cBWHT"\a\n\tWireGuard® 'client' Peer ${cBMAG}${WG_INTERFACE} ${TAG}$cBWHT needs to be ${CMD}ed for modified '$FN'" # v4.17
+                                echo -e $cBWHT"\tPress$cBRED y$cRESET to$cBRED $CMD 'client' Peer ($WG_INTERFACE) or press$cBGRE [Enter] to SKIP."          # v4.17
+                                [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2                                                                                                               # v4.17
+                                if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
+                                    Manage_Wireguard_Sessions "$CMD" "$WG_INTERFACE"
+                                    Show_Peer_Status "show"                         # v4.17
+                                fi
                             fi
                         fi
                     fi
@@ -6732,6 +6739,7 @@ Process_User_Choice() {
                         #fi
                     ;;
                 esac
+                [ -d /www/user/wireguard ] && awk '!/^ *#/ && NF' /jffs/addons/wireguard/WireguardVPN.conf >/www/user/wireguard/config.htm  # v4.17
             ;;
             addon|addon*)                           # v4.15         {script_name [ dev | remove | del ] }
 
@@ -7798,29 +7806,32 @@ if [ "$1" != "install" ];then   # v2.01
     # Check if v2.00 was installed, then offer to rename it
     VERSION_NUMDOT=$VERSION                                             # v3.03
     VERSION_NUM=$(echo "$VERSION" | sed 's/[^0-9]*//g')
-    if [ "${VERSION_NUM:0:1}" -eq 3 ] && [ ! -d ${CONFIG_DIR} ];then    # v3.03
 
-        if [ -d /opt/etc/wireguard ] && [ "$(ls -1 /opt/etc/wireguard | wc -l)" -gt "5" ];then
+    [ -d /www/user/wireguard ] && awk '!/^ *#/ && NF' /jffs/addons/wireguard/WireguardVPN.conf >/www/user/wireguard/config.htm  # v4.17
 
-            echo -e $cBRED"\a\n\tWireGuard® Session Manager v3.0 requires '${CONFIG_DIR}'\n\n\t${cBWHT}Do you want to rename '/opt/etc/wireguard' to '${CONFIG_DIR}' ?"
-            echo -e "\tPress$cBRED y$cRESET to$cBRED auto-migrate to WireGuard® Session Manager v3.0${cRESET} or press$cBGRE [Enter] to SKIP."
-                [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
-                if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
+    # if [ "${VERSION_NUM:0:1}" -eq 3 ] && [ ! -d ${CONFIG_DIR} ];then    # v3.03
 
-                    mv /opt/etc/wireguard ${CONFIG_DIR}
+        # if [ -d /opt/etc/wireguard ] && [ "$(ls -1 /opt/etc/wireguard | wc -l)" -gt "5" ];then
 
-                    # Legacy tidy-up! to adopt the new name for the configuration file
-                    if [ -f /jffs/configs/WireguardVPN_map ];then
-                        mv /jffs/configs/WireguardVPN_map /jffs/configs/WireguardVPN_map.bak
-                        cp /jffs/configs/WireguardVPN_map.bak ${INSTALL_DIR}WireguardVPN.conf      # v2.01
-                    fi
+            # echo -e $cBRED"\a\n\tWireGuard® Session Manager v3.0 requires '${CONFIG_DIR}'\n\n\t${cBWHT}Do you want to rename '/opt/etc/wireguard' to '${CONFIG_DIR}' ?"
+            # echo -e "\tPress$cBRED y$cRESET to$cBRED auto-migrate to WireGuard® Session Manager v3.0${cRESET} or press$cBGRE [Enter] to SKIP."
+                # [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+                # if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
 
-                else
-                    echo -e $cBYEL"\n\tManually migrate by \n\n\t1. Reinstalling from Github\n\t2. Copy '/jffs/configs/WireguardVPN_map' to '${INSTALL_DIR}WireguardVPN.conf\n\t3. Copy /opt/etc/wireguard/'*.conf'/'*_key' to '${CONFIG_DIR}'\n"$cRESET
-                    exit 99
-                fi
-        fi
-    fi
+                    # mv /opt/etc/wireguard ${CONFIG_DIR}
+
+                    # # Legacy tidy-up! to adopt the new name for the configuration file
+                    # if [ -f /jffs/configs/WireguardVPN_map ];then
+                        # mv /jffs/configs/WireguardVPN_map /jffs/configs/WireguardVPN_map.bak
+                        # cp /jffs/configs/WireguardVPN_map.bak ${INSTALL_DIR}WireguardVPN.conf      # v2.01
+                    # fi
+
+                # else
+                    # echo -e $cBYEL"\n\tManually migrate by \n\n\t1. Reinstalling from Github\n\t2. Copy '/jffs/configs/WireguardVPN_map' to '${INSTALL_DIR}WireguardVPN.conf\n\t3. Copy /opt/etc/wireguard/'*.conf'/'*_key' to '${CONFIG_DIR}'\n"$cRESET
+                    # exit 99
+                # fi
+        # fi
+    # fi
 
     if [ "$CALL_REQUEST" == "service_event" ];then     # v4.17
 
@@ -7846,7 +7857,7 @@ if [ "$1" != "install" ];then   # v2.01
                     FN="/tmp/wgm_Data.txt"
 
                     case $WEBUI_CMD in
-                        "?"|list|stop|start|restart|start*|stop*|restart*|trimdb*|import*|diag|diag*|export*|vpndirector*|qrcode*|peer*|create*|ipset*)
+                        "?"|list|stop|start|restart|start*|stop*|restart*|trimdb*|import*|diag|diag*|export*|vpndirector*|qrcode*|peer*|create*|ipset*|WebUI_Import*)
                             TS=$(date)
                             echo -e "$TS" > $FN
                             am_settings_set wgm_Execute_TS $TS                               # v4.17
@@ -8176,6 +8187,21 @@ if [ "$1" != "install" ];then   # v2.01
                 Manage_IPSET "$@"
                 echo -e $cRESET
                 exit_message
+            ;;
+            WebUI_Import*)                                                          # import Peer.conf [type=server]
+
+                BASE64ENCODED=$2
+                FN="WebUIImport.conf"
+
+                echo -e $BASE64ENCODED | openssl base64 -d >${CONFIG_DIR}/$FN
+
+                Import_Peer "import" $FN
+
+                am_settings_set wgm_Execute "#WebUI_Import"
+
+                echo -e $cRESET
+                exit_message
+
             ;;
             "")
             ;;
