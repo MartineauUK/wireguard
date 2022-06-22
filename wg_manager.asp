@@ -32,18 +32,33 @@ font-weight: bolder;
 <script language="JavaScript" type="text/javascript" src="/help.js"></script>
 <script language="JavaScript" type="text/javascript" src="/validator.js"></script>
 <script language="JavaScript" type="text/javascript" src="/client_function.js"></script>
-<script language="JavaScript" type="text/javascript" src="/js/jquery.js"></script>
-<script language="JavaScript" type="text/javascript" src="/switcherplugin/jquery.iphone-switch.js"></script>
-<script language="JavaScript" type="text/javascript" src="/js/httpApi.js"></script>
-<script language="JavaScript" type="text/javascript" src="/ext/shared-jy/jquery.js"></script>
+<script language="JavaScript" type="text/javascript" type="text/javascript" src="/form.js"></script>
+<script language="JavaScript" type="text/javascript" src="js/httpApi.js"></script>
+<script language="JavaScript" type="text/javascript" src="js/qrcode.min.js"></script>
+<script language="JavaScript" type="text/javascript" src="js/jquery.js"></script>
+<!--<script language="JavaScript" type="text/javascript" src="/ext/shared-jy/jquery.js"></script>-->
+
 <script language="JavaScript" type="text/javascript" src="/ext/wireguard/ExecuteResults.js"></script>
 <!--<script language="JavaScript" type="text/javascript" src="/ext/wireguard/ExecutedTS.js"></script>-->
+<style>
+#wgm_QRCode_block{
+position: absolute;
+width: 230px;
+height: 260px;
+background-color: #444f53;
+padding: 3px 3px;
+margin-top: -40px;
+}
+</style>
 <script>
 <% get_wgc_parameter(); %>
 var custom_settings = <% get_custom_settings(); %>;
+
+/*var fs = require([require/require.min.js])*/
+
 /*openvpn_unit = '<% nvram_get("wgmc_unit"); %>';*/
 window.onresize = function() {
-cal_panel_block("wgs_QRCode_block", 0.18);
+cal_panel_block("wgm_QRCode_block", 0.18);
 }
 function initial(){
     show_menu();
@@ -59,12 +74,18 @@ function initial(){
     else
             document.getElementById('wgm_Kernel').value = custom_settings.wgm_Kernel;
 
-    document.getElementById('wgm_Execute').value = "";
+    if (document.getElementById("wgm_ExecuteResultsBase64").innerHTML == "Pending............") {
+        UpdateResults();
+
+        document.getElementById("wgm_ExecuteResultsBase64").innerHTML == "Ready"
+        }
 
     if (custom_settings.wgm_Execute_Result == undefined)
             document.getElementById("wgm_ExecuteResultsBase64").innerHTML = "N/A"
     else
            document.getElementById("wgm_ExecuteResultsBase64").innerHTML = atob(custom_settings.wgm_Execute_Result);
+
+    GetConfigSettings();
 
     $("thead").click(function(){
         $(this).siblings().toggle("fast");
@@ -88,7 +109,13 @@ function CMDExecute(){
    document.getElementById('amng_custom').value = JSON.stringify(custom_settings);
 
     if(validForm()){
-        showLoading();
+
+        debugger;
+
+        if (custom_settings.wgm_Execute == "stop" || custom_settings.wgm_Execute == "start") {
+            document.action_wait.value = "3";
+            showLoading();
+            }
 
         /*alert("Confirmation prompts such as\n\t\t'Are you sure you want to DELETE a Peer?\nobviously cannot be manually answered, so an affirmative auto reply\n\t\t'Y'\nwill be used'.\n\nSimilarly if you create a new Road-Warrior 'device' Peer, the Parent 'server' Peer will be automatically restarted so it can listen for the new Road-Warrior 'device' Peer, which may interrupt other Road-Warrior 'device' connections");*/
 
@@ -107,7 +134,12 @@ function CMDExecuteARG(command){
    document.getElementById('amng_custom').value = JSON.stringify(custom_settings);
 
     if(validForm()){
-        showLoading();
+
+        if (custom_settings.wgm_Execute == "stop" || custom_settings.wgm_Execute == "start") {
+            document.action_wait.value = "3";
+            showLoading();
+            }
+
         document.form.submit();
 
         /*sleepThenAct();*/
@@ -117,7 +149,11 @@ function CMDExecuteARG(command){
 }
 function CMDExecutePeerImport(command){
 
-    custom_settings.wgm_Execute = "import "+document.getElementById('wgm_PeerImport').value;;
+
+    if (document.getElementById('wgm_WebUI_Import').textContent == undefined)
+        custom_settings.wgm_Execute = "import "+document.getElementById('wgm_PeerImport').value;
+    else
+        custom_settings.wgm_Execute = "WebUI_Import " + btoa(document.getElementById('wgm_WebUI_Import').textContent)
 
    /* Store object as a string in the amng_custom hidden input field */
    document.getElementById('amng_custom').value = JSON.stringify(custom_settings);
@@ -146,12 +182,6 @@ function change_wgc_unit(unit){
     document.chg_wgc.wgc_unit.value=unit.toString();
     document.chg_wgc.submit();
 }
-/*function change_vpn_unit(val){
-    document.form.action_mode.value = "change_vpn_client_unit";
-    document.form.action = "apply.cgi";
-    document.form.target = "";
-    document.form.submit();
-}*/
 function sleepFor(sleepDuration){
     var now = new Date().getTime();
     while(new Date().getTime() < now + sleepDuration){
@@ -162,15 +192,73 @@ function sleepThenAct(){
     sleepFor(2000);
     console.log("Hello, JavaScript sleep!");
 }
+function change_wgm_unit(unit){
+document.chg_wgm.wgm_unit.value=unit.toString();
+document.chg_wgm.submit();
+}
+function change_wgmc_unit(unit){
+document.chg_wgmc.wgmc_unit.value=unit.toString();
+document.chg_wgmc.submit();
+}
+function ShowQRCode() {
+$('#wgm_QRCode_block').show();
+cal_panel_block("wgm_QRCode_block", 0.18);
+}
+function HideQRCode(){
+$('#wgm_QRCode_block').hide();
+}
+function ShowWinFile() {
+$('#wgm_WinFile_block').show();
+cal_panel_block("wgm_WinFile_block", 0.18);
+}
+function HideWinFile(){
+$('#wgm_WinFile_block').hide();
+}
 
-function showQRCode() {
-$('#wgs_QRCode_block').show();
-cal_panel_block("wgs_QRCode_block", 0.18);
+function GetConfigSettings() {
+    $.ajax({
+        url: "/ext/wireguard/config.htm",
+        dataType: "text",
+        cache: !1,
+        error: function(t) {
+            setTimeout(GetConfigSettings, 1e3)
+        },
+        success: function(data) {
+            for (var configdata = data.split("\n"), configdata = configdata.filter(Boolean), i = 0; i < configdata.length; i++) {
+
+            /*https://stackoverflow.com/questions/58718800/how-to-set-radio-button-by-default-based-on-variable-value*/
+                if (configdata[i] == "WEBUI"){
+                    $('#wgm_WEBUI').prop('checked',true);
+                }
+                if (configdata[i] == "USE_ENTWARE_KERNEL_MODULE"){
+                    $('#wgm_USE_ENTWARE_KERNEL_MODULE_enabled').prop('checked',true);
+                }
+                if (configdata[i] == "NOIPV6"){
+                    $('#wgm_NOIPV6_enabled').prop('checked',true);
+                }
+                if (configdata[i] == "DISABLE_FLOW_CACHE"){
+                    $('#wgm_DISABLE_FLOW_CACHE_enabled').prop('checked',true);
+                }
+                if (configdata[i] == "NOCOLOR"){
+                    $('#wgm_NOCOLOR_enabled').prop('checked',true);
+                }
+                if (configdata[i] == "NOMENU"){
+                    $('#wgm_NOMENU_enabled').prop('checked',true);
+                }
+                if (configdata[i] == "KILLSWITCH"){
+                    $('#wgm_KILLSWITCH_enabled').prop('checked',true);
+                }
+            }
+        }
+    })
 }
-function hideQRCode(){
-$('#wgs_QRCode_block').hide();
+function LetsDEBUG(wot) {
+    /*alert(wot);*/
+    debugger;
 }
+
 </script>
+
 
 </head>
 <body onload="initial();" onunLoad="return unload_body();" class="bg">
@@ -185,7 +273,7 @@ $('#wgs_QRCode_block').hide();
 <input type="hidden" name="first_time" value="">
 <input type="hidden" name="action_mode" value="apply">
 <input type="hidden" name="action_script" value="restart_wg_manager|serviceevent">
-<input type="hidden" name="action_wait" value="5">
+<input type="hidden" name="action_wait" value="1">
 <input type="hidden" name="preferred_lang" id="preferred_lang" value="<% nvram_get("preferred_lang"); %>">
 <input type="hidden" name="firmver" value="<% nvram_get("firmver"); %>">
 
@@ -208,7 +296,7 @@ $('#wgs_QRCode_block').hide();
                         <tr>
                             <td bgcolor="#4D595D" valign="top" >
                             <div>&nbsp;</div>
-                            <div style="color: indianred;" class="formfonttitle">VPN - WireGuard® Client ***** EXPERIMENTAL Beta v0.7 *****</div>
+                            <div style="color: indianred;" class="formfonttitle">VPN - WireGuard® Client ***** EXPERIMENTAL Beta v0.8 *****</div>
                             <div id="divSwitchMenu" style="margin-top:-40px;float:right;"></div
                             <div style="margin:10px 0 10px 5px;" class="splitLine"></div>
 
@@ -227,6 +315,7 @@ $('#wgs_QRCode_block').hide();
                                             <td>
                                                 <input type="text" readonly maxlength="30" class="input_12_table" id="wgm_Kernel">
                                             </td>
+
                             </table>
 
 <div>&nbsp;</div>
@@ -251,11 +340,11 @@ $('#wgs_QRCode_block').hide();
         <tr>
             <td style="padding: 0px;">
             <div style="color:#FFCC00;"><input type="checkbox" checked id="auto_refresh">Auto refresh</div>
-            <!--<div class="web_frame"><textarea cols="190" rows="27" wrap="off" readonly="readonly" id="wgm_ExecuteResultsBase64" class="textarea_log_table" style="font-family:'Courier New', Courier, mono; font-size:12px;border: none;padding: 0px;">Empty</textarea></div>-->
-            <div class="web_frame"><textarea cols="190" rows="27" wrap="off" readonly="readonly" id="wgm_ExecuteResultsBase64" class="textarea_log_table" style="font-family:'Courier New', Helvetica, MS UI Gothic, MS P Gothic, Microsoft Yahei UI, sans-serif; font-size:12px;border: none;padding: 0px;">Empty</textarea></div>
-            <!--<textarea cols="190" rows="27" wrap="off" readonly="readonly" id="wgm_ExecuteResultsBase64" class="scrollabletextbox" spellcheck="false" maxlength="8192" style="width:99%; font-family:'Courier New', Courier, mono; font-size:11px;"></textarea>-->
-            <!--<div class="web_frame" style="height:600px;overflow:auto;margin:5px><textarea cols="190" rows="27" wrap="off" readonly="readonly" id="wgm_ExecuteResultsBase64" class="textarea_ssh_table" spellcheck="false" maxlength="16384" style="width:99%; font-family:'Courier New', Courier, mono; font-size:11px;"></textarea></div>-->
 
+            <!--Syslog text area definition-->
+            <!--<textarea cols="63" rows="27" wrap="off" readonly="readonly" id="textarea" class="textarea_ssh_table" style="width:99%; font-family:'Courier New', Courier, mono; font-size:11px;">#TOP of Syslog</textarea>-->
+            <!--<textarea cols="63" rows="27" wrap="off" readonly="readonly" id="wgm_ExecuteResultsBase64" class="textarea_ssh_table" style="width:99%; font-family:'Courier New', Courier, mono; font-size:13px;">#TOP of Syslog</textarea>-->
+            <textarea cols="63" rows="27" wrap="off" readonly="readonly" id="wgm_ExecuteResultsBase64" class="textarea_ssh_table" style="width:99%; font-family:'Courier New', Helvetica, MS UI Gothic, MS P Gothic, Microsoft Yahei UI, sans-serif; font-size:13px;">#TOP of Syslog</textarea>
         </tr>
 </tbody>
 </table>
@@ -272,39 +361,41 @@ $('#wgs_QRCode_block').hide();
             <input type="text" maxlength="30" class="input_32_table" id="wgm_PeerImport">
             <legend>Import from <% nvram_get("productid"); %> Directory '/opt/etc/wireguard.d/'<legend>
         </td>
-        <td>
+        <td rowspan="2">
             <input type="radio" name="wgm_IMPORT" id="wgm_ImportClient_enabled" class="input" value="enable" checked="">
             <label for="XIMPORT_PEER">Client</label>
             <input type="radio" name="wgm_IMPORT" id="wgm_ImportServer_enabled" class="input" value="disable">
             <label for="XIMPORT_PEER">Server</label>
         </td>
-        <td>
+        <td rowspan="2">
             <input type="button" class="button_gen" onclick="CMDExecutePeerImport();" value="Import" id="btnClientImport" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
         </td>
     </tr>
 
-    <!--https://www.geeksforgeeks.org/how-to-read-a-local-text-file-using-javascript/-->
     <div style="line-height:10px;">&nbsp;</div>
     <tr>
-        <td colspan="4" class="buttongen">
-            <label>Upload from local PC </label>
+       <td colspan="4" class="buttongen">
+            <label>Upload from Local: ==> </label>
             <input type="file" name="inputfile" id="inputfile">
             <!--<legend>Upload from local PC<legend>-->
             <br>
 
-            <pre id="output"></pre>
+            <pre id="wgm_WebUI_Import"></pre>
 
             <script type="text/javascript">
                 document.getElementById('inputfile').addEventListener('change', function() {
 
                     var fr=new FileReader();
                     fr.onload=function(){
-                        document.getElementById('output')
+                        document.getElementById('wgm_WebUI_Import')
                                 .textContent=fr.result;
+
                     }
 
                     fr.readAsText(this.files[0]);
+
                 })
+
             </script>
         </td>
 
@@ -376,11 +467,10 @@ $('#wgs_QRCode_block').hide();
     </tr>
 </thead>
 <tbody>
-    <tr id="vpn_unit_field" class="rept ew" value=openvpn_unit>
-
+    <tr id="wgmc_unit_field" class="rept ew">
         <th>Select Client Index</th>
         <td>
-            <select name="vpn_client_unit" class="input_option" onChange="change_vpn_unit(this.value);">
+            <select name="wgmc_unit" class="input_option" onChange="change_wgmc_unit(this.value);">
             <option class="content_input_fd" value="1" <% nvram_match("wgmc_unit", "1","selected"); %>>1</option>
             <option class="content_input_fd" value="2" <% nvram_match("wgmc_unit", "2","selected"); %>>2</option>
             <option class="content_input_fd" value="3" <% nvram_match("wgmc_unit", "3","selected"); %>>3</option>
@@ -396,7 +486,7 @@ $('#wgs_QRCode_block').hide();
     <tr>
         <th>Description</th>
         <td>
-            <input type="text" readonly maxlength="40" name="wgc_desc" id="wgc_desc" class="input_32_table" value="<% nvram_get("wgmc_desc"); %>" autocorrect="off" autocapitalize="off"></input>
+            <input type="text" maxlength="40" name="wgc_desc" id="wgc_desc" class="input_32_table" value="<% nvram_get("wgmc_desc"); %>" autocorrect="off" autocapitalize="off"></input>
         </td>
     </tr>
     <tr id="wgc_auto" value="<% nvram_get("wgmc_auto"); %>">
@@ -409,7 +499,6 @@ $('#wgs_QRCode_block').hide();
                 <option value="S">Site to Site</option>
                 <option value="W">WG-Quick</option>
              </select>
-            <!--<legend>Legend Descriptions goes here</legend>-->
         </td>
     </tr>
     <tr id="wgmc_status">
@@ -431,20 +520,20 @@ $('#wgs_QRCode_block').hide();
             <input type="button" class="button_gen" onclick="CMDExecuteARG('start wg1'+wgcindex);" value="Start" id="btnStartWGClient" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
             <input type="button" class="button_gen" onclick="CMDExecuteARG('restart wg1'+wgcindex);" value="Restart" id="btnRestartWGClient" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
             <input type="button" class="button_gen" onclick="CMDExecuteARG('peer wg1'+wgcindex+' del');" value="Delete" id="btnDeleteWGClient" style="background: linear-gradient(rgb(234, 45, 8) 0%, rgb(234, 45, 8) 100%);">
-            <input type="button" class="button_gen" onClick="showQRCode('wg11');"value="QR Code" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);"/>
+            <input type="button" class="button_gen" onClick="ShowQRCode('wg11');" value="QR Code" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);"/>
 
-
-<div id="wgs_QRCode_block" style="display:none">
-<div style="display:flex; align-items: center;">
-<div style="width:28px;height:28px;background-image:url('images/New_ui/disable.svg');cursor:pointer" onclick="hideQRCode();"></div>
-</div>
-<img src='wgs_client.png'></img>
-</div>
-
-
-
+            <div id="wgm_QRCode_block" style="display:none">
+                <div style="display:flex; align-items: center;">
+                    <div style="width:20px;height:20px;background-image:url('images/New_ui/disable.svg');cursor:pointer" onclick="HideQRCode();"></div>
+                </div>
+                <div id="qrcode"></div>
+                <script type="text/javascript">
+                    new QRCode(document.getElementById("qrcode"), " Sorry old bean, not ready for Primetime yet!");
+                </script>
+            </div>
         </td>
     </tr>
+    <!--<img src="/ext/wireguard/frame.png" alt="wg11 QRCODE" width="200" height="185"/>-->
 </tbody>
 </table>
 
@@ -525,63 +614,57 @@ $('#wgs_QRCode_block').hide();
             <input type="button" class="button_gen" onclick="CMDExecuteARG('?');" value="Show Infomation" id="btnShowConfig" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
         </td>
     </tr>
-    <tr class="even" id="wgm_row_opt_noipv6">
-        <td class="settingname">NOIPV6 - Disable IPv6<br></td>
-        <td class="settingvalue">
-            <input type="radio" name="wgm_NOIPV6" id="wgm_NOIPV6_enabled" class="input" value="enable">
-            <label for="XNOIPV6 - Disable IPv6">Yes</label>
-            <input type="radio" name="wgm_NOIPV6"" id="wgm_NOIPV6_enabled" class="input" value="disable" checked="">
-            <label for="XNOIPV6 - Allow IPv6">No</label>
-        </td>
     </tr>
-        <tr class="even" id="wgm_row_opt_nocolor">
-        <td class="settingname">NOCOLOUR (Disable ANSI colours)<br></td>
-        <td class="settingvalue">
-            <input type="radio" name="wgm_NOCOLOR" id="wgm_NOCOLOR_enabled" class="input" value="enable">
-            <label for="XNOCOLOR - Disable ANSI colour">Yes</label>
-            <input type="radio" name="wgm_NOCOLOR"" id="wgm_NOCOLOR_enabled" class="input" value="disable" checked="">
-            <label for="XNOCOLOR - Allow ANSI colour">No</label>
-        </td>
-    </tr>
-    </tr>
-        <tr class="even" id="wgm_row_opt_killswitch">
-        <td class="settingname">KILLSWITCH (Activate)<br></td>
-        <td class="settingvalue">
-            <input type="radio" name="wgm_KILLSWITCH" id="wgm_KILLSWITCH_enabled" class="input" value="enable">
-            <label for="XKILLSWITCH">Yes</label>
-            <input type="radio" name="wgm_KILLSWITCH" id="wgm_KILLSWITCH_enabled" class="input" value="disable" checked="">
-            <label for="XKILLSWITCH">No</label>
-        </td>
-    </tr>
-    </tr>
-        <tr class="even" id="wgm_row_opt_killswitch">
+    <tr id="wgm_row_opt_use_entware_kernel_module">
         <td class="settingname">USE_ENTWARE_KERNEL_MODULE (Activate)<br></td>
         <td class="settingvalue">
-            <input type="radio" name="wgm_USE_ENTWARE_KERNEL_MODULE" id="wgm_USE_ENTWARE_KERNEL_MODULE_enabled" class="input" value="enable">
+            <input type="radio" name="wgm_USE_ENTWARE_KERNEL_MODULE" id="wgm_USE_ENTWARE_KERNEL_MODULE_enabled" class="input" value="disable">
             <label for="XUSE_ENTWARE_KERNEL_MODULE">Yes</label>
-            <input type="radio" name="wgm_USE_ENTWARE_KERNEL_MODULE" id="wgm_USE_ENTWARE_KERNEL_MODULE_enabled" class="input" value="disable" checked="">
-            <label for="XUSE_ENTWARE_KERNEL_MODULE">No</label>
         </td>
     </tr>
+    <tr id="wgm_row_opt_noipv6">
+        <td class="settingname">NOIPV6 - Disable IPv6<br></td>
+        <td class="settingvalue">
+            <input type="radio" name="wgm_NOIPV6" id="wgm_NOIPV6_enabled" class="input" value="disable">
+            <label for="XNOIPV6 - Disable IPv6">Yes</label>
+        </td>
     </tr>
-        <tr class="even" id="wgm_row_opt_disable_fc">
+    <tr id="wgm_row_opt_disable_fc">
         <td class="settingname">DISABLE_FLOW_CACHE (Activate)<br></td>
         <td class="settingvalue">
-            <input type="radio" name="wgm_DISABLE_FLOW_CACHE" id="wgm_DISABLE_FLOW_CACHE_enabled" class="input" value="enable">
+            <input type="radio" name="wgm_DISABLE_FLOW_CACHE_enabled" id="wgm_DISABLE_FLOW_CACHE_enabled" class="input" value="disable">
             <label for="XDISABLE_FLOW_CACHE">Yes</label>
-            <input type="radio" name="wgm_DISABLE_FLOW_CACHE" id="wgm_DISABLE_FLOW_CACHE_enabled" class="input" value="disable" checked="">
-            <label for="XDISABLE_FLOW_CACHE">No</label>
+
         </td>
     </tr>
+    <tr  id="wgm_row_opt_nocolor">
+        <td class="settingname">NOCOLOR (Disable ANSI colours)<br></td>
+        <td class="settingvalue">
+            <input type="radio" name="wgm_NOCOLOR" id="wgm_NOCOLOR_enabled" class="input" value="disable">
+            <label for="XNOCOLOR - Disable ANSI colour">Yes</label>
+        </td>
     </tr>
-        <tr class="even" id="wgm_row_opt_webui">
+    <tr id="wgm_row_opt_nomenu">
+        <td class="settingname">NOMENU (Disable MENU)<br></td>
+        <td class="settingvalue">
+            <input type="radio" name="wgm_NOMENU" id="wgm_NOMENU_enabled" class="input" value="disable">
+            <label for="XNOCOLOR - Disable MENU">Yes</label>
+        </td>
+    </tr>
+    <tr id="wgm_row_opt_killswitch">
+        <td class="settingname">KILLSWITCH (Activate)<br></td>
+        <td class="settingvalue">
+            <input type="radio" name="wgm_KILLSWITCH" id="wgm_KILLSWITCH_enabled" class="input" value="disable">
+            <label for="XKILLSWITCH">Yes</label>
+        </td>
+    </tr>
+    <tr id="wgm_row_opt_webui">
         <td class="settingname">WebUI Enabled<br></td>
         <td class="settingvalue">
-            <input type="radio" name="wgm_WEBUI" id="wgm_WEBUI_enabled" class="input" value="enable" checked="">
+            <input type="radio"  name="wgm_WEBUI" id="wgm_WEBUI" class="input">
             <label for="XWEBUI">Yes</label>
         </td>
     </tr>
-
     <tr class="apply_gen" valign="top" height="35px">
         <td colspan="2" class="savebutton">
         <input type="button" onclick="SaveConfig();" value="Dummy SAVE Button" class="button_gen savebutton" name="button">
@@ -714,19 +797,23 @@ $('#wgs_QRCode_block').hide();
 <td width="10" align="center" valign="top">&nbsp;</td>
 </tr>
 </table>
-
-
-
-
-
 </form>
-<form method="post" name="chg_wgc" action="apply.cgi" target="hidden_frame">
-<input type="hidden" name="action_mode" value="chg_wgc_unit">
+
+<form method="post" name="chg_wgm" action="apply.cgi" target="hidden_frame">
+<input type="hidden" name="action_mode" value="chg_wgm_unit">
 <input type="hidden" name="action_script" value="">
 <input type="hidden" name="action_wait" value="">
 <input type="hidden" name="current_page" value="wg_manager.asp">
-<input type="hidden" name="wgc_unit" value="">
+<input type="hidden" name="wgmc_unit" value="">
 </form>
+<form method="post" name="chg_wgmc" action="apply.cgi" target="hidden_frame">
+<input type="hidden" name="action_mode" value="chg_wgmc_unit">
+<input type="hidden" name="action_script" value="">
+<input type="hidden" name="action_wait" value="">
+<input type="hidden" name="current_page" value="wg_manager.sp">
+<input type="hidden" name="wgmc_unit" value="">
+</form>
+
 <div id="footer"></div>
 </body>
 </html>
