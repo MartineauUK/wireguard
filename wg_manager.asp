@@ -87,6 +87,8 @@ function initial(){
 
     GetConfigSettings();
 
+    document.getElementById('wgm_WebUI_Import').textContent = ""
+
     $("thead").click(function(){
         $(this).siblings().toggle("fast");
     })
@@ -166,6 +168,7 @@ function CMDExecutePeerImport(command){
 
         UpdateResults();
     }
+    document.getElementById('wgm_WebUI_Import').textContent = ""
 }
 function applyRule(){
 
@@ -245,6 +248,12 @@ function GetConfigSettings() {
                 if (configdata[i] == "NOMENU"){
                     $('#wgm_NOMENU_enabled').prop('checked',true);
                 }
+                if (configdata[i] == "ROGUE220IGNORE"){
+                    $('#wgm_ROGUE220IGNORE_enabled').prop('checked',true);
+                }
+                if (configdata[i] == "ROGUE220DELETE"){
+                    $('#wgm_ROGUE220DELETE_enabled').prop('checked',true);
+                }
                 if (configdata[i] == "KILLSWITCH"){
                     $('#wgm_KILLSWITCH_enabled').prop('checked',true);
                 }
@@ -296,7 +305,7 @@ function LetsDEBUG(wot) {
                         <tr>
                             <td bgcolor="#4D595D" valign="top" >
                             <div>&nbsp;</div>
-                            <div style="color: indianred;" class="formfonttitle">VPN - WireGuard® Client ***** EXPERIMENTAL Beta v0.8 *****</div>
+                            <div style="color: indianred;" class="formfonttitle">VPN - WireGuard® Client ***** EXPERIMENTAL Beta v0.9 *****</div>
                             <div id="divSwitchMenu" style="margin-top:-40px;float:right;"></div
                             <div style="margin:10px 0 10px 5px;" class="splitLine"></div>
 
@@ -528,7 +537,7 @@ function LetsDEBUG(wot) {
                 </div>
                 <div id="qrcode"></div>
                 <script type="text/javascript">
-                    new QRCode(document.getElementById("qrcode"), " Sorry old bean, not ready for Primetime yet!");
+                    new QRCode(document.getElementById("qrcode"), "<% nvram_get("wgmc_desc"); %>" + "\n[Interface]" + "\nPrivateKey = " + "<% nvram_get("wgmc_priv"); %>" + "\nAddress = " + "<% nvram_get("wgmc_addr"); %>" + "\nDNS = " + "<% nvram_get("wgmc_dns"); %>" + "\n\n[Peer]" + "\nPublicKey = " + "<% nvram_get("wgmc_ppub"); %>" + "\nAllowedIPs = " + "<% nvram_get("wgmc_aips"); %>" + "\nEndPoint = " + "<% nvram_get("wgmc_ep_addr"); %>" + ":" + "<% nvram_get("wgmc_ep_port"); %>"  );
                 </script>
             </div>
         </td>
@@ -616,21 +625,21 @@ function LetsDEBUG(wot) {
     </tr>
     </tr>
     <tr id="wgm_row_opt_use_entware_kernel_module">
-        <td class="settingname">USE_ENTWARE_KERNEL_MODULE (Activate)<br></td>
+        <td class="settingname">USE_ENTWARE_KERNEL_MODULE Allow use of 3rd Party WireGuard modules Enabled<br></td>
         <td class="settingvalue">
             <input type="radio" name="wgm_USE_ENTWARE_KERNEL_MODULE" id="wgm_USE_ENTWARE_KERNEL_MODULE_enabled" class="input" value="disable">
             <label for="XUSE_ENTWARE_KERNEL_MODULE">Yes</label>
         </td>
     </tr>
     <tr id="wgm_row_opt_noipv6">
-        <td class="settingname">NOIPV6 - Disable IPv6<br></td>
+        <td class="settingname">NOIPV6 - Disable IPv6 Enabled<br></td>
         <td class="settingvalue">
             <input type="radio" name="wgm_NOIPV6" id="wgm_NOIPV6_enabled" class="input" value="disable">
             <label for="XNOIPV6 - Disable IPv6">Yes</label>
         </td>
     </tr>
     <tr id="wgm_row_opt_disable_fc">
-        <td class="settingname">DISABLE_FLOW_CACHE (Activate)<br></td>
+        <td class="settingname">DISABLE_FLOW_CACHE Enabled<br></td>
         <td class="settingvalue">
             <input type="radio" name="wgm_DISABLE_FLOW_CACHE_enabled" id="wgm_DISABLE_FLOW_CACHE_enabled" class="input" value="disable">
             <label for="XDISABLE_FLOW_CACHE">Yes</label>
@@ -638,24 +647,38 @@ function LetsDEBUG(wot) {
         </td>
     </tr>
     <tr  id="wgm_row_opt_nocolor">
-        <td class="settingname">NOCOLOR (Disable ANSI colours)<br></td>
+        <td class="settingname">NOCOLOR Disable ANSI colours Enabled<br></td>
         <td class="settingvalue">
             <input type="radio" name="wgm_NOCOLOR" id="wgm_NOCOLOR_enabled" class="input" value="disable">
             <label for="XNOCOLOR - Disable ANSI colour">Yes</label>
         </td>
     </tr>
     <tr id="wgm_row_opt_nomenu">
-        <td class="settingname">NOMENU (Disable MENU)<br></td>
+        <td class="settingname">NOMENU Disable MENU Enabled<br></td>
         <td class="settingvalue">
             <input type="radio" name="wgm_NOMENU" id="wgm_NOMENU_enabled" class="input" value="disable">
             <label for="XNOCOLOR - Disable MENU">Yes</label>
         </td>
     </tr>
     <tr id="wgm_row_opt_killswitch">
-        <td class="settingname">KILLSWITCH (Activate)<br></td>
+        <td class="settingname">KILLSWITCH Enabled)<br></td>
         <td class="settingvalue">
             <input type="radio" name="wgm_KILLSWITCH" id="wgm_KILLSWITCH_enabled" class="input" value="disable">
             <label for="XKILLSWITCH">Yes</label>
+        </td>
+    </tr>
+    <tr id="wgm_row_opt_ignore_rogue220">
+        <td class="settingname">ROGUE220IGNORE RPDB Priority 220 IGNORE Enabled<br></td>
+        <td class="settingvalue">
+            <input type="radio" name="wgm_KILLSWITCH" id="wgm_ROGUE220IGNORE_enabled" class="input" value="disable">
+            <label for="XROGUE220IGNORE">Yes</label>
+        </td>
+    </tr>
+    <tr id="wgm_row_opt_delete_rogue220">
+        <td class="settingname">ROGUE220DELETE RPDB Priority 220 DELETE Enabled<br></td>
+        <td class="settingvalue">
+            <input type="radio" name="wgm_KILLSWITCH" id="wgm_ROGUE220DELETE_enabled" class="input" value="disable">
+            <label for="XROGUE220DELETE">Yes</label>
         </td>
     </tr>
     <tr id="wgm_row_opt_webui">
