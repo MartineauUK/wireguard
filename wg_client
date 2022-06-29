@@ -1,11 +1,11 @@
 #!/bin/sh
-# shellcheck disable=SC2039,SC2155,SC2124,SC2046
-VERSION="v4.17.6"
-#============================================================================================ © 2021-2022 Martineau v4.17.6
+    # shellcheck disable=SC2039,SC2155,SC2124,SC2046
+VERSION="v4.17.7"
+#============================================================================================ © 2021-2022 Martineau v4.17.7
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 22-May-2022
+# Last Updated Date: 29-Jun-2022
 #
 # Description:
 #
@@ -841,6 +841,32 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
 
                         ADD_IPV4_RULE=
                         ADD_IPV6_RULE=
+                    done
+            fi
+
+            if [ -n "$PEER_DNS_LIST" ];then                                             # V4.17.7
+                for PEER_DNS in $(echo "$PEER_DNS_LIST" | tr ',' ' ')
+                    do
+                        if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then
+                            if [ -n "$(echo "${LAN_SUBNET}.0/24" | Is_IPv4_CIDR)" ];then
+                                if [ -z "$(echo "$PEER_DNS" | grep -F ":")" ];then
+                                    cmd iptables -t nat -A WGDNS$VPN_NUM -s ${LAN_SUBNET}.0/24 -j DNAT --to-destination $PEER_DNS -m comment --comment "WireGuard 'client${VPN_NUM} DNS'"
+                                fi
+                            fi
+                            if [ "$USE_IPV6" == "Y" ] && [ -n "$(echo "$PEER_DNS" | grep -F ":")" ];then
+                                #   ipv6_service=dhcp6
+                                #   ipv6_prefix=2a02:c7f:xxxx:yyyy::
+                                #   ipv6_prefix_length=56
+                                #   ipv6_rtr_addr=2a02:c7f:xxxx:yyyy::1
+                                if [ -n "$(nvram get ipv6_rtr_addr)" ];then
+                                    cmd ip6tables -t nat -A WGDNS$VPN_NUM -s $(nvram get ipv6_prefix)/$(nvram get ipv6_prefix_length)  -j DNAT --to-destination $PEER_DNS -m comment --comment "WireGuard 'client${VPN_NUM} DNS'"
+                                else
+                                    cmd ip6tables -t nat -A WGDNS$VPN_NUM -j DNAT --to-destination $PEER_DNS -m comment --comment "WireGuard 'client${VPN_NUM} DNS'"
+                                fi
+                            fi
+                        else
+                            [ -z "$(echo "$PEER_DNS" | grep -F ":")" ] && cmd iptables -t nat -A WGDNS$WG_INTERFACE -s ${LAN_SUBNET}.0/24 -j DNAT --to-destination $PEER_DNS -m comment --comment "WireGuard 'client${WG_INTERFACE} DNS'"
+                        fi
                     done
             fi
 
