@@ -1,7 +1,7 @@
 #!/bin/sh
     # shellcheck disable=SC2039,SC2155,SC2124,SC2046,SC2027
-VERSION="v4.17bC"
-#============================================================================================ © 2021-2022 Martineau v4.17bC
+VERSION="v4.17bD"
+#============================================================================================ © 2021-2022 Martineau v4.17bD
 #
 #       wgm   [ help | -h ]
 #       wgm   [ { start | stop | restart } [wg_interface]... ]
@@ -33,7 +33,7 @@ VERSION="v4.17bC"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 22-Jun-2022
+# Last Updated Date: 29-Jun-2022
 
 #
 # Description:
@@ -1250,7 +1250,7 @@ Import_Peer() {
                     case $MODE in
                         client)
                             local TABLE="clients"
-                            local AUTO="N"
+                            local AUTO="Y"                  # v4.17
                             local KEY="peer"
                         ;;
                         device)
@@ -1260,7 +1260,7 @@ Import_Peer() {
                         ;;
                         server)
                             local TABLE="servers"
-                            local AUTO="N"
+                            local AUTO="Y"                  # v4.17
                             local KEY="peer"
                             [ -n "$(grep -E "^Endpoint" ${IMPORT_DIR}${WG_INTERFACE}.conf)" ] && AUTO="S"   # v.4.15 Site-to-Site
                         ;;
@@ -3505,7 +3505,7 @@ TrimDB 99
 
 # Auto delete the rogue RPDB PRIO 220 rules
 #     Use command 'vx' to edit this setting
-#ROUGE220IGNORE
+#ROGUE220IGNORE
 #ROGUE220DELETE
 
 # During Boot 'init' request process, specify a delay period e.g. INITDELAY 90s
@@ -6257,7 +6257,17 @@ Process_User_Choice() {
 
                     ShowHelp
                 ;;
-            vx|vx" "*|v|v" "*)              # v4.17 v1.10
+            vx|vx" "*|v|v" "*|vi|vi" "*|vix*)            # v4.17 v1.10
+
+                local EDITOR="nano"
+                local ACCESS="--view"
+
+                if [ "${menu1:0:2}" == "vi" ];then          # v4.17 @JGrana
+                    local EDITOR="vi"                       # v4.17 @JGrana
+                    local ACCESS="-R"                       # v4.17 @JGrana
+                fi
+
+                [ "$menu1" == "vix" ] &&  local ACCESS=""   # v4.17 @JGrana
 
                 if [ -n "$2" ];then         # v4.17
                     local FN=$2             # v4.17
@@ -6268,10 +6278,10 @@ Process_User_Choice() {
                     local FN="${INSTALL_DIR}WireguardVPN.conf"
                 fi
 
-                local ACCESS="--view"
+                if [ "${menu1:0:2}" == "vx" ] || [ "${menu1:0:3}" == "vix" ];then       # v4.17 @JGrana
+                    [ "${menu1:0:2}" == "vx" ] && local ACCESS="--unix"
+                    [ "${menu1:0:3}" == "vix" ] && local ACCESS=                        # v4.17 @JGrana
 
-                if [ "${menu1:0:2}" == "vx" ];then
-                    local ACCESS="--unix"
                     if [ "$FN" != "${INSTALL_DIR}WireguardVPN.conf" ];then
                         if [ "$(nvram get et0macaddr | tail -c 6)" != "$3" ] && [ ! -f ${CONFIG_DIR}Read.me ];then
                             local ACCESS="--view"
@@ -6282,18 +6292,20 @@ Process_User_Choice() {
                 fi
 
                 if [ -f $FN ];then
-                    [ "$ACCESS" == "--unix" ] && local PRE_MD5="$(md5sum $FN | awk '{print $1}')"
-                    nano $ACCESS $FN
+                    if [ "$ACCESS" == "--unix" ] || [ "${menu1:0:3}" == "vix" ];then        # v4.17 @JGrana
+                        local PRE_MD5="$(md5sum $FN | awk '{print $1}')"
+                    fi
+                    $EDITOR $ACCESS $FN                                             # v4.17
                 else
                     echo -e $cBRED"\a\n\t***ERROR WireGuard® Peer Configuration ${cBWHT}'$FN'${cBRED} NOT found\n"$cRESET
                 fi
 
-                if [ "$ACCESS" == "--unix" ];then                                                                       # v4.17
+                if [ "$ACCESS" == "--unix" ] || [ "${menu1:0:3}" == "vix" ];then        # v4.17 @JGrana                                                                            # v4.17
                     local POST_MD5="$(md5sum $FN | awk '{print $1}')"
                     local WG_INTERFACE=${FN##*/}
                     local WG_INTERFACE=${WG_INTERFACE%.*}
 
-                    [ -d /www/user/wireguard ] && awk '!/^ *#/ && NF' /jffs/addons/wireguard/WireguardVPN.conf >/www/user/wireguard/config.htm  # v4.17
+                    [ -d /www/user/wireguard ] && awk '!/^ *#/ && NF' ${INSTALL_DIR}WireguardVPN.conf > ${SCRIPT_WEB_DIR}/config.htm  # v4.17
 
                     if [ "$POST_MD5" != "$PRE_MD5" ];then
 
@@ -6623,6 +6635,8 @@ Process_User_Choice() {
 
                             Manage_WebUI_API "INIT"          # v4.17
 
+                            [ -d /www/user/wireguard ] && awk '!/^ *#/ && NF' ${INSTALL_DIR}WireguardVPN.conf > ${SCRIPT_WEB_DIR}/config.htm  # v4.17
+
                             if [ "$ACTION" == "mountX" ] || [ "$ACTION" == "mX" ];then
                                 service restart_httpd >/dev/null        # WebUI v4.17
                                 echo -e $cBGRE"\t[✔]${cBWHT} Restarted service_httpd for WebUI"$cRESET
@@ -6739,7 +6753,7 @@ Process_User_Choice() {
                         #fi
                     ;;
                 esac
-                [ -d /www/user/wireguard ] && awk '!/^ *#/ && NF' /jffs/addons/wireguard/WireguardVPN.conf >/www/user/wireguard/config.htm  # v4.17
+                [ -d /www/user/wireguard ] && awk '!/^ *#/ && NF' /jffs/addons/wireguard/WireguardVPN.conf > ${SCRIPT_WEB_DIR}/config.htm  # v4.17
             ;;
             addon|addon*)                           # v4.15         {script_name [ dev | remove | del ] }
 
@@ -7715,6 +7729,9 @@ SHELL=$(readlink /proc/$$/exe)              # 4.14
 
 EASYMENU="Y"
 
+# Hack!!!!
+[ -d /www/user/wireguard ] && awk '!/^ *#/ && NF' ${INSTALL_DIR}WireguardVPN.conf > ${SCRIPT_WEB_DIR}/config.htm  # v4.17
+
 IPV6_SERVICE=$(nvram get ipv6_service)                  # v4.14
 if [ "$IPV6_SERVICE" != "disabled" ];then               # v4.14
     case $IPV6_SERVICE in
@@ -7807,7 +7824,7 @@ if [ "$1" != "install" ];then   # v2.01
     VERSION_NUMDOT=$VERSION                                             # v3.03
     VERSION_NUM=$(echo "$VERSION" | sed 's/[^0-9]*//g')
 
-    [ -d /www/user/wireguard ] && awk '!/^ *#/ && NF' /jffs/addons/wireguard/WireguardVPN.conf >/www/user/wireguard/config.htm  # v4.17
+    [ -d /www/user/wireguard ] && awk '!/^ *#/ && NF' /jffs/addons/wireguard/WireguardVPN.conf > ${SCRIPT_WEB_DIR}/config.htm  # v4.17
 
     # if [ "${VERSION_NUM:0:1}" -eq 3 ] && [ ! -d ${CONFIG_DIR} ];then    # v3.03
 
