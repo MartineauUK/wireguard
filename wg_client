@@ -1,11 +1,11 @@
 #!/bin/sh
     # shellcheck disable=SC2039,SC2155,SC2124,SC2046
-VERSION="v4.17.8"
-#============================================================================================ © 2021-2022 Martineau v4.17.8
+VERSION="v4.17.9"
+#============================================================================================ © 2021-2022 Martineau v4.17.9
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 29-Jun-2022
+# Last Updated Date: 30-Jun-2022
 #
 # Description:
 #
@@ -210,7 +210,7 @@ create_client_list(){
             logger -t "wg_manager-${MODE}${VPN_NAME}" "Adding WireGuard 'client' Peer route ${SRCA}${DSTC}$DSTA through $TARGET_NAME"
             echo -en $cRESET
 
-            if [ -n "$PEER_DNS" ] && [ "$TARGET_LOOKUP" != "main" ] && [ "$VPN_IP" != "Any" ];then
+            if [ -n "$PEERDNS_LIST" ] && [ "$TARGET_LOOKUP" != "main" ] && [ "$VPN_IP" != "Any" ];then  # v4.17.9 @ZebMcKayhan
 
                 for PEER_DNS in $PEERDNS_LIST                   # v4.14.8 @ZebMcKayhan
                     do
