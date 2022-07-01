@@ -22,12 +22,21 @@ Example successful install.....
     +======================================================================+
     |  Welcome to the WireGuard Manager/Installer script (Asuswrt-Merlin)  |
     |                                                                      |
-    |                      Version v4.17b by Martineau                     |
+    |                     Version v4.18bX by Martineau                     |
     |                                                                      |
     | Requirements: HND or AX router with Kernel 4.1.xx or later           |
     |                         e.g. RT-AC86U or RT-AX86U etc.               |
     |                                                                      |
     |               USB drive with Entware installed                       |
+    | ******************************************************************** |
+    | *   NOTE:  WireGuard® is incompatible with Hardware Acceleration   * |
+    | *          You can disable Hardware Acceleration using command     * |
+    | *                                                                  * |
+    | *                   E:Option ==> fc disable                        * |
+    | *                                                                  * |
+    | *          but you will most likely limit the throughput via WAN   * |
+    | *                  to match the maximum WireGuard® speed           * |
+    | ******************************************************************** |
     |                                                                      |
     |   1 = Install WireGuard                                              |
     |       o1. Enable firewall-start protection for Firewall rules        |
