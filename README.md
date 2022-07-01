@@ -28,6 +28,16 @@ Example successful install.....
     |                         e.g. RT-AC86U or RT-AX86U etc.               |
     |                                                                      |
     |               USB drive with Entware installed                       |
+    |                                                                      |  
+    | ******************************************************************** |
+    | *   NOTE:  WireGuard® is incompatible with Hardware Acceleration   * |
+    | *          You can disable Hardware Acceleration using command     * |
+    | *                                                                  * |
+    | *                   E:Option ==> fc disable                        * |
+    | *                                                                  * |
+    | *          but you will most likely limit the throughput via WAN   * |
+    | *                  to match the maximum WireGuard® speed           * |
+    | ******************************************************************** |
     |                                                                      |
     |   1 = Install WireGuard                                              |
     |       o1. Enable firewall-start protection for Firewall rules        |
