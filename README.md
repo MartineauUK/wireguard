@@ -28,6 +28,7 @@ Example successful install.....
     |                         e.g. RT-AC86U or RT-AX86U etc.               |
     |                                                                      |
     |               USB drive with Entware installed                       |
+    |                                                                      |
     | ******************************************************************** |
     | *   NOTE:  WireGuard® is incompatible with Hardware Acceleration   * |
     | *          You can disable Hardware Acceleration using command     * |
