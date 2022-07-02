@@ -33,7 +33,7 @@ VERSION="v4.17"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 01-Jul-2022
+# Last Updated Date: 02-Jul-2022
 
 #
 # Description:
@@ -2431,8 +2431,10 @@ Manage_Wireguard_Sessions() {
                     local POLICY_MODE=                      # v4.14
 
                     # Temporary WebUI hack
-                    Export_Peer "export" "wg11"
-                    nvram commit
+                    if [ -f ${CONFIG_DIR}wg11.conf ];then   # v4.17
+                        Export_Peer "export" "wg11"
+                        nvram commit
+                    fi
 
                 done
             WG_show
