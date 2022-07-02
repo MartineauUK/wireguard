@@ -33,7 +33,7 @@ VERSION="v4.18b"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 29-Jun-2022
+# Last Updated Date: 02-Jul-2022
 
 #
 # Description:
@@ -1155,7 +1155,7 @@ Import_Peer() {
     local ACTION=$1;shift
     local WG_INTERFACE=$1
 
-    if [ "$1" == "?" ];then
+    if [ -z "$1"] || [ "$1" == "?" ];then       # v4.17
         local CONFIGS=$(ls -1 ${CONFIG_DIR}*.conf 2>/dev/null | awk -F '/' '{print $5}' | grep -v "wg[1-2]" | sort )
         echo -e $cBYEL"\n\t Available Peer Configs for import:\n${cRESET}$CONFIGS"
         return 0
@@ -2431,8 +2431,10 @@ Manage_Wireguard_Sessions() {
                     local POLICY_MODE=                      # v4.14
 
                     # Temporary WebUI hack
-                    Export_Peer "export" "wg11"
-                    nvram commit
+                    if [ -f ${CONFIG_DIR}wg11.conf ];then   # v4.17
+                        Export_Peer "export" "wg11"
+                        nvram commit
+                    fi
 
                 done
             WG_show
@@ -2512,8 +2514,10 @@ Manage_Wireguard_Sessions() {
                 done
 
                 # Temporary WebUI hack
-                Export_Peer "export" "wg11"
-                nvram commit
+                if [ -f ${CONFIG_DIR}wg11.conf ];then   # v4.18
+                    Export_Peer "export" "wg11"
+                    nvram commit
+                fi
 
             WG_show
             ;;
@@ -3993,6 +3997,11 @@ Show_Info_HDR() {
     echo -e $cBMAG"\n\t${VERSION}$cBWHT WireGuard® Session Manager" ${CHANGELOG}$cRESET  # v2.01
 
     [ -d ${INSTALL_DIR} ] && Show_MD5 "script"
+
+    local AVERSION=$(grep -E "^VERSION=" ${INSTALL_DIR}wg_client | awk -F'"' '{print $2}')
+    echo -e $cBMAG"\n\t\t${AVERSION}$cBWHT (${cBCYA}wg_client$cRESET)"  # v4.17
+    local AVERSION=$(grep -E "^VERSION=" ${INSTALL_DIR}wg_server | awk -F'"' '{print $2}')
+    echo -e $cBMAG"\t\t${AVERSION}$cBWHT (${cBCYA}wg_server$cRESET)"  # v4.17
 
 }
 Show_Info() {
@@ -5922,8 +5931,8 @@ Build_Menu() {
 
         if [ "$(WireGuard_Installed)" == "Y" ];then
 
-            MENU_VX="$(printf '%bv %b = View %b%s\n' "${cBYEL}" "${cRESET}" "$cRESET" "[ Peer[.conf] (default 'WireguardVPN.conf')")"
-            MENU_RS="$(printf '%brs%b = %bRestart%b (or %bStart%b) WireGuard® Sessions()\n' "${cBYEL}" "${cRESET}" "$cBGRE" "${cRESET}" "$cBGRE" "${cRESET}" )"
+            MENU_VX="$(printf '%bv %b = %bView%b [ Peer[.conf] (default 'WireguardVPN.conf') (%bvx%b - Edit)\n' "${cBYEL}" "${cRESET}" "${cGRE}" "$cRESET" "${cGRE}" "${cRESET}" )"
+            MENU_RS="$(printf '%brs%b = %bRestart%b (or %bStart%b) WireGuard® Sessions()\n' "${cBYEL}" "${cRESET}" "$cGRE" "${cRESET}" "$cGRE" "${cRESET}" )"
 
             if [ -n "$(wg show interfaces)" ];then
                 MENU_S="$(printf '%b4 %b = %bStart%b   [ [Peer [nopolicy]...] | category ] e.g. start clients \n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"        # v2.02
@@ -5943,7 +5952,7 @@ Build_Menu() {
             MENU_VPNDIR="$(printf '%b12 %b= %bvpndirector%b Clone VPN Director rules [ "clone" [ "wan" | "ovpn"n [ changeto_wg1n ]] | "delete" | "list" ] %b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")" # v4.14
         fi
 
-        MENU__="$(printf '%b? %b = About Configuration\n' "${cBYEL}" "${cRESET}")"
+        MENU__="$(printf '%b? %b = %bAbout%b Configuration\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
         echo -e ${cWGRE}"\n"$cRESET      # Separator line
 
         echo -e
@@ -5987,8 +5996,8 @@ Validate_User_Choice() {
             9*) menu1=$(echo "$menu1" | awk '{$1="create"}1') ;;
 
             u|uf|uf" "*) ;;                           # v3.14
-            "?") ;;
-            v|vx) ;;
+            "?"|[aA]bout) ;;
+            [vV]|vx|[vV]iew) ;;
             createsplit*|create*) ;;
             ip) ;;                         # v3.03
             getmod*) ;;
@@ -6193,14 +6202,14 @@ Process_User_Choice() {
                     fi
                 fi
                 ;;
-            "?"|u|u" "*|uf|uf" "*)
+            "?"|[aA]bout|u|u" "*|uf|uf" "*)
 
                 local ACTION="$(echo "$menu1"| awk '{print $1}')"
 
                 Show_Info_HDR
 
                 case "$ACTION" in
-                    "?")
+                    "?"|[aA]bout)
                         Show_Info
                         ;;
                     *)
@@ -6257,12 +6266,12 @@ Process_User_Choice() {
 
                     ShowHelp
                 ;;
-            vx|vx" "*|v|v" "*|vi|vi" "*|vix*)            # v4.17 v1.10
+            vx|vx" "*|[vV]|v" "*|V" "*|vi|vi" "*|vix*|[vV]iew)            # v4.17 v1.10
 
                 local EDITOR="nano"
                 local ACCESS="--view"
 
-                if [ "${menu1:0:2}" == "vi" ];then          # v4.17 @JGrana
+                if [ "${menu1:0:2}" == "vi" ] && [ "${menu1:0:4}" != "view" ];then          # v4.17 @JGrana
                     local EDITOR="vi"                       # v4.17 @JGrana
                     local ACCESS="-R"                       # v4.17 @JGrana
                 fi
