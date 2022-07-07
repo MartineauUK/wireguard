@@ -33,7 +33,7 @@ VERSION="v4.18b"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 02-Jul-2022
+# Last Updated Date: 07-Jul-2022
 
 #
 # Description:
@@ -3590,7 +3590,7 @@ Get_WAN_IF_Name() {
 WAN_IF=\$(Get_WAN_IF_Name)
 
 logger -st "(\$(basename "\$0"))" \$\$ "Checking if WireGuard® VPN Peer KILL-Switch is required....."
-if [ -n "\$(grep -E "^KILLSWITCH" /jffs/addons/wireguard/WireguardVPN.conf)" ];then
+if [ -n "\$(grep -E "^KILLSWITCH" ${INSTALL_DIR}WireguardVPN.conf)" ];then
     iptables -D FORWARD -i br0 -o \$WAN_IF -j REJECT -m comment --comment "WireGuard KILL-Switch" 2>/dev/null
     iptables -I FORWARD -i br0 -o \$WAN_IF -j REJECT -m comment --comment "WireGuard KILL-Switch" 2>/dev/null
     logger -st "(\$(basename "\$0"))" \$\$ "WireGuard® VPN Peer KILL-Switch ENABLED"
@@ -3767,19 +3767,21 @@ Get_scripts() {
     download_file ${INSTALL_DIR} wg_client martineau $BRANCH dos2unix 777
     download_file ${INSTALL_DIR} wg_server martineau $BRANCH dos2unix 777
     download_file ${INSTALL_DIR} UDP_Updater.sh martineau $BRANCH dos2unix 777
-    download_file ${INSTALL_DIR} wg_ChkEndpointDDNS.sh martineau $BRANCH dos2unix 777           # v4.15
+    download_file ${INSTALL_DIR} wg_ChkEndpointDDNS.sh martineau $BRANCH dos2unix 777   # v4.15
     download_file ${INSTALL_DIR} wg_manager.asp martineau $BRANCH dos2unix              # v4.17
+    download_file ${INSTALL_DIR} Help.md martineau $BRANCH                              # v4.18
+    ln -s ${INSTALL_DIR}Help.md ${SCRIPT_WEB_DIR}/help.htm 2>/dev/null                  # v4.18
 
     chmod +x ${INSTALL_DIR}wg_manager.sh
     chmod +x ${INSTALL_DIR}wg_client
     chmod +x ${INSTALL_DIR}wg_server
-    chmod +x ${INSTALL_DIR}UDP_Updater.sh                                               # v4.01
+    chmod +x ${INSTALL_DIR}UDP_Updater.sh                                                       # v4.01
     chmod +x ${INSTALL_DIR}wg_ChkEndpointDDNS.sh                                                # v4.15
 
     md5sum ${INSTALL_DIR}wg_manager.sh      > ${INSTALL_DIR}"wg_manager.md5"
     md5sum ${INSTALL_DIR}wg_client          > ${INSTALL_DIR}"wg_client.md5"
     md5sum ${INSTALL_DIR}wg_server          > ${INSTALL_DIR}"wg_server.md5"
-    md5sum ${INSTALL_DIR}UDP_Updater.sh     > ${INSTALL_DIR}"UDP_Updater.md5"          # v4.01
+    md5sum ${INSTALL_DIR}UDP_Updater.sh     > ${INSTALL_DIR}"UDP_Updater.md5"                   # v4.01
     md5sum ${INSTALL_DIR}wg_ChkEndpointDDNS.sh     > ${INSTALL_DIR}"wg_ChkEndpointDDNS.md5"     # v4.15
 }
 Read_INPUT() {
@@ -6314,7 +6316,10 @@ Process_User_Choice() {
                     local WG_INTERFACE=${FN##*/}
                     local WG_INTERFACE=${WG_INTERFACE%.*}
 
-                    [ -d /www/user/wireguard ] && awk '!/^ *#/ && NF' ${INSTALL_DIR}WireguardVPN.conf > ${SCRIPT_WEB_DIR}/config.htm  # v4.17
+                    if [ -d /www/user/wireguard ];then
+                        awk '!/^ *#/ && NF' ${INSTALL_DIR}WireguardVPN.conf > ${INSTALL_DIR}config.htm  # v4.18
+                        ln -s ${INSTALL_DIR}config.htm ${SCRIPT_WEB_DIR}/config.htm 2>/dev/null         # v4.18
+                    fi
 
                     if [ "$POST_MD5" != "$PRE_MD5" ];then
 
@@ -6644,7 +6649,10 @@ Process_User_Choice() {
 
                             Manage_WebUI_API "INIT"          # v4.17
 
-                            [ -d /www/user/wireguard ] && awk '!/^ *#/ && NF' ${INSTALL_DIR}WireguardVPN.conf > ${SCRIPT_WEB_DIR}/config.htm  # v4.17
+                            if [ -d /www/user/wireguard ];then
+                                awk '!/^ *#/ && NF' ${INSTALL_DIR}WireguardVPN.conf > ${INSTALL_DIR}config.htm  # v4.18
+                                ln -s ${INSTALL_DIR}config.htm ${SCRIPT_WEB_DIR}/config.htm 2>/dev/null         # v4.18
+                            fi
 
                             if [ "$ACTION" == "mountX" ] || [ "$ACTION" == "mX" ];then
                                 service restart_httpd >/dev/null        # WebUI v4.17
@@ -6762,7 +6770,11 @@ Process_User_Choice() {
                         #fi
                     ;;
                 esac
-                [ -d /www/user/wireguard ] && awk '!/^ *#/ && NF' /jffs/addons/wireguard/WireguardVPN.conf > ${SCRIPT_WEB_DIR}/config.htm  # v4.17
+
+                if [ -d /www/user/wireguard ];then
+                    awk '!/^ *#/ && NF' ${INSTALL_DIR}WireguardVPN.conf > ${INSTALL_DIR}config.htm  # v4.18
+                    ln -s ${INSTALL_DIR}config.htm ${SCRIPT_WEB_DIR}/config.htm 2>/dev/null         # v4.18
+                fi
             ;;
             addon|addon*)                           # v4.15         {script_name [ dev | remove | del ] }
 
@@ -7110,7 +7122,10 @@ Mount_WebUI(){
         flock -u "$FD"
 
         [ -z "$(grep -i wireguard /jffs/scripts/service-event)" ] && echo -e "if echo \"\$2\" | /bin/grep -q \"wg_manager\"; then { /jffs/addons/wireguard/wg_manager.sh service_event \"\$@\" & }; fi # WireGuard WebUI" >> /jffs/scripts/service-event    # v4.17
+
         Manage_WebUI_API "INIT"                 # v4.17
+
+        [ -f ${INSTALL_DIR}Help.md ] && ln -s ${INSTALL_DIR}Help.md ${SCRIPT_WEB_DIR}/help.htm 2>/dev/null      # v4.18
     fi
 }
 Unmount_WebUI(){
@@ -7739,7 +7754,10 @@ SHELL=$(readlink /proc/$$/exe)              # 4.14
 EASYMENU="Y"
 
 # Hack!!!!
-[ -d /www/user/wireguard ] && awk '!/^ *#/ && NF' ${INSTALL_DIR}WireguardVPN.conf > ${SCRIPT_WEB_DIR}/config.htm  # v4.17
+if [ -d /www/user/wireguard ];then
+    awk '!/^ *#/ && NF' ${INSTALL_DIR}WireguardVPN.conf > ${INSTALL_DIR}config.htm  # v4.18
+    ln -s ${INSTALL_DIR}config.htm ${SCRIPT_WEB_DIR}/config.htm 2>/dev/null         # v4.18
+fi
 
 IPV6_SERVICE=$(nvram get ipv6_service)                  # v4.14
 if [ "$IPV6_SERVICE" != "disabled" ];then               # v4.14
@@ -7833,8 +7851,11 @@ if [ "$1" != "install" ];then   # v2.01
     VERSION_NUMDOT=$VERSION                                             # v3.03
     VERSION_NUM=$(echo "$VERSION" | sed 's/[^0-9]*//g')
 
-    [ -d /www/user/wireguard ] && awk '!/^ *#/ && NF' /jffs/addons/wireguard/WireguardVPN.conf > ${SCRIPT_WEB_DIR}/config.htm  # v4.17
-
+    if [ -d /www/user/wireguard ];then
+        awk '!/^ *#/ && NF' ${INSTALL_DIR}WireguardVPN.conf > ${INSTALL_DIR}config.htm  # v4.18
+        ln -s ${INSTALL_DIR}config.htm ${SCRIPT_WEB_DIR}/config.htm 2>/dev/null         # v4.18
+        ln -s ${INSTALL_DIR}Help.md ${SCRIPT_WEB_DIR}/help.htm 2>/dev/null              # v4.18
+    fi
     # if [ "${VERSION_NUM:0:1}" -eq 3 ] && [ ! -d ${CONFIG_DIR} ];then    # v3.03
 
         # if [ -d /opt/etc/wireguard ] && [ "$(ls -1 /opt/etc/wireguard | wc -l)" -gt "5" ];then
