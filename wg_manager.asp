@@ -194,9 +194,9 @@ function validForm(){
 
     return true;
 }
-function change_wgc_unit(unit){
-    document.chg_wgc.wgc_unit.value=unit.toString();
-    document.chg_wgc.submit();
+function change_wgmc_unit(unit){
+    document.chg_wgmc.wgmc_unit.value=unit.toString();
+    document.chg_wgmc.submit();
 }
 function sleepFor(sleepDuration){
     var now = new Date().getTime();
@@ -512,10 +512,10 @@ function newPopup(url) {
             <option class="content_input_fd" value="3" <% nvram_match("wgmc_unit", "3","selected"); %>>3</option>
             <option class="content_input_fd" value="4" <% nvram_match("wgmc_unit", "4","selected"); %>>4</option>
             <option class="content_input_fd" value="5" <% nvram_match("wgmc_unit", "5","selected"); %>>5</option>
-            <option class="content_input_fd" value="6" <% nvram_match("wgmc_unit", "5","selected"); %>>6</option>
-            <option class="content_input_fd" value="7" <% nvram_match("wgmc_unit", "5","selected"); %>>7</option>
-            <option class="content_input_fd" value="8" <% nvram_match("wgmc_unit", "5","selected"); %>>8</option>
-            <option class="content_input_fd" value="9" <% nvram_match("wgmc_unit", "5","selected"); %>>9</option>
+            <option class="content_input_fd" value="6" <% nvram_match("wgmc_unit", "6","selected"); %>>6</option>
+            <option class="content_input_fd" value="7" <% nvram_match("wgmc_unit", "7","selected"); %>>7</option>
+            <option class="content_input_fd" value="8" <% nvram_match("wgmc_unit", "8","selected"); %>>8</option>
+            <option class="content_input_fd" value="9" <% nvram_match("wgmc_unit", "9","selected"); %>>9</option>
             </select>
         </td>
     </tr>
