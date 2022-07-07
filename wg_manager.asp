@@ -99,13 +99,20 @@ function UpdateResults(){
 
     document.getElementById("wgm_ExecuteResultsBase64").innerHTML = atob(custom_settings.wgm_Execute_Result);
 
+    document.getElementById("wgm_ExecuteRC").innerHTML =    custom_settings.wgm_ExecuteRC;
     /*ShowExecutedTS();*/
-    ShowExecuteResults();
+    /*ShowExecuteResults();*/
 }
 function CMDExecute(){
+
+   HideCMDRC();
+   ShowCMDEexecuting();
+
+
    /* As per RMerlin Wiki https://github.com/RMerl/asuswrt-merlin.ng/wiki/Addons-API */
    /* Retrieve value from input fields, and store in object */
    custom_settings.wgm_Execute = document.getElementById('wgm_Execute').value;
+   custom_settings.wgm_ExecuteRC = "Pending.....";
 
    /* Store object as a string in the amng_custom hidden input field */
    document.getElementById('amng_custom').value = JSON.stringify(custom_settings);
@@ -130,7 +137,10 @@ function CMDExecute(){
 }
 function CMDExecuteARG(command){
 
+    ShowCMDEexecuting();
+
     custom_settings.wgm_Execute = command;
+    custom_settings.wgm_ExecuteRC = "Pending.....";
 
    /* Store object as a string in the amng_custom hidden input field */
    document.getElementById('amng_custom').value = JSON.stringify(custom_settings);
@@ -150,6 +160,9 @@ function CMDExecuteARG(command){
     }
 }
 function CMDExecutePeerImport(command){
+
+    ShowCMDEexecuting();
+    custom_settings.wgm_ExecuteRC = "Pending.....";
 
 
     if (document.getElementById('wgm_WebUI_Import').textContent == undefined)
@@ -173,7 +186,7 @@ function CMDExecutePeerImport(command){
 function applyRule(){
 
     if(validForm()){
-        showLoading();
+        /*showLoading();*/
         document.form.submit();
     }
 }
@@ -209,6 +222,22 @@ cal_panel_block("wgm_QRCode_block", 0.18);
 }
 function HideQRCode(){
 $('#wgm_QRCode_block').hide();
+}
+function ShowCMDEexecuting() {
+$('#imgExecuting').show();
+/*document.getElementById("imgExecuting").style.visibility = "visible";*/
+}
+function HideCMDEexecuting(){
+$('#imgExecuting').hide();
+/*document.getElementById("imgExecuting").style.visibility = "visible";*/
+}
+function ShowCMDRC() {
+$('#wgm_ExecuteRC').show();
+/*document.getElementById("imgExecuting").style.visibility = "visible";*/
+}
+function HideCMDRC(){
+$('#wgm_ExecuteRC').hide();
+/*document.getElementById("imgExecuting").style.visibility = "visible";*/
 }
 function ShowWinFile() {
 $('#wgm_WinFile_block').show();
@@ -267,6 +296,13 @@ function LetsDEBUG(wot) {
 }
 
 </script>
+<script type="text/javascript">
+// Popup window code
+function newPopup(url) {
+    popupWindow = window.open(
+        url,'popUpWindow','height=300,width=400,left=10,top=10,resizable=yes,scrollbars=yes,toolbar=yes,menubar=no,location=no,directories=no,status=yes')
+}
+</script>
 
 
 </head>
@@ -305,7 +341,7 @@ function LetsDEBUG(wot) {
                         <tr>
                             <td bgcolor="#4D595D" valign="top" >
                             <div>&nbsp;</div>
-                            <div style="color: indianred;" class="formfonttitle">VPN - WireGuard® Client ***** EXPERIMENTAL Beta v0.9 *****</div>
+                            <div style="color: indianred;" class="formfonttitle">VPN - WireGuard® Manager© Beta v0.11 by Martineau *****</div>
                             <div id="divSwitchMenu" style="margin-top:-40px;float:right;"></div
                             <div style="margin:10px 0 10px 5px;" class="splitLine"></div>
 
@@ -315,8 +351,8 @@ function LetsDEBUG(wot) {
                                             <td>
                                                 <input type="text" readonly maxlength="7" class="input_6_table" id="wgm_version">
                                             </td>
-                                            <td  style="text-align: right;">
-                                                <button type="button" class="button_gen navbutton" onclick="Help" id="btnHelp" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">Help</button>
+                                            <td colspan="2" rowspan="2" align="center">
+                                                <input type="button" class="button_gen" onclick="JavaScript:newPopup('/ext/wireguard/help.htm');" value="Help" id="btnShowHelp" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
                                             </td>
                                     </tr>
                                     <tr>
@@ -324,7 +360,7 @@ function LetsDEBUG(wot) {
                                             <td>
                                                 <input type="text" readonly maxlength="30" class="input_12_table" id="wgm_Kernel">
                                             </td>
-
+                                    </tr>
                             </table>
 
 <div>&nbsp;</div>
@@ -340,7 +376,10 @@ function LetsDEBUG(wot) {
         <td colspan="2" class="execbutton">
             <label>wgm </label>
             <input type="text" maxlength="100" class="input_32_table" id="wgm_Execute">
+            <img id="imgExecuting" style="vertical-align: middle; display: none;" src="images/InternetScan.gif">
             <input type="button" class="button_gen" onclick="CMDExecute();" value="Execute" id="btnCMDExecute" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
+            <label>RC= </label>
+            <input type="text" readonly maxlength="6" class="input_6_table" id="wgm_ExecuteRC">
             <input type="button" onClick="location.href=location.href" value="Refresh Results" class="button_gen" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
         </td>
         <tr>
@@ -366,7 +405,7 @@ function LetsDEBUG(wot) {
 <tbody>
 
     </tr>
-        <td colspan="2" class="execbutton">
+        <td colspan="2">
             <input type="text" maxlength="30" class="input_32_table" id="wgm_PeerImport">
             <legend>Import from <% nvram_get("productid"); %> Directory '/opt/etc/wireguard.d/'<legend>
         </td>
@@ -417,7 +456,7 @@ function LetsDEBUG(wot) {
 
     </tr>
         <tr>
-            <td class="settingname">Peers defined"</td>
+            <td class="settingname">DEFINED Peers</td>
             <td colspan="3">
                 <input type="button" class="button_gen" onclick="CMDExecuteARG('diag peers');" value="Show ALL" id="btnDiagPeers" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
             </td>
@@ -429,38 +468,26 @@ function LetsDEBUG(wot) {
             </td>
         </tr>
         <tr>
-            <td class="settingname">ALL Peers </td>
-            <td>
+            <td>ALL Peers </td>
+            <td colspan="3">
                 <input type="button" class="button_gen" onclick="CMDExecuteARG('stop');" value="Stop" id="btnStopPeers" style="color: indianred; background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
-            </td>
-            <td>
                 <input type="button" class="button_gen" onclick="CMDExecuteARG('start');" value="Start" id="btnStartPeers" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
-            </td>
-            <td>
                 <input type="button" class="button_gen" onclick="CMDExecuteARG('restart');" value="Restart" id="btnRestartPeers" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
             </td>
         </tr>
         <tr>
-            <td class="settingname">Category: 'clients'</td>
-            <td>
+            <td>Category: 'clients'</td>
+            <td colspan="3">
                 <input type="button" class="button_gen" onclick="CMDExecuteARG('stop clients');" value="Stop" id="btnStopCategoryClients" style="color: indianred; background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
-            </td>
-            <td>
                 <input type="button" class="button_gen" onclick="CMDExecuteARG('start clients');" value="Start" id="btnStartCategoryClients" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
-            </td>
-            <td>
                 <input type="button" class="button_gen" onclick="CMDExecuteARG('restart clients');" value="Restart" id="btnRestartCategoryClients" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
             </td>
         </tr>
         <tr>
-            <td class="settingname">Category: 'servers'</td>
-            <td>
+            <td>Category: 'servers'</td>
+            <td colspan="3">
                 <input type="button" class="button_gen" onclick="CMDExecuteARG('stop servers');" value="Stop" id="btnStopCategoryServers" style="color: indianred; background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
-            </td>
-            <td>
                 <input type="button" class="button_gen" onclick="CMDExecuteARG('start servers');" value="Start" id="btnStartCategoryServers" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
-            </td>
-            <td>
                 <input type="button" class="button_gen" onclick="CMDExecuteARG('restart servers');" value="Restart" id="btnRestartCategoryServers" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
             </td>
         </tr>
@@ -840,6 +867,5 @@ function LetsDEBUG(wot) {
 <div id="footer"></div>
 </body>
 </html>
-
 
 
