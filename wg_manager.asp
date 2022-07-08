@@ -54,9 +54,6 @@ margin-top: -40px;
 <% get_wgc_parameter(); %>
 var custom_settings = <% get_custom_settings(); %>;
 
-/*var fs = require([require/require.min.js])*/
-
-/*openvpn_unit = '<% nvram_get("wgmc_unit"); %>';*/
 window.onresize = function() {
 cal_panel_block("wgm_QRCode_block", 0.18);
 }
@@ -194,10 +191,6 @@ function validForm(){
 
     return true;
 }
-function change_wgmc_unit(unit){
-    document.chg_wgmc.wgmc_unit.value=unit.toString();
-    document.chg_wgmc.submit();
-}
 function sleepFor(sleepDuration){
     var now = new Date().getTime();
     while(new Date().getTime() < now + sleepDuration){
@@ -207,10 +200,6 @@ function sleepFor(sleepDuration){
 function sleepThenAct(){
     sleepFor(2000);
     console.log("Hello, JavaScript sleep!");
-}
-function change_wgm_unit(unit){
-document.chg_wgm.wgm_unit.value=unit.toString();
-document.chg_wgm.submit();
 }
 function change_wgmc_unit(unit){
 document.chg_wgmc.wgmc_unit.value=unit.toString();
@@ -341,7 +330,7 @@ function newPopup(url) {
                         <tr>
                             <td bgcolor="#4D595D" valign="top" >
                             <div>&nbsp;</div>
-                            <div style="color: indianred;" class="formfonttitle">VPN - WireGuard® Manager© Beta v0.12 by Martineau *****</div>
+                            <div style="color: indianred;" class="formfonttitle">VPN - WireGuard® Manager© Beta v0.13 by Martineau *****</div>
                             <div id="divSwitchMenu" style="margin-top:-40px;float:right;"></div
                             <div style="margin:10px 0 10px 5px;" class="splitLine"></div>
 
@@ -508,15 +497,15 @@ function newPopup(url) {
         <th>Select Client Index</th>
         <td>
             <select name="wgmc_unit" class="input_option" onChange="change_wgmc_unit(this.value);">
-            <option class="content_input_fd" value="1" <% nvram_match("wgmc_unit", "1","selected"); %>>1</option>
-            <option class="content_input_fd" value="2" <% nvram_match("wgmc_unit", "2","selected"); %>>2</option>
-            <option class="content_input_fd" value="3" <% nvram_match("wgmc_unit", "3","selected"); %>>3</option>
-            <option class="content_input_fd" value="4" <% nvram_match("wgmc_unit", "4","selected"); %>>4</option>
-            <option class="content_input_fd" value="5" <% nvram_match("wgmc_unit", "5","selected"); %>>5</option>
-            <option class="content_input_fd" value="6" <% nvram_match("wgmc_unit", "6","selected"); %>>6</option>
-            <option class="content_input_fd" value="7" <% nvram_match("wgmc_unit", "7","selected"); %>>7</option>
-            <option class="content_input_fd" value="8" <% nvram_match("wgmc_unit", "8","selected"); %>>8</option>
-            <option class="content_input_fd" value="9" <% nvram_match("wgmc_unit", "9","selected"); %>>9</option>
+            <option class="content_input_fd" value="1" <% nvram_match("wgmc_unit", "1", "selected"); %>>1</option>
+            <option class="content_input_fd" value="2" <% nvram_match("wgmc_unit", "2", "selected"); %>>2</option>
+            <option class="content_input_fd" value="3" <% nvram_match("wgmc_unit", "3", "selected"); %>>3</option>
+            <option class="content_input_fd" value="4" <% nvram_match("wgmc_unit", "4", "selected"); %>>4</option>
+            <option class="content_input_fd" value="5" <% nvram_match("wgmc_unit", "5", "selected"); %>>5</option>
+            <option class="content_input_fd" value="6" <% nvram_match("wgmc_unit", "6", "selected"); %>>6</option>
+            <option class="content_input_fd" value="7" <% nvram_match("wgmc_unit", "7", "selected"); %>>7</option>
+            <option class="content_input_fd" value="8" <% nvram_match("wgmc_unit", "8", "selected"); %>>8</option>
+            <option class="content_input_fd" value="9" <% nvram_match("wgmc_unit", "9", "selected"); %>>9</option>
             </select>
         </td>
     </tr>
@@ -526,15 +515,15 @@ function newPopup(url) {
             <input type="text" maxlength="40" name="wgc_desc" id="wgc_desc" class="input_32_table" value="<% nvram_get("wgmc_desc"); %>" autocorrect="off" autocapitalize="off"></input>
         </td>
     </tr>
-    <tr id="wgc_auto" value="<% nvram_get("wgmc_auto"); %>">
+    <tr id="wgc_auto_field" class="rept ew">
         <th>Auto start Type</th>
         <td>
-            <select name="AUTO_Start" >
-                <option value="Y">Auto Start</option>
-                <option value="N">DISABLED</option>
-                <option value="P">Policy Mode</option>
-                <option value="S">Site to Site</option>
-                <option value="W">WG-Quick</option>
+            <select name="wgmc_auto_type" class="input_option" >
+                <option value="Y" <% nvram_match("wgmc_auto", "Y", "selected"); %>>Auto Start</option>
+                <option value="N" <% nvram_match("wgmc_auto", "N", "selected"); %>>DISABLED</option>
+                <option value="P" <% nvram_match("wgmc_auto", "P", "selected"); %>>Policy Mode</option>
+                <option value="S" <% nvram_match("wgmc_auto", "S", "selected"); %>>Site to Site</option>
+                <option value="W" <% nvram_match("wgmc_auto", "W", "selected"); %>>WG-Quick</option>
              </select>
         </td>
     </tr>
@@ -849,20 +838,13 @@ function newPopup(url) {
 </tr>
 </table>
 </form>
-
-<form method="post" name="chg_wgm" action="apply.cgi" target="hidden_frame">
-<input type="hidden" name="action_mode" value="chg_wgm_unit">
-<input type="hidden" name="action_script" value="">
-<input type="hidden" name="action_wait" value="">
-<input type="hidden" name="current_page" value="wg_manager.asp">
-<input type="hidden" name="wgmc_unit" value="">
-</form>
 <form method="post" name="chg_wgmc" action="apply.cgi" target="hidden_frame">
 <input type="hidden" name="action_mode" value="chg_wgmc_unit">
 <input type="hidden" name="action_script" value="">
 <input type="hidden" name="action_wait" value="">
-<input type="hidden" name="current_page" value="wg_manager.sp">
+<input type="hidden" name="current_page" value="wg_manager.asp">
 <input type="hidden" name="wgmc_unit" value="">
+<input type="hidden" name="wgmc_auto_type" value="">
 </form>
 
 <div id="footer"></div>
