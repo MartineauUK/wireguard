@@ -341,7 +341,7 @@ function newPopup(url) {
                         <tr>
                             <td bgcolor="#4D595D" valign="top" >
                             <div>&nbsp;</div>
-                            <div style="color: indianred;" class="formfonttitle">VPN - WireGuard® Manager© Beta v0.11 by Martineau *****</div>
+                            <div style="color: indianred;" class="formfonttitle">VPN - WireGuard® Manager© Beta v0.12 by Martineau *****</div>
                             <div id="divSwitchMenu" style="margin-top:-40px;float:right;"></div
                             <div style="margin:10px 0 10px 5px;" class="splitLine"></div>
 
@@ -350,6 +350,7 @@ function newPopup(url) {
                                         <th>WireGuard® Manager Version</th>
                                             <td>
                                                 <input type="text" readonly maxlength="7" class="input_6_table" id="wgm_version">
+												<a href="https://github.com/MartineauUK/wireguard/commits/dev/wg_manager.sh">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Github Change Log</a>
                                             </td>
                                             <td colspan="2" rowspan="2" align="center">
                                                 <input type="button" class="button_gen" onclick="JavaScript:newPopup('/ext/wireguard/help.htm');" value="Help" id="btnShowHelp" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
