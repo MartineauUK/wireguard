@@ -16,8 +16,18 @@
 whilst WireGuard&#174; Manager&#169; allows for 5 'server' Peers (<strong>wg21</strong> thru' <strong>wg25</strong>) and up to 9 'client' Peers (<strong>wg11</strong> thru' <strong>wg19</strong>)
 <p>MIPS routers such as the venerable <strong>RT-AC68U</strong> are based on Kernel <strong>v2.6.xx</strong> therefore unfortunately lack Kernel support for the WireGuard&#174; modules, however @RMerlin firmware <strong>v386.4+</strong> (Jan 2022) now includes the necessary Kernel/Userspace Tools (<strong>v1.0.20210124</strong>) in a larger number of ASUS supported routers such as <strong>RT-AX58U/GT-AXE11000</strong> etc.</p>
 <p>SNB Forums member <strong>@ZebMcKayhan</strong> has now taken on the task to compile new WireGuard&#174; Kernel modules/Userspace Tools for certain HND router models to keep in line with <a href="https://git.kernel.org/pub/scm/linux/kernel/git/netdev/net.git/log/">WireGuard&#174; GitHub Patches/Release</a> from Jason, and these updated modules may optionally be used by WireGuard&#174; Manager&#169; to override <strong>@RMerlin's</strong> included firmware modules. see <a href="https://github.com/ZebMcKayhan/Wireguard">@ZebMcKayhan's Kernel Modules</a></p>
-<p><strong>NOTE: As of July 2022 the Nov 2021 ASUSWRT 386 RC3-3 Public Beta has not been updated by ASUS</strong>, with rumours that <strong>ASUS</strong> firmware <strong>v388.xx</strong> will contain full WireGuard&#174; features in their revamped VPN support. see <a href="https://www.asus.com/support/FAQ/1048281/">ASUS WireGuard&#174; Support FAQ</a>/<a href="https://www.snbforums.com/threads/wireguard-and-fw-3-0-0-4-388-20000.79682/post-774767">@RMerlin forum post</a> in <strong>4Q2022 ?</strong></p>
-
+<p><strong>NOTE: As of July 2022 the Nov 2021 ASUSWRT 386 RC3-3 Public Beta has not been updated by ASUS</strong>, with rumours that <strong>ASUS</strong> firmware <strong>v388.xx</strong> will contain full WireGuard&#174; features in their revamped VPN support - release in <strong>3Q2022 ?</strong> 
+<br>
+<pre>
+	<a href="https://www.asus.com/support/FAQ/1048282">ASUS WireGuard&#174; 'client' Peer Support FAQ</a>
+	<a href="https://www.asus.com/support/FAQ/1048280">ASUS WireGuard&#174; 'server' Peer Support FAQ</a>
+<br>
+	<a href="https://www.asus.com/support/FAQ/1048281/">ASUS WireGuard&#174; Site-to-Site Peers Support FAQ</a>
+<br>
+	<a href="https://www.snbforums.com/threads/wireguard-and-fw-3-0-0-4-388-20000.79682/post-774767">@RMerlin forum post</a> speculation release in <strong>4Q2022 ?</strong></p>
+</pre>
+<hr>
+<hr>
 <h2>User commands</h2>
 
 <h3>Main menu options</h2>
