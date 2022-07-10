@@ -54,6 +54,8 @@ margin-top: -40px;
 <% get_wgc_parameter(); %>
 var custom_settings = <% get_custom_settings(); %>;
 
+var wgcindex = "<% nvram_get("wgmc_unit"); %>";
+
 window.onresize = function() {
 cal_panel_block("wgm_QRCode_block", 0.18);
 }
@@ -292,7 +294,18 @@ function newPopup(url) {
         url,'popUpWindow','height=300,width=400,left=10,top=10,resizable=yes,scrollbars=yes,toolbar=yes,menubar=no,location=no,directories=no,status=yes')
 }
 </script>
-
+<script>
+// https://sebhastian.com/javascript-confirmation-yes-no/
+function confirmPeerDelete(wgPeer) {
+let confirmAction = confirm("Confirm OK to DELETE Peer: '" + wgPeer + "'");
+if (confirmAction) {
+  //alert("Action successfully executed");
+  CMDExecuteARG("peer " + wgPeer + " del");
+} else {
+  alert("DELETE Peer: '" + wgPeer + "' request cancelled");
+}
+}
+</script>
 
 </head>
 <body onload="initial();" onunLoad="return unload_body();" class="bg">
@@ -330,18 +343,19 @@ function newPopup(url) {
                         <tr>
                             <td bgcolor="#4D595D" valign="top" >
                             <div>&nbsp;</div>
-                            <div style="color: indianred;" class="formfonttitle">VPN - WireGuard® Manager© Beta v0.13 by Martineau *****</div>
+                            <div style="color: indianred;" class="formfonttitle">VPN - WireGuard® Manager© Beta v0.14 by Martineau *****</div>
                             <div id="divSwitchMenu" style="margin-top:-40px;float:right;"></div
                             <div style="margin:10px 0 10px 5px;" class="splitLine"></div>
-
-                            <table width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#6b8fa3" class="FormTable">
+                            <table width="100%" border="0" align="center" cellpadding="4" cellspacing="0" bordercolor="#6b8fa3" class="FormTable">
                                     <tr>
                                         <th>WireGuard® Manager Version</th>
                                             <td>
                                                 <input type="text" readonly maxlength="7" class="input_6_table" id="wgm_version">
-												<a href="https://github.com/MartineauUK/wireguard/commits/dev/wg_manager.sh">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Github Change Log</a>
+											</td>
+											<td align="center">
+												<input type="button" class="button_gen"  onclick="JavaScript:newPopup('https://github.com/MartineauUK/wireguard/commits/dev/wg_manager.sh');" value="Change Log" id="btnShowHelp" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
                                             </td>
-                                            <td colspan="2" rowspan="2" align="center">
+                                            <td colspan="2" align="center">
                                                 <input type="button" class="button_gen" onclick="JavaScript:newPopup('/ext/wireguard/help.htm');" value="Help" id="btnShowHelp" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
                                             </td>
                                     </tr>
@@ -530,8 +544,7 @@ function newPopup(url) {
     <tr id="wgmc_status">
         <th><#3179#></th>
         <td>
-            <input type="radio" value="1" name="wgmc_enable" class="input" <% nvram_match("wgmc_enable", "1", "checked"); %>><#188#></input>
-            <input type="radio" value="0" name="wgmc_enable" class="input" <% nvram_match("wgmc_enable", "0", "checked"); %>><#216#></input>
+            <input type="radio" onclick="this.checked = false; value="1" name="wgmc_enable" class="input" <% nvram_match("wgmc_enable", "1", "checked"); %>><#188#></input>
         </td>
     </tr>
 </tbody>
@@ -542,11 +555,11 @@ function newPopup(url) {
 <tbody>
     <tr>
         <td>
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('stop wg1'+wgcindex);" value="Stop" id="btnStopWGClient" style="color: indianred; background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('start wg1'+wgcindex);" value="Start" id="btnStartWGClient" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('restart wg1'+wgcindex);" value="Restart" id="btnRestartWGClient" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('peer wg1'+wgcindex+' del');" value="Delete" id="btnDeleteWGClient" style="background: linear-gradient(rgb(234, 45, 8) 0%, rgb(234, 45, 8) 100%);">
-            <input type="button" class="button_gen" onClick="ShowQRCode('wg11');" value="QR Code" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);"/>
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('stop wg1' + wgcindex);" value="Stop" id="btnStopWGClient" style="color: indianred; background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('start wg1' + wgcindex);" value="Start" id="btnStartWGClient" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('restart wg1' + wgcindex);" value="Restart" id="btnRestartWGClient" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
+            <input type="button" class="button_gen" onclick="confirmPeerDelete('wg1' + wgcindex);" value="Delete" id="btnDeleteWGClient" style="background: linear-gradient(rgb(234, 45, 8) 0%, rgb(234, 45, 8) 100%);">
+			<input type="button" class="button_gen" onClick="ShowQRCode('wg11');" value="QR Code" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);"/>
 
             <div id="wgm_QRCode_block" style="display:none">
                 <div style="display:flex; align-items: center;">
