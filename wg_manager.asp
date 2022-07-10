@@ -205,7 +205,9 @@ function sleepThenAct(){
 }
 function change_wgmc_unit(unit){
 document.chg_wgmc.wgmc_unit.value=unit.toString();
-document.chg_wgmc.submit();
+CMDExecuteARG('export wg1' + unit);
+// document.chg_wgmc.submit();
+
 }
 function ShowQRCode() {
 $('#wgm_QRCode_block').show();
