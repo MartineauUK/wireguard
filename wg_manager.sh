@@ -6260,7 +6260,7 @@ Process_User_Choice() {
                             Create_Sample_Config                    # v4.17
 
                             # Refresh WebUI with FULL restart of httpd
-                            [ -f ${INSTALL_DIR}*.asp] && Process_User_Choice "www" "refreshX"   # v4.18
+                            [ -f ${INSTALL_DIR}*.asp ] && Process_User_Choice "www" "refreshX"   # v4.18
 
                             [ -f ${INSTALL_DIR}$SCRIPT_NAME ] && { rm $0.u; sleep 1; exec "$0"; } || mv $0.u $0     # v4.14
 
