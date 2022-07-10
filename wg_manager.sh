@@ -1,7 +1,7 @@
 #!/bin/sh
     # shellcheck disable=SC2039,SC2155,SC2124,SC2046,SC2027
-VERSION="v4.18b"
-#============================================================================================ © 2021-2022 Martineau v4.18b
+VERSION="v4.18b2"
+#============================================================================================ © 2021-2022 Martineau v4.18b2
 #
 #       wgm   [ help | -h ]
 #       wgm   [ { start | stop | restart } [wg_interface]... ]
@@ -33,7 +33,7 @@ VERSION="v4.18b"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 07-Jul-2022
+# Last Updated Date: 10-Jul-2022
 
 #
 # Description:
@@ -1680,6 +1680,10 @@ Manage_Peer() {
                     echo -e "\tpeer peer_name {cmd {options} }\t\t\t\t\t\t- Action the command against the Peer"
                     echo -e "\tpeer peer_name del\t\t\t\t\t\t\t- Delete the Peer from the database and all of its files *.conf, *.key"
                     echo -e "\tpeer peer_name ip=xxx.xxx.xxx.xxx\t\t\t\t\t- Change the Peer VPN Pool IP"
+
+                    echo -e "\tpeer peer_name comment [%n] text_string\t\t\t\t\t- Change the Peer annotation/tag e.g. peer SGS20+ comment My Phone"
+                    echo -e "\t\t\t\t\t\t\t\t\t\t                                      peer SGS20+ comment My Phone (Model Name is %n)"
+
                     echo -e "\tpeer category\t\t\t\t\t\t\t\t- Show Peer categories in database"
                     echo -e "\tpeer peer_name category [category_name {del | add peer_name[...]} ]\t- Create a new category with 3 Peers e.g. peer category GroupA add wg17 wg99 wg11"
 
@@ -2431,9 +2435,13 @@ Manage_Wireguard_Sessions() {
                     local POLICY_MODE=                      # v4.14
 
                     # Temporary WebUI hack
-                    if [ -f ${CONFIG_DIR}wg11.conf ];then   # v4.17
-                        Export_Peer "export" "wg11"
-                        nvram commit
+                    if [ "$(nvram get wgmc_unit)" == "${WG_INTERFACE:3:1}" ];then       # v4.18
+                        nvram set wgmc_enable="1"
+                    else
+                        if [ -f ${CONFIG_DIR}wg11.conf ];then   # v4.17
+                            Export_Peer "export" "wg11"
+                            nvram commit
+                        fi
                     fi
 
                 done
@@ -2514,9 +2522,13 @@ Manage_Wireguard_Sessions() {
                 done
 
                 # Temporary WebUI hack
-                if [ -f ${CONFIG_DIR}wg11.conf ];then   # v4.18
-                    Export_Peer "export" "wg11"
-                    nvram commit
+                if [ "$(nvram get wgmc_unit)" == "${WG_INTERFACE:3:1}" ];then       # v4.18
+                    nvram set wgmc_enable="0"
+                else
+                    if [ -f ${CONFIG_DIR}wg11.conf ];then   # v4.18
+                        Export_Peer "export" "wg11"
+                        nvram commit
+                    fi
                 fi
 
             WG_show
@@ -5931,9 +5943,12 @@ Build_Menu() {
             MENU_I="$(printf '%b1 %b = %bBegin%b WireGuard® Installation Process' "${cBYEL}" "${cRESET}" "${cBGRE}" "${cRESET}")"
         fi
 
+        MENU_U="$(printf '%bu %b = %bUpdate%b wg_manager scripts/WebUI [dev] (%buf%b - Force)\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cBGRE}" "${cRESET}")"
+
         if [ "$(WireGuard_Installed)" == "Y" ];then
 
             MENU_VX="$(printf '%bv %b = %bView%b [ Peer[.conf] (default 'WireguardVPN.conf') (%bvx%b - Edit)\n' "${cBYEL}" "${cRESET}" "${cGRE}" "$cRESET" "${cGRE}" "${cRESET}" )"
+
             MENU_RS="$(printf '%brs%b = %bRestart%b (or %bStart%b) WireGuard® Sessions()\n' "${cBYEL}" "${cRESET}" "$cGRE" "${cRESET}" "$cGRE" "${cRESET}" )"
 
             if [ -n "$(wg show interfaces)" ];then
@@ -5969,6 +5984,7 @@ Build_Menu() {
             printf "%s\t\t\t\t\t\t\t\t\t\n"             "$MENU_R"
             printf "\n%s\t\t\t\t\t\n"                   "$MENU__"
             printf "%s\t\t\n"                           "$MENU_VX"
+            printf "\n%s\t\t\n"                         "$MENU_U"                   # v4.18
         fi
 
         printf '\n%be %b = Exit Script [?]\n' "${cBYEL}" "${cRESET}"
@@ -6204,7 +6220,7 @@ Process_User_Choice() {
                     fi
                 fi
                 ;;
-            "?"|[aA]bout|u|u" "*|uf|uf" "*)
+            "?"|[aA]bout|u|u" "*|uf|uf" "*|[uU]pdate*)
 
                 local ACTION="$(echo "$menu1"| awk '{print $1}')"
 
@@ -6242,6 +6258,9 @@ Process_User_Choice() {
 
                             # Ensure any new Configuration options are now available...
                             Create_Sample_Config                    # v4.17
+
+                            # Refresh WebUI with FULL restart of httpd
+                            [ -f ${INSTALL_DIR}*.asp] && Process_User_Choice "www" "refreshX"   # v4.18
 
                             [ -f ${INSTALL_DIR}$SCRIPT_NAME ] && { rm $0.u; sleep 1; exec "$0"; } || mv $0.u $0     # v4.14
 
@@ -6632,12 +6651,14 @@ Process_User_Choice() {
                 [ -z "$(echo $PAGES | grep -E ".asp$")" ] && PAGES=$PAGES".asp"
 
                 case "$ACTION" in
-                    mount|mountX|on|m|refresh)              # v4.17
+                    mount|mountX|on|m|refresh|refreshX)              # #v4.18 v4.17
                         echo -e $cBGRE
                         if [ -z "$INTERNAL_PAGE" ];then
                             if [ "$PAGES" == "${SCRIPT_NAME%.*}.asp" ];then
 
-                                [ "$ACTION" == "refresh" ] && Unmount_WebUI "${PAGES}"
+                                if [ "$ACTION" == "refresh" ] || [ "$ACTION" == "refreshX" ];then   # v4.18
+                                    Unmount_WebUI "${PAGES}"
+                                fi
 
                                 if [ ! -f /tmp/menuTree.js ] || { [ -f /tmp/menuTree.js ] && [ -z "$(grep -i "WireGuard® Manager" /tmp/menuTree.js)" ] ;} ;then
                                     Mount_WebUI "${PAGES}"
@@ -6654,7 +6675,7 @@ Process_User_Choice() {
                                 ln -s ${INSTALL_DIR}config.htm ${SCRIPT_WEB_DIR}/config.htm 2>/dev/null         # v4.18
                             fi
 
-                            if [ "$ACTION" == "mountX" ] || [ "$ACTION" == "mX" ];then
+                            if [ "$ACTION" == "mountX" ] || [ "$ACTION" == "mX" ] || [ "$ACTION" == "refreshX" ];then   # v4.18
                                 service restart_httpd >/dev/null        # WebUI v4.17
                                 echo -e $cBGRE"\t[✔]${cBWHT} Restarted service_httpd for WebUI"$cRESET
                                 SayT "Restarted service_httpd"
@@ -8186,15 +8207,20 @@ if [ "$1" != "install" ];then   # v2.01
                 echo -e
 
                 case $ACTION in
-                    mount)
+                    mount|mountX)                               # v4.18
                         Mount_WebUI "${SCRIPT_NAME%.*}.asp"     # v4.17
                     ;;
                     unmount)
                         Unmount_WebUI "${SCRIPT_NAME%.*}.asp"   # v4.17
                     ;;
-                    refresh)
+                    refresh|refreshX)                           # v4.18
                         Unmount_WebUI "${SCRIPT_NAME%.*}.asp"   # v4.17
                         Mount_WebUI "${SCRIPT_NAME%.*}.asp"     # v4.17
+                        if [ "$ACTION" == "mountX" ] || [ "$ACTION" == "refreshX" ];then    # v4.18
+                            service restart_httpd >/dev/null
+                            echo -e $cBGRE"\t[✔]${cBWHT} Restarted service_httpd for WebUI"$cRESET
+                            SayT "Restarted service_httpd"
+                        fi
                     ;;
                     *)
                         echo -en $cBRED"\a\n\t***ERROR: Invalid arg $cBWHT'"$ACTION"'$cBRED for WebUI TAB - valid 'mount','unmount' or refresh only!\n"$cRESET
