@@ -429,6 +429,7 @@ if (confirmAction) {
         <td rowspan="2">
             <input type="radio" name="wgm_IMPORT" id="wgm_ImportClient_enabled" class="input" value="enable" checked="">
             <label for="XIMPORT_PEER">Client</label>
+	    <br>
             <input type="radio" name="wgm_IMPORT" id="wgm_ImportServer_enabled" class="input" value="disable">
             <label for="XIMPORT_PEER">Server</label>
         </td>
