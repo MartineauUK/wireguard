@@ -54,9 +54,8 @@ margin-top: -40px;
 <% get_wgc_parameter(); %>
 var custom_settings = <% get_custom_settings(); %>;
 
-/*var fs = require([require/require.min.js])*/
+var wgcindex = "<% nvram_get("wgmc_unit"); %>";
 
-/*openvpn_unit = '<% nvram_get("wgmc_unit"); %>';*/
 window.onresize = function() {
 cal_panel_block("wgm_QRCode_block", 0.18);
 }
@@ -122,7 +121,7 @@ function CMDExecute(){
         debugger;
 
         if (custom_settings.wgm_Execute == "stop" || custom_settings.wgm_Execute == "start") {
-            document.action_wait.value = "3";
+            /*document.action_wait.value = "3"; */
             showLoading();
             }
 
@@ -148,7 +147,7 @@ function CMDExecuteARG(command){
     if(validForm()){
 
         if (custom_settings.wgm_Execute == "stop" || custom_settings.wgm_Execute == "start") {
-            document.action_wait.value = "3";
+            /*document.action_wait.value = "3";*/
             showLoading();
             }
 
@@ -183,6 +182,17 @@ function CMDExecutePeerImport(command){
     }
     document.getElementById('wgm_WebUI_Import').textContent = ""
 }
+function SwitchStatus(){
+	
+	Connected = "<% nvram_get("wgmc_enable"); %>"
+	
+	if (Connected == "1") {
+		CMDExecuteARG("stop wg1" + <% nvram_get("wgmc_unit"); %>);
+	} else {
+		CMDExecuteARG("start wg1" + <% nvram_get("wgmc_unit"); %>);
+	}
+	
+}
 function applyRule(){
 
     if(validForm()){
@@ -194,10 +204,6 @@ function validForm(){
 
     return true;
 }
-function change_wgc_unit(unit){
-    document.chg_wgc.wgc_unit.value=unit.toString();
-    document.chg_wgc.submit();
-}
 function sleepFor(sleepDuration){
     var now = new Date().getTime();
     while(new Date().getTime() < now + sleepDuration){
@@ -208,13 +214,11 @@ function sleepThenAct(){
     sleepFor(2000);
     console.log("Hello, JavaScript sleep!");
 }
-function change_wgm_unit(unit){
-document.chg_wgm.wgm_unit.value=unit.toString();
-document.chg_wgm.submit();
-}
 function change_wgmc_unit(unit){
 document.chg_wgmc.wgmc_unit.value=unit.toString();
-document.chg_wgmc.submit();
+CMDExecuteARG('export wg1' + unit);
+// document.chg_wgmc.submit();
+
 }
 function ShowQRCode() {
 $('#wgm_QRCode_block').show();
@@ -296,7 +300,25 @@ function LetsDEBUG(wot) {
 }
 
 </script>
-
+<script type="text/javascript">
+// Popup window code
+function newPopup(url) {
+    popupWindow = window.open(
+        url,'popUpWindow','height=300,width=400,left=10,top=10,resizable=yes,scrollbars=yes,toolbar=yes,menubar=no,location=no,directories=no,status=yes')
+}
+</script>
+<script>
+// https://sebhastian.com/javascript-confirmation-yes-no/
+function confirmPeerDelete(wgPeer) {
+let confirmAction = confirm("Confirm OK to DELETE Peer: '" + wgPeer + "'");
+if (confirmAction) {
+  //alert("Action successfully executed");
+  CMDExecuteARG("peer " + wgPeer + " del");
+} else {
+  alert("DELETE Peer: '" + wgPeer + "' request cancelled");
+}
+}
+</script>
 
 </head>
 <body onload="initial();" onunLoad="return unload_body();" class="bg">
@@ -334,18 +356,20 @@ function LetsDEBUG(wot) {
                         <tr>
                             <td bgcolor="#4D595D" valign="top" >
                             <div>&nbsp;</div>
-                            <div style="color: indianred;" class="formfonttitle">VPN - WireGuard® Manager© Beta v0.10 *****</div>
+                            <div style="color: indianred;" class="formfonttitle">VPN - WireGuard® Manager© Beta v0.15 by Martineau *****</div>
                             <div id="divSwitchMenu" style="margin-top:-40px;float:right;"></div
                             <div style="margin:10px 0 10px 5px;" class="splitLine"></div>
-
-                            <table width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#6b8fa3" class="FormTable">
+                            <table width="100%" border="0" align="center" cellpadding="4" cellspacing="0" bordercolor="#6b8fa3" class="FormTable">
                                     <tr>
                                         <th>WireGuard® Manager Version</th>
                                             <td>
                                                 <input type="text" readonly maxlength="7" class="input_6_table" id="wgm_version">
+											</td>
+											<td align="center">
+												<input type="button" class="button_gen"  onclick="JavaScript:newPopup('https://github.com/MartineauUK/wireguard/commits/dev/wg_manager.sh');" value="Change Log" id="btnShowHelp" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
                                             </td>
-                                            <td  style="text-align: right;">
-                                                <button type="button" class="button_gen navbutton" onclick="Help" id="btnHelp" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">Help</button>
+                                            <td colspan="2" align="center">
+                                                <input type="button" class="button_gen" onclick="JavaScript:newPopup('/ext/wireguard/help.htm');" value="Help" id="btnShowHelp" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
                                             </td>
                                     </tr>
                                     <tr>
@@ -353,7 +377,7 @@ function LetsDEBUG(wot) {
                                             <td>
                                                 <input type="text" readonly maxlength="30" class="input_12_table" id="wgm_Kernel">
                                             </td>
-
+                                    </tr>
                             </table>
 
 <div>&nbsp;</div>
@@ -390,7 +414,7 @@ function LetsDEBUG(wot) {
 </tbody>
 </table>
 
-<div style="line-height:10px;">&nbsp; column-count: 3</div>
+<div style="line-height:10px;">&nbsp;</div>
 <table width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#4D595D" class="FormTable">
 <thead class="collapsible">
     <tr><td colspan="4">Peer control Commands (click to expand/collapse)</td></tr>
@@ -405,6 +429,7 @@ function LetsDEBUG(wot) {
         <td rowspan="2">
             <input type="radio" name="wgm_IMPORT" id="wgm_ImportClient_enabled" class="input" value="enable" checked="">
             <label for="XIMPORT_PEER">Client</label>
+	    <br>
             <input type="radio" name="wgm_IMPORT" id="wgm_ImportServer_enabled" class="input" value="disable">
             <label for="XIMPORT_PEER">Server</label>
         </td>
@@ -500,15 +525,15 @@ function LetsDEBUG(wot) {
         <th>Select Client Index</th>
         <td>
             <select name="wgmc_unit" class="input_option" onChange="change_wgmc_unit(this.value);">
-            <option class="content_input_fd" value="1" <% nvram_match("wgmc_unit", "1","selected"); %>>1</option>
-            <option class="content_input_fd" value="2" <% nvram_match("wgmc_unit", "2","selected"); %>>2</option>
-            <option class="content_input_fd" value="3" <% nvram_match("wgmc_unit", "3","selected"); %>>3</option>
-            <option class="content_input_fd" value="4" <% nvram_match("wgmc_unit", "4","selected"); %>>4</option>
-            <option class="content_input_fd" value="5" <% nvram_match("wgmc_unit", "5","selected"); %>>5</option>
-            <option class="content_input_fd" value="6" <% nvram_match("wgmc_unit", "5","selected"); %>>6</option>
-            <option class="content_input_fd" value="7" <% nvram_match("wgmc_unit", "5","selected"); %>>7</option>
-            <option class="content_input_fd" value="8" <% nvram_match("wgmc_unit", "5","selected"); %>>8</option>
-            <option class="content_input_fd" value="9" <% nvram_match("wgmc_unit", "5","selected"); %>>9</option>
+            <option class="content_input_fd" value="1" <% nvram_match("wgmc_unit", "1", "selected"); %>>1</option>
+            <option class="content_input_fd" value="2" <% nvram_match("wgmc_unit", "2", "selected"); %>>2</option>
+            <option class="content_input_fd" value="3" <% nvram_match("wgmc_unit", "3", "selected"); %>>3</option>
+            <option class="content_input_fd" value="4" <% nvram_match("wgmc_unit", "4", "selected"); %>>4</option>
+            <option class="content_input_fd" value="5" <% nvram_match("wgmc_unit", "5", "selected"); %>>5</option>
+            <option class="content_input_fd" value="6" <% nvram_match("wgmc_unit", "6", "selected"); %>>6</option>
+            <option class="content_input_fd" value="7" <% nvram_match("wgmc_unit", "7", "selected"); %>>7</option>
+            <option class="content_input_fd" value="8" <% nvram_match("wgmc_unit", "8", "selected"); %>>8</option>
+            <option class="content_input_fd" value="9" <% nvram_match("wgmc_unit", "9", "selected"); %>>9</option>
             </select>
         </td>
     </tr>
@@ -518,23 +543,22 @@ function LetsDEBUG(wot) {
             <input type="text" maxlength="40" name="wgc_desc" id="wgc_desc" class="input_32_table" value="<% nvram_get("wgmc_desc"); %>" autocorrect="off" autocapitalize="off"></input>
         </td>
     </tr>
-    <tr id="wgc_auto" value="<% nvram_get("wgmc_auto"); %>">
+    <tr id="wgc_auto_field" class="rept ew">
         <th>Auto start Type</th>
         <td>
-            <select name="AUTO_Start" >
-                <option value="Y">Auto Start</option>
-                <option value="N">DISABLED</option>
-                <option value="P">Policy Mode</option>
-                <option value="S">Site to Site</option>
-                <option value="W">WG-Quick</option>
+            <select name="wgmc_auto_type" class="input_option" >
+                <option value="Y" <% nvram_match("wgmc_auto", "Y", "selected"); %>>Auto Start</option>
+                <option value="N" <% nvram_match("wgmc_auto", "N", "selected"); %>>DISABLED</option>
+                <option value="P" <% nvram_match("wgmc_auto", "P", "selected"); %>>Policy Mode</option>
+                <option value="S" <% nvram_match("wgmc_auto", "S", "selected"); %>>Site to Site</option>
+                <option value="W" <% nvram_match("wgmc_auto", "W", "selected"); %>>WG-Quick</option>
              </select>
         </td>
     </tr>
     <tr id="wgmc_status">
         <th><#3179#></th>
         <td>
-            <input type="radio" value="1" name="wgmc_enable" class="input" <% nvram_match("wgmc_enable", "1", "checked"); %>><#188#></input>
-            <input type="radio" value="0" name="wgmc_enable" class="input" <% nvram_match("wgmc_enable", "0", "checked"); %>><#216#></input>
+            <input type="checkbox" value="1" onclick="SwitchStatus();" name="wgmc_enable" class="input" <% nvram_match("wgmc_enable", "1", "checked"); %>><#188#></input>
         </td>
     </tr>
 </tbody>
@@ -545,11 +569,11 @@ function LetsDEBUG(wot) {
 <tbody>
     <tr>
         <td>
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('stop wg1'+wgcindex);" value="Stop" id="btnStopWGClient" style="color: indianred; background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('start wg1'+wgcindex);" value="Start" id="btnStartWGClient" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('restart wg1'+wgcindex);" value="Restart" id="btnRestartWGClient" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('peer wg1'+wgcindex+' del');" value="Delete" id="btnDeleteWGClient" style="background: linear-gradient(rgb(234, 45, 8) 0%, rgb(234, 45, 8) 100%);">
-            <input type="button" class="button_gen" onClick="ShowQRCode('wg11');" value="QR Code" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);"/>
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('stop wg1' + wgcindex);" value="Stop" id="btnStopWGClient" style="color: indianred; background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('start wg1' + wgcindex);" value="Start" id="btnStartWGClient" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('restart wg1' + wgcindex);" value="Restart" id="btnRestartWGClient" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
+            <input type="button" class="button_gen" onclick="confirmPeerDelete('wg1' + wgcindex);" value="Delete" id="btnDeleteWGClient" style="background: linear-gradient(rgb(234, 45, 8) 0%, rgb(234, 45, 8) 100%);">
+			<input type="button" class="button_gen" onClick="ShowQRCode('wg11');" value="QR Code" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);"/>
 
             <div id="wgm_QRCode_block" style="display:none">
                 <div style="display:flex; align-items: center;">
@@ -647,21 +671,21 @@ function LetsDEBUG(wot) {
     <tr id="wgm_row_opt_use_entware_kernel_module">
         <td class="settingname">USE_ENTWARE_KERNEL_MODULE Allow use of 3rd Party WireGuard modules Enabled<br></td>
         <td class="settingvalue">
-            <input type="radio" name="wgm_USE_ENTWARE_KERNEL_MODULE" id="wgm_USE_ENTWARE_KERNEL_MODULE_enabled" class="input" value="disable">
+            <input type="checkbox" name="wgm_USE_ENTWARE_KERNEL_MODULE" id="wgm_USE_ENTWARE_KERNEL_MODULE_enabled" class="input" value="disable">
             <label for="XUSE_ENTWARE_KERNEL_MODULE">Yes</label>
         </td>
     </tr>
     <tr id="wgm_row_opt_noipv6">
         <td class="settingname">NOIPV6 - Disable IPv6 Enabled<br></td>
         <td class="settingvalue">
-            <input type="radio" name="wgm_NOIPV6" id="wgm_NOIPV6_enabled" class="input" value="disable">
+            <input type="checkbox" name="wgm_NOIPV6" id="wgm_NOIPV6_enabled" class="input" value="disable">
             <label for="XNOIPV6 - Disable IPv6">Yes</label>
         </td>
     </tr>
     <tr id="wgm_row_opt_disable_fc">
         <td class="settingname">DISABLE_FLOW_CACHE Enabled<br></td>
         <td class="settingvalue">
-            <input type="radio" name="wgm_DISABLE_FLOW_CACHE_enabled" id="wgm_DISABLE_FLOW_CACHE_enabled" class="input" value="disable">
+            <input type="checkbox" name="wgm_DISABLE_FLOW_CACHE_enabled" id="wgm_DISABLE_FLOW_CACHE_enabled" class="input" value="disable">
             <label for="XDISABLE_FLOW_CACHE">Yes</label>
 
         </td>
@@ -669,42 +693,42 @@ function LetsDEBUG(wot) {
     <tr  id="wgm_row_opt_nocolor">
         <td class="settingname">NOCOLOR Disable ANSI colours Enabled<br></td>
         <td class="settingvalue">
-            <input type="radio" name="wgm_NOCOLOR" id="wgm_NOCOLOR_enabled" class="input" value="disable">
+            <input type="checkbox" name="wgm_NOCOLOR" id="wgm_NOCOLOR_enabled" class="input" value="disable">
             <label for="XNOCOLOR - Disable ANSI colour">Yes</label>
         </td>
     </tr>
     <tr id="wgm_row_opt_nomenu">
         <td class="settingname">NOMENU Disable MENU Enabled<br></td>
         <td class="settingvalue">
-            <input type="radio" name="wgm_NOMENU" id="wgm_NOMENU_enabled" class="input" value="disable">
+            <input type="checkbox" name="wgm_NOMENU" id="wgm_NOMENU_enabled" class="input" value="disable">
             <label for="XNOCOLOR - Disable MENU">Yes</label>
         </td>
     </tr>
     <tr id="wgm_row_opt_killswitch">
         <td class="settingname">KILLSWITCH Enabled)<br></td>
         <td class="settingvalue">
-            <input type="radio" name="wgm_KILLSWITCH" id="wgm_KILLSWITCH_enabled" class="input" value="disable">
+            <input type="checkbox" name="wgm_KILLSWITCH" id="wgm_KILLSWITCH_enabled" class="input" value="disable">
             <label for="XKILLSWITCH">Yes</label>
         </td>
     </tr>
     <tr id="wgm_row_opt_ignore_rogue220">
         <td class="settingname">ROGUE220IGNORE RPDB Priority 220 IGNORE Enabled<br></td>
         <td class="settingvalue">
-            <input type="radio" name="wgm_KILLSWITCH" id="wgm_ROGUE220IGNORE_enabled" class="input" value="disable">
+            <input type="checkbox" name="wgm_KILLSWITCH" id="wgm_ROGUE220IGNORE_enabled" class="input" value="disable">
             <label for="XROGUE220IGNORE">Yes</label>
         </td>
     </tr>
     <tr id="wgm_row_opt_delete_rogue220">
         <td class="settingname">ROGUE220DELETE RPDB Priority 220 DELETE Enabled<br></td>
         <td class="settingvalue">
-            <input type="radio" name="wgm_KILLSWITCH" id="wgm_ROGUE220DELETE_enabled" class="input" value="disable">
+            <input type="checkbox" name="wgm_KILLSWITCH" id="wgm_ROGUE220DELETE_enabled" class="input" value="disable">
             <label for="XROGUE220DELETE">Yes</label>
         </td>
     </tr>
     <tr id="wgm_row_opt_webui">
         <td class="settingname">WebUI Enabled<br></td>
         <td class="settingvalue">
-            <input type="radio"  name="wgm_WEBUI" id="wgm_WEBUI" class="input">
+            <input type="checkbox"  name="wgm_WEBUI" id="wgm_WEBUI" class="input">
             <label for="XWEBUI">Yes</label>
         </td>
     </tr>
@@ -841,25 +865,16 @@ function LetsDEBUG(wot) {
 </tr>
 </table>
 </form>
-
-<form method="post" name="chg_wgm" action="apply.cgi" target="hidden_frame">
-<input type="hidden" name="action_mode" value="chg_wgm_unit">
-<input type="hidden" name="action_script" value="">
-<input type="hidden" name="action_wait" value="">
-<input type="hidden" name="current_page" value="wg_manager.asp">
-<input type="hidden" name="wgmc_unit" value="">
-</form>
 <form method="post" name="chg_wgmc" action="apply.cgi" target="hidden_frame">
 <input type="hidden" name="action_mode" value="chg_wgmc_unit">
 <input type="hidden" name="action_script" value="">
 <input type="hidden" name="action_wait" value="">
-<input type="hidden" name="current_page" value="wg_manager.sp">
+<input type="hidden" name="current_page" value="wg_manager.asp">
 <input type="hidden" name="wgmc_unit" value="">
+<input type="hidden" name="wgmc_auto_type" value="">
 </form>
 
 <div id="footer"></div>
 </body>
 </html>
-
-
 
