@@ -121,7 +121,7 @@ function CMDExecute(){
         debugger;
 
         if (custom_settings.wgm_Execute == "stop" || custom_settings.wgm_Execute == "start") {
-            document.action_wait.value = "3";
+            /*document.action_wait.value = "3"; */
             showLoading();
             }
 
@@ -147,7 +147,7 @@ function CMDExecuteARG(command){
     if(validForm()){
 
         if (custom_settings.wgm_Execute == "stop" || custom_settings.wgm_Execute == "start") {
-            document.action_wait.value = "3";
+            /*document.action_wait.value = "3";*/
             showLoading();
             }
 
@@ -181,6 +181,17 @@ function CMDExecutePeerImport(command){
         UpdateResults();
     }
     document.getElementById('wgm_WebUI_Import').textContent = ""
+}
+function SwitchStatus(){
+	
+	Connected = "<% nvram_get("wgmc_enable"); %>"
+	
+	if (Connected == "1") {
+		CMDExecuteARG("stop wg1" + <% nvram_get("wgmc_unit"); %>);
+	} else {
+		CMDExecuteARG("start wg1" + <% nvram_get("wgmc_unit"); %>);
+	}
+	
 }
 function applyRule(){
 
@@ -345,7 +356,7 @@ if (confirmAction) {
                         <tr>
                             <td bgcolor="#4D595D" valign="top" >
                             <div>&nbsp;</div>
-                            <div style="color: indianred;" class="formfonttitle">VPN - WireGuard® Manager© Beta v0.14 by Martineau *****</div>
+                            <div style="color: indianred;" class="formfonttitle">VPN - WireGuard® Manager© Beta v0.15 by Martineau *****</div>
                             <div id="divSwitchMenu" style="margin-top:-40px;float:right;"></div
                             <div style="margin:10px 0 10px 5px;" class="splitLine"></div>
                             <table width="100%" border="0" align="center" cellpadding="4" cellspacing="0" bordercolor="#6b8fa3" class="FormTable">
@@ -546,7 +557,7 @@ if (confirmAction) {
     <tr id="wgmc_status">
         <th><#3179#></th>
         <td>
-            <input type="radio" onclick="this.checked = false; value="1" name="wgmc_enable" class="input" <% nvram_match("wgmc_enable", "1", "checked"); %>><#188#></input>
+            <input type="checkbox" value="1" onclick="SwitchStatus();" name="wgmc_enable" class="input" <% nvram_match("wgmc_enable", "1", "checked"); %>><#188#></input>
         </td>
     </tr>
 </tbody>
@@ -659,21 +670,21 @@ if (confirmAction) {
     <tr id="wgm_row_opt_use_entware_kernel_module">
         <td class="settingname">USE_ENTWARE_KERNEL_MODULE Allow use of 3rd Party WireGuard modules Enabled<br></td>
         <td class="settingvalue">
-            <input type="radio" name="wgm_USE_ENTWARE_KERNEL_MODULE" id="wgm_USE_ENTWARE_KERNEL_MODULE_enabled" class="input" value="disable">
+            <input type="checkbox" name="wgm_USE_ENTWARE_KERNEL_MODULE" id="wgm_USE_ENTWARE_KERNEL_MODULE_enabled" class="input" value="disable">
             <label for="XUSE_ENTWARE_KERNEL_MODULE">Yes</label>
         </td>
     </tr>
     <tr id="wgm_row_opt_noipv6">
         <td class="settingname">NOIPV6 - Disable IPv6 Enabled<br></td>
         <td class="settingvalue">
-            <input type="radio" name="wgm_NOIPV6" id="wgm_NOIPV6_enabled" class="input" value="disable">
+            <input type="checkbox" name="wgm_NOIPV6" id="wgm_NOIPV6_enabled" class="input" value="disable">
             <label for="XNOIPV6 - Disable IPv6">Yes</label>
         </td>
     </tr>
     <tr id="wgm_row_opt_disable_fc">
         <td class="settingname">DISABLE_FLOW_CACHE Enabled<br></td>
         <td class="settingvalue">
-            <input type="radio" name="wgm_DISABLE_FLOW_CACHE_enabled" id="wgm_DISABLE_FLOW_CACHE_enabled" class="input" value="disable">
+            <input type="checkbox" name="wgm_DISABLE_FLOW_CACHE_enabled" id="wgm_DISABLE_FLOW_CACHE_enabled" class="input" value="disable">
             <label for="XDISABLE_FLOW_CACHE">Yes</label>
 
         </td>
@@ -681,42 +692,42 @@ if (confirmAction) {
     <tr  id="wgm_row_opt_nocolor">
         <td class="settingname">NOCOLOR Disable ANSI colours Enabled<br></td>
         <td class="settingvalue">
-            <input type="radio" name="wgm_NOCOLOR" id="wgm_NOCOLOR_enabled" class="input" value="disable">
+            <input type="checkbox" name="wgm_NOCOLOR" id="wgm_NOCOLOR_enabled" class="input" value="disable">
             <label for="XNOCOLOR - Disable ANSI colour">Yes</label>
         </td>
     </tr>
     <tr id="wgm_row_opt_nomenu">
         <td class="settingname">NOMENU Disable MENU Enabled<br></td>
         <td class="settingvalue">
-            <input type="radio" name="wgm_NOMENU" id="wgm_NOMENU_enabled" class="input" value="disable">
+            <input type="checkbox" name="wgm_NOMENU" id="wgm_NOMENU_enabled" class="input" value="disable">
             <label for="XNOCOLOR - Disable MENU">Yes</label>
         </td>
     </tr>
     <tr id="wgm_row_opt_killswitch">
         <td class="settingname">KILLSWITCH Enabled)<br></td>
         <td class="settingvalue">
-            <input type="radio" name="wgm_KILLSWITCH" id="wgm_KILLSWITCH_enabled" class="input" value="disable">
+            <input type="checkbox" name="wgm_KILLSWITCH" id="wgm_KILLSWITCH_enabled" class="input" value="disable">
             <label for="XKILLSWITCH">Yes</label>
         </td>
     </tr>
     <tr id="wgm_row_opt_ignore_rogue220">
         <td class="settingname">ROGUE220IGNORE RPDB Priority 220 IGNORE Enabled<br></td>
         <td class="settingvalue">
-            <input type="radio" name="wgm_KILLSWITCH" id="wgm_ROGUE220IGNORE_enabled" class="input" value="disable">
+            <input type="checkbox" name="wgm_KILLSWITCH" id="wgm_ROGUE220IGNORE_enabled" class="input" value="disable">
             <label for="XROGUE220IGNORE">Yes</label>
         </td>
     </tr>
     <tr id="wgm_row_opt_delete_rogue220">
         <td class="settingname">ROGUE220DELETE RPDB Priority 220 DELETE Enabled<br></td>
         <td class="settingvalue">
-            <input type="radio" name="wgm_KILLSWITCH" id="wgm_ROGUE220DELETE_enabled" class="input" value="disable">
+            <input type="checkbox" name="wgm_KILLSWITCH" id="wgm_ROGUE220DELETE_enabled" class="input" value="disable">
             <label for="XROGUE220DELETE">Yes</label>
         </td>
     </tr>
     <tr id="wgm_row_opt_webui">
         <td class="settingname">WebUI Enabled<br></td>
         <td class="settingvalue">
-            <input type="radio"  name="wgm_WEBUI" id="wgm_WEBUI" class="input">
+            <input type="checkbox"  name="wgm_WEBUI" id="wgm_WEBUI" class="input">
             <label for="XWEBUI">Yes</label>
         </td>
     </tr>
