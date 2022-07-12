@@ -1,7 +1,7 @@
 #!/bin/sh
     # shellcheck disable=SC2039,SC2155,SC2124,SC2046,SC2027
-VERSION="v4.18b2"
-#============================================================================================ © 2021-2022 Martineau v4.18b2
+VERSION="v4.18b3"
+#============================================================================================ © 2021-2022 Martineau v4.18b3
 #
 #       wgm   [ help | -h ]
 #       wgm   [ { start | stop | restart } [wg_interface]... ]
@@ -33,7 +33,7 @@ VERSION="v4.18b2"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 10-Jul-2022
+# Last Updated Date: 12-Jul-2022
 
 #
 # Description:
@@ -2520,6 +2520,11 @@ Manage_Wireguard_Sessions() {
                         echo -e $cBRED"\a\n\t***ERROR: WireGuard® ${TXT}Peer (${cBWHT}$WG_INTERFACE${cBRED}) config NOT found?....skipping $ACTION request\n"$cRESET   2>&1  # v1.09
                     fi
                 done
+
+                # If there are no active 'client' Peers, then enable FC if not EXPLICITY disabled in configuration
+                if [ -z "$(wg show interfaces | grep "wg1")" ] && [ -z "$(grep -E "^DISABLE_FLOW_CACHE" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                    [ -z "$(fc status | grep "Flow Learning Enabled")" ] && RC="$(Manage_FC "enable")"  # v4.18
+                fi
 
                 # Temporary WebUI hack
                 if [ "$(nvram get wgmc_unit)" == "${WG_INTERFACE:3:1}" ];then       # v4.18
@@ -8082,9 +8087,11 @@ if [ "$1" != "install" ];then   # v2.01
                 fi
 
                 # http://www.snbforums.com/threads/beta-wireguard-session-manager.70787/post-688282
-                if { [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^DISABLE_FLOW_CACHE" ${INSTALL_DIR}WireguardVPN.conf)" ] ;} || \
-                     [ -n "$(echo "RT-AX86U RT-AX56U" | grep -ow "$HARDWARE_MODEL")" ];then     # v4.16 v4.15
-                        RC="$(Manage_FC "disable")"                                             # v4.14
+                #if { [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^DISABLE_FLOW_CACHE" ${INSTALL_DIR}WireguardVPN.conf)" ] ;} || \
+                     #[ -n "$(echo "RT-AX86U RT-AX56U" | grep -ow "$HARDWARE_MODEL")" ];then     # v4.16 v4.15
+                # Force users to manually set DISABLE_FLOW_CACHE using command 'vx' rather than have the script hard-code the models to always DISABLE_FLOW_CACHE
+                if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^DISABLE_FLOW_CACHE" ${INSTALL_DIR}WireguardVPN.conf)" ];then # v4.18
+                    RC="$(Manage_FC "disable")"                                             # v4.14
                 fi
 
                 Manage_Wireguard_Sessions "start" "$PEER" "$NOPOLICY"
@@ -8094,6 +8101,10 @@ if [ "$1" != "install" ];then   # v2.01
             ;;
             stop)
                 Manage_Wireguard_Sessions "stop" "$PEER" "$NOPOLICY"
+                # If there are no active 'client' Peers, then enable FC if not EXPLICITY disabled in configuration
+                if [ -z "$(wg show interfaces | grep "wg1")" ] && [ -z "$(grep -E "^DISABLE_FLOW_CACHE" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                    [ -z "$(fc status | grep "Flow Learning Enabled")" ] && RC="$(Manage_FC "enable")"  # v4.18
+                fi
                 echo -e $cRESET
                 exit_message
             ;;
