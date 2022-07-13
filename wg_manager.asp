@@ -163,11 +163,16 @@ function CMDExecutePeerImport(command){
     ShowCMDEexecuting();
     custom_settings.wgm_ExecuteRC = "Pending.....";
 
+	var importType="";
+	
+	if (document.getElementById('wgm_ImportServer_enabled').checked) {
+		importType="type=server"
+	}
 
     if (document.getElementById('wgm_WebUI_Import').textContent == undefined)
-        custom_settings.wgm_Execute = "import "+document.getElementById('wgm_PeerImport').value;
+        custom_settings.wgm_Execute = "import " + document.getElementById('wgm_PeerImport').value + " " + importType;
     else
-        custom_settings.wgm_Execute = "WebUI_Import " + btoa(document.getElementById('wgm_WebUI_Import').textContent)
+        custom_settings.wgm_Execute = "WebUI_Import " + btoa(document.getElementById('wgm_WebUI_Import').textContent + " " + importType);
 
    /* Store object as a string in the amng_custom hidden input field */
    document.getElementById('amng_custom').value = JSON.stringify(custom_settings);
@@ -310,13 +315,102 @@ function newPopup(url) {
 <script>
 // https://sebhastian.com/javascript-confirmation-yes-no/
 function confirmPeerDelete(wgPeer) {
-let confirmAction = confirm("Confirm OK to DELETE Peer: '" + wgPeer + "'");
-if (confirmAction) {
-  //alert("Action successfully executed");
-  CMDExecuteARG("peer " + wgPeer + " del");
-} else {
-  alert("DELETE Peer: '" + wgPeer + "' request cancelled");
+	let confirmAction = confirm("Confirm OK to DELETE Peer: '" + wgPeer + "'");
+	if (confirmAction) {
+	  CMDExecuteARG("peer " + wgPeer + " del"); 
+	} else {
+	  alert("DELETE Peer: '" + wgPeer + "' request cancelled");
+	}
 }
+</script>
+<script>
+function confirmDescFieldUpdate(comment) {
+	let confirmAction = confirm("Confirm OK to Update 'Annotate/Tag' to " + comment + "'");
+	if (confirmAction) {
+	  CMDExecuteARG("peer wg1" + wgcindex + " comment " + comment);
+	} else {
+	  alert("Update 'Annotate/Tag' cancelled!");
+	}
+}
+</script>
+<script>
+function confirmAutoFieldUpdate(auto) {
+let confirmAction = confirm("Confirm OK to Update 'Auto-Start Type' to '" + auto + "'");
+	if (confirmAction) {
+	  CMDExecuteARG("peer wg1" + wgcindex + " auto=" + auto);
+	} else {
+	  alert("Update Update 'Auto-Start' cancelled!");
+	}
+}
+</script>
+<script>
+function confirmAddressFieldUpdate(address) {
+let confirmAction = confirm("Confirm OK to Update 'Address' to '" + address + "'");
+	if (confirmAction) {
+	  CMDExecuteARG("peer wg1" + wgcindex + " ip=" + address);
+	} else {
+	  alert("Update 'Address' cancelled!");
+	}
+}
+</script>
+<script>
+function confirmDNSFieldUpdate(dns) {
+let confirmAction = confirm("Confirm OK to Update 'DNS' to '" + dns + "'");
+	if (confirmAction) {
+	  CMDExecuteARG("peer wg1" + wgcindex + " dns=" + dns);
+	} else {
+	  alert("Update 'DNS' cancelled!");
+	}
+}
+</script>
+<script>
+function confirmPreSharedKeyFieldUpdate(psk_value) {
+let confirmAction = confirm("Confirm OK to Update 'Preshared Key' to '" + psk_value + "'");
+	if (confirmAction) {
+	  CMDExecuteARG("peer wg1" + wgcindex + " psk=" + psk_value);
+	} else {
+	  alert("Update 'Preshared Key' cancelled!");
+	}
+}
+</script>
+<script>
+function confirmAllowedIPsFieldUpdate(allowedips) {
+let confirmAction = confirm("Confirm OK to Update 'Allowed IPs' to '" + allowedips + "'");
+	if (confirmAction) {
+	  CMDExecuteARG("peer wg1" + wgcindex + " allowedips=" + allowedips);
+	} else {
+	  alert("Update 'Allowed IPs' cancelled!");
+	}
+}
+</script>
+<script>
+function confirmEndpointAddressFieldUpdate(ep_addr) {
+let confirmAction = confirm("Confirm OK to Update 'Endpoint Address' to '" + ep_addr + "'");
+	if (confirmAction) {
+	  CMDExecuteARG("peer wg1" + wgcindex + " endpoint=" + ep_addr + ":" + document.getElementById('wgc_ep_port').value);
+	} else {
+	  alert("Update 'Endpoint Address' cancelled!");
+	}
+}
+</script>
+<script>
+function confirmEndpointPortFieldUpdate(epp_value) {
+let confirmAction = confirm("Confirm OK to Update 'Endpoint Port' to '" + epp_value + "'");
+	if (confirmAction) {
+	  CMDExecuteARG("peer wg1" + wgcindex + " endpoint=" + document.getElementById('wgc_ep_addr').value + ":" + epp_value);
+	} else {
+	  alert("Update 'Endpoint Port' cancelled!");
+	}
+}
+</script>
+<script>
+function confirmPersistentKeepAliveFieldUpdate(pka_value) {
+let confirmAction = confirm("Confirm OK to Update 'Persistent Keep Alive' to '" + pka_value + "'");
+	if (confirmAction) {
+	  CMDExecuteARG("peer wg1" + wgcindex + " psk=" + pka_value);
+	} else {
+	  alert("Update 'Persistent Keep Alive' cancelled!");
+	}
 }
 </script>
 
@@ -356,7 +450,7 @@ if (confirmAction) {
                         <tr>
                             <td bgcolor="#4D595D" valign="top" >
                             <div>&nbsp;</div>
-                            <div style="color: indianred;" class="formfonttitle">VPN - WireGuard® Manager© Beta v0.15 by Martineau *****</div>
+                            <div style="color: indianred;" class="formfonttitle">VPN - WireGuard® Manager© Beta v0.16 by Martineau *****</div>
                             <div id="divSwitchMenu" style="margin-top:-40px;float:right;"></div
                             <div style="margin:10px 0 10px 5px;" class="splitLine"></div>
                             <table width="100%" border="0" align="center" cellpadding="4" cellspacing="0" bordercolor="#6b8fa3" class="FormTable">
@@ -414,6 +508,8 @@ if (confirmAction) {
 </tbody>
 </table>
 
+
+<!--====================================================Peer Control (Import etc.)==========================================================-->
 <div style="line-height:10px;">&nbsp;</div>
 <table width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#4D595D" class="FormTable">
 <thead class="collapsible">
@@ -429,7 +525,7 @@ if (confirmAction) {
         <td rowspan="2">
             <input type="radio" name="wgm_IMPORT" id="wgm_ImportClient_enabled" class="input" value="enable" checked="">
             <label for="XIMPORT_PEER">Client</label>
-	    <br>
+			<br>
             <input type="radio" name="wgm_IMPORT" id="wgm_ImportServer_enabled" class="input" value="disable">
             <label for="XIMPORT_PEER">Server</label>
         </td>
@@ -513,6 +609,8 @@ if (confirmAction) {
 </table>
 
 
+
+<!--====================================================Client Configuration==========================================================-->
 <div style="line-height:10px;">&nbsp;</div>
 <table width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#4D595D" class="FormTable">
 <thead>
@@ -540,13 +638,13 @@ if (confirmAction) {
     <tr>
         <th>Description</th>
         <td>
-            <input type="text" maxlength="40" name="wgc_desc" id="wgc_desc" class="input_32_table" value="<% nvram_get("wgmc_desc"); %>" autocorrect="off" autocapitalize="off"></input>
+            <input type="text" maxlength="40" name="wgc_desc" id="wgc_desc" onChange="confirmDescFieldUpdate(this.value);" class="input_32_table" value="<% nvram_get("wgmc_desc"); %>" autocorrect="off" autocapitalize="off"></input>
         </td>
     </tr>
     <tr id="wgc_auto_field" class="rept ew">
         <th>Auto start Type</th>
         <td>
-            <select name="wgmc_auto_type" class="input_option" >
+            <select name="wgmc_auto_type" class="input_option" onChange="confirmAutoFieldUpdate(this.value);">
                 <option value="Y" <% nvram_match("wgmc_auto", "Y", "selected"); %>>Auto Start</option>
                 <option value="N" <% nvram_match("wgmc_auto", "N", "selected"); %>>DISABLED</option>
                 <option value="P" <% nvram_match("wgmc_auto", "P", "selected"); %>>Policy Mode</option>
@@ -586,7 +684,7 @@ if (confirmAction) {
             </div>
         </td>
     </tr>
-    <!--<img src="/ext/wireguard/frame.png" alt="wg11 QRCODE" width="200" height="185"/>-->
+
 </tbody>
 </table>
 
@@ -599,19 +697,25 @@ if (confirmAction) {
     <tr>
         <th>Private Key</th>
         <td>
-            <input type="text" readonly maxlength="63" name="wgc_priv" id="wgc_priv" class="input_32_table" value="<% nvram_get("wgmc_priv"); %>" autocorrect="off" autocapitalize="off"></input>
+            <input type="text" readonly maxlength="63" name="wgc_priv" id="wgc_priv" onChange="confirmPrivateKeyFieldUpdate(this.value);" class="input_32_table" value="<% nvram_get("wgmc_priv"); %>" autocorrect="off" autocapitalize="off"></input>
         </td>
     </tr>
     <tr>
         <th>Address</th>
         <td>
-            <input type="text" readonly maxlength="39" name="wgc_addr" id="wgc_addr" class="input_32_table" value="<% nvram_get("wgmc_addr"); %>" autocorrect="off" autocapitalize="off"></input>
+            <input type="text" maxlength="39" name="wgc_addr" id="wgc_addr" onChange="confirmAddressFieldUpdate(this.value);" class="input_32_table" value="<% nvram_get("wgmc_addr"); %>" autocorrect="off" autocapitalize="off"></input>
         </td>
     </tr>
     <tr>
         <th>DNS Server (Optional)</th>
         <td>
-            <input type="text" readonly maxlength="39" name="wgc_dns" id="wgc_dns" class="input_32_table" value="<% nvram_get("wgmc_dns"); %>" autocorrect="off" autocapitalize="off"></input>
+            <input type="text" maxlength="39" name="wgc_dns" id="wgc_dns" onChange="confirmDNSFieldUpdate(this.value);"class="input_32_table" value="<% nvram_get("wgmc_dns"); %>" autocorrect="off" autocapitalize="off"></input>
+        </td>
+    </tr>
+	<tr>
+        <th>MTU (Default IPv4=1440, IPv6=1420)</th>
+        <td>
+            <input type="text" maxlength="39" name="wgc_mtu" id="wgc_mtu" onChange="confirmMTUFieldUpdate(this.value);"class="input_32_table" value="<% nvram_get("wgmc_mtu"); %>" autocorrect="off" autocapitalize="off"></input>
         </td>
     </tr>
 
@@ -625,36 +729,38 @@ if (confirmAction) {
     <tr>
         <th>Server Public Key</th>
             <td>
-                <input type="text" readonly maxlength="63" name="wgc_ppub" id="wgc_ppub" class="input_32_table" value="<% nvram_get("wgmc_ppub"); %>" autocorrect="off" autocapitalize="off"></input>
+                <input type="text" readonly maxlength="63" name="wgc_ppub" id="wgc_ppub" onChange="confirmPublicKeyFieldUpdate(this.value);" class="input_32_table" value="<% nvram_get("wgmc_ppub"); %>" autocorrect="off" autocapitalize="off"></input>
             </td>
     </tr>
     <tr>
         <th>Preshared Key (Optional)</th>
         <td>
-            <input type="text" readonly maxlength="63" name="wgc_psk" id="wgc_psk" class="input_32_table" value="<% nvram_get("wgmc_psk"); %>" autocorrect="off" autocapitalize="off"></input>
+            <input type="text" readonly maxlength="63" name="wgc_psk" id="wgc_psk" onChange="confirmPreSharedKeyFieldUpdate(this.value);"class="input_32_table" value="<% nvram_get("wgmc_psk"); %>" autocorrect="off" autocapitalize="off"></input>
         </td>
     </tr>
     <tr>
-        <th>Allowed IPs</th>
+        <th>Allowed IPs (Default ipv4,ipv6)</th>
         <td>
-            <input type="text" readonly maxlength="1023" name="wgc_aips" id="wgc_aips" class="input_32_table" value="<% nvram_get("wgmc_aips"); %>" autocorrect="off" autocapitalize="off"></input>
+            <input type="text" maxlength="1023" name="wgc_aips" id="wgc_aips" onChange="confirmAllowedIPsFieldUpdate(this.value);" class="input_32_table" value="<% nvram_get("wgmc_aips"); %>" autocorrect="off" autocapitalize="off"></input>
         </td>
     </tr>
     <tr>
         <th>Endpoint Address:Port</th>
         <td>
-            <input type="text" readonly maxlength="39" name="wgc_ep_addr" id="wgc_ep_addr" class="input_32_table" value="<% nvram_get("wgmc_ep_addr"); %>" autocorrect="off" autocapitalize="off"></input> :
-            <input type="text" readonly maxlength="5" name="wgc_ep_port" id="wgc_ep_port" class="input_6_table" onKeyPress="return validator.isNumber(this,event);" value="<% nvram_get("wgmc_ep_port"); %>" autocorrect="off" autocapitalize="off"></input>
+            <input type="text" maxlength="39" name="wgc_ep_addr" id="wgc_ep_addr" onChange="confirmEndpointAddressFieldUpdate(this.value);" class="input_32_table" value="<% nvram_get("wgmc_ep_addr"); %>" autocorrect="off" autocapitalize="off"></input> :
+            <input type="text" maxlength="5" name="wgc_ep_port" id="wgc_ep_port" onChange="confirmEndpointPortFieldUpdate(this.value);" class="input_6_table" onKeyPress="return validator.isNumber(this,event);" value="<% nvram_get("wgmc_ep_port"); %>" autocorrect="off" autocapitalize="off"></input>
         </td>
     </tr>
     <tr>
         <th>Persistent Keepalive</th>
         <td>
-            <input type="text" readonly maxlength="5" name="wgc_alive" id="wgc_alive" class="input_6_table" onKeyPress="return validator.isNumber(this,event);" value="<% nvram_get("wgmc_alive"); %>" autocorrect="off" autocapitalize="off"></input>
+            <input type="text" readonly maxlength="5" name="wgc_alive" id="wgc_alive" onChange="confirmPersistentKeepAliveFieldUpdate(this.value);" class="input_6_table" onKeyPress="return validator.isNumber(this,event);" value="<% nvram_get("wgmc_alive"); %>" autocorrect="off" autocapitalize="off"></input>
         </td>
     </tr>
 </table>
 
+
+<!--====================================================WireGuard Manager Configuration==========================================================-->
 <div style="line-height:10px;">&nbsp;</div>
 <table width="100%" border="1" align="center" cellpadding="2" cellspacing="0" bordercolor="#6b8fa3" class="FormTable SettingsTable" style="border:0px;" id="table_config">
 <thead class="collapsible" id="scriptconfig">
@@ -740,6 +846,8 @@ if (confirmAction) {
 </tbody>
 </table>
 
+
+<!--====================================================VPN Director Configuration==========================================================-->
 <div style="line-height:10px;">&nbsp;</div>
 <table width="100%" border="1" align="center" cellpadding="2" cellspacing="0" bordercolor="#6b8fa3" class="FormTable SettingsTable" style="border:0px;" id="table_config">
 <thead class="collapsible" id="scriptconfig">
@@ -791,6 +899,8 @@ if (confirmAction) {
 </tbody>
 </table>
 
+
+<!--====================================================Diagnostics==========================================================-->
 <div style="line-height:10px;">&nbsp;</div>
 <table width="100%" border="1" align="center" cellpadding="2" cellspacing="0" bordercolor="#6b8fa3" class="FormTable SettingsTable" style="border:0px;" id="table_config">
 <thead class="collapsible" id="scriptconfig">
@@ -877,4 +987,5 @@ if (confirmAction) {
 <div id="footer"></div>
 </body>
 </html>
+
 
