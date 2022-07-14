@@ -1,7 +1,7 @@
 #!/bin/sh
     # shellcheck disable=SC2039,SC2155,SC2124,SC2046,SC2027
-VERSION="v4.18b4"
-#============================================================================================ © 2021-2022 Martineau v4.18b4
+VERSION="v4.18b5"
+#============================================================================================ © 2021-2022 Martineau v4.18b5
 #
 #       wgm   [ help | -h ]
 #       wgm   [ { start | stop | restart } [wg_interface]... ]
@@ -33,7 +33,7 @@ VERSION="v4.18b4"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 13-Jul-2022
+# Last Updated Date: 14-Jul-2022
 
 #
 # Description:
@@ -5968,7 +5968,13 @@ Build_Menu() {
             MENU_I="$(printf '%b1 %b = %bBegin%b WireGuard® Installation Process' "${cBYEL}" "${cRESET}" "${cBGRE}" "${cRESET}")"
         fi
 
-        MENU_U="$(printf '%bu %b = %bUpdate%b wg_manager scripts/WebUI [dev] (%buf%b - Force)\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cBGRE}" "${cRESET}")"
+        if [ -f /jffs/addons/wireguard/wg_manager.asp ];then        # v4.18
+            local GUI_TAB=                                          # v4.18
+            if [ -f /tmp/menuTree.js ];then                         # v4.18
+                local GUI_TAB="$HTTP_TYPE://$(nvram get lan_ipaddr):$HTTP_PORT/"$(grep -i wireguard /tmp/menuTree.js  | grep -Eo "(user.*\.asp)") # v4.18
+            fi
+        fi
+        MENU_U="$(printf '%bu %b = %bUpdate%b wg_manager scripts/WebUI [dev] (%buf%b - Force)\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cBYEL}" "${cRESET}")"  #v4.18
 
         if [ "$(WireGuard_Installed)" == "Y" ];then
 
@@ -5994,7 +6000,7 @@ Build_Menu() {
             MENU_VPNDIR="$(printf '%b12 %b= %bvpndirector%b Clone VPN Director rules [ "clone" [ "wan" | "ovpn"n [ changeto_wg1n ]] | "delete" | "list" ] %b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")" # v4.14
         fi
 
-        MENU__="$(printf '%b? %b = %bAbout%b Configuration\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
+        MENU__="$(printf '%b? %b = %bAbout%b Configuration (WebUI %b%s%b)' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cBYEL}" "http://${GUI_TAB}" "${cRESET}" )"
         echo -e ${cWGRE}"\n"$cRESET      # Separator line
 
         echo -e
