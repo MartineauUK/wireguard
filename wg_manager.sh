@@ -1,7 +1,7 @@
 #!/bin/sh
     # shellcheck disable=SC2039,SC2155,SC2124,SC2046,SC2027
-VERSION="v4.17"
-#============================================================================================ © 2021-2022 Martineau v4.17
+VERSION="v4.18"
+#============================================================================================ © 2021-2022 Martineau v4.18
 #
 #       wgm   [ help | -h ]
 #       wgm   [ { start | stop | restart } [wg_interface]... ]
@@ -33,7 +33,7 @@ VERSION="v4.17"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 02-Jul-2022
+# Last Updated Date: 14-Jul-2022
 
 #
 # Description:
@@ -1582,6 +1582,7 @@ Export_Peer(){
             local PRI_KEY=$(sqlite3 $SQL_DATABASE "SELECT prikey FROM clients where peer='$WG_INTERFACE';")
             local ALLOWIP=$(awk '/^Allow/ {$1="";$2="";print $0}' ${CONFIG_DIR}${WG_INTERFACE}.conf | awk '{$1=$1};1')
             local AUTO=$(sqlite3 $SQL_DATABASE "SELECT auto FROM clients where peer='$WG_INTERFACE';")
+            local MTU=$(sqlite3 $SQL_DATABASE "SELECT mtu FROM clients where peer='$WG_INTERFACE';")            # v4.18
             [ -n "$(wg show interfaces | grep "$WG_INTERFACE")" ] && local CONNECTED=1 || local CONNECTED=0
 
             eval "nvram set wgm${TYPE}${INDEX}_unit='$INDEX'"
@@ -1610,6 +1611,7 @@ Export_Peer(){
             eval "nvram set wgm${TYPE}_aips='$ALLOWIP'"
             eval "nvram set wgm${TYPE}_alive=25"
             eval "nvram set wgm${TYPE}_dns='$DNS'"
+            eval "nvram set wgm${TYPE}_mtu='$MTU'"          # v4.18
 
             eval "nvram set wgm${TYPE}_enable='$CONNECTED'"
             # Split  Endpoint 'ip:port' for separate GUI fields
@@ -1641,8 +1643,10 @@ Manage_Peer() {
     WG_INTERFACE=$1;shift
     local CMD=$1
 
+    local UPDATE_WGMC_NVRAM="N"
+
     if [ "$WG_INTERFACE" == "new" ] || [ "$WG_INTERFACE" == "newC" ] || [ "$WG_INTERFACE" == "new6" ] ;then
-        CMD="$WG_INTERFACE";
+        local CMD="$WG_INTERFACE";
         WG_INTERFACE=
     fi
 
@@ -1680,6 +1684,10 @@ Manage_Peer() {
                     echo -e "\tpeer peer_name {cmd {options} }\t\t\t\t\t\t- Action the command against the Peer"
                     echo -e "\tpeer peer_name del\t\t\t\t\t\t\t- Delete the Peer from the database and all of its files *.conf, *.key"
                     echo -e "\tpeer peer_name ip=xxx.xxx.xxx.xxx\t\t\t\t\t- Change the Peer VPN Pool IP"
+
+                    echo -e "\tpeer peer_name comment [%n] text_string\t\t\t\t\t- Change the Peer annotation/tag e.g. peer SGS20+ comment My Phone"
+                    echo -e "\t\t\t\t\t\t\t\t\t\t                                      peer SGS20+ comment My Phone (Model Name is %n)"
+
                     echo -e "\tpeer category\t\t\t\t\t\t\t\t- Show Peer categories in database"
                     echo -e "\tpeer peer_name category [category_name {del | add peer_name[...]} ]\t- Create a new category with 3 Peers e.g. peer category GroupA add wg17 wg99 wg11"
 
@@ -1741,7 +1749,7 @@ Manage_Peer() {
 
                                 [ "$Mode" == "device" ] && { echo -e $cBRED"\a\n\t***ERROR 'device' Peer '$WG_INTERFACE' does not support $cBWHT'auto=$AUTO'\n"$cRESET; return ; }  # v4.11
 
-                                if [ "$(echo "$AUTO" | grep "^[yYnNpPZWS]$" )" ];then       # v4.15
+                                if [ "$(echo "$AUTO" | grep "^[yYnNpPzZwWsS]$" )" ];then       # v4.18 v4.15
                                     FLAG=$(echo "$AUTO" | tr 'a-z' 'A-Z')
                                     if [ -z "$(echo "$CMD" | grep "autoX")" ];then
                                         # If Auto='P' then enforce existence of RPDB Selective Routing rules or IPSET fwmark for the 'client' Peer or Passthru gateway
@@ -1758,7 +1766,8 @@ Manage_Peer() {
                                     [ "$Mode" == "server" ] && local TABLE="servers" || TABLE="clients" # v4.11 v4.10
 
                                     sqlite3 $SQL_DATABASE "UPDATE $TABLE SET auto='$FLAG' WHERE peer='$WG_INTERFACE';"
-                                    echo -e $cBGRE"\n\t[✔] Updated '$WG_INTERFACE' AUTO=$FLAG"$cRESET
+                                    echo -e $cBGRE"\n\t[✔] Updated '$WG_INTERFACE' Auto=$FLAG"$cRESET
+                                    local UPDATE_WGMC_NVRAM="Y"         # v4.18
                                     Show_Peer_Config_Entry "$WG_INTERFACE"          # v4.17
                                 else
                                     echo -e $cBRED"\a\n\t***ERROR Invalid Peer Auto='$AUTO' $WG_INTERFACE'\n"$cRESET
@@ -1767,6 +1776,7 @@ Manage_Peer() {
                             delX|del)
 
                                 [ "$CMD" == "delX" ] && Delete_Peer "$WG_INTERFACE" "force" || Delete_Peer "$WG_INTERFACE"  # v3.05
+                                local UPDATE_WGMC_NVRAM="Y"         # v4.18
                             ;;
                             comment)
                                 shift 1
@@ -1788,6 +1798,7 @@ Manage_Peer() {
                                 sqlite3 $SQL_DATABASE "UPDATE $TABLE SET tag='$COMMENT' WHERE $SQL_COL='$WG_INTERFACE';"    # v4.15
 
                                 echo -e $cBGRE"\n\t[✔] Updated Annotation tag "$COMMENT"\n"$cRESET
+                                local UPDATE_WGMC_NVRAM="Y"         # v4.18
                                 Show_Peer_Config_Entry "$WG_INTERFACE"          # v4.17
                             ;;
                             dump|config)
@@ -1857,12 +1868,12 @@ Manage_Peer() {
                                 local ALLOWEDIPS=
                                 for IP in $ALLOWEDIPSCMD
                                     do
-                                        if [ "$IP" == "default" ] || [ "$IP" == "default6" ] || [ "$IP" == "4" ] || [ "$IP" == "6" ] || [ -n "$(echo "$IP" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$IP" | Is_IPv4)" ] || [ -n "$(echo "$IP" | Is_IPv6)" ];then       # v4.17 v4.14 v4.11
+                                        if [ "$IP" == "0.0.0.0/0" ]  || [ "$IP" == "::0/0" ] || [ "$IP" == "default" ] || [ "$IP" == "default6" ] || [ "$IP" == "4" ] || [ "$IP" == "6" ] || [ "$IP" == "ipv4" ] || [ "$IP" == "ipv6" ] || [ -n "$(echo "$IP" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$IP" | Is_IPv4)" ] || [ -n "$(echo "$IP" | Is_IPv6)" ];then       # v4.18 v4.17 v4.14 v4.11
                                             [ -n "$ALLOWEDIPS" ] && local ALLOWEDIPS=$ALLOWEDIPS","
-                                            if [ "$IP" == "default" ] || [ "$IP" == "4" ];then  # v4.14
+                                            if [ "$IP" == "default" ] || [ "$IP" == "4" ] || [ "$IP" == "ipv4" ];then  # v4.18 v4.14
                                                 local IP="0.0.0.0/0"                            # v4.14
                                             fi
-                                            if [ "$IP" == "default6" ] || [ "$IP" == "6" ];then # v4.14
+                                            if [ "$IP" == "default6" ] || [ "$IP" == "6" ] || [ "$IP" == "ipv6" ];then # v4.18 v4.14
                                                 local IP="::0/0"                                # v4.14
                                             fi
                                             ALLOWEDIPS=$ALLOWEDIPS""$IP
@@ -1873,7 +1884,9 @@ Manage_Peer() {
                                     done
 
                                 #[ -n "$ALLOWEDIPS" ] && sed -i "/^AllowedIPs/ s~[^ ]*[^ ]~$ALLOWEDIPS #~3" ${CONFIG_DIR}${WG_INTERFACE}.conf  # v4.17 v4.14
-                                [ -n "$ALLOWEDIPS" ] && sed -i "/^AllowedIPs/ s~\(^.*=\)\(.*\)\(#.*$\)~\1 $ALLOWEDIPS \3~" ${CONFIG_DIR}${WG_INTERFACE}.conf  # v4.17 v4.14
+                                #[ -n "$ALLOWEDIPS" ] && sed -i "/^AllowedIPs/ s~\(^.*=\)\(.*\)\(#.*$\)~\1 $ALLOWEDIPS \3~" ${CONFIG_DIR}${WG_INTERFACE}.conf  # v4.17 v4.14
+
+                                [ -n "$ALLOWEDIPS" ] && sed -i "/^AllowedIPs/ s~^.*$~AllowedIPs = $ALLOWEDIPS~" ${CONFIG_DIR}${WG_INTERFACE}.conf  # v4.18 v4.17 v4.14
 
                                 local SQL_MATCH="subnet"; local ID="peer"; IPADDR="allowedip"
                                 case $Mode in
@@ -1902,6 +1915,7 @@ Manage_Peer() {
                                 fi
 
                                 echo -e $cBGRE"\n\t[✔] Updated Allowed IPs"$cRESET
+                                local UPDATE_WGMC_NVRAM="Y"         # v4.18
                                 Raw_config "$WG_INTERFACE"                      # v4.17
 
                             ;;
@@ -1947,6 +1961,7 @@ Manage_Peer() {
                                                 sed -i "/^Address/ s~[^ ]*[^ ]~$IP_SUBNET~3" ${CONFIG_DIR}${WG_INTERFACE}.conf
 
                                                 echo -e $cBGRE"\n\t[✔] Updated IP/Subnet"$cRESET
+                                                local UPDATE_WGMC_NVRAM="Y"         # v4.18
                                                 Show_Peer_Config_Entry "$WG_INTERFACE"          # v4.17
 
                                                 # v4.11 If it's a 'device' Peer, then its 'server' Peer needs to be updated, and the new QRCODE scanned into device @here1310
@@ -2006,6 +2021,7 @@ Manage_Peer() {
                                     fi
 
                                     echo -e $cBGRE"\n\t[✔] Updated DNS"$cRESET
+                                    local UPDATE_WGMC_NVRAM="Y"         # v4.18
                                     Show_Peer_Config_Entry "$WG_INTERFACE"          # v4.17
                                 else
                                      echo -e $cBRED"\a\n\t***ERROR 'server' Peer '$WG_INTERFACE' cannot set DNS\n"$cRESET
@@ -2038,6 +2054,7 @@ Manage_Peer() {
                                         fi
 
                                         echo -e $cBGRE"\n\t[✔] Updated MTU"$cRESET
+                                        local UPDATE_WGMC_NVRAM="Y"         # v4.18
                                         Show_Peer_Config_Entry "$WG_INTERFACE"          # v4.17
                                     else
                                         echo -e $cBRED"\a\n\t***ERROR 'client' Peer'$WG_INTERFACE' MTU '$MTU' invalid; ONLY range 1280-1440 (Default 1420)\n"$cRESET    # v4.12
@@ -2052,6 +2069,7 @@ Manage_Peer() {
                                 if [ "$SUBCMD" == "add" ] || [ "$SUBCMD" == "del" ] || [ "$SUBCMD" == "upd" ];then
                                     shift 2
                                     Manage_Custom_Subnets "$SUBCMD" "$WG_INTERFACE" "$@"
+                                    local UPDATE_WGMC_NVRAM="Y"         # v4.18
                                     Show_Peer_Config_Entry "$WG_INTERFACE"          # v4.17
                                 else
                                     echo -e $cBRED"\a\n\t***ERROR Invalid command '$SUBCMD' e.g. [add | del | upd]\n"$cRESET
@@ -2153,7 +2171,8 @@ EOF
                                     if [ "$(echo "$ENDPOINT" | tr -cd ":" | wc -c)" -gt 0 ];then
                                         [ "$Mode" = "client" ] && sqlite3 $SQL_DATABASE "UPDATE clients SET socket='$ENDPOINT' WHERE peer='$WG_INTERFACE';"         # v4.17
                                         sed -i "/^Endpoint/ s~\(^.*=\)\(.*\)\(#.*$\)~\1 $ENDPOINT \3~" ${CONFIG_DIR}${WG_INTERFACE}.conf    # v4.17
-                                        echo -e $cBGRE"\n\t[✔] Updated 'client' Peer Endpoint"$cRESET                                       # v4.17
+                                        echo -e $cBGRE"\n\t[✔] Updated 'client' Peer Endpoint"$cRESET   # v4.17
+                                        local UPDATE_WGMC_NVRAM="Y"         # v4.18
                                         [ "$Mode" = "client" ] && Show_Peer_Config_Entry "$WG_INTERFACE" || Raw_config "$WG_INTERFACE"      # v4.17
                                     else
                                         echo -e $cBRED"\a\n\t***ERROR 'client' Peer ${cBWHT}'$WG_INTERFACE'${cBRED} proposed Endpoint ${cBWHT}'$ENDPOINT'${cBRED} does not contain ':Port'?\n"$cRESET
@@ -2169,6 +2188,11 @@ EOF
                     else
                         echo -e $cBRED"\a\n\t***ERROR Invalid WireGuard® Peer '$WG_INTERFACE'\n"$cRESET
                     fi
+
+                    if [ "$UPDATE_WGMC_NVRAM" == "Y" ] && [ "${WG_INTERFACE:3:1}" == "$(nvram get wgmc_unit)" ];then            # v4.18
+                        Export_Peer "export" "$WG_INTERFACE"                    # v4.18
+                    fi
+
                 else
 
                     local CATEGORY_NAME=$1;shift                                    # v3.04
@@ -2431,9 +2455,13 @@ Manage_Wireguard_Sessions() {
                     local POLICY_MODE=                      # v4.14
 
                     # Temporary WebUI hack
-                    if [ -f ${CONFIG_DIR}wg11.conf ];then   # v4.17
-                        Export_Peer "export" "wg11"
-                        nvram commit
+                    if [ "$(nvram get wgmc_unit)" == "${WG_INTERFACE:3:1}" ];then       # v4.18
+                        nvram set wgmc_enable="1"
+                    else
+                        if [ -f ${CONFIG_DIR}wg11.conf ];then   # v4.17
+                            Export_Peer "export" "wg11"
+                            nvram commit
+                        fi
                     fi
 
                 done
@@ -2513,9 +2541,20 @@ Manage_Wireguard_Sessions() {
                     fi
                 done
 
+                # If there are no active 'client' Peers, then enable FC if not EXPLICITY disabled in configuration
+                if [ -z "$(wg show interfaces | grep "wg1")" ] && [ -z "$(grep -E "^DISABLE_FLOW_CACHE" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                    [ -z "$(fc status | grep "Flow Learning Enabled")" ] && RC="$(Manage_FC "enable")"  # v4.18
+                fi
+
                 # Temporary WebUI hack
-                Export_Peer "export" "wg11"
-                nvram commit
+                if [ "$(nvram get wgmc_unit)" == "${WG_INTERFACE:3:1}" ];then       # v4.18
+                    nvram set wgmc_enable="0"
+                else
+                    if [ -f ${CONFIG_DIR}wg11.conf ];then   # v4.18
+                        Export_Peer "export" "wg11"
+                        nvram commit
+                    fi
+                fi
 
             WG_show
             ;;
@@ -3588,7 +3627,7 @@ Get_WAN_IF_Name() {
 WAN_IF=\$(Get_WAN_IF_Name)
 
 logger -st "(\$(basename "\$0"))" \$\$ "Checking if WireGuard® VPN Peer KILL-Switch is required....."
-if [ -n "\$(grep -E "^KILLSWITCH" /jffs/addons/wireguard/WireguardVPN.conf)" ];then
+if [ -n "\$(grep -E "^KILLSWITCH" ${INSTALL_DIR}WireguardVPN.conf)" ];then
     iptables -D FORWARD -i br0 -o \$WAN_IF -j REJECT -m comment --comment "WireGuard KILL-Switch" 2>/dev/null
     iptables -I FORWARD -i br0 -o \$WAN_IF -j REJECT -m comment --comment "WireGuard KILL-Switch" 2>/dev/null
     logger -st "(\$(basename "\$0"))" \$\$ "WireGuard® VPN Peer KILL-Switch ENABLED"
@@ -3765,19 +3804,21 @@ Get_scripts() {
     download_file ${INSTALL_DIR} wg_client martineau $BRANCH dos2unix 777
     download_file ${INSTALL_DIR} wg_server martineau $BRANCH dos2unix 777
     download_file ${INSTALL_DIR} UDP_Updater.sh martineau $BRANCH dos2unix 777
-    download_file ${INSTALL_DIR} wg_ChkEndpointDDNS.sh martineau $BRANCH dos2unix 777           # v4.15
+    download_file ${INSTALL_DIR} wg_ChkEndpointDDNS.sh martineau $BRANCH dos2unix 777   # v4.15
     download_file ${INSTALL_DIR} wg_manager.asp martineau $BRANCH dos2unix              # v4.17
+    download_file ${INSTALL_DIR} Help.md martineau $BRANCH                              # v4.18
+    ln -s ${INSTALL_DIR}Help.md ${SCRIPT_WEB_DIR}/help.htm 2>/dev/null                  # v4.18
 
     chmod +x ${INSTALL_DIR}wg_manager.sh
     chmod +x ${INSTALL_DIR}wg_client
     chmod +x ${INSTALL_DIR}wg_server
-    chmod +x ${INSTALL_DIR}UDP_Updater.sh                                               # v4.01
+    chmod +x ${INSTALL_DIR}UDP_Updater.sh                                                       # v4.01
     chmod +x ${INSTALL_DIR}wg_ChkEndpointDDNS.sh                                                # v4.15
 
     md5sum ${INSTALL_DIR}wg_manager.sh      > ${INSTALL_DIR}"wg_manager.md5"
     md5sum ${INSTALL_DIR}wg_client          > ${INSTALL_DIR}"wg_client.md5"
     md5sum ${INSTALL_DIR}wg_server          > ${INSTALL_DIR}"wg_server.md5"
-    md5sum ${INSTALL_DIR}UDP_Updater.sh     > ${INSTALL_DIR}"UDP_Updater.md5"          # v4.01
+    md5sum ${INSTALL_DIR}UDP_Updater.sh     > ${INSTALL_DIR}"UDP_Updater.md5"                   # v4.01
     md5sum ${INSTALL_DIR}wg_ChkEndpointDDNS.sh     > ${INSTALL_DIR}"wg_ChkEndpointDDNS.md5"     # v4.15
 }
 Read_INPUT() {
@@ -5488,7 +5529,7 @@ EOF
             fi
         done
     fi
-    [ $EDIT -eq 1 ] && nano --unix $FN
+    [ $EDIT -eq 1 ] && nano --linenumbers --unix $FN
     echo -e $cRESET"\n\t'$FN'$cBGRE modified for custom Subnet management"$cRESET
     FN="${INSTALL_DIR}/Scripts/${WG_INTERFACE}-route-down.sh"
     if [ ! -f $FN ];then
@@ -5927,9 +5968,18 @@ Build_Menu() {
             MENU_I="$(printf '%b1 %b = %bBegin%b WireGuard® Installation Process' "${cBYEL}" "${cRESET}" "${cBGRE}" "${cRESET}")"
         fi
 
+        if [ -f /jffs/addons/wireguard/wg_manager.asp ];then        # v4.18
+            local GUI_TAB=                                          # v4.18
+            if [ -f /tmp/menuTree.js ];then                         # v4.18
+                local GUI_TAB="$HTTP_TYPE://$(nvram get lan_ipaddr):$HTTP_PORT/"$(grep -i wireguard /tmp/menuTree.js  | grep -Eo "(user.*\.asp)") # v4.18
+            fi
+        fi
+        MENU_U="$(printf '%bu %b = %bUpdate%b wg_manager scripts/WebUI [dev] (%buf%b - Force)\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cBYEL}" "${cRESET}")"  #v4.18
+
         if [ "$(WireGuard_Installed)" == "Y" ];then
 
             MENU_VX="$(printf '%bv %b = %bView%b [ Peer[.conf] (default 'WireguardVPN.conf') (%bvx%b - Edit)\n' "${cBYEL}" "${cRESET}" "${cGRE}" "$cRESET" "${cGRE}" "${cRESET}" )"
+
             MENU_RS="$(printf '%brs%b = %bRestart%b (or %bStart%b) WireGuard® Sessions()\n' "${cBYEL}" "${cRESET}" "$cGRE" "${cRESET}" "$cGRE" "${cRESET}" )"
 
             if [ -n "$(wg show interfaces)" ];then
@@ -5950,7 +6000,7 @@ Build_Menu() {
             MENU_VPNDIR="$(printf '%b12 %b= %bvpndirector%b Clone VPN Director rules [ "clone" [ "wan" | "ovpn"n [ changeto_wg1n ]] | "delete" | "list" ] %b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")" # v4.14
         fi
 
-        MENU__="$(printf '%b? %b = %bAbout%b Configuration\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}")"
+        MENU__="$(printf '%b? %b = %bAbout%b Configuration (WebUI %b%s%b)' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cBYEL}" "http://${GUI_TAB}" "${cRESET}" )"
         echo -e ${cWGRE}"\n"$cRESET      # Separator line
 
         echo -e
@@ -5965,6 +6015,7 @@ Build_Menu() {
             printf "%s\t\t\t\t\t\t\t\t\t\n"             "$MENU_R"
             printf "\n%s\t\t\t\t\t\n"                   "$MENU__"
             printf "%s\t\t\n"                           "$MENU_VX"
+            printf "\n%s\t\t\n"                         "$MENU_U"                   # v4.18
         fi
 
         printf '\n%be %b = Exit Script [?]\n' "${cBYEL}" "${cRESET}"
@@ -6200,7 +6251,7 @@ Process_User_Choice() {
                     fi
                 fi
                 ;;
-            "?"|[aA]bout|u|u" "*|uf|uf" "*)
+            "?"|[aA]bout|u|u" "*|uf|uf" "*|[uU]pdate*)
 
                 local ACTION="$(echo "$menu1"| awk '{print $1}')"
 
@@ -6239,6 +6290,9 @@ Process_User_Choice() {
                             # Ensure any new Configuration options are now available...
                             Create_Sample_Config                    # v4.17
 
+                            # Refresh WebUI with FULL restart of httpd
+                            [ -f ${INSTALL_DIR}*.asp ] && Process_User_Choice "www" "refreshX"   # v4.18
+
                             [ -f ${INSTALL_DIR}$SCRIPT_NAME ] && { rm $0.u; sleep 1; exec "$0"; } || mv $0.u $0     # v4.14
 
                             # Never get here!!!
@@ -6266,12 +6320,13 @@ Process_User_Choice() {
                 ;;
             vx|vx" "*|[vV]|v" "*|V" "*|vi|vi" "*|vix*|[vV]iew)            # v4.17 v1.10
 
-                local EDITOR="nano"
+                local EDITOR="nano";local SHOWLINENUMBERS="--linenumbers"   # v4.18
                 local ACCESS="--view"
 
                 if [ "${menu1:0:2}" == "vi" ] && [ "${menu1:0:4}" != "view" ];then          # v4.17 @JGrana
                     local EDITOR="vi"                       # v4.17 @JGrana
                     local ACCESS="-R"                       # v4.17 @JGrana
+                    local SHOWLINENUMBERS=
                 fi
 
                 [ "$menu1" == "vix" ] &&  local ACCESS=""   # v4.17 @JGrana
@@ -6302,7 +6357,7 @@ Process_User_Choice() {
                     if [ "$ACCESS" == "--unix" ] || [ "${menu1:0:3}" == "vix" ];then        # v4.17 @JGrana
                         local PRE_MD5="$(md5sum $FN | awk '{print $1}')"
                     fi
-                    $EDITOR $ACCESS $FN                                             # v4.17
+                    $EDITOR $SHOWLINENUMBERS $ACCESS $FN                                    # v4.18 v4.17
                 else
                     echo -e $cBRED"\a\n\t***ERROR WireGuard® Peer Configuration ${cBWHT}'$FN'${cBRED} NOT found\n"$cRESET
                 fi
@@ -6312,7 +6367,10 @@ Process_User_Choice() {
                     local WG_INTERFACE=${FN##*/}
                     local WG_INTERFACE=${WG_INTERFACE%.*}
 
-                    [ -d /www/user/wireguard ] && awk '!/^ *#/ && NF' ${INSTALL_DIR}WireguardVPN.conf > ${SCRIPT_WEB_DIR}/config.htm  # v4.17
+                    if [ -d /www/user/wireguard ];then
+                        awk '!/^ *#/ && NF' ${INSTALL_DIR}WireguardVPN.conf > ${INSTALL_DIR}config.htm  # v4.18
+                        ln -s ${INSTALL_DIR}config.htm ${SCRIPT_WEB_DIR}/config.htm 2>/dev/null         # v4.18
+                    fi
 
                     if [ "$POST_MD5" != "$PRE_MD5" ];then
 
@@ -6625,12 +6683,14 @@ Process_User_Choice() {
                 [ -z "$(echo $PAGES | grep -E ".asp$")" ] && PAGES=$PAGES".asp"
 
                 case "$ACTION" in
-                    mount|mountX|on|m|refresh)              # v4.17
+                    mount|mountX|on|m|refresh|refreshX)              # #v4.18 v4.17
                         echo -e $cBGRE
                         if [ -z "$INTERNAL_PAGE" ];then
                             if [ "$PAGES" == "${SCRIPT_NAME%.*}.asp" ];then
 
-                                [ "$ACTION" == "refresh" ] && Unmount_WebUI "${PAGES}"
+                                if [ "$ACTION" == "refresh" ] || [ "$ACTION" == "refreshX" ];then   # v4.18
+                                    Unmount_WebUI "${PAGES}"
+                                fi
 
                                 if [ ! -f /tmp/menuTree.js ] || { [ -f /tmp/menuTree.js ] && [ -z "$(grep -i "WireGuard® Manager" /tmp/menuTree.js)" ] ;} ;then
                                     Mount_WebUI "${PAGES}"
@@ -6642,9 +6702,12 @@ Process_User_Choice() {
 
                             Manage_WebUI_API "INIT"          # v4.17
 
-                            [ -d /www/user/wireguard ] && awk '!/^ *#/ && NF' ${INSTALL_DIR}WireguardVPN.conf > ${SCRIPT_WEB_DIR}/config.htm  # v4.17
+                            if [ -d /www/user/wireguard ];then
+                                awk '!/^ *#/ && NF' ${INSTALL_DIR}WireguardVPN.conf > ${INSTALL_DIR}config.htm  # v4.18
+                                ln -s ${INSTALL_DIR}config.htm ${SCRIPT_WEB_DIR}/config.htm 2>/dev/null         # v4.18
+                            fi
 
-                            if [ "$ACTION" == "mountX" ] || [ "$ACTION" == "mX" ];then
+                            if [ "$ACTION" == "mountX" ] || [ "$ACTION" == "mX" ] || [ "$ACTION" == "refreshX" ];then   # v4.18
                                 service restart_httpd >/dev/null        # WebUI v4.17
                                 echo -e $cBGRE"\t[✔]${cBWHT} Restarted service_httpd for WebUI"$cRESET
                                 SayT "Restarted service_httpd"
@@ -6760,7 +6823,11 @@ Process_User_Choice() {
                         #fi
                     ;;
                 esac
-                [ -d /www/user/wireguard ] && awk '!/^ *#/ && NF' /jffs/addons/wireguard/WireguardVPN.conf > ${SCRIPT_WEB_DIR}/config.htm  # v4.17
+
+                if [ -d /www/user/wireguard ];then
+                    awk '!/^ *#/ && NF' ${INSTALL_DIR}WireguardVPN.conf > ${INSTALL_DIR}config.htm  # v4.18
+                    ln -s ${INSTALL_DIR}config.htm ${SCRIPT_WEB_DIR}/config.htm 2>/dev/null         # v4.18
+                fi
             ;;
             addon|addon*)                           # v4.15         {script_name [ dev | remove | del ] }
 
@@ -7108,7 +7175,10 @@ Mount_WebUI(){
         flock -u "$FD"
 
         [ -z "$(grep -i wireguard /jffs/scripts/service-event)" ] && echo -e "if echo \"\$2\" | /bin/grep -q \"wg_manager\"; then { /jffs/addons/wireguard/wg_manager.sh service_event \"\$@\" & }; fi # WireGuard WebUI" >> /jffs/scripts/service-event    # v4.17
+
         Manage_WebUI_API "INIT"                 # v4.17
+
+        [ -f ${INSTALL_DIR}Help.md ] && ln -s ${INSTALL_DIR}Help.md ${SCRIPT_WEB_DIR}/help.htm 2>/dev/null      # v4.18
     fi
 }
 Unmount_WebUI(){
@@ -7737,7 +7807,10 @@ SHELL=$(readlink /proc/$$/exe)              # 4.14
 EASYMENU="Y"
 
 # Hack!!!!
-[ -d /www/user/wireguard ] && awk '!/^ *#/ && NF' ${INSTALL_DIR}WireguardVPN.conf > ${SCRIPT_WEB_DIR}/config.htm  # v4.17
+if [ -d /www/user/wireguard ];then
+    awk '!/^ *#/ && NF' ${INSTALL_DIR}WireguardVPN.conf > ${INSTALL_DIR}config.htm  # v4.18
+    ln -s ${INSTALL_DIR}config.htm ${SCRIPT_WEB_DIR}/config.htm 2>/dev/null         # v4.18
+fi
 
 IPV6_SERVICE=$(nvram get ipv6_service)                  # v4.14
 if [ "$IPV6_SERVICE" != "disabled" ];then               # v4.14
@@ -7831,8 +7904,11 @@ if [ "$1" != "install" ];then   # v2.01
     VERSION_NUMDOT=$VERSION                                             # v3.03
     VERSION_NUM=$(echo "$VERSION" | sed 's/[^0-9]*//g')
 
-    [ -d /www/user/wireguard ] && awk '!/^ *#/ && NF' /jffs/addons/wireguard/WireguardVPN.conf > ${SCRIPT_WEB_DIR}/config.htm  # v4.17
-
+    if [ -d /www/user/wireguard ];then
+        awk '!/^ *#/ && NF' ${INSTALL_DIR}WireguardVPN.conf > ${INSTALL_DIR}config.htm  # v4.18
+        ln -s ${INSTALL_DIR}config.htm ${SCRIPT_WEB_DIR}/config.htm 2>/dev/null         # v4.18
+        ln -s ${INSTALL_DIR}Help.md ${SCRIPT_WEB_DIR}/help.htm 2>/dev/null              # v4.18
+    fi
     # if [ "${VERSION_NUM:0:1}" -eq 3 ] && [ ! -d ${CONFIG_DIR} ];then    # v3.03
 
         # if [ -d /opt/etc/wireguard ] && [ "$(ls -1 /opt/etc/wireguard | wc -l)" -gt "5" ];then
@@ -8038,9 +8114,11 @@ if [ "$1" != "install" ];then   # v2.01
                 fi
 
                 # http://www.snbforums.com/threads/beta-wireguard-session-manager.70787/post-688282
-                if { [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^DISABLE_FLOW_CACHE" ${INSTALL_DIR}WireguardVPN.conf)" ] ;} || \
-                     [ -n "$(echo "RT-AX86U RT-AX56U" | grep -ow "$HARDWARE_MODEL")" ];then     # v4.16 v4.15
-                        RC="$(Manage_FC "disable")"                                             # v4.14
+                #if { [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^DISABLE_FLOW_CACHE" ${INSTALL_DIR}WireguardVPN.conf)" ] ;} || \
+                     #[ -n "$(echo "RT-AX86U RT-AX56U" | grep -ow "$HARDWARE_MODEL")" ];then     # v4.16 v4.15
+                # Force users to manually set DISABLE_FLOW_CACHE using command 'vx' rather than have the script hard-code the models to always DISABLE_FLOW_CACHE
+                if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^DISABLE_FLOW_CACHE" ${INSTALL_DIR}WireguardVPN.conf)" ];then # v4.18
+                    RC="$(Manage_FC "disable")"                                             # v4.14
                 fi
 
                 Manage_Wireguard_Sessions "start" "$PEER" "$NOPOLICY"
@@ -8050,6 +8128,10 @@ if [ "$1" != "install" ];then   # v2.01
             ;;
             stop)
                 Manage_Wireguard_Sessions "stop" "$PEER" "$NOPOLICY"
+                # If there are no active 'client' Peers, then enable FC if not EXPLICITY disabled in configuration
+                if [ -z "$(wg show interfaces | grep "wg1")" ] && [ -z "$(grep -E "^DISABLE_FLOW_CACHE" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                    [ -z "$(fc status | grep "Flow Learning Enabled")" ] && RC="$(Manage_FC "enable")"  # v4.18
+                fi
                 echo -e $cRESET
                 exit_message
             ;;
@@ -8163,15 +8245,20 @@ if [ "$1" != "install" ];then   # v2.01
                 echo -e
 
                 case $ACTION in
-                    mount)
+                    mount|mountX)                               # v4.18
                         Mount_WebUI "${SCRIPT_NAME%.*}.asp"     # v4.17
                     ;;
                     unmount)
                         Unmount_WebUI "${SCRIPT_NAME%.*}.asp"   # v4.17
                     ;;
-                    refresh)
+                    refresh|refreshX)                           # v4.18
                         Unmount_WebUI "${SCRIPT_NAME%.*}.asp"   # v4.17
                         Mount_WebUI "${SCRIPT_NAME%.*}.asp"     # v4.17
+                        if [ "$ACTION" == "mountX" ] || [ "$ACTION" == "refreshX" ];then    # v4.18
+                            service restart_httpd >/dev/null
+                            echo -e $cBGRE"\t[✔]${cBWHT} Restarted service_httpd for WebUI"$cRESET
+                            SayT "Restarted service_httpd"
+                        fi
                     ;;
                     *)
                         echo -en $cBRED"\a\n\t***ERROR: Invalid arg $cBWHT'"$ACTION"'$cBRED for WebUI TAB - valid 'mount','unmount' or refresh only!\n"$cRESET
