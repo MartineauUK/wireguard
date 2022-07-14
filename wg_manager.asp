@@ -50,6 +50,47 @@ padding: 3px 3px;
 margin-top: -40px;
 }
 </style>
+<!-- https://www.w3schools.com/howto/tryit.asp?filename=tryhow_css_tooltip-->
+<style>
+.tooltip {
+  position: relative;
+  display: inline-block;
+  border-bottom: 1px dotted black;
+}
+
+.tooltip .tooltiptext {
+  visibility: hidden;
+  width: 230px;
+  background-color: #4D595D;
+  color: #fff;
+  text-align: center;
+  border-radius: 6px;
+  padding: 5px 0;
+  position: absolute;
+  z-index: 1;
+  bottom: 125%;
+  left: 50%;
+  margin-left: -60px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.tooltip .tooltiptext::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: #4D595D transparent transparent transparent;
+}
+
+.tooltip:hover .tooltiptext {
+  visibility: visible;
+  opacity: 1;
+}
+</style>
 <script>
 <% get_wgc_parameter(); %>
 var custom_settings = <% get_custom_settings(); %>;
@@ -104,7 +145,7 @@ function UpdateResults(){
 }
 function CMDExecute(){
 
-   HideCMDRC();
+HideCMDRC();
    ShowCMDEexecuting();
 
 
@@ -413,6 +454,16 @@ let confirmAction = confirm("Confirm OK to Update 'Persistent Keep Alive' to '" 
 	}
 }
 </script>
+<script>
+function confirmDeleteVPNDirector() {
+let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Routing rules");
+	if (confirmAction) {
+	  CMDExecuteARG('vpndirector delete');
+	} else {
+	  alert("DELETE ALL 'VPN Director' Policy Routing rules cancelled!");
+	}
+}
+</script>
 
 </head>
 <body onload="initial();" onunLoad="return unload_body();" class="bg">
@@ -450,7 +501,7 @@ let confirmAction = confirm("Confirm OK to Update 'Persistent Keep Alive' to '" 
                         <tr>
                             <td bgcolor="#4D595D" valign="top" >
                             <div>&nbsp;</div>
-                            <div style="color: indianred;" class="formfonttitle">VPN - WireGuard® Manager© Beta v0.16 by Martineau *****</div>
+                            <div class="formfonttitle">VPN - WireGuard® Manager© v1.01 by Martineau</div>
                             <div id="divSwitchMenu" style="margin-top:-40px;float:right;"></div
                             <div style="margin:10px 0 10px 5px;" class="splitLine"></div>
                             <table width="100%" border="0" align="center" cellpadding="4" cellspacing="0" bordercolor="#6b8fa3" class="FormTable">
@@ -654,7 +705,7 @@ let confirmAction = confirm("Confirm OK to Update 'Persistent Keep Alive' to '" 
         </td>
     </tr>
     <tr id="wgmc_status">
-        <th><#3179#></th>
+		<th><div class="tooltip"><#3179#><span class="tooltiptext">For convenience, you can instantly change the connection state<br>by clicking the checkbox !</span></div></th>
         <td>
             <input type="checkbox" value="1" onclick="SwitchStatus();" name="wgmc_enable" class="input" <% nvram_match("wgmc_enable", "1", "checked"); %>><#188#></input>
         </td>
@@ -713,7 +764,7 @@ let confirmAction = confirm("Confirm OK to Update 'Persistent Keep Alive' to '" 
         </td>
     </tr>
 	<tr>
-        <th>MTU (Default IPv4=1440, IPv6=1420)</th>
+		<th><div class="tooltip">MTU<span class="tooltiptext">WireGuard® will auto determine the<br>MTU if not specified<br><br>IPv4 = 1440<br>IPv6 = 1420<br>IPv4 PPoE = 1432<br>IPv6 PPoE = 1412<br><br>Some WireGuard® ISPs custom MTU<br>e.g. TorGuard = 1292<br><br>Another common value is 1380<br><br>Minimum accepted is 1280</span></div></th>
         <td>
             <input type="text" maxlength="39" name="wgc_mtu" id="wgc_mtu" onChange="confirmMTUFieldUpdate(this.value);"class="input_32_table" value="<% nvram_get("wgmc_mtu"); %>" autocorrect="off" autocapitalize="off"></input>
         </td>
@@ -735,17 +786,17 @@ let confirmAction = confirm("Confirm OK to Update 'Persistent Keep Alive' to '" 
     <tr>
         <th>Preshared Key (Optional)</th>
         <td>
-            <input type="text" readonly maxlength="63" name="wgc_psk" id="wgc_psk" onChange="confirmPreSharedKeyFieldUpdate(this.value);"class="input_32_table" value="<% nvram_get("wgmc_psk"); %>" autocorrect="off" autocapitalize="off"></input>
+            <input type="text" readonly maxlength="63" name="wgc_psk" id="wgc_psk" onChange="confirmPreSharedKeyFieldUpdate(this.value);" class="input_32_table" value="<% nvram_get("wgmc_psk"); %>" autocorrect="off" autocapitalize="off"></input>
         </td>
     </tr>
     <tr>
-        <th>Allowed IPs (Default ipv4,ipv6)</th>
+		<th><div class="tooltip">Allowed IPs<span class="tooltiptext">You may specify shortcuts:<br><br>[ipv]4 or default<br>for<br>0.0.0.0/0<br><br>[ipv]6 or default6<br>for<br>::0/0</span></div></th>
         <td>
             <input type="text" maxlength="1023" name="wgc_aips" id="wgc_aips" onChange="confirmAllowedIPsFieldUpdate(this.value);" class="input_32_table" value="<% nvram_get("wgmc_aips"); %>" autocorrect="off" autocapitalize="off"></input>
         </td>
     </tr>
     <tr>
-        <th>Endpoint Address:Port</th>
+		<th><div class="tooltip">Endpoint Address:Port<span class="tooltiptext">Enter IP address or Domain name<br>of<br>'server' Peer and Port number</span></div></th>
         <td>
             <input type="text" maxlength="39" name="wgc_ep_addr" id="wgc_ep_addr" onChange="confirmEndpointAddressFieldUpdate(this.value);" class="input_32_table" value="<% nvram_get("wgmc_ep_addr"); %>" autocorrect="off" autocapitalize="off"></input> :
             <input type="text" maxlength="5" name="wgc_ep_port" id="wgc_ep_port" onChange="confirmEndpointPortFieldUpdate(this.value);" class="input_6_table" onKeyPress="return validator.isNumber(this,event);" value="<% nvram_get("wgmc_ep_port"); %>" autocorrect="off" autocapitalize="off"></input>
@@ -856,12 +907,12 @@ let confirmAction = confirm("Confirm OK to Update 'Persistent Keep Alive' to '" 
 
 <tbody style="">
     <tr>
-        <td class="settingname">VPN Director rules</td>
+		<th><div class="tooltip">VPN Director rules<span class="tooltiptext">For convenience, use the VPN Director GUI to define the Selective Routing required, then clone them into WireGuard® Manager©, otherwise specify them manually.</span></div></th>
         <td>
             <input type="button" class="button_gen" onclick="CMDExecuteARG('vpndirector list');" value="Show" id="btnVPNDirectorList" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
         </td>
         <td>
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('vpndirector delete');" value="Delete" id="btnVPNDirectorDelete" style="background: linear-gradient(rgb(234, 45, 8) 0%, rgb(234, 45, 8) 100%);">
+            <input type="button" class="button_gen" onclick="confirmDeleteVPNDirector()" value="Delete" id="btnVPNDirectorDelete" style="background: linear-gradient(rgb(234, 45, 8) 0%, rgb(234, 45, 8) 100%);">
         </td>
     </tr>
     <tr>
