@@ -50,6 +50,16 @@ padding: 3px 3px;
 margin-top: -40px;
 }
 </style>
+<style>
+#wgm_QRCode_block2{
+position: absolute;
+width: 230px;
+height: 260px;
+background-color: #444f53;
+padding: 3px 3px;
+margin-top: -40px;
+}
+</style>
 <!-- https://www.w3schools.com/howto/tryit.asp?filename=tryhow_css_tooltip-->
 <style>
 .tooltip {
@@ -96,8 +106,9 @@ margin-top: -40px;
 var custom_settings = <% get_custom_settings(); %>;
 
 var wgcindex = "<% nvram_get("wgmc_unit"); %>";
+var wgsindex = "<% nvram_get("wgms_unit"); %>";
 
-window.onresize = function() {
+window.onresize = function(thisblock) {
 cal_panel_block("wgm_QRCode_block", 0.18);
 }
 function initial(){
@@ -128,6 +139,12 @@ function initial(){
     GetConfigSettings();
 
     document.getElementById('wgm_WebUI_Import').textContent = ""
+	
+	var wgm_ver = document.getElementById('wgm_version').value
+	if (wgm_ver.includes("b"))
+		repository = "dev"
+	else
+		repository = "main";
 
     $("thead").click(function(){
         $(this).siblings().toggle("fast");
@@ -140,8 +157,6 @@ function UpdateResults(){
     document.getElementById("wgm_ExecuteResultsBase64").innerHTML = atob(custom_settings.wgm_Execute_Result);
 
     document.getElementById("wgm_ExecuteRC").innerHTML =    custom_settings.wgm_ExecuteRC;
-    /*ShowExecutedTS();*/
-    /*ShowExecuteResults();*/
 }
 function CMDExecute(){
 
@@ -230,12 +245,23 @@ function CMDExecutePeerImport(command){
 }
 function SwitchStatus(){
 	
-	Connected = "<% nvram_get("wgmc_enable"); %>"
+	var Connected = "<% nvram_get("wgmc_enable"); %>"
 	
 	if (Connected == "1") {
 		CMDExecuteARG("stop wg1" + <% nvram_get("wgmc_unit"); %>);
 	} else {
 		CMDExecuteARG("start wg1" + <% nvram_get("wgmc_unit"); %>);
+	}
+	
+}
+function SwitchStatus2(){
+	
+	var Connected = "<% nvram_get("wgms_enable"); %>"
+	
+	if (Connected == "1") {
+		CMDExecuteARG("stop wg2" + <% nvram_get("wgms_unit"); %>);
+	} else {
+		CMDExecuteARG("start wg2" + <% nvram_get("wgms_unit"); %>);
 	}
 	
 }
@@ -263,8 +289,6 @@ function sleepThenAct(){
 function change_wgmc_unit(unit){
 document.chg_wgmc.wgmc_unit.value=unit.toString();
 CMDExecuteARG('export wg1' + unit);
-// document.chg_wgmc.submit();
-
 }
 function ShowQRCode() {
 $('#wgm_QRCode_block').show();
@@ -272,6 +296,10 @@ cal_panel_block("wgm_QRCode_block", 0.18);
 }
 function HideQRCode(){
 $('#wgm_QRCode_block').hide();
+}
+function change_wgms_unit(unit){
+document.chg_wgms.wgms_unit.value=unit.toString();
+CMDExecuteARG('export wg2' + unit);
 }
 function ShowCMDEexecuting() {
 $('#imgExecuting').show();
@@ -340,11 +368,6 @@ function GetConfigSettings() {
         }
     })
 }
-function LetsDEBUG(wot) {
-    /*alert(wot);*/
-    debugger;
-}
-
 </script>
 <script type="text/javascript">
 // Popup window code
@@ -380,7 +403,17 @@ let confirmAction = confirm("Confirm OK to Update 'Auto-Start Type' to '" + auto
 	if (confirmAction) {
 	  CMDExecuteARG("peer wg1" + wgcindex + " auto=" + auto);
 	} else {
-	  alert("Update Update 'Auto-Start' cancelled!");
+	  alert("Update 'Auto-Start' cancelled!");
+	}
+}
+</script>
+<script>
+function confirmServerAutoFieldUpdate(auto) {
+let confirmAction = confirm("Confirm OK to Update 'Auto-Start Type' to '" + auto + "'");
+	if (confirmAction) {
+	  CMDExecuteARG("peer wg2" + wgcindex + " auto=" + auto);
+	} else {
+	  alert("Update 'Auto-Start' cancelled!");
 	}
 }
 </script>
@@ -455,6 +488,25 @@ let confirmAction = confirm("Confirm OK to Update 'Persistent Keep Alive' to '" 
 }
 </script>
 <script>
+function cloneVPNDirector() {
+	
+	var SRCFilter = ""
+	var DSTPeer = ""
+debugger;
+	if (document.getElementById('wgm_VPNDirector_SRCFilter').value != "No Source Filter") {
+		SRCFilter = document.getElementById('wgm_VPNDirector_SRCFilter').value
+		if (SRCFilter.length > 3) 
+			SRCFilter = SRCFilter.slice(5)
+		//else
+			//SRCFilter = "wan"
+	}
+
+debugger;
+	CMDExecuteARG('vpndirector clone ' + SRCFilter + " " + DSTPeer);
+}
+</script>
+
+<script>
 function confirmDeleteVPNDirector() {
 let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Routing rules");
 	if (confirmAction) {
@@ -501,7 +553,7 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
                         <tr>
                             <td bgcolor="#4D595D" valign="top" >
                             <div>&nbsp;</div>
-                            <div class="formfonttitle">VPN - WireGuard® Manager© v1.01 by Martineau</div>
+                            <div class="formfonttitle">VPN - WireGuard® Manager© v1.02 by Martineau</div>
                             <div id="divSwitchMenu" style="margin-top:-40px;float:right;"></div
                             <div style="margin:10px 0 10px 5px;" class="splitLine"></div>
                             <table width="100%" border="0" align="center" cellpadding="4" cellspacing="0" bordercolor="#6b8fa3" class="FormTable">
@@ -511,7 +563,7 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
                                                 <input type="text" readonly maxlength="7" class="input_6_table" id="wgm_version">
 											</td>
 											<td align="center">
-												<input type="button" class="button_gen"  onclick="JavaScript:newPopup('https://github.com/MartineauUK/wireguard/commits/dev/wg_manager.sh');" value="Change Log" id="btnShowHelp" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
+												<input type="button" class="button_gen"  onclick="JavaScript:newPopup('https://github.com/MartineauUK/wireguard/commits/' + repository + '/wg_manager.sh');" value="Change Log" id="btnShowHelp" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
                                             </td>
                                             <td colspan="2" align="center">
                                                 <input type="button" class="button_gen" onclick="JavaScript:newPopup('/ext/wireguard/help.htm');" value="Help" id="btnShowHelp" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
@@ -527,6 +579,47 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
 
 <div>&nbsp;</div>
 <div class="formfonttitle">WireGuard® Manager©</div>
+
+<div style="line-height:15px;">&nbsp;</div>
+<!--<div style="margin-top:;" >-->
+	<div id="tabMenu" class="submenuBlock" style="background: black;">
+		<div>
+			<table>
+				<tbody>
+					<tr>
+						<td>
+							<div class="tab" onclick="goToPage(18, 0, this);" title="wg_manager.asp" id="ClientPeer_tab"><span>Client Peer</span></div>
+						</td>
+						<td>
+							<div class="tab" onclick="goToPage(18, 1, this);" title="wg_manager.asp" id="ServerPeer_tab"><span>Server Peer</span></div>
+						</td>
+						<td>
+							<div class="tab" onclick="goToPage(18, 2, this);" title="wg_manager.asp" id="DevicePeer_tab"><span>Road-Warrior Peer</span></div>
+						</td>
+						<td>
+							<div class="tab" onclick="goToPage(18, 2, this);" title="wg_manager.asp" id="VPN Director_tab"><span>VPNDirector </span></div>
+						</td>
+						<td>
+							<div class="tab" onclick="goToPage(18, 2, this);" title="wg_manager.asp" id="IPSET_tab"><span>IPSET</span></div>
+						</td>
+						<td>
+							<div class="tab" onclick="goToPage(18, 2, this);" title="wg_manager.asp" id="Passthru_tab"><span>Passthru'</span></div>
+						</td>
+						<td>
+							<div class="tab" onclick="goToPage(18, 2, this);" title="wg_manager.asp" id="Options_tab"><span>Options</span></div>
+						</td>
+						<td>
+							<div class="tab" onclick="goToPage(18, 2, this);" title="wg_manager.asp" id="Diag_tab"><span>Diags</span></div>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+	</div>
+</div>
+
+<div style="line-height:10px;">&nbsp;</div>
+<div class="splitline"></div>
 <table id="WgcBasicTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable SettingsTable">
 <thead class="collapsible">
     <tr><td colspan="2">Command Interface (click to expand/collapse)</td></tr>
@@ -559,11 +652,10 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
 </tbody>
 </table>
 
-
 <!--====================================================Peer Control (Import etc.)==========================================================-->
 <div style="line-height:10px;">&nbsp;</div>
 <table width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#4D595D" class="FormTable">
-<thead class="collapsible">
+	<thead class="collapsible">
     <tr><td colspan="4">Peer control Commands (click to expand/collapse)</td></tr>
 </thead>
 <tbody>
@@ -659,14 +751,12 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
 </tbody>
 </table>
 
-
-
 <!--====================================================Client Configuration==========================================================-->
 <div style="line-height:10px;">&nbsp;</div>
-<table width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#4D595D" class="FormTable">
+<table id="ClientPeerTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#4D595D" class="FormTable">
 <thead>
     <tr>
-        <td colspan="2">Client Configuration</td>
+        <td colspan="2">Client Peer Configuration (click to expand/collapse)</td>
     </tr>
 </thead>
 <tbody>
@@ -710,31 +800,34 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
             <input type="checkbox" value="1" onclick="SwitchStatus();" name="wgmc_enable" class="input" <% nvram_match("wgmc_enable", "1", "checked"); %>><#188#></input>
         </td>
     </tr>
-</tbody>
-</table>
+<!--</tbody>
+</table>-->
 
 
-<table id="WgcStateTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable">
-<tbody>
-    <tr>
-        <td>
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('stop wg1' + wgcindex);" value="Stop" id="btnStopWGClient" style="color: indianred; background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('start wg1' + wgcindex);" value="Start" id="btnStartWGClient" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('restart wg1' + wgcindex);" value="Restart" id="btnRestartWGClient" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
-            <input type="button" class="button_gen" onclick="confirmPeerDelete('wg1' + wgcindex);" value="Delete" id="btnDeleteWGClient" style="background: linear-gradient(rgb(234, 45, 8) 0%, rgb(234, 45, 8) 100%);">
+	<!--<table id="WgcStateTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable">
+	<tbody>-->
+	<tr>
+		<td colspan="4">
+			<input type="button" class="button_gen" onclick="CMDExecuteARG('stop wg1' + wgcindex);" value="Stop" id="btnStopWGClient" style="width: 123px; color: indianred; background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
+			<input type="button" class="button_gen" onclick="CMDExecuteARG('start wg1' + wgcindex);" value="Start" id="btnStartWGClient" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
+			<input type="button" class="button_gen" onclick="CMDExecuteARG('restart wg1' + wgcindex);" value="Restart" id="btnRestartWGClient" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
+			<input type="button" class="button_gen" onclick="confirmPeerDelete('wg1' + wgcindex);" value="Delete" id="btnDeleteWGClient" style="background: linear-gradient(rgb(234, 45, 8) 0%, rgb(234, 45, 8) 100%);">
 			<input type="button" class="button_gen" onClick="ShowQRCode('wg11');" value="QR Code" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);"/>
 
-            <div id="wgm_QRCode_block" style="display:none">
-                <div style="display:flex; align-items: center;">
-                    <div style="width:20px;height:20px;background-image:url('images/New_ui/disable.svg');cursor:pointer" onclick="HideQRCode();"></div>
-                </div>
-                <div id="qrcode"></div>
-                <script type="text/javascript">
-                    new QRCode(document.getElementById("qrcode"), "<% nvram_get("wgmc_desc"); %>" + "\n[Interface]" + "\nPrivateKey = " + "<% nvram_get("wgmc_priv"); %>" + "\nAddress = " + "<% nvram_get("wgmc_addr"); %>" + "\nDNS = " + "<% nvram_get("wgmc_dns"); %>" + "\n\n[Peer]" + "\nPublicKey = " + "<% nvram_get("wgmc_ppub"); %>" + "\nAllowedIPs = " + "<% nvram_get("wgmc_aips"); %>" + "\nEndPoint = " + "<% nvram_get("wgmc_ep_addr"); %>" + ":" + "<% nvram_get("wgmc_ep_port"); %>"  );
-                </script>
-            </div>
-        </td>
-    </tr>
+			<div id="wgm_QRCode_block" style="display:none">
+				<div style="display:flex; align-items: center;">
+					<div style="width:20px;height:20px;background-image:url('images/New_ui/disable.svg');cursor:pointer" onclick="HideQRCode();"></div>
+				</div>
+				<div id="qrcode"></div>
+				<script type="text/javascript">
+					new QRCode(document.getElementById("qrcode"), "<% nvram_get("wgmc_desc"); %>" + "\n[Interface]" + "\nPrivateKey = " + "<% nvram_get("wgmc_priv"); %>" + "\nAddress = " + "<% nvram_get("wgmc_addr"); %>" + "\nDNS = " + "<% nvram_get("wgmc_dns"); %>" + "\n\n[Peer]" + "\nPublicKey = " + "<% nvram_get("wgmc_ppub"); %>" + "\nAllowedIPs = " + "<% nvram_get("wgmc_aips"); %>" + "\nEndPoint = " + "<% nvram_get("wgmc_ep_addr"); %>" + ":" + "<% nvram_get("wgmc_ep_port"); %>"  );
+				</script>
+			</div>
+		</td>
+	</tr>
+
+	<!--</tbody>
+	</table>-->
 
 </tbody>
 </table>
@@ -810,9 +903,126 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
     </tr>
 </table>
 
+<!--====================================================Server Configuration==========================================================-->
+<div style="line-height:10px;">&nbsp;</div>
+<table id="ServerPeerTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#4D595D" class="FormTable">
+<thead>
+    <tr>
+        <td colspan="2">Server Peer Configuration (click to expand/collapse)</td>
+    </tr>
+</thead>
+<tbody>
+    <tr id="wgms_unit_field" class="rept ew">
+        <th>Select Server Index</th>
+        <td>
+            <select name="wgms_unit" class="input_option" onChange="change_wgms_unit(this.value);">
+            <option class="content_input_fd" value="1" <% nvram_match("wgms_unit", "1", "selected"); %>>1</option>
+            <option class="content_input_fd" value="2" <% nvram_match("wgms_unit", "2", "selected"); %>>2</option>
+            <option class="content_input_fd" value="3" <% nvram_match("wgms_unit", "3", "selected"); %>>3</option>
+            <option class="content_input_fd" value="4" <% nvram_match("wgms_unit", "4", "selected"); %>>4</option>
+            <option class="content_input_fd" value="5" <% nvram_match("wgms_unit", "5", "selected"); %>>5</option>
+            </select>
+        </td>
+    </tr>
+    <tr>
+        <th>Description</th>
+        <td>
+            <input type="text" maxlength="40" name="wgs_desc" id="wgs_desc" onChange="confirmDescFieldUpdate(this.value);" class="input_32_table" value="<% nvram_get("wgms_desc"); %>" autocorrect="off" autocapitalize="off"></input>
+        </td>
+    </tr>
+    <tr id="wgs_auto_field" class="rept ew">
+        <th>Auto start Type</th>
+        <td>
+            <select name="wgms_auto_type" class="input_option" onChange="confirmServerAutoFieldUpdate(this.value);">
+                <option value="Y" <% nvram_match("wgms_auto", "Y", "selected"); %>>Auto Start</option>
+                <option value="N" <% nvram_match("wgms_auto", "N", "selected"); %>>DISABLED</option>
+                <option value="P" <% nvram_match("wgms_auto", "P", "selected"); %>>Policy Mode</option>
+                <option value="S" <% nvram_match("wgms_auto", "S", "selected"); %>>Site to Site</option>
+                <option value="W" <% nvram_match("wgms_auto", "W", "selected"); %>>WG-Quick</option>
+             </select>
+        </td>
+    </tr>
+    <tr id="wgms_status">
+		<th><div class="tooltip">Server status<span class="tooltiptext">For convenience, you can instantly change the connection state<br>by clicking the checkbox !</span></div></th>
+        <td>
+            <input type="checkbox" value="1" onclick="SwitchStatus2();" name="wgms_enable" class="input" <% nvram_match("wgms_enable", "1", "checked"); %>><#188#></input>
+        </td>
+    </tr>
+<!--</tbody>
+</table>
+
+
+<table id="WgsStateTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable">
+<tbody>-->
+    <tr>
+        <td colspan="4">
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('stop wg2' + wgsindex);" value="Stop" id="btnStopWGServer" style="color: indianred; background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('start wg2' + wgsindex);" value="Start" id="btnStartWGServer" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('restart wg2' + wgsindex);" value="Restart" id="btnRestartWGServer" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
+            <input type="button" class="button_gen" onclick="confirmPeerDelete('wg2' + wgsindex);" value="Delete" id="btnDeleteWGServer" style="background: linear-gradient(rgb(234, 45, 8) 0%, rgb(234, 45, 8) 100%);">
+			<input type="button" class="button_gen" onClick="ShowQRCode('wg2' + wgsindex);" value="QR Code" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
+
+            <div id="wgms_QRCode_block2" style="display:none">
+                <div style="display:flex; align-items: center;">
+                    <div style="width:20px;height:20px;background-image:url('images/New_ui/disable.svg');cursor:pointer" onclick="HideQRCode2();"></div>
+                </div>
+                <div id="qrcode2"></div>
+                <script type="text/javascript">
+                    new QRCode(document.getElementById("qrcode2"), "<% nvram_get("wgms_desc"); %>" + "\n[Interface]" + "\nPrivateKey = " + "<% nvram_get("wgms_priv"); %>" + "\nAddress = " + "<% nvram_get("wgms_addr"); %>" + "\nDNS = " + "<% nvram_get("wgms_dns"); %>" + "\n\n[Peer]" + "\nPublicKey = " + "<% nvram_get("wgms_ppub"); %>" + "\nAllowedIPs = " + "<% nvram_get("wgms_aips"); %>" + "\nEndPoint = " + "<% nvram_get("wgms_ep_addr"); %>" + ":" + "<% nvram_get("wgms_ep_port"); %>"  );
+                </script>
+            </div>
+        </td>
+    </tr>
+
+</tbody>
+</table>
+
+<table id="WgsInterfaceTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable">
+    <thead>
+        <tr>
+            <td colspan="2">Interface</td>
+        </tr>
+    </thead>
+    <tr>
+        <th>Private Key</th>
+        <td>
+            <input type="text" readonly maxlength="63" name="wgs_priv" id="wgs_priv" onChange="confirmPrivateKeyFieldUpdate(this.value);" class="input_32_table" value="<% nvram_get("wgms_priv"); %>" autocorrect="off" autocapitalize="off"></input>
+        </td>
+    </tr>
+    <tr>
+        <th>VPN Subnet</th>
+        <td>
+            <input type="text" maxlength="39" name="wgs_addr" id="wgs_addr" onChange="confirmVPNSubnetFieldUpdate(this.value);" class="input_32_table" value="<% nvram_get("wgms_addr"); %>" autocorrect="off" autocapitalize="off"></input>
+        </td>
+    </tr>
+		<th>Listen Port</th>
+		<td>
+			<input type="text" maxlength="5" name="wgs_ep_port" id="wgs_ep_port" onChange="confirmEndpointPortFieldUpdate(this.value);" class="input_6_table" onKeyPress="return validator.isNumber(this,event);" value="<% nvram_get("wgms_ep_port"); %>" autocorrect="off" autocapitalize="off"></input>
+		</td>
+
+</table>
+<table id="WgsPeerTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable">
+    <thead>
+        <tr>
+            <td colspan="2">Peer</td>
+        </tr>
+    </thead>
+    <tr>
+        <th>Server Public Key</th>
+            <td>
+                <input type="text" readonly maxlength="63" name="wgs_ppub" id="wgc_ppub" onChange="confirmPublicKeyFieldUpdate(this.value);" class="input_32_table" value="<% nvram_get("wgms_ppub"); %>" autocorrect="off" autocapitalize="off"></input>
+            </td>
+    </tr>
+    <tr>
+        <th>Preshared Key (Optional)</th>
+        <td>
+            <input type="text" readonly maxlength="63" name="wgs_psk" id="wgs_psk" onChange="confirmPreSharedKeyFieldUpdate(this.value);" class="input_32_table" value="<% nvram_get("wgms_psk"); %>" autocorrect="off" autocapitalize="off"></input>
+        </td>
+    </tr>
+</table>
 
 <!--====================================================WireGuard Manager Configuration==========================================================-->
-<div style="line-height:10px;">&nbsp;</div>
+
 <table width="100%" border="1" align="center" cellpadding="2" cellspacing="0" bordercolor="#6b8fa3" class="FormTable SettingsTable" style="border:0px;" id="table_config">
 <thead class="collapsible" id="scriptconfig">
     <tr><td colspan="2">Configuration Options (click to expand/collapse)</td></tr>
@@ -907,7 +1117,7 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
 
 <tbody style="">
     <tr>
-		<th><div class="tooltip">VPN Director rules<span class="tooltiptext">For convenience, use the VPN Director GUI to define the Selective Routing required, then clone them into WireGuard® Manager©, otherwise specify them manually.</span></div></th>
+		<th><div class="tooltip">VPN Director rules<span class="tooltiptext">For convenience, use the VPN Director GUI to define the Policy Routing required, then clone them into WireGuard® Manager©, otherwise specify them manually.</span></div></th>
         <td>
             <input type="button" class="button_gen" onclick="CMDExecuteARG('vpndirector list');" value="Show" id="btnVPNDirectorList" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
         </td>
@@ -917,8 +1127,8 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
     </tr>
     <tr>
         <td>
-            <select name="VPNDirectorFilter" >
-            <option value="wan">No Source Filter</option>
+            <select id="wgm_VPNDirector_SRCFilter" name="VPNDirectorFilter" >
+				<option value="wan">No Source Filter</option>
                 <option value="wan">WAN</option>
                 <option value="ovpnc1">OVPN Client 1</option>
                 <option value="ovpnc2">OVPN Client 2</option>
@@ -926,11 +1136,10 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
                 <option value="ovpnc4">OVPN Client 4</option>
                 <option value="ovpnc5">OVPN Client 5</option>
              </select>
-            <!--<legend>Legend Descriptions goes here</legend>-->
             <legend>Default Source: ALL</legend>
         </td>
         <td>
-            <select name="VPNDirectorWGTarget" >
+            <select id="wgm_VPNDirector_DSTranslation" name="VPNDirectorWGTarget" >
                 <option value="">Default mapping</option>
                 <option value="wg11">WG 'client' Peer 1</option>
                 <option value="wg12">WG 'client' Peer 2</option>
@@ -938,12 +1147,11 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
                 <option value="wg14">WG 'client' Peer 4</option>
                 <option value="wg15">WG 'client' Peer 5</option>
              </select>
-            <!--<legend>Legend Descriptions goes here</legend>-->
             <legend>Default Destination Mapping: tun11 to wg11 etc.</legend>
         </td>
 
         <td>
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('vpndirector clone');" value="Clone" id="btnVPNDirectorClone" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
+            <input type="button" class="button_gen" onclick="cloneVPNDirector()" value="Clone" id="btnVPNDirectorClone" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
         </td>
     </tr>
 
@@ -1033,6 +1241,14 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
 <input type="hidden" name="current_page" value="wg_manager.asp">
 <input type="hidden" name="wgmc_unit" value="">
 <input type="hidden" name="wgmc_auto_type" value="">
+</form>
+<form method="post" name="chg_wgms" action="apply.cgi" target="hidden_frame">
+<input type="hidden" name="action_mode" value="chg_wgms_unit">
+<input type="hidden" name="action_script" value="">
+<input type="hidden" name="action_wait" value="">
+<input type="hidden" name="current_page" value="wg_manager.asp">
+<input type="hidden" name="wgms_unit" value="">
+<input type="hidden" name="wgms_auto_type" value="">
 </form>
 
 <div id="footer"></div>
