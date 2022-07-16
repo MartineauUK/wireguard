@@ -1,7 +1,7 @@
 #!/bin/sh
     # shellcheck disable=SC2039,SC2155,SC2124,SC2046,SC2027
-VERSION="v4.18b5"
-#============================================================================================ © 2021-2022 Martineau v4.18b5
+VERSION="v4.19b"
+#============================================================================================ © 2021-2022 Martineau v4.19b
 #
 #       wgm   [ help | -h ]
 #       wgm   [ { start | stop | restart } [wg_interface]... ]
@@ -33,7 +33,7 @@ VERSION="v4.18b5"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 14-Jul-2022
+# Last Updated Date: 16-Jul-2022
 
 #
 # Description:
@@ -1571,18 +1571,28 @@ Export_Peer(){
 
             local INDEX=${WG_INTERFACE:3:1}
 
-            local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM clients where peer='$WG_INTERFACE';")
+            local TABLE="clients"                           # v4.19
+            [ "$TYPE" == "s" ] && local TABLE="servers"     # v4.19
+
+            local DESC=$(sqlite3 $SQL_DATABASE "SELECT tag FROM $TABLE where peer='$WG_INTERFACE';")            # v4.19
             [ -z "$DESC" ] && local DESC=$(grep -FB1 "[Interface]" ${CONFIG_DIR}${WG_INTERFACE}.conf | grep -vF "[Interface]")    # v4.14
             local DESC=$(printf "%s" "$DESC" | sed 's/^[ \t]*//;s/[ \t]*$//')
             [ -z "$DESC" ] && local DESC="# Unidentified"
-            local SOCKET=$(sqlite3 $SQL_DATABASE "SELECT socket FROM clients where peer='$WG_INTERFACE';")
-            local SUBNET=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM clients where peer='$WG_INTERFACE';")
-            local DNS=$(sqlite3 $SQL_DATABASE "SELECT dns FROM clients where peer='$WG_INTERFACE';")
-            local PUB_KEY=$(sqlite3 $SQL_DATABASE "SELECT pubkey FROM clients where peer='$WG_INTERFACE';")
-            local PRI_KEY=$(sqlite3 $SQL_DATABASE "SELECT prikey FROM clients where peer='$WG_INTERFACE';")
+
+            local PUB_KEY=$(sqlite3 $SQL_DATABASE "SELECT pubkey FROM $TABLE where peer='$WG_INTERFACE';")      # v4.19
+            local PRI_KEY=$(sqlite3 $SQL_DATABASE "SELECT prikey FROM $TABLE where peer='$WG_INTERFACE';")      # v4.19
             local ALLOWIP=$(awk '/^Allow/ {$1="";$2="";print $0}' ${CONFIG_DIR}${WG_INTERFACE}.conf | awk '{$1=$1};1')
-            local AUTO=$(sqlite3 $SQL_DATABASE "SELECT auto FROM clients where peer='$WG_INTERFACE';")
-            local MTU=$(sqlite3 $SQL_DATABASE "SELECT mtu FROM clients where peer='$WG_INTERFACE';")            # v4.18
+            local AUTO=$(sqlite3 $SQL_DATABASE "SELECT auto FROM $TABLE where peer='$WG_INTERFACE';")           # v4.19
+            local SUBNET=$(sqlite3 $SQL_DATABASE "SELECT subnet FROM $TABLE where peer='$WG_INTERFACE';")       # v4.19
+
+            if [ "$TYPE" == "c" ];then
+                local SOCKET=$(sqlite3 $SQL_DATABASE "SELECT socket FROM $TABLE where peer='$WG_INTERFACE';")   # v4.19
+                local DNS=$(sqlite3 $SQL_DATABASE "SELECT dns FROM $TABLE where peer='$WG_INTERFACE';")         # v4.19
+                local MTU=$(sqlite3 $SQL_DATABASE "SELECT mtu FROM $TABLE where peer='$WG_INTERFACE';")         # v4.19 v4.18
+            else
+                local SOCKET_PORT=$(sqlite3 $SQL_DATABASE "SELECT port FROM $TABLE where peer='$WG_INTERFACE';")        # v4.19
+            fi
+
             [ -n "$(wg show interfaces | grep "$WG_INTERFACE")" ] && local CONNECTED=1 || local CONNECTED=0
 
             eval "nvram set wgm${TYPE}${INDEX}_unit='$INDEX'"
@@ -1594,35 +1604,38 @@ Export_Peer(){
             eval "nvram set wgm${TYPE}${INDEX}_dns='$DNS'"
 
             eval "nvram set wgm${TYPE}${INDEX}_enable='$CONNECTED'"
-            # Split  Endpoint 'ip:port' for separate GUI fields
-            local SOCKET_IP=${SOCKET%:*}        # Endpoint IP address
-            local SOCKET_PORT=${SOCKET##*:}     # Endpoint Port
+
+            # Split 'client' Peer Endpoint 'ip:port' for separate GUI fields
+            if [ "$TYPE" == "c" ];then              # v4.19
+                local SOCKET_IP=${SOCKET%:*}        # Endpoint IP address
+                local SOCKET_PORT=${SOCKET##*:}     # Endpoint Port
+            fi
             eval "nvram set wgm${TYPE}${INDEX}_ep_addr='$SOCKET_IP'"
             eval "nvram set wgm${TYPE}${INDEX}_ep_port='$SOCKET_PORT'"
-            eval "nvram set wgm${TYPE}${INDEX}_nat=1"
+            if [ "$TYPE" == "c" ];then              # v4.19
+                eval "nvram set wgm${TYPE}${INDEX}_nat=1"
+            fi
+
             eval "nvram set wgm${TYPE}${INDEX}_ppub='$PUB_KEY'"
             eval "nvram set wgm${TYPE}${INDEX}_priv='$PRI_KEY'"
 
             # WebUI Hack
+            if [ "$TYPE" == "c" ];then              # v4.19
+                eval "nvram set wgm${TYPE}_ep_addr='$SOCKET_IP'"
+                eval "nvram set wgm${TYPE}_dns='$DNS'"
+                eval "nvram set wgm${TYPE}_mtu='$MTU'"          # v4.18
+                eval "nvram set wgm${TYPE}_nat=1"
+            fi
             eval "nvram set wgm${TYPE}_unit='$INDEX'"
             eval "nvram set wgm${TYPE}_desc='$DESC'"
             eval "nvram set wgm${TYPE}_auto='$AUTO'"
+            eval "nvram set wgm${TYPE}_enable='$CONNECTED'"
             eval "nvram set wgm${TYPE}_addr='$SUBNET'"
             eval "nvram set wgm${TYPE}_aips='$ALLOWIP'"
             eval "nvram set wgm${TYPE}_alive=25"
-            eval "nvram set wgm${TYPE}_dns='$DNS'"
-            eval "nvram set wgm${TYPE}_mtu='$MTU'"          # v4.18
-
-            eval "nvram set wgm${TYPE}_enable='$CONNECTED'"
-            # Split  Endpoint 'ip:port' for separate GUI fields
-            local SOCKET_IP=${SOCKET%:*}        # Endpoint IP address
-            local SOCKET_PORT=${SOCKET##*:}     # Endpoint Port
-            eval "nvram set wgm${TYPE}_ep_addr='$SOCKET_IP'"
-            eval "nvram set wgm${TYPE}_ep_port='$SOCKET_PORT'"
-            eval "nvram set wgm${TYPE}_nat=1"
+            eval "nvram set wgm${TYPE}_ep_port='$SOCKET_PORT'"  # v4.19
             eval "nvram set wgm${TYPE}_ppub='$PUB_KEY'"
             eval "nvram set wgm${TYPE}_priv='$PRI_KEY'"
-
 
             #vpnc_clientlist=Mullvad_USA_Los_Angeles>WireGuard>5>>>1>5>><Mullvad_Oz_Melbourne>WireGuard>4>>>1>6>>
             local PREV=$(nvram get vpnc_clientlist)
@@ -2454,16 +2467,29 @@ Manage_Wireguard_Sessions() {
                     local FORCEPOLICY=                      # v4.14
                     local POLICY_MODE=                      # v4.14
 
-                    # Temporary WebUI hack
-                    if [ "$(nvram get wgmc_unit)" == "${WG_INTERFACE:3:1}" ];then       # v4.18
-                        nvram set wgmc_enable="1"
-                    else
-                        if [ -f ${CONFIG_DIR}wg11.conf ];then   # v4.17
-                            Export_Peer "export" "wg11"
-                            nvram commit
-                        fi
-                    fi
-
+                    # WebUI
+                    case $Mode in
+                        client)
+                            if [ "$(nvram get wgmc_unit)" == "${WG_INTERFACE:3:1}" ];then       # v4.18
+                                nvram set wgmc_enable="1"
+                            else
+                                if [ -f ${CONFIG_DIR}wg11.conf ];then   # v4.17
+                                    Export_Peer "export" "wg11"
+                                    nvram commit
+                                fi
+                            fi
+                            ;;
+                        server)
+                            if [ "$(nvram get wgms_unit)" == "${WG_INTERFACE:3:1}" ];then       # v4.19
+                                nvram set wgms_enable="1"
+                            else
+                                if [ -f ${CONFIG_DIR}wg21.conf ];then   # v4.17
+                                    Export_Peer "export" "wg21"
+                                    nvram commit
+                                fi
+                            fi
+                            ;;
+                    esac
                 done
             WG_show
             ;;
@@ -2541,20 +2567,34 @@ Manage_Wireguard_Sessions() {
                     fi
                 done
 
-                # If there are no active 'client' Peers, then enable FC if not EXPLICITY disabled in configuration
-                if [ -z "$(wg show interfaces | grep "wg1")" ] && [ -z "$(grep -E "^DISABLE_FLOW_CACHE" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                # If there are no active 'client' Peers, then enable FC if not EXPLICITY disabled in configuration and NOT DISABLED by firmware
+                if [ -z "$(wg show interfaces | grep "wg1")" ] && [ -z "$(grep -E "^DISABLE_FLOW_CACHE" ${INSTALL_DIR}WireguardVPN.conf)" ] && [ "$(nvram get fc_disable)" == "0" ];then    # v4.19
                     [ -z "$(fc status | grep "Flow Learning Enabled")" ] && RC="$(Manage_FC "enable")"  # v4.18
                 fi
 
-                # Temporary WebUI hack
-                if [ "$(nvram get wgmc_unit)" == "${WG_INTERFACE:3:1}" ];then       # v4.18
-                    nvram set wgmc_enable="0"
-                else
-                    if [ -f ${CONFIG_DIR}wg11.conf ];then   # v4.18
-                        Export_Peer "export" "wg11"
-                        nvram commit
-                    fi
-                fi
+                # WebUI
+                case $Mode in
+                    client)
+                        if [ "$(nvram get wgmc_unit)" == "${WG_INTERFACE:3:1}" ];then       # v4.18
+                            nvram set wgmc_enable="0"
+                        else
+                            if [ -f ${CONFIG_DIR}wg11.conf ];then   # v4.17
+                                Export_Peer "export" "wg11"
+                                nvram commit
+                            fi
+                        fi
+                        ;;
+                    server)
+                        if [ "$(nvram get wgms_unit)" == "${WG_INTERFACE:3:1}" ];then       # v4.19
+                            nvram set wgms_enable="0"
+                        else
+                            if [ -f ${CONFIG_DIR}wg21.conf ];then   # v4.17
+                                Export_Peer "export" "wg21"
+                                nvram commit
+                            fi
+                        fi
+                        ;;
+                esac
 
             WG_show
             ;;
