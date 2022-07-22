@@ -138,11 +138,11 @@ function initial(){
 
     GetConfigSettings();
 
-    document.getElementById('wgm_WebUI_Import').textContent = ""
+    document.getElementById('wgm_WebUI_Import').textContent = "";
 	
-	var wgm_ver = document.getElementById('wgm_version').value
+	var wgm_ver = document.getElementById('wgm_version').value;
 	if (wgm_ver.includes("b"))
-		repository = "dev"
+		repository = "dev";
 	else
 		repository = "main";
 
@@ -151,12 +151,112 @@ function initial(){
     })
 
     $(".default-collapsed").trigger("click");
+	
+	let cookie = getCookie("firsttime");
+	//if (cookie == "") {
+	
+		// cookie doesn't exist, create it now
+		setCookie("firsttime", "1");
+		
+		cookie = getCookie("ToggleCommandInterface");
+		if ( cookie != "1") {
+			setCookie("ToggleCommandInterface", "1");		// collapse it
+			Toggle("ToggleCommandInterface", "CMD_tab");
+		} else {
+			document.getElementById("CMD_tab").style.color = "lightgreen";
+		}
+		
+		cookie = getCookie("ToggleControlCommands");
+		if ( cookie != "1") {		
+			setCookie("ToggleControlCommands", "1");
+			//Toggle("ToggleControlCommands", "Controls_tab");
+			document.getElementById("Controls_tab").style.color = "lightgreen";
+		} else {
+			document.getElementById("Controls_tab").style.color = "lightblue";
+		}
+		
+		cookie = getCookie("ToggleClientPeerConfiguration");
+		if ( cookie != "1") {
+			setCookie("ToggleClientPeerConfiguration", "1");			// collapse it
+			Toggle("ToggleClientPeerConfiguration", "ClientPeer_tab");
+		} else {
+			document.getElementById("ClientPeer_tab").style.color = "lightgreen";
+		}
+	
+		cookie = getCookie("ToggleServerPeerConfiguration");
+		if ( cookie != "1") {
+			setCookie("ToggleServerPeerConfiguration", "1");			// collapse it
+			Toggle("ToggleServerPeerConfiguration", "ServerPeer_tab");
+		} else {
+			document.getElementById("ServerPeer_tab").style.color = "lightgreen";
+		}
+		
+		setCookie("ToggleDevicePeer", "0");
+		document.getElementById("DevicePeer_tab").style.color = "grey";
+		//Toggle("ToggleDevicePeer");
+		
+		cookie = getCookie("ToggleVPNDirector");
+		if ( cookie != "1") {
+			setCookie("ToggleVPNDirector", "1");				// collapse it		
+			Toggle("ToggleVPNDirector", "VPNDirector_tab");	
+		} else {
+			document.getElementById("VPNDirector_tab").style.color = "lightgreen";
+		}
+		
+		setCookie("ToggleIPSET", "0");
+		//Toggle("ToggleIPSET");	
+		document.getElementById("IPSET_tab").style.color = "grey";	
+		
+		setCookie("TogglePassthru", "0");
+		//Toggle("TogglePassthru");			
+		document.getElementById("Passthru_tab").style.color = "grey";
+
+		cookie = getCookie("ToggleConfigurationOptions");
+		if ( cookie != "1") {
+			setCookie("ToggleConfigurationOptions", "1");		// collapse it
+			Toggle("ToggleConfigurationOptions", "Options_tab");
+		} else {
+			document.getElementById("Options_tab").style.color = "lightgreen";
+		}
+		
+		cookie = getCookie("ToggleDiagnostics");
+		if ( cookie != "1") {
+			setCookie("ToggleDiagnostics", "1");			// collapse it
+			Toggle("ToggleDiagnostics", "Diags_tab");
+		} else {
+			document.getElementById("Diags_tab").style.color = "lightgreen";
+		}
+	//} 
+/*	else {
+debugger;
+			// not first visit.....
+	}*/
+}
+function Toggle(clickthis,tabName,scrollto) {
+		document.getElementById(clickthis).click();
+
+		let cookie = getCookie(tabName);		
+		if (cookie == "1") {
+			setCookie(tabName, "0")
+			document.getElementById(tabName).style.color = "lightblue";	
+			//setFocusOnDivWithId('WgmTabViewAutoScroll')			
+		} else {
+			setCookie(tabName, "1")
+			document.getElementById(tabName).style.color = "lightgreen";
+debugger;			
+			if (scrollto != undefined && scrollto != null ) {
+				setFocusOnDivWithId(scrollto);
+			}
+		}
+}
+function setFocusOnDivWithId(elementId) {
+		 document.getElementById(elementId).scrollIntoView();
 }
 function UpdateResults(){
 
     document.getElementById("wgm_ExecuteResultsBase64").innerHTML = atob(custom_settings.wgm_Execute_Result);
 
-    document.getElementById("wgm_ExecuteRC").innerHTML =    custom_settings.wgm_ExecuteRC;
+    document.getElementById("wgm_ExecuteRC").innerHTML = custom_settings.wgm_ExecuteRC;
 }
 function CMDExecute(){
 
@@ -273,7 +373,6 @@ function applyRule(){
     }
 }
 function validForm(){
-
     return true;
 }
 function sleepFor(sleepDuration){
@@ -324,7 +423,6 @@ cal_panel_block("wgm_WinFile_block", 0.18);
 function HideWinFile(){
 $('#wgm_WinFile_block').hide();
 }
-
 function GetConfigSettings() {
     $.ajax({
         url: "/ext/wireguard/config.htm",
@@ -367,6 +465,27 @@ function GetConfigSettings() {
             }
         }
     })
+}
+// https://www.w3schools.com/js/js_cookies.asp
+function setCookie(cname, cvalue, exdays) {
+  const d = new Date();
+  d.setTime(d.getTime() + (exdays * 24 * 60 * 60 * 1000));
+  let expires = "expires="+d.toUTCString();
+  document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
+}
+function getCookie(cname) {
+  let name = cname + "=";
+  let ca = document.cookie.split(';');
+  for(let i = 0; i < ca.length; i++) {
+    let c = ca[i];
+    while (c.charAt(0) == ' ') {
+      c = c.substring(1);
+    }
+    if (c.indexOf(name) == 0) {
+      return c.substring(name.length, c.length);
+    }
+  }
+  return "";
 }
 </script>
 <script type="text/javascript">
@@ -518,8 +637,8 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
 </script>
 
 </head>
-<body onload="initial();" onunLoad="return unload_body();" class="bg">
-    <div id="TopBanner"></div>
+<body onload="initial();" onunLoad="setCookie('firsttime'); return unload_body();" class="bg">
+<div id="TopBanner"></div>
 <div id="Loading" class="popup_bg"></div>
 <iframe name="hidden_frame" id="hidden_frame" src="" width="0" height="0" frameborder="0"></iframe>
 <form method="post" name="form" id="ruleForm" action="/start_apply.htm" target="hidden_frame">
@@ -553,9 +672,9 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
                         <tr>
                             <td bgcolor="#4D595D" valign="top" >
                             <div>&nbsp;</div>
-                            <div class="formfonttitle">VPN - WireGuard® Manager© v1.02 by Martineau</div>
+                            <div class="formfonttitle">VPN - WireGuard® Manager© v1.03 by Martineau</div>
                             <div id="divSwitchMenu" style="margin-top:-40px;float:right;"></div
-                            <div style="margin:10px 0 10px 5px;" class="splitLine"></div>
+                            <div style="margin:10px 0 10px 5px;" class="splitLine" id="WgmTabViewAutoScroll"></div>
                             <table width="100%" border="0" align="center" cellpadding="4" cellspacing="0" bordercolor="#6b8fa3" class="FormTable">
                                     <tr>
                                         <th>WireGuard® Manager Version</th>
@@ -580,37 +699,44 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
 <div>&nbsp;</div>
 <div class="formfonttitle">WireGuard® Manager©</div>
 
-<div style="line-height:15px;">&nbsp;</div>
 <!--<div style="margin-top:;" >-->
-	<div id="tabMenu" class="submenuBlock" style="background: black;">
+
+	<div id="wgmtabMenu" class="submenuBlock" align="center">
 		<div>
 			<table>
 				<tbody>
 					<tr>
+					<hr>					
 						<td>
-							<div class="tab" onclick="goToPage(18, 0, this);" title="wg_manager.asp" id="ClientPeer_tab"><span>Client Peer</span></div>
+							<div class="tab" onclick="Toggle('ToggleCommandInterface','CMD_tab');" title="wg_manager.asp" id="CMD_tab" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);"><span>CMD</span></div>
 						</td>
 						<td>
-							<div class="tab" onclick="goToPage(18, 1, this);" title="wg_manager.asp" id="ServerPeer_tab"><span>Server Peer</span></div>
+							<div class="tab" onclick="Toggle('ToggleControlCommands', 'Controls_tab', 'ControlsViewAutoScroll');" title="wg_manager.asp" id="Controls_tab" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);"><span>Control Peers</span></div>
 						</td>
 						<td>
-							<div class="tab" onclick="goToPage(18, 2, this);" title="wg_manager.asp" id="DevicePeer_tab"><span>Road-Warrior Peer</span></div>
+							<div class="tab" onclick="Toggle('ToggleClientPeerConfiguration', 'ClientPeer_tab', 'ClientViewAutoScroll');" title="wg_manager.asp" id="ClientPeer_tab" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);"><span>Client Peer</span></div>
 						</td>
 						<td>
-							<div class="tab" onclick="goToPage(18, 2, this);" title="wg_manager.asp" id="VPN Director_tab"><span>VPNDirector </span></div>
+							<div class="tab" onclick="Toggle('ToggleServerPeerConfiguration', 'ServerPeer_tab', 'ServerViewAutoScroll');" title="wg_manager.asp" id="ServerPeer_tab" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);"><span>Server Peer</span></div>
 						</td>
 						<td>
-							<div class="tab" onclick="goToPage(18, 2, this);" title="wg_manager.asp" id="IPSET_tab"><span>IPSET</span></div>
+							<div class="tab" onclick="Toggle('ToggleDevicePeerConfiguration', 'DevicePeer_tab');" title="wg_manager.asp" id="DevicePeer_tab" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);"><span>Road-Warrior Peer</span></div>
 						</td>
 						<td>
-							<div class="tab" onclick="goToPage(18, 2, this);" title="wg_manager.asp" id="Passthru_tab"><span>Passthru'</span></div>
+							<div class="tab" onclick="Toggle('ToggleVPNDirector', 'VPNDirector_tab', 'VPNDirectorViewAutoScroll');" title="wg_manager.asp" id="VPNDirector_tab" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);"><span>VPNDirector</span></div>
 						</td>
 						<td>
-							<div class="tab" onclick="goToPage(18, 2, this);" title="wg_manager.asp" id="Options_tab"><span>Options</span></div>
+							<div class="tab" onclick="Toggle('ToggleIPSET', 'IPSET_tab');" title="wg_manager.asp" id="IPSET_tab" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);"><span>IPSET</span></div>
 						</td>
 						<td>
-							<div class="tab" onclick="goToPage(18, 2, this);" title="wg_manager.asp" id="Diag_tab"><span>Diags</span></div>
+							<div class="tab" onclick="Toggle('TogglePassthru', 'Passthru_tab');" title="wg_manager.asp" id="Passthru_tab" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);"><span>Passthru'</span></div>
 						</td>
+						<td>
+							<div class="tab" onclick="Toggle('ToggleConfigurationOptions', 'Options_tab', 'OptionsViewAutoScroll');" title="wg_manager.asp" id="Options_tab" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);"><span>Options</span></div>
+						</td>
+						<td>
+							<div class="tab" onclick="Toggle('ToggleDiagnostics', 'Diags_tab', 'DiagViewAutoScroll');" title="wg_manager.asp" id="Diags_tab" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);"><span>Diags</span></div>
+						</td>						
 					</tr>
 				</tbody>
 			</table>
@@ -618,11 +744,11 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
 	</div>
 </div>
 
-<div style="line-height:10px;">&nbsp;</div>
-<div class="splitline"></div>
+<div style="line-height:8px;">&nbsp;</div>
+<hr>
 <table id="WgcBasicTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable SettingsTable">
 <thead class="collapsible">
-    <tr><td colspan="2">Command Interface (click to expand/collapse)</td></tr>
+    <tr><td id="ToggleCommandInterface" colspan="2">Command Interface</td></tr>
 </thead>
 <tbody>
         <!--<tr>
@@ -653,10 +779,9 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
 </table>
 
 <!--====================================================Peer Control (Import etc.)==========================================================-->
-<div style="line-height:10px;">&nbsp;</div>
 <table width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#4D595D" class="FormTable">
 	<thead class="collapsible">
-    <tr><td colspan="4">Peer control Commands (click to expand/collapse)</td></tr>
+    <tr><td colspan="4" id="ToggleControlCommands">Peer control Commands</td></tr>
 </thead>
 <tbody>
 
@@ -677,7 +802,7 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
         </td>
     </tr>
 
-    <div style="line-height:10px;">&nbsp;</div>
+    <div style="line-height:10px;" id="ControlsViewAutoScroll">&nbsp;</div>
     <tr>
        <td colspan="4" class="buttongen">
             <label>Upload from Local: ==> </label>
@@ -752,11 +877,11 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
 </table>
 
 <!--====================================================Client Configuration==========================================================-->
-<div style="line-height:10px;">&nbsp;</div>
+<div style="line-height:10px;" id="ClientViewAutoScroll">&nbsp;</div>
 <table id="ClientPeerTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#4D595D" class="FormTable">
 <thead>
     <tr>
-        <td colspan="2">Client Peer Configuration (click to expand/collapse)</td>
+        <td colspan="2" id="ToggleClientPeerConfiguration">Client Peer Configuration</td>
     </tr>
 </thead>
 <tbody>
@@ -800,12 +925,6 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
             <input type="checkbox" value="1" onclick="SwitchStatus();" name="wgmc_enable" class="input" <% nvram_match("wgmc_enable", "1", "checked"); %>><#188#></input>
         </td>
     </tr>
-<!--</tbody>
-</table>-->
-
-
-	<!--<table id="WgcStateTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable">
-	<tbody>-->
 	<tr>
 		<td colspan="4">
 			<input type="button" class="button_gen" onclick="CMDExecuteARG('stop wg1' + wgcindex);" value="Stop" id="btnStopWGClient" style="width: 123px; color: indianred; background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
@@ -825,19 +944,10 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
 			</div>
 		</td>
 	</tr>
-
-	<!--</tbody>
-	</table>-->
-
-</tbody>
-</table>
-
-<table id="WgcInterfaceTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable">
-    <thead>
-        <tr>
-            <td colspan="2">Interface</td>
-        </tr>
-    </thead>
+	
+	<tr>
+		<td colspan="2" style="background: linear-gradient(to bottom, #92A0A5  0%, #66757C 100%)">Interface</td>
+	</tr>
     <tr>
         <th>Private Key</th>
         <td>
@@ -863,13 +973,9 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
         </td>
     </tr>
 
-</table>
-<table id="WgcPeerTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable">
-    <thead>
-        <tr>
-            <td colspan="2">Peer</td>
-        </tr>
-    </thead>
+	<tr>
+		<td colspan="2" style="background: linear-gradient(to bottom, #92A0A5  0%, #66757C 100%)">Peer</td>
+	</tr>
     <tr>
         <th>Server Public Key</th>
             <td>
@@ -901,14 +1007,15 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
             <input type="text" readonly maxlength="5" name="wgc_alive" id="wgc_alive" onChange="confirmPersistentKeepAliveFieldUpdate(this.value);" class="input_6_table" onKeyPress="return validator.isNumber(this,event);" value="<% nvram_get("wgmc_alive"); %>" autocorrect="off" autocapitalize="off"></input>
         </td>
     </tr>
+</tbody>
 </table>
 
 <!--====================================================Server Configuration==========================================================-->
-<div style="line-height:10px;">&nbsp;</div>
+<div style="line-height:10px;" id="ServerViewAutoScroll">&nbsp;</div>
 <table id="ServerPeerTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#4D595D" class="FormTable">
 <thead>
     <tr>
-        <td colspan="2">Server Peer Configuration (click to expand/collapse)</td>
+        <td colspan="2" id="ToggleServerPeerConfiguration">Server Peer Configuration</td>
     </tr>
 </thead>
 <tbody>
@@ -948,12 +1055,6 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
             <input type="checkbox" value="1" onclick="SwitchStatus2();" name="wgms_enable" class="input" <% nvram_match("wgms_enable", "1", "checked"); %>><#188#></input>
         </td>
     </tr>
-<!--</tbody>
-</table>
-
-
-<table id="WgsStateTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable">
-<tbody>-->
     <tr>
         <td colspan="4">
             <input type="button" class="button_gen" onclick="CMDExecuteARG('stop wg2' + wgsindex);" value="Stop" id="btnStopWGServer" style="color: indianred; background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
@@ -973,16 +1074,10 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
             </div>
         </td>
     </tr>
-
-</tbody>
-</table>
-
-<table id="WgsInterfaceTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable">
-    <thead>
-        <tr>
-            <td colspan="2">Interface</td>
-        </tr>
-    </thead>
+	<tr>
+		<td colspan="2" style="background: linear-gradient(to bottom, #92A0A5  0%, #66757C 100%)">Interface</td>
+	</tr>
+	
     <tr>
         <th>Private Key</th>
         <td>
@@ -1000,13 +1095,9 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
 			<input type="text" maxlength="5" name="wgs_ep_port" id="wgs_ep_port" onChange="confirmEndpointPortFieldUpdate(this.value);" class="input_6_table" onKeyPress="return validator.isNumber(this,event);" value="<% nvram_get("wgms_ep_port"); %>" autocorrect="off" autocapitalize="off"></input>
 		</td>
 
-</table>
-<table id="WgsPeerTable" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" class="FormTable">
-    <thead>
-        <tr>
-            <td colspan="2">Peer</td>
-        </tr>
-    </thead>
+	<tr>
+		<td colspan="2" style="background: linear-gradient(to bottom, #92A0A5  0%, #66757C 100%);">Peer</td>
+	</tr>
     <tr>
         <th>Server Public Key</th>
             <td>
@@ -1019,13 +1110,64 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
             <input type="text" readonly maxlength="63" name="wgs_psk" id="wgs_psk" onChange="confirmPreSharedKeyFieldUpdate(this.value);" class="input_32_table" value="<% nvram_get("wgms_psk"); %>" autocorrect="off" autocapitalize="off"></input>
         </td>
     </tr>
+</tbody>
+</table>
+
+<!--====================================================VPN Director Configuration==========================================================-->
+<div style="line-height:10px;" id="VPNDirectorViewAutoScroll">&nbsp;</div>
+<table width="100%" border="1" align="center" cellpadding="2" cellspacing="0" bordercolor="#6b8fa3" class="FormTable SettingsTable" style="border:0px;" id="table_config">
+<thead class="collapsible" id="vpndirector">
+    <tr><td colspan="3" id="ToggleVPNDirector">VPN Director Management Tools</td></tr>
+</thead>
+
+<tbody style="">
+    <tr>
+		<th><div class="tooltip">VPN Director rules<span class="tooltiptext">For convenience, use the VPN Director GUI to define the Policy Routing required, then clone them into WireGuard® Manager©, otherwise specify them manually.</span></div></th>
+        <td>
+            <input type="button" class="button_gen" onclick="CMDExecuteARG('vpndirector list');" value="Show" id="btnVPNDirectorList" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
+        </td>
+        <td>
+            <input type="button" class="button_gen" onclick="confirmDeleteVPNDirector()" value="Delete" id="btnVPNDirectorDelete" style="background: linear-gradient(rgb(234, 45, 8) 0%, rgb(234, 45, 8) 100%);">
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <select id="wgm_VPNDirector_SRCFilter" name="VPNDirectorFilter" >
+				<option value="wan">No Source Filter</option>
+                <option value="wan">WAN</option>
+                <option value="ovpnc1">OVPN Client 1</option>
+                <option value="ovpnc2">OVPN Client 2</option>
+                <option value="ovpnc3">OVPN Client 3</option>
+                <option value="ovpnc4">OVPN Client 4</option>
+                <option value="ovpnc5">OVPN Client 5</option>
+             </select>
+            <legend>Default Source: ALL</legend>
+        </td>
+        <td>
+            <select id="wgm_VPNDirector_DSTranslation" name="VPNDirectorWGTarget" >
+                <option value="">Default mapping</option>
+                <option value="wg11">WG 'client' Peer 1</option>
+                <option value="wg12">WG 'client' Peer 2</option>
+                <option value="wg13">WG 'client' Peer 3</option>
+                <option value="wg14">WG 'client' Peer 4</option>
+                <option value="wg15">WG 'client' Peer 5</option>
+             </select>
+            <legend>Default Destination Mapping: tun11 to wg11 etc.</legend>
+        </td>
+
+        <td>
+            <input type="button" class="button_gen" onclick="cloneVPNDirector()" value="Clone" id="btnVPNDirectorClone" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
+        </td>
+    </tr>
+
+</tbody>
 </table>
 
 <!--====================================================WireGuard Manager Configuration==========================================================-->
-
+<div style="line-height:10px;" id="OptionsViewAutoScroll">&nbsp;</div>
 <table width="100%" border="1" align="center" cellpadding="2" cellspacing="0" bordercolor="#6b8fa3" class="FormTable SettingsTable" style="border:0px;" id="table_config">
 <thead class="collapsible" id="scriptconfig">
-    <tr><td colspan="2">Configuration Options (click to expand/collapse)</td></tr>
+    <tr><td colspan="2" id="ToggleConfigurationOptions">Configuration Options</td></tr>
 </thead>
 <tbody style="">
     <tr>
@@ -1107,63 +1249,11 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
 </tbody>
 </table>
 
-
-<!--====================================================VPN Director Configuration==========================================================-->
-<div style="line-height:10px;">&nbsp;</div>
-<table width="100%" border="1" align="center" cellpadding="2" cellspacing="0" bordercolor="#6b8fa3" class="FormTable SettingsTable" style="border:0px;" id="table_config">
-<thead class="collapsible" id="scriptconfig">
-    <tr><td colspan="3">VPN Director Management Tools (click to expand/collapse)</td></tr>
-</thead>
-
-<tbody style="">
-    <tr>
-		<th><div class="tooltip">VPN Director rules<span class="tooltiptext">For convenience, use the VPN Director GUI to define the Policy Routing required, then clone them into WireGuard® Manager©, otherwise specify them manually.</span></div></th>
-        <td>
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('vpndirector list');" value="Show" id="btnVPNDirectorList" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
-        </td>
-        <td>
-            <input type="button" class="button_gen" onclick="confirmDeleteVPNDirector()" value="Delete" id="btnVPNDirectorDelete" style="background: linear-gradient(rgb(234, 45, 8) 0%, rgb(234, 45, 8) 100%);">
-        </td>
-    </tr>
-    <tr>
-        <td>
-            <select id="wgm_VPNDirector_SRCFilter" name="VPNDirectorFilter" >
-				<option value="wan">No Source Filter</option>
-                <option value="wan">WAN</option>
-                <option value="ovpnc1">OVPN Client 1</option>
-                <option value="ovpnc2">OVPN Client 2</option>
-                <option value="ovpnc3">OVPN Client 3</option>
-                <option value="ovpnc4">OVPN Client 4</option>
-                <option value="ovpnc5">OVPN Client 5</option>
-             </select>
-            <legend>Default Source: ALL</legend>
-        </td>
-        <td>
-            <select id="wgm_VPNDirector_DSTranslation" name="VPNDirectorWGTarget" >
-                <option value="">Default mapping</option>
-                <option value="wg11">WG 'client' Peer 1</option>
-                <option value="wg12">WG 'client' Peer 2</option>
-                <option value="wg13">WG 'client' Peer 3</option>
-                <option value="wg14">WG 'client' Peer 4</option>
-                <option value="wg15">WG 'client' Peer 5</option>
-             </select>
-            <legend>Default Destination Mapping: tun11 to wg11 etc.</legend>
-        </td>
-
-        <td>
-            <input type="button" class="button_gen" onclick="cloneVPNDirector()" value="Clone" id="btnVPNDirectorClone" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
-        </td>
-    </tr>
-
-</tbody>
-</table>
-
-
 <!--====================================================Diagnostics==========================================================-->
-<div style="line-height:10px;">&nbsp;</div>
+<div style="line-height:10px;" id="DiagViewAutoScroll">&nbsp;</div>
 <table width="100%" border="1" align="center" cellpadding="2" cellspacing="0" bordercolor="#6b8fa3" class="FormTable SettingsTable" style="border:0px;" id="table_config">
-<thead class="collapsible" id="scriptconfig">
-    <tr><td colspan="2">Diagnostic Tools (click to expand/collapse)</td></tr>
+<thead class="collapsible" id="diagnostics">
+    <tr><td colspan="2" id="ToggleDiagnostics">Diagnostic Tools</td></tr>
 </thead>
 <tbody style="">
     <tr>
