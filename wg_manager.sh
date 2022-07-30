@@ -1,7 +1,7 @@
 #!/bin/sh
     # shellcheck disable=SC2039,SC2155,SC2124,SC2046,SC2027
-VERSION="v4.19b"
-#============================================================================================ © 2021-2022 Martineau v4.19b
+VERSION="v4.19b2"
+#============================================================================================ © 2021-2022 Martineau v4.19b2
 #
 #       wgm   [ help | -h ]
 #       wgm   [ { start | stop | restart } [wg_interface]... ]
@@ -33,14 +33,14 @@ VERSION="v4.19b"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 16-Jul-2022
+# Last Updated Date: 30-Jul-2022
 
 #
 # Description:
 #
 # Acknowledgement:
 #
-# Contributors: odkrys,Torson,ZebMcKayhan,jobhax,elorimer,Sh0cker54,here1310,defung,The Chief,abir1909,JGrana,heysoundude,archiel,Cam,endiz,Meshkoff,johndoe85,Juched
+# Contributors: odkrys,Torson,ZebMcKayhan,jobhax,elorimer,Sh0cker54,here1310,defung,The Chief,abir1909,JGrana,heysoundude,archiel,Cam,endiz,Meshkoff,johndoe85,Juched,evlo
 
 GIT_REPO="wireguard"
 GITHUB_MARTINEAU="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/main"
@@ -1155,7 +1155,7 @@ Import_Peer() {
     local ACTION=$1;shift
     local WG_INTERFACE=$1
 
-    if [ -z "$1"] || [ "$1" == "?" ];then       # v4.17
+    if [ -z "$1" ] || [ "$1" == "?" ];then       # v4.19 v4.17
         local CONFIGS=$(ls -1 ${CONFIG_DIR}*.conf 2>/dev/null | awk -F '/' '{print $5}' | grep -v "wg[1-2]" | sort )
         echo -e $cBYEL"\n\t Available Peer Configs for import:\n${cRESET}$CONFIGS"
         return 0
@@ -1697,6 +1697,7 @@ Manage_Peer() {
                     echo -e "\tpeer peer_name {cmd {options} }\t\t\t\t\t\t- Action the command against the Peer"
                     echo -e "\tpeer peer_name del\t\t\t\t\t\t\t- Delete the Peer from the database and all of its files *.conf, *.key"
                     echo -e "\tpeer peer_name ip=xxx.xxx.xxx.xxx\t\t\t\t\t- Change the Peer VPN Pool IP"
+                    echo -e "\t\t\t\t\t\t\t\t\t\t- Other options: [auto=​] [allowedips=​] [dns=] [endpoint=] [mtu=] [port=] [subnet=]"
 
                     echo -e "\tpeer peer_name comment [%n] text_string\t\t\t\t\t- Change the Peer annotation/tag e.g. peer SGS20+ comment My Phone"
                     echo -e "\t\t\t\t\t\t\t\t\t\t                                      peer SGS20+ comment My Phone (Model Name is %n)"
@@ -2568,7 +2569,7 @@ Manage_Wireguard_Sessions() {
                 done
 
                 # If there are no active 'client' Peers, then enable FC if not EXPLICITY disabled in configuration and NOT DISABLED by firmware
-                if [ -z "$(wg show interfaces | grep "wg1")" ] && [ -z "$(grep -E "^DISABLE_FLOW_CACHE" ${INSTALL_DIR}WireguardVPN.conf)" ] && [ "$(nvram get fc_disable)" == "0" ];then    # v4.19
+                if [ -z "$(wg show interfaces | grep "wg1")" ] && [ -z "$(grep -E "^DISABLE_FLOW_CACHE" ${INSTALL_DIR}WireguardVPN.conf)" ] && [ "$(nvram get fc_disable)" == "0" ] && [ -z "$(nvram get fc_disable_force)" ];then    # v4.19
                     [ -z "$(fc status | grep "Flow Learning Enabled")" ] && RC="$(Manage_FC "enable")"  # v4.18
                 fi
 
@@ -6011,7 +6012,7 @@ Build_Menu() {
         if [ -f /jffs/addons/wireguard/wg_manager.asp ];then        # v4.18
             local GUI_TAB=                                          # v4.18
             if [ -f /tmp/menuTree.js ];then                         # v4.18
-                local GUI_TAB="$HTTP_TYPE://$(nvram get lan_ipaddr):$HTTP_PORT/"$(grep -i wireguard /tmp/menuTree.js  | grep -Eo "(user.*\.asp)") # v4.18
+                local GUI_TAB="${HTTP_TYPE}://$(nvram get lan_ipaddr):${HTTP_PORT}/"$(grep -i wireguard /tmp/menuTree.js  | grep -Eo "(user.*\.asp)") # v4.19 @evlo v4.18
             fi
         fi
         MENU_U="$(printf '%bu %b = %bUpdate%b wg_manager scripts/WebUI [dev] (%buf%b - Force)\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cBYEL}" "${cRESET}")"  #v4.18
@@ -6040,7 +6041,7 @@ Build_Menu() {
             MENU_VPNDIR="$(printf '%b12 %b= %bvpndirector%b Clone VPN Director rules [ "clone" [ "wan" | "ovpn"n [ changeto_wg1n ]] | "delete" | "list" ] %b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")" # v4.14
         fi
 
-        MENU__="$(printf '%b? %b = %bAbout%b Configuration (WebUI %b%s%b)' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cBYEL}" "http://${GUI_TAB}" "${cRESET}" )"
+        MENU__="$(printf '%b? %b = %bAbout%b Configuration (WebUI %b%s%b)' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cBYEL}" "${GUI_TAB}" "${cRESET}" )"  # v4.19 @ evlo
         echo -e ${cWGRE}"\n"$cRESET      # Separator line
 
         echo -e
@@ -7808,6 +7809,11 @@ PATH=/opt/sbin:/opt/bin:/opt/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/u
 
 CALL_REQUEST=$1
 
+# Global Router URL
+HTTP_TYPE="http"                                                          # v4.19 @evlo
+HTTP_PORT=$(nvram get http_lanport)                                       # v4.19 @evlo
+[ "$(nvram get http_enable)" == "1" ] && { HTTP_TYPE="https"; HTTP_PORT=$(nvram get https_lanport) ; } # v4.19 @evlo
+
 if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -z "$(grep -E "^NOCOLOR|^NOCOLOUR" ${INSTALL_DIR}WireguardVPN.conf)" ];then     # v4.15
     ANSIColours
 fi
@@ -8146,7 +8152,21 @@ if [ "$1" != "install" ];then   # v2.01
                     fi
 
                     if [ -f ${INSTALL_DIR}WireguardVPN.conf ] && [ -n "$(grep -E "^WEBUI" ${INSTALL_DIR}WireguardVPN.conf)" ];then              # v4.17
-                        Mount_WebUI "${SCRIPT_NAME%.*}.asp"     # v4.17
+
+                        if [ -n "$(grep -E "^DEBUGWEBUI" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                            SayT "DEBUG duplicate WEBUI....."
+                            ( ls -lah /tmp/var/wwwext | grep -TE "user[1-9]+.*";grep -TH . /tmp/var/wwwext/*.title;grep -THE "user[1-9]\." /tmp/menuTree.js | sort) >>/tmp/syslog.log
+                                Mount_WebUI "${SCRIPT_NAME%.*}.asp"
+#                           ) 2>&1 | logger -t $(basename $0)"[$$_***DEBUG]"
+                        else
+                            Mount_WebUI "${SCRIPT_NAME%.*}.asp"     # v4.17
+                        fi
+
+                        if [ -n "$(grep -E "^DEBUGWEBUI" ${INSTALL_DIR}WireguardVPN.conf)" ];then
+                            SayT "DEBUG duplicate WEBUI....."
+                            ( ls -lah /tmp/var/wwwext | grep -TE "user[1-9]+.*";grep -TH . /tmp/var/wwwext/*.title;grep -THE "user[1-9]\." /tmp/menuTree.js | sort) >>/tmp/syslog.log
+                        fi
+
                     else
                         Unmount_WebUI "${SCRIPT_NAME%.*}.asp"   # v4.17
                         Manage_WebUI_API "FLUSH"                # v4.17
