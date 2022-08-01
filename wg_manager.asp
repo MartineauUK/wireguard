@@ -343,27 +343,51 @@ function CMDExecutePeerImport(command){
     }
     document.getElementById('wgm_WebUI_Import').textContent = ""
 }
-function SwitchStatus(){
+function SwitchClientState(){
 	
-	var Connected = "<% nvram_get("wgmc_enable"); %>"
-	
-	if (Connected == "1") {
-		CMDExecuteARG("stop wg1" + <% nvram_get("wgmc_unit"); %>);
+	var Connected = "<% nvram_get("wgmc_enable"); %>";
+	var PeerDefined = "<% nvram_get("wgmc_unit"); %>";
+
+	if (PeerDefined != "") {
+		if (Connected == "1") {
+			CMDExecuteARG("stop wg1" + PeerDefined);
+		} else {
+			CMDExecuteARG("start wg1" + PeerDefined);
+		}
 	} else {
-		CMDExecuteARG("start wg1" + <% nvram_get("wgmc_unit"); %>);
+		alert("***ERROR: 'client' Peer not configured");
 	}
-	
 }
-function SwitchStatus2(){
-	
-	var Connected = "<% nvram_get("wgms_enable"); %>"
-	
-	if (Connected == "1") {
-		CMDExecuteARG("stop wg2" + <% nvram_get("wgms_unit"); %>);
+function SwitchServerState(){
+
+	var Connected = "<% nvram_get("wgms_enable"); %>";
+	var PeerDefined = "<% nvram_get("wgms_unit"); %>";
+
+	if (PeerDefined != "") {
+		if (Connected == "1") {
+			CMDExecuteARG("stop wg2" + PeerDefined);
+		} else {
+			CMDExecuteARG("start wg2" + PeerDefined);
+		}
 	} else {
-		CMDExecuteARG("start wg2" + <% nvram_get("wgms_unit"); %>);
+		alert("***ERROR: 'server' Peer not configured");
 	}
-	
+}
+function ModifyPeerState(action,peer){
+
+	if (peer == "wg1") {
+		var PeerDefined = "<% nvram_get("wgmc_unit"); %>";
+		var list = document.getElementsByName('wgmc_unit');
+	} else {
+		var PeerDefined = "<% nvram_get("wgms_unit"); %>";
+		var list = document.getElementsByName('wgms_unit');
+	}	
+
+	if (PeerDefined != "") {
+			CMDExecuteARG(action + " " + peer + PeerDefined);
+	} else {
+		alert("***ERROR: Peer " + peer + "x NOT configured");
+	}
 }
 function applyRule(){
 
@@ -672,7 +696,7 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
                         <tr>
                             <td bgcolor="#4D595D" valign="top" >
                             <div>&nbsp;</div>
-                            <div class="formfonttitle">VPN - WireGuard® Manager© v1.03 by Martineau</div>
+                            <div class="formfonttitle">VPN - WireGuard® Manager© v1.04 by Martineau</div>
                             <div id="divSwitchMenu" style="margin-top:-40px;float:right;"></div
                             <div style="margin:10px 0 10px 5px;" class="splitLine" id="WgmTabViewAutoScroll"></div>
                             <table width="100%" border="0" align="center" cellpadding="4" cellspacing="0" bordercolor="#6b8fa3" class="FormTable">
@@ -922,14 +946,14 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
     <tr id="wgmc_status">
 		<th><div class="tooltip"><#3179#><span class="tooltiptext">For convenience, you can instantly change the connection state<br>by clicking the checkbox !</span></div></th>
         <td>
-            <input type="checkbox" value="1" onclick="SwitchStatus();" name="wgmc_enable" class="input" <% nvram_match("wgmc_enable", "1", "checked"); %>><#188#></input>
+            <input type="checkbox" value="1" onclick="SwitchClientState();" name="wgmc_enable" class="input" <% nvram_match("wgmc_enable", "1", "checked"); %>><#188#></input>
         </td>
     </tr>
 	<tr>
 		<td colspan="4">
-			<input type="button" class="button_gen" onclick="CMDExecuteARG('stop wg1' + wgcindex);" value="Stop" id="btnStopWGClient" style="width: 123px; color: indianred; background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
-			<input type="button" class="button_gen" onclick="CMDExecuteARG('start wg1' + wgcindex);" value="Start" id="btnStartWGClient" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
-			<input type="button" class="button_gen" onclick="CMDExecuteARG('restart wg1' + wgcindex);" value="Restart" id="btnRestartWGClient" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
+			<input type="button" class="button_gen" onclick="ModifyPeerState('stop', 'wg1');" value="Stop" id="btnStopWGClient" style="width: 123px; color: indianred; background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
+			<input type="button" class="button_gen" onclick="ModifyPeerState('start', 'wg1');" value="Start" id="btnStartWGClient" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
+			<input type="button" class="button_gen" onclick="ModifyPeerState('restart', 'wg1');" value="Restart" id="btnRestartWGClient" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
 			<input type="button" class="button_gen" onclick="confirmPeerDelete('wg1' + wgcindex);" value="Delete" id="btnDeleteWGClient" style="background: linear-gradient(rgb(234, 45, 8) 0%, rgb(234, 45, 8) 100%);">
 			<input type="button" class="button_gen" onClick="ShowQRCode('wg11');" value="QR Code" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);"/>
 
@@ -1052,14 +1076,14 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
     <tr id="wgms_status">
 		<th><div class="tooltip">Server status<span class="tooltiptext">For convenience, you can instantly change the connection state<br>by clicking the checkbox !</span></div></th>
         <td>
-            <input type="checkbox" value="1" onclick="SwitchStatus2();" name="wgms_enable" class="input" <% nvram_match("wgms_enable", "1", "checked"); %>><#188#></input>
+            <input type="checkbox" value="1" onclick="SwitchServerState();" name="wgms_enable" class="input" <% nvram_match("wgms_enable", "1", "checked"); %>><#188#></input>
         </td>
     </tr>
     <tr>
         <td colspan="4">
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('stop wg2' + wgsindex);" value="Stop" id="btnStopWGServer" style="color: indianred; background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('start wg2' + wgsindex);" value="Start" id="btnStartWGServer" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
-            <input type="button" class="button_gen" onclick="CMDExecuteARG('restart wg2' + wgsindex);" value="Restart" id="btnRestartWGServer" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
+            <input type="button" class="button_gen" onclick="ModifyPeerState('stop', 'wg2');" value="Stop" id="btnStopWGServer" style="color: indianred; background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
+            <input type="button" class="button_gen" onclick="ModifyPeerState('start', 'wg2');" value="Start" id="btnStartWGServer" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
+            <input type="button" class="button_gen" onclick="ModifyPeerState('restart', 'wg2');" value="Restart" id="btnRestartWGServer" style="background: linear-gradient(rgb(34, 164, 21) 0%, rgb(34, 164, 21) 100%);">
             <input type="button" class="button_gen" onclick="confirmPeerDelete('wg2' + wgsindex);" value="Delete" id="btnDeleteWGServer" style="background: linear-gradient(rgb(234, 45, 8) 0%, rgb(234, 45, 8) 100%);">
 			<input type="button" class="button_gen" onClick="ShowQRCode('wg2' + wgsindex);" value="QR Code" style="background: linear-gradient(rgb(9, 99, 156) 0%, rgb(0, 48, 71) 100%);">
 
