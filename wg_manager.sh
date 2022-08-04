@@ -1,7 +1,7 @@
 #!/bin/sh
     # shellcheck disable=SC2039,SC2155,SC2124,SC2046,SC2027
-VERSION="v4.19b2"
-#============================================================================================ © 2021-2022 Martineau v4.19b2
+VERSION="v4.19b3"
+#============================================================================================ © 2021-2022 Martineau v4.19b3
 #
 #       wgm   [ help | -h ]
 #       wgm   [ { start | stop | restart } [wg_interface]... ]
@@ -33,7 +33,7 @@ VERSION="v4.19b2"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 30-Jul-2022
+# Last Updated Date: 04-Aug-2022
 
 #
 # Description:
@@ -5640,6 +5640,12 @@ Create_Site2Site() {
             ;;
         add)
             local ADD_SITE="Y"
+            local I=0               # v4.19
+            ;;
+        multi*)
+            # site2site add Home BeachHut lan=nnn.nnn.nnn.nnn multi=Cabin
+            local MULTI_SITES="$(echo "$1" | sed -n "s/^.*multi=//p" | awk '{print $1}')"   # v4.19
+            [ "$I" -ge 1 ] && local I=$((I-1))
             ;;
         *)
             case $I in
@@ -5667,7 +5673,7 @@ Create_Site2Site() {
             return 1
         fi
     else
-        local NAME_ONE=
+        #local NAME_ONE=
         [ -z "$NAME_TWO" ] && local NAME_TWO="SiteC"
     fi
 
@@ -5787,7 +5793,8 @@ Create_Site2Site() {
     [ -n "$NAME_ONE" ] && local SLASH="/" || local SLASH=
     echo -e $cBCYA"\n\tCreating WireGuard® Private/Public key-pair for Site-to-Site ${IPV6_TXT}Peers ${cBMAG}${NAME_ONE}/${NAME_TWO}${cBCYA}"$cRESET
 
-    for SITE in $NAME_ONE $NAME_TWO
+    [ -n "$ADD_SITE" ] && NAMES=$NAME_TWO || local NAMES="$NAME_ONE $NAME_TWO"  # v4.19
+    for SITE in $NAMES
         do
             if [ -n "$(which wg)" ];then
                 wg genkey | tee ${CONFIG_DIR}${SITE}_private.key | wg pubkey > ${CONFIG_DIR}${SITE}_public.key
@@ -5804,9 +5811,36 @@ Create_Site2Site() {
 
     [ -n "$ANS" ] && local DDNS=$ANS || local DDNS=$NAME_TWO".DDNS"
 
+    # If no formal DDNS...ask what to do, so $NAME_TWO can connect to this $NAME_ONE router
+    [ -z "$ADD_SITE" ] && local ROUTER_DDNS=$(nvram get ddns_hostname_x) || local ROUTER_DDNS=$(awk "/^# $NAME_ONE /" ${CONFIG_DIR}$NAME_ONE.conf | awk '{print $NF}')
+
+    #if [ -z "$ADD_SITE" ];then
+        if [ -z "$ROUTER_DDNS" ];then
+            echo -e $cRED"\n\a\tWarning: No DDNS is configured! to reach local ${cBMAG}${NAME_ONE}${cRED} Endpoint from remote ${cBMAG}$NAME_TWO"$cRESET
+            echo -e $cRESET"\tPress$cBRED y$cRESET to use the current ${cBRED}WAN IP ${cRESET}or enter ${cBMAG}$NAME_ONE${cRESET} Endpoint IP or DDNS name or press$cBGRE [Enter] to SKIP."
+            [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+            if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
+                if [ -z "$(ip route show table main | grep -E "^0\.|^128\.")" ];then
+                    local ROUTER_DDNS=$(curl -${SILENT} ipecho.net/plain)                     # v3.01
+                else
+                    echo -e $cRED"\a\n\tWarning: VPN is ACTIVE...cannot determine public WAN IP address!!!"
+                fi
+                [ -z "$ROUTER_DDNS" ] && ROUTER_DDNS="${NAME_ONE}_DDNS_$HARDWARE_MODEL"
+            else
+                if [ -n "$ANS" ] && [ ${#ANS} -gt 1 ] && [ $(echo "$ANS" | tr -cd "." | wc -c ) -ge 1 ];then
+                    local ROUTER_DDNS="$ANS"
+                fi
+            fi
+
+            [ -z "$ROUTER_DDNS" ] && local ROUTER_DDNS=$NAME_ONE".DDNS"
+
+        fi
+    #fi
+
     if [ -z "$ADD_SITE" ];then
+
         cat > ${CONFIG_DIR}${NAME_ONE}.conf << EOF
-# $NAME_ONE - $SITE_ONE_LAN
+# $NAME_ONE - $SITE_ONE_LAN $ROUTER_DDNS
 [Interface]
 PrivateKey = $SITE_ONE_PRI_KEY
 Address = $SITE_ONE_IP
@@ -5822,52 +5856,59 @@ PersistentKeepalive = 25
 EOF
 
         chmod 600 ${CONFIG_DIR}${NAME_ONE}.conf         # v4.15 Prevent wg-quick "Warning: '/opt/etc/wireguard.d/Home.conf' is world accessible"
+    else
+        local LISTEN_PORT=$(grep 6182 ${CONFIG_DIR}$NAME_ONE.conf | grep -v ListenPort | cut -d ':' -f2 | sort | tail -n 1) # v4.19
+        local SITE_TWO_IP="10.9.8."$(($(grep 10.9.8. ${CONFIG_DIR}$NAME_ONE.conf | wc -l)+1))"/32"  # v4.19
+        local SITE_TWO_ALLOWIPS=$SITE_TWO_IP", "$SITE_TWO_LAN           # v4.19
+        sed -i -e :a -e '/^\n*$/{$d;N;};/\n$/ba' ${CONFIG_DIR}${NAME_ONE}.conf   # v4.19 Delete all trailing blank lines from file
+        echo -e >> ${CONFIG_DIR}${NAME_ONE}.conf        # v4.19
+        cat >> ${CONFIG_DIR}${NAME_ONE}.conf << EOF     # v4.19
+# $NAME_TWO LAN
+[Peer]
+PublicKey = $SITE_TWO_PUB_KEY
+AllowedIPs = $SITE_TWO_ALLOWIPS
+Endpoint = $DDNS:$((LISTEN_PORT+1))
+#PresharedKey = $PRE_SHARED_KEY
+PersistentKeepalive = 25
+EOF
+
     fi
 
     if [ -n "$ADD_SITE" ];then
         # Determine WG interface if user doesn't explicitly specify the 'server' Peer
-        echo -e $cRESET"\tEnter the name of interface or descriptive name e.g. ${cBMAG}'Home'${cRESET} to bind site '${cBMAG}${NAME_TWO}${cRESET}' or press$cBGRE [Enter] to SKIP."
-        [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
-        if [ -n "$ANS" ];then
-            if [ "${ANS:0:3}" == "wg2" ];then
-                local WG_INTERFACE=$ANS
-            else
-                local MATCHTHIS="$ANS"
-                if [ -n "$(ls /opt/etc/wireguard.d/wg2*.conf 2>/dev/null)" ];then
-                    local SERVER_PEER_LIST=$(grep -HEi "^#.*${MATCHTHIS} " ${CONFIG_DIR}*.conf | grep "wg2" | tr '\n' ' ')    # v4.15
+        if [ -z "$NAME_ONE" ];then                      # v4.19
+            echo -e $cRESET"\tEnter the name of interface or descriptive name e.g. ${cBMAG}'Home'${cRESET} to bind site '${cBMAG}${NAME_TWO}${cRESET}' or press$cBGRE [Enter] to SKIP."
+            [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
+            if [ -n "$ANS" ];then
+                if [ "${ANS:0:3}" == "wg2" ];then
+                    local WG_INTERFACE=$ANS
+                else
+                    local MATCHTHIS="$ANS"
+                    if [ -n "$(ls /opt/etc/wireguard.d/wg2*.conf 2>/dev/null)" ];then
+                        local SERVER_PEER_LIST=$(grep -HEi "^#.*${MATCHTHIS} " ${CONFIG_DIR}*.conf | grep "wg2" | tr '\n' ' ')    # v4.15
+                    fi
+                    [ -n "$SERVER_PEER_LIST" ] && local WG_INTERFACE=$(echo "$SERVER_PEER_LIST" | grep -Eo "wg2[1-9]")
                 fi
-                [ -n "$SERVER_PEER_LIST" ] && local WG_INTERFACE=$(echo "$SERVER_PEER_LIST" | grep -Eo "wg2[1-9]")
             fi
         fi
-        if [ -n "$SERVER_PEER_LIST" ];then
-            NAME_ONE=$MATCHTHIS
-            SITE_ONE_IP=$(awk '/^[#]*Address/ {print $3}' /opt/etc/wireguard.d/$WG_INTERFACE.conf)
-            SITE_ONE_LAN=$('NR==1{print $NF}' /opt/etc/wireguard.d/$WG_INTERFACE.conf)
-            LISTEN_PORT=$(awk '/^ListenPort/ {print $3}' /opt/etc/wireguard.d/$WG_INTERFACE.conf)
+        #if [ -n "$SERVER_PEER_LIST" ];then
+            #NAME_ONE=$MATCHTHIS
+            local SITE_ONE_IP=$(awk '/^Address/ {print $3}' ${CONFIG_DIR}$NAME_ONE.conf)                # v4.19
+            local SITE_ONE_LAN=$(awk 'NR==1{print $4}' ${CONFIG_DIR}$NAME_ONE.conf)                 # v4.19
+            local SITE_ONE_LISTEN_PORT=$(awk '/^ListenPort/ {print $3}' ${CONFIG_DIR}$NAME_ONE.conf)            # v4.19
+            local LISTEN_PORT=$(grep 6182 ${CONFIG_DIR}$NAME_ONE.conf | grep -v ListenPort | cut -d ':' -f2 | sort | tail -n 1) # v4.19
+        # Should we mesh the new site?
+        if [ -n "$MULTI_SITES" ];then                                   # v4.19
+            local MULTI_SITES=$(echo "$MULTI_SITES" | tr -d ',')        # v4.19
+            for MESH in $MULTI_SITES                                    # v4.19
+                do
+                    if [ -f ${CONFIG_DIR}$MESH.conf ];then              # v4.19
+                        local MESH_LAN=$(awk 'NR==1{print $4}' ${CONFIG_DIR}$MESH.conf)     # v4.19
+                        [ -n "$MESH_LAN" ] && local MESH_LANS=$MESH_LANS", "$MESH_LAN       # v4.19
+                    fi
+                done
         fi
-    fi
-
-    # If no formal DDNS...ask what to do, so $NAME_TWO can connect to this $NAME_ONE router
-    local ROUTER_DDNS=$(nvram get ddns_hostname_x)
-    if [ -z "$ROUTER_DDNS" ];then
-        echo -e $cRED"\n\a\tWarning: No DDNS is configured! to reach local ${cBMAG}${NAME_ONE}${cRED} Endpoint from remote ${cBMAG}$NAME_TWO"$cRESET
-        echo -e $cRESET"\tPress$cBRED y$cRESET to use the current ${cBRED}WAN IP ${cRESET}or enter ${cBMAG}$NAME_ONE${cRESET} Endpoint IP or DDNS name or press$cBGRE [Enter] to SKIP."
-        [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
-        if [ -n "$WEBUI_AUTOREPLY" ] || [ "$ANS" == "y" ];then
-            if [ -z "$(ip route show table main | grep -E "^0\.|^128\.")" ];then
-                local ROUTER_DDNS=$(curl -${SILENT} ipecho.net/plain)                     # v3.01
-            else
-                echo -e $cRED"\a\n\tWarning: VPN is ACTIVE...cannot determine public WAN IP address!!!"
-            fi
-            [ -z "$ROUTER_DDNS" ] && ROUTER_DDNS="${NAME_ONE}_DDNS_$HARDWARE_MODEL"
-        else
-            if [ -n "$ANS" ] && [ ${#ANS} -gt 1 ] && [ $(echo "$ANS" | tr -cd "." | wc -c ) -ge 1 ];then
-                local ROUTER_DDNS="$ANS"
-            fi
-        fi
-
-        [ -z "$ROUTER_DDNS" ] && local ROUTER_DDNS=$NAME_ONE".DDNS"
-
+        #fi
     fi
 
     cat > ${CONFIG_DIR}${NAME_TWO}.conf << EOF
@@ -5880,48 +5921,41 @@ ListenPort = $((LISTEN_PORT+1))
 # $NAME_ONE LAN
 [Peer]
 PublicKey = $SITE_ONE_PUB_KEY
-AllowedIPs = $SITE_ONE_IP, $SITE_ONE_LAN
-Endpoint = $ROUTER_DDNS:$LISTEN_PORT
+AllowedIPs = $SITE_ONE_IP $SITE_ONE_LAN $MESH_LANS
+Endpoint = $ROUTER_DDNS:$SITE_ONE_LISTEN_PORT
 #PresharedKey = $PRE_SHARED_KEY
 PersistentKeepalive = 25
 EOF
 
-    chmod 600 ${CONFIG_DIR}${NAME_TWO}.conf         # v4.15 Prevent wg-quick "Warning: '/opt/etc/wireguard.d/Cabin.conf' is world accessible"
-
-    if [ -n "$ADD_SITE" ];then
-        # Bind the remote site to the host
-        [ -n "$WG_INTERFACE" ] && Manage_Peer "peer" "$WG_INTERFACE" "bind" "$NAME_TWO"
-    fi
-
-    echo -e "\n========== $NAME_ONE configuration =====================================================\n"$cRESET
-    cat ${CONFIG_DIR}${NAME_ONE}.conf
-
-    echo -e "\n========== $NAME_TWO configuration =====================================================\n"
-    cat ${CONFIG_DIR}${NAME_TWO}.conf
-
-    echo -e "\n=======================================================================================\n"
-
-    [ -n "$ADD_SITE" ] && local NAME_ONE=
-
-    for FN in $NAME_ONE $NAME_TWO
+    # Remote Site may not be running wg_manager, so add basic rules
+    for FN in $NAME_TWO                                                                     # v4.19
         do
-            LISTEN_PORT=$(awk '/^ListenPort/ {print $3}' /opt/etc/wireguard.d/$FN.conf)
+            LISTEN_PORT=$(awk '/^ListenPort/ {print $3}' ${CONFIG_DIR}$FN.conf)
 
             #echo -e $cBCYA"\tAdding WireGuard Site-to-Site Peer ${cBMAG}${FN}.conf PreUP/PostDown ${cBCYA}"$cRESET
 
             cat > /tmp/Site2Site.txt << EOF
 
-# WireGuard (%p - ListenPort; %wan - WAN interface; %lan - LAN subnet; %net - IPv4 Tunnel subnet ONLY recognised by Martineau's WireGuard Manager/wg-quick2)
+#
+# WireGuard® (%p - ListenPort; %wan - WAN interface; %lan - LAN subnet; %net - IPv4 Tunnel subnet ONLY recognised by Martineau's WireGuard® Manager©/wg-quick2)
+#
 
-PostUp =   iptables -I INPUT -p udp --dport %p -j ACCEPT; iptables -I INPUT -i %i -j ACCEPT; iptables -I FORWARD -i %i -j ACCEPT
-PostDown = iptables -D INPUT -p udp --dport %p -j ACCEPT; iptables -D INPUT -i %i -j ACCEPT; iptables -D FORWARD -i %i -j ACCEPT
+# wg-quick2
+# =========
+#PostUp =   iptables -I INPUT -p udp --dport %p -j ACCEPT; iptables -I INPUT -i %i -j ACCEPT; iptables -I FORWARD -i %i -j ACCEPT
+#PostDown = iptables -D INPUT -p udp --dport %p -j ACCEPT; iptables -D INPUT -i %i -j ACCEPT; iptables -D FORWARD -i %i -j ACCEPT
+
+# wg-quick
+# ========
+#PostUp =   iptables -I INPUT -p udp --dport $LISTEN_PORT -j ACCEPT; iptables -I INPUT -i %i -j ACCEPT; iptables -I FORWARD -i %i -j ACCEPT
+#PostDown = iptables -D INPUT -p udp --dport $LISTEN_PORT -j ACCEPT; iptables -D INPUT -i %i -j ACCEPT; iptables -D FORWARD -i %i -j ACCEPT
 
 EOF
 
             if [ "$ALLRULES" == "Y" ];then
                 cat > /tmp/Site2Site.txt << EOF
 
-# WireGuard (%p - ListenPort; %wan - WAN interface; %lan - LAN subnet; %net - IPv4 Tunnel subnet ONLY recognised by Martineau's WireGuard Manager/wg-quick2)
+# WireGuard® (%p - ListenPort; %wan - WAN interface; %lan - LAN subnet; %net - IPv4 Tunnel subnet ONLY recognised by Martineau's WireGuard® Manager©/wg-quick2)
 PreUp = iptables -I INPUT -p udp --dport %p -j ACCEPT
 PreUp = iptables -I INPUT -i %i -j ACCEPT
 PreUp = iptables -t nat -I PREROUTING -p udp --dport %p -j ACCEPT
@@ -5945,17 +5979,33 @@ PostDown = iptables -D FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
 EOF
             fi
 
-            sed -i '/^ListenPort/r /tmp/Site2Site.txt' /opt/etc/wireguard.d/$FN.conf
+            sed -i '/^ListenPort/r /tmp/Site2Site.txt' ${CONFIG_DIR}$FN.conf    # v4.19
 
         done
 
-    [ -n "$NAME_ONE" ] && local JOIN_TXT=" and " || JOIN_TXT=
-    echo -e $cBGRE"\n\tWireGuard® Site-to-Site Peers ${cBMAG}${NAME_ONE}${JOIN_TXT}${NAME_TWO}${cBGRE} created\n"$cRESET
+    chmod 600 ${CONFIG_DIR}${NAME_TWO}.conf         # v4.15 Prevent wg-quick "Warning: '/opt/etc/wireguard.d/Cabin.conf' is world accessible"
+
+    #if [ -n "$ADD_SITE" ];then
+        # Bind the remote site to the host
+        #[ -n "$WG_INTERFACE" ] && Manage_Peer "peer" "$WG_INTERFACE" "bind" "$NAME_TWO"
+    #fi
+
+    echo -e "\n========== $NAME_ONE configuration =====================================================\n"$cRESET
+    cat ${CONFIG_DIR}${NAME_ONE}.conf
+
+    echo -e "\n========== $NAME_TWO configuration =====================================================\n"
+    cat ${CONFIG_DIR}${NAME_TWO}.conf
+
+    echo -e "\n=======================================================================================\n"
+
+    [ -n "$NAME_ONE" ] && local JOIN_TXT=" and " || local JOIN_TXT=
+    [ -n "$ADD_SITE" ] && local JOIN_TXT=" additional link with "                   # v4.19
+    echo -e $cBGRE"\n\tWireGuard® Site-to-Site Peers ${cBMAG}${NAME_ONE}${cRESET}${JOIN_TXT}${cBMAG}${NAME_TWO}${cBGRE} created\n"$cRESET
 
     echo -en "\n\tCopy ${cBMAG}${NAME_TWO}/${NAME_ONE}${cRESET} files: "$cBCYA
 
     if [ -n "$(which 7z)" ];then
-        # shellcheck disable=SC2164                                                                        # v4.15
+        # shellcheck disable=SC2164                                                                     # v4.15
         cd ${CONFIG_DIR}
         rm ${CONFIG_DIR}WireGuard_${NAME_TWO}.7z 2>/dev/null
         # shellcheck disable=SC2010
