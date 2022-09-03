@@ -30,13 +30,18 @@ Example successful install.....
     |               USB drive with Entware installed                       |
     |                                                                      |  
     | ******************************************************************** |
-    | *   NOTE:  WireGuard® is incompatible with Hardware Acceleration   * |
-    | *          You can disable Hardware Acceleration using command     * |
-    | *                                                                  * |
-    | *                   E:Option ==> fc disable                        * |
-    | *                                                                  * |
-    | *          but you will most likely limit the throughput via WAN   * |
-    | *                  to match the maximum WireGuard® speed           * |
+    ! ******************************************************************** !
+    ! *   NOTE:  WireGuard® is incompatible with Hardware Acceleration   * !
+    ! *          which is REQUIRED if your WAN ISP speed is > 350 Mbps   * !
+    ! *                                                                  * !
+    ! *          You can disable Hardware Acceleration using command     * !
+    ! *                                                                  * !
+    ! *                   E:Option ==> fc disable                        * !
+    ! *                                                                  * !
+    ! *          but you will LIMIT ALL WAN throughput (not just         * !
+    ! *               WireGuard® clients) to about 350 Mbps              * !
+    ! ******************************************************************** !
+
     | ******************************************************************** |
     |                                                                      |
     |   1 = Install WireGuard                                              |
