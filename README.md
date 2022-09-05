@@ -31,12 +31,19 @@ Example successful install.....
     |                                                                      |
     | ******************************************************************** |
     | *   NOTE:  WireGuard® is incompatible with Hardware Acceleration   * |
-    | *          You can disable Hardware Acceleration using command     * |
+    | *          which is REQUIRED IF your WAN ISP speed is > 350 Mbps   * |
+    | *                                                                  * |
+    | *          IF your WAN ISP speed is > 350 Mbps then you can        * |
+    | *             DISABLE Hardware Acceleration using command          * |
     | *                                                                  * |
     | *                   E:Option ==> fc disable                        * |
     | *                                                                  * |
-    | *          but you will most likely limit the throughput via WAN   * |
-    | *                  to match the maximum WireGuard® speed           * |
+    | *          but you will LIMIT ALL WAN throughput (not just         * |
+    | *               WireGuard® clients) to about 350 Mbps              * |
+    | *                                                                  * |
+    | *          NOTE: WireGuard® Manager© will try and auto             * |
+    | *                ENABLE/DISABLE Hardware Aceleration based on      * |
+    | *                the number of ACTIVE "client" Peers               * |
     | ******************************************************************** |
     |                                                                      |
     |   1 = Install WireGuard                                              |
