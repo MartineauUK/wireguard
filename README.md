@@ -30,18 +30,20 @@ Example successful install.....
     |               USB drive with Entware installed                       |
     |                                                                      |  
     | ******************************************************************** |
-    ! ******************************************************************** !
-    ! *   NOTE:  WireGuard® is incompatible with Hardware Acceleration   * !
-    ! *          which is REQUIRED if your WAN ISP speed is > 350 Mbps   * !
-    ! *                                                                  * !
-    ! *          You can disable Hardware Acceleration using command     * !
-    ! *                                                                  * !
-    ! *                   E:Option ==> fc disable                        * !
-    ! *                                                                  * !
-    ! *          but you will LIMIT ALL WAN throughput (not just         * !
-    ! *               WireGuard® clients) to about 350 Mbps              * !
-    ! ******************************************************************** !
-
+    | *   NOTE:  WireGuard® is incompatible with Hardware Acceleration   * |
+    | *          which is REQUIRED IF your WAN ISP speed is > 350 Mbps   * |
+    | *                                                                  * |
+    | *          IF your WAN ISP speed is > 350 Mbps then you can        * |
+    | *             DISABLE Hardware Acceleration using command          * |
+    | *                                                                  * |
+    | *                   E:Option ==> fc disable                        * |
+    | *                                                                  * |
+    | *          but you will LIMIT ALL WAN throughput (not just         * |
+    | *               WireGuard® clients) to about 350 Mbps              * |
+    | *                                                                  * |
+    | *          NOTE: WireGuard® Manager© will try and auto             * |
+    | *                ENABLE/DISABLE Hardware Aceleration based on      * |
+    | *                the number of ACTIVE "client" Peers               * |
     | ******************************************************************** |
     |                                                                      |
     |   1 = Install WireGuard                                              |
