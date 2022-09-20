@@ -4320,8 +4320,8 @@ EOF
         if  [ -n "$(which wg)" ] && [ "$ROUTER_COMPATIBLE" == "Y" ];then
 
             # Test 'wg' and this script - (well actually the one used @BOOT) against the 'server' Peers e.g. wg21
-            echo -e $cBCYA"\tInitialising WireGuard® VPN 'server' Peer"$cRESET
-            Manage_Wireguard_Sessions "start" "wg21"
+            #echo -e $cBCYA"\tInitialising WireGuard® VPN 'server' Peer"$cRESET
+            #Manage_Wireguard_Sessions "start" "wg21"                            # v4.18 HOTFIX @Stingray123
         else
             echo -e $cBRED"\a\n\t***ERROR: WireGuard® install FAILED!\n"$cRESET
             exit 96
@@ -4371,6 +4371,10 @@ EOF
         opkg install sqlite3-cli        # v4.14
     fi
 
+    # Test 'wg' and this script - (well actually the one used @BOOT) against the 'server' Peers e.g. wg21
+    echo -e $cBCYA"\tInitialising WireGuard® VPN 'server' Peer"$cRESET
+    Manage_Wireguard_Sessions "start" "wg21"                            # v4.18 HOTFIX @Stingray123
+            
     # Create a sample Road-Warrior device and QR code for import into WireGuard App on the say an iPhone
     echo -e $cBWHT"\tDo you want to create a 'device' Peer for 'server' Peer (${cBMAG}wg21${cBWHT}) ?\n\t${cBWHT}Press ${cBGRE}y$cRESET to ${cBWHT}create 'device' Peer ${cRESET}or press$cBGRE [Enter] to skip"
     [ -z "$WEBUI_AUTOREPLY" ] && read -r "ANS" || echo -e "$WEBUI_AUTOREPLY" >&2
