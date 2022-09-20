@@ -4322,6 +4322,7 @@ EOF
             # Test 'wg' and this script - (well actually the one used @BOOT) against the 'server' Peers e.g. wg21
             #echo -e $cBCYA"\tInitialising WireGuard® VPN 'server' Peer"$cRESET
             #Manage_Wireguard_Sessions "start" "wg21"                            # v4.18 HOTFIX @Stingray123
+            :
         else
             echo -e $cBRED"\a\n\t***ERROR: WireGuard® install FAILED!\n"$cRESET
             exit 96
