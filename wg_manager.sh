@@ -33,7 +33,7 @@ VERSION="v4.18"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 14-Jul-2022
+# Last Updated Date: 20-Sep-2022
 
 #
 # Description:
@@ -4374,6 +4374,7 @@ EOF
 
     # Test 'wg' and this script - (well actually the one used @BOOT) against the 'server' Peers e.g. wg21
     echo -e $cBCYA"\tInitialising WireGuard® VPN 'server' Peer"$cRESET
+    Load_UserspaceTool                                                  # v4.18 HOTFIX @Stingray123
     Manage_Wireguard_Sessions "start" "wg21"                            # v4.18 HOTFIX @Stingray123
             
     # Create a sample Road-Warrior device and QR code for import into WireGuard App on the say an iPhone
