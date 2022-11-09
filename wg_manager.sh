@@ -1,7 +1,7 @@
 #!/bin/sh
     # shellcheck disable=SC2039,SC2155,SC2124,SC2046,SC2027
-VERSION="v4.19b3"
-#============================================================================================ © 2021-2022 Martineau v4.19b3
+VERSION="v4.19b4"
+#============================================================================================ © 2021-2022 Martineau v4.19b4
 #
 #       wgm   [ help | -h ]
 #       wgm   [ { start | stop | restart } [wg_interface]... ]
@@ -33,14 +33,14 @@ VERSION="v4.19b3"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 04-Aug-2022
+# Last Updated Date: 09-Nov-2022
 
 #
 # Description:
 #
 # Acknowledgement:
 #
-# Contributors: odkrys,Torson,ZebMcKayhan,jobhax,elorimer,Sh0cker54,here1310,defung,The Chief,abir1909,JGrana,heysoundude,archiel,Cam,endiz,Meshkoff,johndoe85,Juched,evlo
+# Contributors: odkrys,Torson,ZebMcKayhan,jobhax,elorimer,Sh0cker54,here1310,defung,The Chief,abir1909,JGrana,heysoundude,archiel,Cam,endiz,Meshkoff,johndoe85,Juched,evlo,knatterton
 
 GIT_REPO="wireguard"
 GITHUB_MARTINEAU="https://raw.githubusercontent.com/MartineauUK/$GIT_REPO/main"
@@ -2184,7 +2184,7 @@ EOF
                                     local ENDPOINT="$(echo "$CMD" | sed -n "s/^.*endpoint=//p" | awk '{print $1}')"                         # v4.17
                                     if [ "$(echo "$ENDPOINT" | tr -cd ":" | wc -c)" -gt 0 ];then
                                         [ "$Mode" = "client" ] && sqlite3 $SQL_DATABASE "UPDATE clients SET socket='$ENDPOINT' WHERE peer='$WG_INTERFACE';"         # v4.17
-                                        sed -i "/^Endpoint/ s~\(^.*=\)\(.*\)\(#.*$\)~\1 $ENDPOINT \3~" ${CONFIG_DIR}${WG_INTERFACE}.conf    # v4.17
+                                        sed -i "/^Endpoint/s~\(^.*=\)\(.*\)~\1 $ENDPOINT \3~" ${CONFIG_DIR}${WG_INTERFACE}.conf    # v4.17
                                         echo -e $cBGRE"\n\t[✔] Updated 'client' Peer Endpoint"$cRESET   # v4.17
                                         local UPDATE_WGMC_NVRAM="Y"         # v4.18
                                         [ "$Mode" = "client" ] && Show_Peer_Config_Entry "$WG_INTERFACE" || Raw_config "$WG_INTERFACE"      # v4.17
@@ -2270,6 +2270,14 @@ Manage_Wireguard_Sessions() {
             local WG_INTERFACE=
 
             # If no specific Peer specified, for Stop/Restart retrieve ACTIVE Peers otherwise for Start use Peer configuration
+            if [ "$ACTION" == "startX" ];then           # v4.19
+                [ -z "$WG_INTERFACE" ] && echo -e $cBRED"\n\tRequesting ANY WireGuard® VPN Peer $ACTION"
+                if [ "${FIRMWARE:0:3}" -ge "388" ];then # v4.19
+                    service start_wgc >/dev/null        # v4.19
+                    service start_wgs >/dev/null        # v4.19
+                fi
+                local ACTION="start"                    # v4.19
+            fi
             if [ "$ACTION" == "start" ];then                  # v2.02 v1.09
                 WG_INTERFACE=$(sqlite3 $SQL_DATABASE "SELECT peer FROM clients WHERE auto='Y' OR auto='P' OR auto='W';" | tr '\n' ' ')                              # v4.15
                 WG_INTERFACE=$WG_INTERFACE" "$(sqlite3 $SQL_DATABASE "SELECT peer FROM servers WHERE auto='Y' OR auto='P' OR auto='W' OR auto='S';" | tr '\n' ' ')  # v4.15
@@ -2279,7 +2287,18 @@ Manage_Wireguard_Sessions() {
                 fi
             else
                 # Wot if there are Peers we don't control?
-                WG_INTERFACE=$(wg show interfaces)                # v1.09
+                WG_INTERFACE=$(wg show interfaces | sed s'/wgc[1-5] //g' | sed s'/wgs[1-5] //g' | sed s'/^wg[cs][1-5]//g' | tr -d '\n') # 44.19 v1.09
+                if [ "$ACTION" == "stopX" ];then            # v4.19
+                    WG_INTERFACE=$(wg show interfaces)      # v4.19
+                    WG_INTERFACE=$(echo "$WG_INTERFACE" | awk '{$1=$1};1')    # v4.15 Strip leading/trailing spaces/tabs
+
+                    [ -n "$WG_INTERFACE" ] && echo -e $cBRED"\n\tRequesting ANY WireGuard® VPN Peer $ACTION ($WG_INTERFACE)"
+                    local ACTION="stop"                     # v4.19
+                    if [ "${FIRMWARE:0:3}" -ge "388" ];then # v4.19
+                        service stop_wgc >/dev/null         # v4.19
+                        service stop_wgs >/dev/null         # v4.19
+                    fi
+                fi
             fi
             WG_INTERFACE=$(echo "$WG_INTERFACE" | awk '{$1=$1};1')    # v4.15 Strip leading/trailing spaces/tabs
             SayT "$VERSION Requesting WireGuard® VPN Peer $ACTION ($WG_INTERFACE)"
@@ -2494,10 +2513,10 @@ Manage_Wireguard_Sessions() {
                 done
             WG_show
             ;;
-        stop)
+        stop)                                                   # v4.19
             # Default is to terminate ALL ACTIVE Peers,unless a list of Peers belonging to a category has been provided
             if [ -z "$WG_INTERFACE" ];then
-                WG_INTERFACE=$(wg show interfaces | sed s'/wgc[1-5] //g' | sed s'/wgs[1-5] //g')      # v4.12 ACTIVE Peers excluding firmware managed peers e.g. wgs1 or wgc5
+                WG_INTERFACE=$(wg show interfaces | sed s'/wgc[1-5] //g' | sed s'/wgs[1-5] //g' | sed s'/^wg[cs][1-5]//g' | tr -d '\n')      # v4.19 v4.12 ACTIVE Peers excluding firmware managed peers e.g. wgs1 or wgc5
                 if [ -n "$WG_INTERFACE" ];then
                     WG_INTERFACE=
                     SayT "$VERSION Requesting termination of ACTIVE WireGuard® VPN Peers ($WG_INTERFACE)"
@@ -2553,6 +2572,7 @@ Manage_Wireguard_Sessions() {
                             else
                                 # Dump the stats
                                 Show_Peer_Status "generatestats" "$WG_INTERFACE" "ToFile"   # v4.16 v4.04
+
                                 if [ "$Mode" == "client" ] && [ "$Route" != "policy" ] ; then
                                     wg show $WG_INTERFACE >/dev/null 2>&1 && ${INSTALL_DIR}wg_client $WG_INTERFACE "disable" "$FORCE" "$SHOWCMDS" "$WG_QUICK" || Say "WireGuard® $Mode service ('$WG_INTERFACE') NOT running."                       # v4.16
                                 else
@@ -2560,7 +2580,6 @@ Manage_Wireguard_Sessions() {
                                 fi
                                 [ -f /tmp/metrics.wg ] && { cat /tmp/metrics.wg; rm /tmp/metrics.wg ;}          # v4.16
                             fi
-
                         fi
                     else
                         SayT "***ERROR: WireGuard® VPN ${TXT}Peer ('$WG_INTERFACE') config NOT found?....skipping $ACTION request"
@@ -4039,7 +4058,7 @@ Peer_Status_Summary() {
         done
 
     if [ $GUI_CLIENT_PEERS -gt 0 ] || [ $GUI_CLIENT_PEERS -gt 0 ];then  # v4.12
-        local GUI_PEERS="${cBMAG}\n\t\t      ${cRESET}ASUS GUI Peers:${cBMAG} Clients ${cBWHT}$GUI_CLIENT_PEERS${cBMAG}, Servers ${cBWHT}$GUI_SERVER_PEERS${cBMAG}" # v4.12
+        local GUI_PEERS="${cBMAG}\n\t\t       ${cRESET}ASUS GUI Peers:${cBMAG} Clients ${cBWHT}$GUI_CLIENT_PEERS${cBMAG}, Servers ${cBWHT}$GUI_SERVER_PEERS${cBMAG}" # v4.12
     fi
     PEER_STATUS="Clients ${cBWHT}$CLIENT_PEERS${cBMAG}, Servers ${cBWHT}$SERVER_PEERS $GUI_PEERS"
     echo -e "$PEER_STATUS" 2>&1
@@ -4361,8 +4380,9 @@ EOF
         if  [ -n "$(which wg)" ] && [ "$ROUTER_COMPATIBLE" == "Y" ];then
 
             # Test 'wg' and this script - (well actually the one used @BOOT) against the 'server' Peers e.g. wg21
-            echo -e $cBCYA"\tInitialising WireGuard® VPN 'server' Peer"$cRESET
-            Manage_Wireguard_Sessions "start" "wg21"
+            # echo -e $cBCYA"\tInitialising WireGuard® VPN 'server' Peer"$cRESET
+            # Manage_Wireguard_Sessions "start" "wg21"
+            :
         else
             echo -e $cBRED"\a\n\t***ERROR: WireGuard® install FAILED!\n"$cRESET
             exit 96
@@ -4411,6 +4431,11 @@ EOF
         echo -e $cBCYA"\tInstalling sqlite3 module"$cBGRA
         opkg install sqlite3-cli        # v4.14
     fi
+
+    # Test 'wg' and this script - (well actually the one used @BOOT) against the 'server' Peers e.g. wg21
+    echo -e $cBCYA"\tInitialising WireGuard® VPN 'server' Peer"$cRESET
+    Load_UserspaceTool
+    Manage_Wireguard_Sessions "start" "wg21"
 
     # Create a sample Road-Warrior device and QR code for import into WireGuard App on the say an iPhone
     echo -e $cBWHT"\tDo you want to create a 'device' Peer for 'server' Peer (${cBMAG}wg21${cBWHT}) ?\n\t${cBWHT}Press ${cBGRE}y$cRESET to ${cBWHT}create 'device' Peer ${cRESET}or press$cBGRE [Enter] to skip"
@@ -4651,8 +4676,11 @@ Show_Peer_Status() {
 
                             case "$WG_INTERFACE" in
                                 wgc*|wgs*)
-                                    local DESC="${cBRED}***ASUS Internal GUI 'client' Peer***"$cRESET
-                                    ;;
+                                    local SOCKET=$(wg show $WG_INTERFACE endpoints | awk '{print $2}')          # 4.19
+                                    local LOCALIP=$(nvram get ${WG_INTERFACE}_addr)                             # 4.19
+
+                                    local DESC="# "$(nvram get ${WG_INTERFACE}_desc)$cRESET" (ASUS GUI Client)" # 4.19
+                                ;;
                                 *)
                                     local SOCKET=$(wg show $WG_INTERFACE endpoints | awk '{print $2}')          # 4.14
 
@@ -5226,6 +5254,9 @@ Check_Version_Update() {
 
 }
 Display_SplashBox() {
+
+    local INFO_ONLY=$1                                                                      # v4.19
+
     printf '| Requirements: %bHND %bor%b AX %brouter with Kernel %b4.1.xx%b or later           |\n' "$cBMAG" "$cRESET" "$cBMAG" "$cRESET" "$cBMAG" "$cRESET"
     printf '|                         e.g. %bRT-AC86U%b or %bRT-AX86U%b etc.               |\n' "$cBMAG" "$cRESET" "$cBMAG" "$cRESET"
     printf '|                                                                      |\n'
@@ -5233,15 +5264,23 @@ Display_SplashBox() {
     printf '|                                                                      |\n'
     printf '| ******************************************************************** |\n'     # v4.17
     printf '| *   NOTE:  WireGuard® is incompatible with Hardware Acceleration   * |\n'     # v4.17
-    printf '| *          You can disable Hardware Acceleration using command     * |\n'     # v4.17
+    printf '| *          which is REQUIRED IF your WAN ISP speed is > 350 Mbps   * |\n'     # v4.19 v4.17
+    printf '| *                                                                  * |\n'     # v4.19 v4.17
+    printf '| *          IF your WAN ISP speed is > 350 Mbps then you can        * |\n'     # v4.19 v4.17
+    printf '| *             DISABLE Hardware Acceleration using command          * |\n'     # v4.17
     printf '| *                                                                  * |\n'     # v4.17
     printf '| *                   E:Option ==> fc disable                        * |\n'     # v4.17
     printf '| *                                                                  * |\n'     # v4.17
-    printf '| *          but you will most likely limit the throughput via WAN   * |\n'     # v4.17
-    printf '| *                  to match the maximum WireGuard® speed           * |\n'     # v4.17
+    printf '| *          but you will LIMIT ALL WAN throughput (not just         * |\n'     # v4.17
+    printf '| *               WireGuard® clients) to about 350 Mbps              * |\n'     # v4.19 v4.17
+    printf '| *                                                                  * |\n'     # v4.19
+    printf '| *          NOTE: WireGuard® Manager© will try and auto             * |\n'     # v4.19
+    printf '| *                ENABLE/DISABLE Hardware Aceleration based on      * |\n'     # v4.19
+    printf '| *                the number of ACTIVE "client" Peers               * |\n'     # v4.19
     printf '| ******************************************************************** |\n'     # v4.17
     printf '|                                                                      |\n'
 
+    [ -n "$INFO_ONLY" ] && return
 
     if [ "$EASYMENU" == "N" ];then
         printf '|   i = Install WireGuard Advanced Mode                     |\n'
@@ -6129,7 +6168,9 @@ Validate_User_Choice() {
             2|z|remove) menu1="uninstall";; # v4.14
             3*|list*|show*) menu1=$(echo "$menu1" | awk '{$1="list"}1');;
             4*|start|start" "*) menu1=$(echo "$menu1" | awk '{$1="start"}1') ;;
+            startX);;                       # v4.19
             5*|stop|stop" "*) menu1=$(echo "$menu1" | awk '{$1="stop"}1') ;;
+            stopX);;                        # v4.19
             6*|restart|restart" "*) menu1=$(echo "$menu1" | awk '{$1="restart"}1') ;;
             7*|qrcode*) menu1=$(echo "$menu1" | awk '{$1="qrcode"}1') ;;
             8*|peer|peer" "*) menu1=$(echo "$menu1" | awk '{$1="peer"}1') ;;
@@ -6191,8 +6232,9 @@ Process_User_Choice() {
                 #continue
                 :
             ;;
-            0)
+            0|0+)                                                               # v4.19
                 Show_credits
+                [ "$menu1" == "0+" ] && Display_SplashBox "Iinfo ONLY"          # v4.19
                 printf '|                                                                      |\n'
                 printf '+======================================================================+\n'
             ;;
@@ -6499,7 +6541,7 @@ Process_User_Choice() {
                 Manage_Peer $menu1
 
                 ;;
-            restart|restart" "*|stop|stop" "*|start|start" "*)       # start [ Peer [policy] | [client|server]] ]
+            restart|restart" "*|stop|stopX|stop" "*|start|startX|start" "*)       # v4.19 start [ Peer [policy] | [client|server]] ]
 
                 Manage_Wireguard_Sessions $menu1
 
@@ -6785,7 +6827,9 @@ Process_User_Choice() {
 
                                 if [ ! -f /tmp/menuTree.js ] || { [ -f /tmp/menuTree.js ] && [ -z "$(grep -i "WireGuard® Manager" /tmp/menuTree.js)" ] ;} ;then
                                     Mount_WebUI "${PAGES}"
+                                    [ ! -f /jffs/scripts/service-event ] && echo -e "#!/bin/sh\n" > /jffs/scripts/service-event # v4.19
                                     [ -z "$(grep -i wireguard /jffs/scripts/service-event)" ] && echo -e "if echo \"\$2\" | /bin/grep -q \"wg_manager\"; then { /jffs/addons/wireguard/wg_manager.sh service_event \"\$@\" & }; fi # WireGuard WebUI" >> /jffs/scripts/service-event    # v4.17
+                                    chmod +x /jffs/scripts/service-event                            # v4.19 @knatterton
                                 else
                                     echo -en $cBRED"\a\n\t***ERROR: WebUI TAB (${cBWT}'$PAGES') ${cBRED}already mounted!\n"$cRESET
                                 fi
@@ -8146,7 +8190,7 @@ if [ "$1" != "install" ];then   # v2.01
 
         case "$1" in
 
-            start|init)
+            start|startX|init)                                      # v4.19
 
                 if [ "$1" == "init" ];then
 
@@ -8231,13 +8275,13 @@ if [ "$1" != "install" ];then   # v2.01
                     RC="$(Manage_FC "disable")"                                             # v4.14
                 fi
 
-                Manage_Wireguard_Sessions "start" "$PEER" "$NOPOLICY"
+                [ "$1" == "init" ] && Manage_Wireguard_Sessions "start" "$PEER" "$NOPOLICY" || Manage_Wireguard_Sessions "$1" "$PEER" "$NOPOLICY"   # v4.19
 
                 echo -e $cRESET
                 exit_message
             ;;
-            stop)
-                Manage_Wireguard_Sessions "stop" "$PEER" "$NOPOLICY"
+            stop|stopX)                                             # v4.19
+                Manage_Wireguard_Sessions "$1" "$PEER" "$NOPOLICY"  # v4.19
                 # If there are no active 'client' Peers, then enable FC if not EXPLICITY disabled in configuration
                 if [ -z "$(wg show interfaces | grep "wg1")" ] && [ -z "$(grep -E "^DISABLE_FLOW_CACHE" ${INSTALL_DIR}WireguardVPN.conf)" ];then
                     [ -z "$(fc status | grep "Flow Learning Enabled")" ] && RC="$(Manage_FC "enable")"  # v4.18
