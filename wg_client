@@ -1,11 +1,11 @@
 #!/bin/sh
     # shellcheck disable=SC2039,SC2155,SC2124,SC2046
-VERSION="v4.17.9"
-#============================================================================================ © 2021-2022 Martineau v4.17.9
+VERSION="v4.19.1"
+#============================================================================================ © 2021-2022 Martineau v4.19.1
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 30-Jun-2022
+# Last Updated Date: 09-Nov-2022
 #
 # Description:
 #
@@ -1083,24 +1083,50 @@ else
         for WG_IFACE in $(wg show interfaces | grep -E "wg1|wg0" | awk '{do printf "%s"(NF>1?FS:RS),$NF;while(--NF)}')      # v4.07
                 do
                     [ "$WG_IFACE" == "$WG_INTERFACE" ] && continue
-                    if [ -n "$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${WG_IFACE}.conf | grep -oE "0.0.0.0/0|::0/0")" ];then   # v4.07
-                        if [ "$(sqlite3 $SQL_DATABASE "SELECT auto FROM clients where peer='$WG_IFACE';")" != "P" ];then
-                            if [ -n "$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${WG_IFACE}.conf | grep -oE "0.0.0.0/0")" ];then
-                                #ip route add 0/1    dev $WG_IFACE 2>/dev/null
-                                #ip route add 128/1  dev $WG_IFACE 2>/dev/null
+                    if [ "${WG_IFACE:0:3}" != "wgc" ] && [ "${WG_IFACE:0:3}" != "wgs" ]; then   # v4.19.1
+                        if [ -n "$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${WG_IFACE}.conf | grep -oE "0.0.0.0/0|::0/0")" ];then   # v4.07
+                            if [ "$(sqlite3 $SQL_DATABASE "SELECT auto FROM clients where peer='$WG_IFACE';")" != "P" ];then
+                                if [ -n "$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${WG_IFACE}.conf | grep -oE "0.0.0.0/0")" ];then
+                                    #ip route add 0/1    dev $WG_IFACE 2>/dev/null
+                                    #ip route add 128/1  dev $WG_IFACE 2>/dev/null
+                                    if [ -z "$(ip route show 0/1 | grep "dev $WG_IFACE")" ];then    # v4.16.11
+                                        cmd ip route add 0/1    dev $WG_IFACE
+                                        cmd ip route add 128/1  dev $WG_IFACE
+                                    fi
+                                fi
+
+                                if [ "$USE_IPV6" == "Y" ];then
+                                    if [ -n "$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${WG_IFACE}.conf | grep -oE "::0/0")" ];then
+                                        #ip -6 route add 0::/1    dev $WG_IFACE
+                                        #ip -6 route add 8000::/1 dev $WG_IFACE
+                                        if [ -z "$(ip -6 route show ::/1 | grep "dev $WG_IFACE")" ];then    # v4.16.11
+                                            cmd ip -6 route add 0::/1    dev $WG_IFACE
+                                            cmd ip -6 route add 8000::/1 dev $WG_IFACE
+                                        fi
+                                    fi
+                                fi
+                                break
+                            fi
+                        fi
+                    else
+                        if [ "${WG_IFACE:0:3}" == "wgc" ];then  # v4.19.1
+                            logger -t "wg_manager-${MODE}${VPN_NAME}" "Setting previous ASUS GUI client" $WG_IFACE "as default...!" # v4.19.1
+                            # ip rule | awk '/wgc1/ {print $3}' | grep -o '0/24'
+                            if [ -n "$(nvram get $WG_IFACE__aips | grep -oE "0.0.0.0/0")" ];then
                                 if [ -z "$(ip route show 0/1 | grep "dev $WG_IFACE")" ];then    # v4.16.11
-                                    cmd ip route add 0/1    dev $WG_IFACE
-                                    cmd ip route add 128/1  dev $WG_IFACE
+                                    #cmd ip route add 0/1    dev $WG_IFACE
+                                    #cmd ip route add 128/1  dev $WG_IFACE
+                                    :
                                 fi
                             fi
 
                             if [ "$USE_IPV6" == "Y" ];then
-                                if [ -n "$(awk '/^AllowedIPs/ {print $3}' ${CONFIG_DIR}${WG_IFACE}.conf | grep -oE "::0/0")" ];then
-                                    #ip -6 route add 0::/1    dev $WG_IFACE
-                                    #ip -6 route add 8000::/1 dev $WG_IFACE
+                            # ip -6 rule | awk '/wgc1/ {print $3}' | grep -o '::0/0'
+                                if [ -n "$(nvram get $WG_IFACE__aips | grep -oE "::0/0")" ];then
                                     if [ -z "$(ip -6 route show ::/1 | grep "dev $WG_IFACE")" ];then    # v4.16.11
-                                        cmd ip -6 route add 0::/1    dev $WG_IFACE
-                                        cmd ip -6 route add 8000::/1 dev $WG_IFACE
+                                        #cmd ip -6 route add 0::/1    dev $WG_IFACE
+                                        #cmd ip -6 route add 8000::/1 dev $WG_IFACE
+                                        :
                                     fi
                                 fi
                             fi
