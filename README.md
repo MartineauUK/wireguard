@@ -1,11 +1,11 @@
 # WireGuard Manager
-© Copyright 2021-2022 MartineaUK All Rights Reserved.
+© Copyright 2021-2023 MartineaUK All Rights Reserved.
 
 Manage/Install WireGuard®  on applicable ASUS routers
 
 Based on https://www.snbforums.com/threads/experimental-wireguard-for-rt-ac86u-gt-ac2900-rt-ax88u-rt-ax86u.46164/
 
-"WireGuard" and the "WireGuard" logo https://www.wireguard.com/ are registered trademarks of Jason A. Donenfeld. © Copyright 2015-2022 Jason A. Donenfeld. All Rights Reserved. 
+"WireGuard" and the "WireGuard" logo https://www.wireguard.com/ are registered trademarks of Jason A. Donenfeld. © Copyright 2015-2023 Jason A. Donenfeld. All Rights Reserved. 
 
 ## Installation ##
 
