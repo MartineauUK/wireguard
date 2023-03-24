@@ -1,7 +1,7 @@
 #!/bin/sh
     # shellcheck disable=SC2039,SC2155,SC2124,SC2046,SC2027
-VERSION="v4.19b4"
-#============================================================================================ © 2021-2022 Martineau v4.19b4
+VERSION="v4.19b5"
+#============================================================================================ © 2021-2022 Martineau v4.19b5
 #
 #       wgm   [ help | -h ]
 #       wgm   [ { start | stop | restart } [wg_interface]... ]
@@ -33,7 +33,7 @@ VERSION="v4.19b4"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 09-Nov-2022
+# Last Updated Date: 24-Mar-2023
 
 #
 # Description:
@@ -1872,6 +1872,7 @@ Manage_Peer() {
                                 [ $? -eq 1 ] && Show_Peer_Config_Entry "$WG_INTERFACE"
                             ;;
                             passthru*)
+								# peer wg21 passthru {add|del} wg11 all
                                 Manage_PASSTHRU_rules $menu1            # v4.12
                                 [ $? -eq 1 ] && Show_Peer_Config_Entry "$WG_INTERFACE"
                             ;;
@@ -2020,26 +2021,57 @@ Manage_Peer() {
                                 shift
                                 local Mode=$(Server_or_Client "$WG_INTERFACE")
                                 local DNS=$(echo "$CMD" | sed -n "s/^.*dns=//p" | awk '{print $1}')
+								
+								# peer wg1X dns=[router|*|IPv4|IPv6],...]
+								if [ "$DNS" == "router" ] || [ "$DNS" == "*" ];then					# v4.19
+									# Allow user friendly keywords....								# v4.19
+									if [ "$DNS" == "router" ]; then									# v4.19
+										local DNS=$(nvram get lan_ipaddr_rt)						# v4.19
+										local DNS_COMMENT="# Router"								# v4.19
+									fi
+									if [ "$DNS" == "*" ];then										# v4.19
+										local DNS=$(cat /etc/resolv.conf | awk 'NR=1 {print $2}')	# v4.19
+										local DNS_COMMENT="# /etc/resolv.conf"						# v4.19
+									fi
+								else
+									for THIS in $(echo "$DNS" | tr ',' ' ')							# v4.19
+										do
+											if [ -n "$(echo "$THIS" | Is_IPv4)" ] || [ -n "$(echo "$THIS" | Is_IPv6)"  ];then				# v4.19
+												:
+											else
+												echo -e $cBRED"\a\n\t***ERROR 'client' Peer '$WG_INTERFACE' cannot set DNS = $DNS\n"$cRESET	# v4.19
+												local DNS="ERROR"																				# v4.19
+											fi		
+										done
+								fi
+								
                                 local ID="peer"
                                 case $Mode in
                                     client) local TABLE="clients";;
                                     device) local TABLE="devices"; local ID="name";;    # v4.06
                                 esac
+									if [ "$Mode" != "server" ];then
+										if [ "$DNS" != "ERROR" ];then									# v4.19
+											sqlite3 $SQL_DATABASE "UPDATE $TABLE SET dns='$DNS' WHERE $ID='$WG_INTERFACE';"
+											if [ -n "$(grep -E "^[Dd][Nn][Ss]" ${CONFIG_DIR}${WG_INTERFACE}.conf )" ];then      					# HOTFIX v4.17 @johndoe85 v4.16
+												if [ -n "$DNS" ];then
+													[ -z "$DNS_COMMENT" ] && local DNS_COMMENT="# Wireguard® Manager©"									# v4.19# v4.19
+													#sed -i "/^[Dd][Nn][Ss]/ s~\(^.*=\)\(.*\)\(#.*$\)~\1 $DNS \3~" ${CONFIG_DIR}${WG_INTERFACE}.conf    # HOTFIX v4.17 @johndoe85
+													sed -i "/^[Dd][Nn][Ss]/ s~^.*$~DNS = $DNS $DNS_COMMENT~" ${CONFIG_DIR}${WG_INTERFACE}.conf			# v4.19 HOTFIX v4.17 @johndoe85
+												else
+													sed -i '/^[Dd][Nn][Ss]/d' ${CONFIG_DIR}${WG_INTERFACE}.conf											# v4.19
+												fi
+											else
+												sed -i "/^Address/a DNS = $DNS $DNS_COMMENT" ${CONFIG_DIR}${WG_INTERFACE}.conf          				# v4.19 v4.16
+											fi
 
-                                if [ "$Mode" != "server" ];then
-                                    sqlite3 $SQL_DATABASE "UPDATE $TABLE SET dns='$DNS' WHERE $ID='$WG_INTERFACE';"
-                                    if [ -n "$(grep -E "^[Dd][Nn][Ss]" ${CONFIG_DIR}${WG_INTERFACE}.conf )" ];then      # HOTFIX v4.17 @johndoe85 v4.16
-                                        sed -i "/^[Dd][Nn][Ss]/ s~\(^.*=\)\(.*\)\(#.*$\)~\1 $DNS \3~" ${CONFIG_DIR}${WG_INTERFACE}.conf   # HOTFIX v4.17 @johndoe85
-                                    else
-                                        sed -i "/^Address/a DNS = $DNS" ${CONFIG_DIR}${WG_INTERFACE}.conf           # v4.16
-                                    fi
-
-                                    echo -e $cBGRE"\n\t[✔] Updated DNS"$cRESET
-                                    local UPDATE_WGMC_NVRAM="Y"         # v4.18
-                                    Show_Peer_Config_Entry "$WG_INTERFACE"          # v4.17
-                                else
-                                     echo -e $cBRED"\a\n\t***ERROR 'server' Peer '$WG_INTERFACE' cannot set DNS\n"$cRESET
-                                fi
+											[ -n "$DNS" ] && echo -e $cBGRE"\n\t[✔] Updated DNS"$cRESET || echo -e $cBGRE"\n\t[✔] ${cBRED}DELETED${cBGRE} DNS"$cRESET
+											local UPDATE_WGMC_NVRAM="Y"         # v4.18
+											Show_Peer_Config_Entry "$WG_INTERFACE"          # v4.17
+										fi
+									else
+										echo -e $cBRED"\a\n\t***ERROR 'server' Peer '$WG_INTERFACE' cannot set DNS\n"$cRESET
+									fi
                             ;;
                             mtu*)                                                   # v4.09
                                 shift
@@ -3065,6 +3097,11 @@ _Passthru_rules() {
                         echo -e $cBRED"\a\n\t***ERROR: Peer (${cBWHT}$IFACE${cBRED}) must be 'client' peer e.g. 'wg13'"$cRESET
                         return 1
                     fi
+					if [ "$(sqlite3 $SQL_DATABASE "SELECT auto FROM clients WHERE peer='$WG_INTERFACE';")" != "P" ];then	# v4.19
+					    echo -e $cBRED"\a\n\t***ERROR: Peer (${cBMAG}$IFACE${cBRED}) must be defined in 'Policy mode' e.g. $cRESET'Auto=P'"$cRESET	# v4.19
+                        Show_Peer_Config_Entry "$IFACE"																		# v4.19
+						return 1																							# v4.19
+					fi
                 fi
 
                 if [ "$IP_SUBNET" == "all" ];then
@@ -3252,7 +3289,11 @@ Manage_VPNDirector_rules() {
     case $ACTION in
         clone|copy)
             if [ -s /jffs/openvpn/vpndirector_rulelist ];then
-                sed -E 's/(>OVPN[1-5]|>WAN)/\1\n/g' /jffs/openvpn/vpndirector_rulelist > /tmp/VPNDirectorRules.txt
+				if [ "$FIRMWARE" -lt 38800 ];then											# v4.19
+					sed -E 's/(>OVPN[1-5]|>WAN)/\1\n/g' /jffs/openvpn/vpndirector_rulelist > /tmp/VPNDirectorRules.txt
+				else
+					sed -E 's/(>WGC[1-5]|>WAN)/\1\n/g' /jffs/openvpn/vpndirector_rulelist > /tmp/VPNDirectorRules.txt	# v4.19 use WGCn rules
+				fi
                 [ -n "$FILTER" ] && local FILTER_TXT="(ONLY ${FILTER}) "                    # v4.14
                 echo -e $cRESET"\n\tAuto clone VPN Director ${FILTER_TXT}rules\n" 2>&1      # v4.14
                 while read -r LINE || [ -n "$LINE" ]; do
@@ -3335,7 +3376,7 @@ Manage_FC() {
         case "$1" in
             disable|off)
 
-                if [ -n "$(fc status | grep "Flow Learning Enabled")" ];then
+                if [ -n "$(fc status | grep "Flow Learning Enabled")" ] || [ -n "$(fc status | grep -E "Flow.*Learning Enabled")" ];then
                     echo -en $cBRED"\t"
                     fc disable
                     echo -en $cBGRE"\t"
@@ -3344,11 +3385,12 @@ Manage_FC() {
                     nvram set fc_disable=1      # v4.12
                     nvram commit                # v4.12
                 fi
-                local STATUS="\n\t${cBRED}Flow Cache Disabled"
+                #local STATUS="\n\t${cBRED}Flow Cache Disabled"
+				local STATUS="0"				# v4.19
             ;;
             enable|on)
 
-                if [ -z "$(fc status | grep "Flow Learning Enabled")" ];then
+                if [ -z "$(fc status | grep "Flow Learning Enabled")" ] || [ -n "$(fc status | grep -E "Flow.*Learning Enabled")" ];then		# v4.19
                     echo -en $cBGRE"\t"
                     fc enable
                     echo -en $cBGRE"\t"
@@ -3357,11 +3399,23 @@ Manage_FC() {
                     nvram set fc_disable=0      # v4.12
                     nvram commit                # v4.12
                 fi
-                local STATUS="\n\t${cBGRE}Flow Cache Enabled"
+                #local STATUS="\n\t${cBGRE}Flow Cache Enabled"
+				local STATUS="1"				# v4.19
             ;;
             *)
-                [ -n "$(fc status | grep "Flow Learning Enabled")" ] && local STATUS="\tFlow Cache Enabled" || local STATUS="\tFlow Cache Disabled"
-            ;;
+                #[ -n "$(fc status | grep "Flow Learning Enabled")" ] && local STATUS="\tFlow Cache Enabled" || local STATUS="\tFlow Cache Disabled"
+				if [ -n "$(fc status | grep "Flow Learning Enabled")" ] || [ -n "$(fc status | grep -E "Flow.*Learning Enabled")" ];then		# v4.19
+					local STATUS="1"	# v4.19 
+				else
+					local STATUS="0"	# v4.19
+				fi
+				
+				if [ $FIRMWARE -ge 38802 ];then																		# v4.19
+					if [ -f /proc/blog/skip_wireguard_network ] && [ -f /proc/blog/skip_wireguard_port ];then		# v4.19
+						[ -s /proc/blog/skip_wireguard_network ] && STATUS=$STATUS"1" || local STATUS=$STATUS"2"	# v4.19  
+					fi
+				fi
+				;;
         esac
     fi
 
@@ -4159,12 +4213,43 @@ Show_Info() {
     fi
 
     local FC_STATUS=$(Manage_FC "?")                          # v4.14
+
     case "$FC_STATUS" in
-        *[Ee]nabled*)
-            echo -e $cBGRE"\n\t[✔]${cBWHT} Flow Cache ${cBGRE}is ENABLED$cRESET"
+			1|10|11|12)																							# v4.19
+				local FC_STATUS_TXT=$(echo -e $cBGRE"\n\t[✔]${cBWHT} Flow Cache ${cBGRE}is ENABLED$cRESET")	# v4.19
+				case "$FC_STATUS" in																			# v4.19
+					11)																							# v4.19
+						local FC_STATUS_TXT=$FC_STATUS_TXT" (WireGuard© VPN Bypass available)"					# v4.19
+					;;																							# v4.19
+					12)																							# v4.19
+						local LINE_CNT=$(wc -l < /proc/blog/skip_wireguard_network)								# v4.19
+						if [ $LINE_CNT -gt 0 ];then
+							local TXT="${cBGRE}ENABLED$cRESET for $LINE_CNT LAN entities"						# v4.19
+						else																					# v4.19
+							local TXT="available"																# v4.19
+						fi																						#v 4.19
+						local FC_STATUS_TXT=$FC_STATUS_TXT" (WireGuard© VPN Bypass $TXT)"						# v4.19
+					;;																							# v4.19
+				esac																							# v4.19
+				echo -e "$FC_STATUS_TXT"																		# v4.19
         ;;
-        *[Dd]isabled*)
-            echo -e $cRED"\n\t[✖]${cBWHT} Flow Cache ${cBGRE}is ${cBRED}DISABLED$cRESET"
+			0|00|01|02)
+				local FC_STATUS_TXT=$(echo -e $cRED"\n\t[✖]${cBWHT} Flow Cache ${cBGRE}is ${cBRED}DISABLED$cRESET")	# v4.19
+				case "$FC_STATUS" in																					# v4.19
+					01)																									# v4.19
+						local FC_STATUS_TXT=$FC_STATUS_TXT" (WireGuard© VPN Bypass available)"							# v4.19
+					;;																									# v4.19
+					02)																									# v4.19
+						local LINE_CNT=$(wc -l < /proc/blog/skip_wireguard_network)								# v4.19
+						if [ $LINE_CNT -gt 0 ];then																# v4.19
+							local TXT="${cBGRE}ENABLED$cRESET for $LINE_CNT LAN entities"						# v4.19
+						else																					# v4.19
+							local TXT="available"																# v4.19
+						fi																						#v 4.19
+						local FC_STATUS_TXT=$FC_STATUS_TXT" (WireGuard© VPN Bypass $TXT)"						# v4.19
+					;;																									# v4.19																						# v4.14
+				esac																									# v4.19
+				echo -e "$FC_STATUS_TXT"																				# v4.19
         ;;
         *)
             echo -e $cBGRE"\n\t[✔]${cBWHT} Flow Cache status ${cBGRE} N/A$cRESET"
@@ -6127,8 +6212,10 @@ Build_Menu() {
             MENU_C="$(printf '%b9 %b = %bCreate[split]%b Road-Warrior 'device' Peer for 'server' Peer {device [server]} e.g. create myPhone wg21%b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
             MENU_IPS="$(printf '%b10 %b= %bIPSet%b management [ "upd" { ipset [ "fwmark" {fwmark} ] | [ "enable" {"y"|"n"}] | [ "dstsrc"] {src} ] }] %b' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
             MENU_ISPIMP="$(printf '%b11 %b= %bImport%b WireGuard® configuration { [ "?" | [ "dir" directory ] | [/path/]config_file [ "name="rename_as ] ]} %b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")"
-            MENU_VPNDIR="$(printf '%b12 %b= %bvpndirector%b Clone VPN Director rules [ "clone" [ "wan" | "ovpn"n [ changeto_wg1n ]] | "delete" | "list" ] %b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")" # v4.14
-        fi
+			#if [ "$FIRMWARE" -lt 38800 ];then
+				MENU_VPNDIR="$(printf '%b12 %b= %bvpndirector%b Clone VPN Director rules [ "clone" [ "wan" | "ovpn"n [ changeto_wg1n ]] | "delete" | "list" ] %b\n' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cRESET}")" # v4.14
+			#fi
+		fi
 
         MENU__="$(printf '%b? %b = %bAbout%b Configuration (WebUI %b%s%b)' "${cBYEL}" "${cRESET}" "${cGRE}" "${cRESET}" "${cBYEL}" "${GUI_TAB}" "${cRESET}" )"  # v4.19 @ evlo
         echo -e ${cWGRE}"\n"$cRESET      # Separator line
