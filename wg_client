@@ -1,17 +1,20 @@
 #!/bin/sh
     # shellcheck disable=SC2039,SC2155,SC2124,SC2046
-VERSION="v4.19.1"
-#============================================================================================ © 2021-2022 Martineau v4.19.1
+VERSION="v4.19.2"
+#============================================================================================ © 2021-2023 Martineau v4.19.2
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 09-Nov-2022
+# Last Updated Date: 24-Mar-2023
 #
 # Description:
 #
 # Acknowledgement:
 #
 # Contributors: odkrys,ZebMcKayhan,Torson,The Chief,archiel
+
+# Firmware v388+ contains RMerlin WireGuard support with custom scripts:
+# 			https://www.snbforums.com/threads/asuswrt-merlin-388-1-beta-is-available-for-select-models.81644/post-801653
 
 Parse() {
     #
@@ -68,6 +71,16 @@ Is_AX() {
     # Use the following at the command line otherwise 'return X' makes the SSH session terminate!
     # [ -n "(/bin/uname -r | grep "^4")" ] && [ -z "$(/bin/uname -m | grep "aarch64")" ] && echo Y || echo N
     [ -n "$(/bin/uname -r | grep "^4")" ] && [ -z "$(/bin/uname -m | grep "aarch64")" ] && { echo Y; return 0; } || { echo N; return 1; }     # v4.14.6
+}
+Get_Router_Model() {
+
+    # Contribution by @thelonelycoder as odmpid is blank for non SKU hardware,
+    local HARDWARE_MODEL
+    [ -z "$(nvram get odmpid)" ] && HARDWARE_MODEL=$(nvram get productid) || HARDWARE_MODEL=$(nvram get odmpid)
+
+    echo $HARDWARE_MODEL
+
+    return 0
 }
 Is_IPv4 () {
         grep -oE '^([0-9]{1,3}\.){3}[0-9]{1,3}$'                    # IPv4 format
@@ -209,6 +222,10 @@ create_client_list(){
             [ "$DSTC" == "to" ] && DSTC="to "
             logger -t "wg_manager-${MODE}${VPN_NAME}" "Adding WireGuard 'client' Peer route ${SRCA}${DSTC}$DSTA through $TARGET_NAME"
             echo -en $cRESET
+			
+			if [ $FIRMWARE -ge 38802 ] && [ -f /proc/blog/skip_wireguard_network ];then				# v4.19
+				Manage_HND_Skip_WG_FlowCache_CIDR "add" "$SRCA"							            # v4.19
+			fi
 
             if [ -n "$PEERDNS_LIST" ] && [ "$TARGET_LOOKUP" != "main" ] && [ "$VPN_IP" != "Any" ];then  # v4.17.9 @ZebMcKayhan
 
@@ -240,7 +257,78 @@ purge_client_list(){
             echo -en $cRESET
         fi
     done
-    }
+}
+Manage_HND_Skip_WG_FlowCache_CIDR(){
+	# v4.19
+	local ACTION=$1
+	
+	local SRCA=$2
+	if [ -z "$(echo "$SRCA" | grep ":")" ];then
+		[ -z $(echo "$SRCA" | grep "/") ] && SRCA=$SRCA"/32"
+	fi
+	
+	# SDK on these models doesn't support the blog VPN bypass
+	if [ $HARDWARE_MODEL == "RT-AX88U" ] || [ $HARDWARE_MODEL == "GT-AX11000" ];then	# v4.19
+		return
+	fi
+	
+	if [ -z "$(echo "$SRCA" | grep ":")" ];then
+		if [ "$ACTION" == "add" ];then
+			[ -z "$(grep -o $SRCA '/proc/blog/skip_wireguard_network' )" ] && echo "$ACTION $SRCA" >> '/proc/blog/skip_wireguard_network'	# v4.19	 
+		else
+			[ -n "$(grep -o $SRCA '/proc/blog/skip_wireguard_network' )" ] && echo "$ACTION $SRCA" >> '/proc/blog/skip_wireguard_network'	# # v4.19
+		fi
+	else
+		if [ "$USE_IPV6" == "Y" ];then                                                   
+			#if [ -n "$(echo "$SRC_CIDR" | grep ":")" ];then
+				if [ "$ACTION" == "add" ];then
+					[ -z "$(grep -o $SRC_CIDR /proc/blog/skip_wireguard_network )" ] && echo "$ACTION $SRC_CIDR" >> /proc/blog/skip_wireguard_network	# v4.19 
+				else
+					[ -n "$(grep -o $SRC_CIDR /proc/blog/skip_wireguard_network )" ] && echo "$ACTION $SRC_CIDR" >> /proc/blog/skip_wireguard_network	# v4.19
+				fi
+			#fi
+		fi	
+	fi
+
+	logger -t "wg_manager-${MODE}${VPN_NAME}" "$ACTION WireGuard® 'client' Peer ${SRCA}${DSTC}$DSTA Flow Cache bypass"			# v4.19
+}
+Manage_HND_Skip_WG_FlowCache_Port(){	
+	# v4.19
+	local ACTION=$1
+	
+	local SOCKET=$2
+
+	local WG_TARGET_PORT=$(echo "$SOCKET" | cut -d':' -f2 )		# Extract destination port from WG socket
+	
+	local ACTIVE_CLIENT=
+	local REMOVE_PORT=
+	
+	# SDK on these mdels doesn't support the BLOG VPN bypass
+	if [ $HARDWARE_MODEL == "RT-AX88U" ] || [ $HARDWARE_MODEL == "GT-AX11000" ];then	# v4.19
+		return
+	fi
+	
+	if [ "$ACTION" == "add" ];then
+		[ -z "$(grep -o $WG_TARGET_PORT '/proc/blog/skip_wireguard_port' )" ] && { echo "$ACTION $WG_TARGET_PORT either" >> '/proc/blog/skip_wireguard_port'; logger -t "wg_manager-${MODE}${VPN_NAME}" "$ACTION WireGuard® bypass Flow Cache Port to WireGuard® Peer $SOCKET"; }	# v4.19
+	else
+		if [ -n "$(grep -o $WG_TARGET_PORT '/proc/blog/skip_wireguard_port' )" ];then
+			# NOTE: Only remove the Port if there are no 'client' Peers ACTIVE that use the same Port
+			for ACTIVE_CLIENT in $(wg show interfaces | grep "wg1")
+				do
+					local ACTIVE_SOCKET=$(wg show $ACTIVE_CLIENT endpoints | awk '{print $2}')
+					local ACTIVE_PORT=$(echo "$ACTIVE_SOCKET" | cut -d':' -f2)
+					if [ "$WG_TARGET_PORT" == "$ACTIVE_PORT" ];then
+						local REMOVE_PORT="Port STILL in USE by $ACTIVE_CLIENT"
+						break
+					fi
+				done
+		else
+			local REMOVE_PORT="(NOT defined in '/proc/blog/skip_wireguard_port)'"
+		fi
+		
+		[ -z "$REMOVE_PORT" ] && { echo "$ACTION $WG_TARGET_PORT either" >> '/proc/blog/skip_wireguard_port'; logger -t "wg_manager-${MODE}${VPN_NAME}" "$ACTION WireGuard® bypass Flow Cache Port to WireGuard® Peer $SOCKET"; } || logger -t "wg_manager-${MODE}${VPN_NAME}" "Cannot $ACTION WireGuard® bypass Flow Cache Port $REMOVE_PORT to $SOCKET"	# v4.19
+	fi
+}
 Manage_Passthru(){
 
     local SERVER_DEVICEPEERS=$(sqlite3 $SQL_DATABASE "SELECT server,ip_subnet FROM passthru where client='$WG_INTERFACE';" | tr '\n' ' ')
@@ -453,6 +541,7 @@ INSTALL_DIR="/jffs/addons/wireguard/"
 SQL_DATABASE="/opt/etc/wireguard.d/WireGuard.db"        # v1.08
 
 FIRMWARE=$(echo $(nvram get buildno) | awk 'BEGIN { FS = "." } {printf("%03d%02d",$1,$2)}')
+HARDWARE_MODEL=$(Get_Router_Model)
 
 WAN_IF=$(Get_WAN_IF_Name)
 
@@ -507,7 +596,7 @@ WAN_IPV4=$(ip -4 addr | sed -ne 's|^.* inet  \([^/]*\)/.* scope global.*$|\1|p' 
 [ -n "$(echo "$@" | grep "debug")" ] && SHOWCMDS="Y"                        # v4.14.7
 # Is this a standard 'client' Peer interface 'wg11-wg15'                    # v1.03
 if [ -z "$(echo "$VPN_ID" |  grep -oE "^wg[0-2]")" ];then      # v4.02 v1.03
-    # Non-standard so identfy if it's a 'client' or 'server' Peer
+    # Non-standard so identify if it's a 'client' or 'server' Peer
     if [ -f ${CONFIG_DIR}${VPN_ID}.conf ];then                                  # v1.03
         if [ -n "$(grep -E "^Endpoint" ${CONFIG_DIR}${VPN_ID}.conf)" ];then     # v1.03
             MODE="client"
@@ -547,6 +636,7 @@ if [ "$MODE" == "client" ];then                         # v1.03
         VPN_PRIO=99999
         WAN_PRIO=99999
     fi
+	
 else
     SOCKET=$(nvram get wan_gateway)":"$(awk '/Listen/ {print $3}' ${CONFIG_DIR}${VPN_ID}.conf)      # v1.03
 fi
@@ -570,7 +660,9 @@ if [ "$1" != "disable" ] && [ "$2" != "disable" ];then
     if [ -n "$LOCALIP" ] || [ "$MODE" == "client" ];then                                # v1.03
         logger -t "wg_manager-${MODE}${VPN_NAME}" "Initialising WireGuard® VPN $MODE Peer ($VPN_ID) ${POLICY_MODE}${TXT} $SOCKET ($DESC)"
         echo -e $cBCYA"\twg_manager-${MODE}${VPN_NAME}: Initialising WireGuard® VPN '$MODE' Peer (${cBMAG}$VPN_ID${cBCYA}) ${POLICY_MODE}${TXT} $SOCKET (${cBMAG}$DESC${cBCYA}) ${cBWHT}DNS=$PEER_DNS_LIST"$cRESET        # v4.16
-
+	
+		Manage_HND_Skip_WG_FlowCache_Port "add" "$SOCKET"					# v4.19
+	
         if [ -n "$PEER_DNS_LIST" ];then            # v4.16 v4.05
             if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.09
                 cmd iptables -t nat -N WGDNS${VPN_NUM}                      # v4.05
@@ -1156,6 +1248,19 @@ else
     Firewall_delete
 
     if [ -n "$(echo "$VPN_NUM" | grep -oE '^[0-9]+$')" ]; then      # v4.10
+	
+		if [ $FIRMWARE -ge 38802 ] && [ -f /proc/blog/skip_wireguard_network ];then			# v4.19
+			sqlite3 $SQL_DATABASE "SELECT iface,srcip,dstip FROM policy WHERE peer='$WG_INTERFACE' ORDER BY iface DESC;" | while read RULE
+			do
+				BLOG_IP=$(echo $RULE | awk -F '|' '{print $2}')
+				if [ "$BLOG_IP" != "Any" ] && [ -n "$BLOG_IP" ];then
+					if [ -n "$(echo "$BLOG_IP" | Is_IPv4_CIDR)" ] || [ -n "$(echo "$BLOG_IP" | Is_IPv4)" ];then
+						Manage_HND_Skip_WG_FlowCache_CIDR "del" "$BLOG_IP" 
+					fi
+				fi
+			done
+		fi	
+		
         ip rule del from $(nvram get lan_ipaddr | cut -d"." -f1-3).0/24 table 12$VPN_NUM prio 992$VPN_NUM   2>/dev/null
         ip route flush table 12$VPN_NUM 2>/dev/null
         unset DONE;while [ -z ${DONE+x} ];do ip rule del prio 99${VPN_NUM}1 2>/dev/null;[ $? -gt 0 ] && DONE=1;done # v4.16.19
@@ -1227,10 +1332,13 @@ else
 
     # v4.14 Process 'PostDown' commands
     Process_Pre_Post_Commands "PostDown"
-
+	
+	Manage_HND_Skip_WG_FlowCache_Port "del" "$SOCKET"					# v4.19
+	
     rm /tmp/$VPN_ID.* 2>/dev/null
-
+	
     logger -t "wg_manager-${MODE}${VPN_NAME}" "WireGuard® VPN '$MODE' Peer ($VPN_ID) $TXT $SOCKET ($DESC) $TERMINATED_TXT"
+	
     echo -en ${cRESET}"\n"
     echo -e $cBGRE"\twg_manager-${MODE}${VPN_NAME}: WireGuard® VPN '$MODE' Peer (${cBMAG}$VPN_ID${cBGRE}) $TXT $SOCKET (${cBMAG}$DESC${cBGRE}) ${cRED}$TERMINATED_TXT"${cRESET}
 
