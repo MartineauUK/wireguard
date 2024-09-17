@@ -26,6 +26,7 @@ font-weight: bolder;
 }
 </style>
 <!--<script src="/js/jquery.js"></script>-->
+<script language="JavaScript" type="text/javascript" src="/js/jquery.js"></script>
 <script language="JavaScript" type="text/javascript" src="/state.js"></script>
 <script language="JavaScript" type="text/javascript" src="/general.js"></script>
 <script language="JavaScript" type="text/javascript" src="/popup.js"></script>
@@ -35,7 +36,6 @@ font-weight: bolder;
 <script language="JavaScript" type="text/javascript" type="text/javascript" src="/form.js"></script>
 <script language="JavaScript" type="text/javascript" src="js/httpApi.js"></script>
 <script language="JavaScript" type="text/javascript" src="js/qrcode.min.js"></script>
-<script language="JavaScript" type="text/javascript" src="js/jquery.js"></script>
 <!--<script language="JavaScript" type="text/javascript" src="/ext/shared-jy/jquery.js"></script>-->
 
 <script language="JavaScript" type="text/javascript" src="/ext/wireguard/ExecuteResults.js"></script>
@@ -696,7 +696,7 @@ let confirmAction = confirm("Confirm OK to DELETE ALL 'VPN Director' Policy Rout
                         <tr>
                             <td bgcolor="#4D595D" valign="top" >
                             <div>&nbsp;</div>
-                            <div class="formfonttitle">VPN - WireGuard® Manager© v1.04 by Martineau</div>
+                            <div class="formfonttitle">VPN - WireGuard® Manager© v1.05 by Martineau</div>
                             <div id="divSwitchMenu" style="margin-top:-40px;float:right;"></div
                             <div style="margin:10px 0 10px 5px;" class="splitLine" id="WgmTabViewAutoScroll"></div>
                             <table width="100%" border="0" align="center" cellpadding="4" cellspacing="0" bordercolor="#6b8fa3" class="FormTable">
