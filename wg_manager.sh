@@ -1,6 +1,6 @@
 #!/bin/sh
     # shellcheck disable=SC2039,SC2155,SC2124,SC2046,SC2027
-VERSION="v4.18"
+VERSION="v4.19"
 #============================================================================================ © 2021-2022 Martineau v4.18
 #
 #       wgm   [ help | -h ]
@@ -33,7 +33,7 @@ VERSION="v4.18"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 20-Sep-2022
+# Last Updated Date: 14-Jul-2026
 
 #
 # Description:
@@ -60,6 +60,26 @@ CMD1=;CMD2=;CMD3=;CMD4=;CMD5=                      # Command recall push stack  
 SQL_DATABASE="/opt/etc/wireguard.d/WireGuard.db"   # SQL                            # v3.05
 INSTALL_MIGRATE="N"                                # Migration from v3.0 to v4.0    # v4.01
 IMPORTED_PEER_NAME=                                # Global tacky!                  # v4.15
+
+# To support automatic script updates from AMTM #
+doScriptUpdateFromAMTM=false						# v4.19
+
+##-------------------------------------##
+## As per AMTM requirements v4.19      ##
+##-------------------------------------##
+ScriptUpdateFromAMTM()								# v4.19
+{
+    if ! "$doScriptUpdateFromAMTM"
+    then
+        printf "Automatic script updates via AMTM are currently disabled.\n\n"
+        return 1
+    fi
+    if [ $# -gt 0 ] && [ "$1" = "check" ]
+		then return 0
+    fi
+    Update_Version
+    return "$?"
+}
 
 readonly SCRIPT_WEBPAGE_DIR="$(readlink /www/user)"
 readonly SCRIPT_WEB_DIR="$SCRIPT_WEBPAGE_DIR/wireguard"                             # v4.17
@@ -4164,6 +4184,12 @@ Show_Info() {
     echo -e $cBGRE"\t[ℹ ] ${cRESET}@ZebMcKayhan's$cBGRE Hint's and Tips Guide${cBYEL} https://github.com/ZebMcKayhan/WireguardManager/blob/main/README.md#table-of-content \n"$cRESET   # v4.13
 
     [ -f /opt/etc/init.d/S50wireguard ] && echo -e $cBRED"\t[✖] Warning ${cBWHT}'/opt/etc/init.d/S50wireguard'${cBRED} detected! ${aBLINK}***MAY***${cRESET}${cBRED} conflict with ${cRESET}wireguard_manager\n$cRESET" # v4.17
+	
+	if "$doScriptUpdateFromAMTM";then		
+		echo -e $cBGRE"\n\t[✔] ${cRESET}Allow AMTM to auto-update WG_Manager ENABLED\n"$cRESET				# v4.19
+    else
+		echo -e $cRED"\n\t[✖]${cBGRE} ${cRESET}Allow AMTM to auto-update WG_Manager ${cBRED}DISABLED\n"	# v4.19
+	fi
 }
 exit_message() {
 
@@ -6089,6 +6115,7 @@ Validate_User_Choice() {
             formatwg-quick*|formatwgquick*);;   # v4.16
             ipmon*);;                           # v4.16
             prepimport*);;                      # v4.17
+			amtmupdate*);;						# v4.19
             *)
                :
             ;;
@@ -7010,6 +7037,24 @@ Process_User_Choice() {
                 else
                     echo -e $cBRED"\a\n\t***ERROR: '${CONFIG_DIR}${FN}_imported' NOT found!\n"$cRESET
                 fi
+            ;;
+            amtmupdate" "*|amtmupdate)                          # v4.19         amtmupdate { [allow|on] | [deny|off] }
+
+                local ACTION="$(echo "$menu1"| awk '{print $2}')"
+
+                case "$ACTION" in
+                    allow|on)
+                        doScriptUpdateFromAMTM=true
+						echo -e $cBGRE"\n\t[✔] Allow AMTM to auto-update WG_Manager ENABLED\n"$cRESET
+                    ;;
+                    deny|off)
+                        doScriptUpdateFromAMTM=false
+						echo -e $cRED"\n\t[✖]${cBGRE} Allow AMTM to auto-update WG_Manager ${cBRED}DISABLED\n"
+                    ;;
+					*)
+						echo -en $cRED"\a\n\t***ERROR: Invalid arg $cBWHT'"$ACTION"'$cBRED for 'AMTM auto-update - valid 'allow' or 'deny' only!\n"$cRESET
+					;;
+                esac
             ;;
             *)
                 printf '\n\a\t%bInvalid Option%b "%s"%b Please enter a valid option\n' "$cBRED" "$cRESET" "$menu1" "$cBRED"    # v4.03 v3.04 v1.09
@@ -8322,6 +8367,11 @@ if [ "$1" != "install" ];then   # v2.01
             ;;
             "")
             ;;
+			amtmupdate)				# v4.18
+				shift
+				ScriptUpdateFromAMTM "$@"
+				exit "$?"
+			;;
             *)
                 # Prevent showing the menu by default for unrecognised reuest!
                 echo -e $cBRED"\a\n\t***ERROR WireGuard® Manager© command request '$1' not recognised!\n"
