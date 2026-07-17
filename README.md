@@ -1,5 +1,5 @@
 # WireGuard Manager
-© Copyright 2021-2023 MartineaUK All Rights Reserved.
+© Copyright 2021-2026 MartineaUK All Rights Reserved.
 
 Manage/Install WireGuard®  on applicable ASUS routers
 
