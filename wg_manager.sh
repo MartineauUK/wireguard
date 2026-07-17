@@ -1,7 +1,7 @@
 #!/bin/sh
     # shellcheck disable=SC2039,SC2155,SC2124,SC2046,SC2027
-VERSION="v4.19"
-#============================================================================================ © 2021-2022 Martineau v4.18
+VERSION="v4.20"
+#============================================================================================ © 2021-2026 Martineau v4.20
 #
 #       wgm   [ help | -h ]
 #       wgm   [ { start | stop | restart } [wg_interface]... ]
@@ -33,7 +33,7 @@ VERSION="v4.19"
 #
 
 # Maintainer: Martineau
-# Last Updated Date: 14-Jul-2026
+# Last Updated Date: 17-Jul-2026
 
 #
 # Description:
@@ -61,32 +61,57 @@ SQL_DATABASE="/opt/etc/wireguard.d/WireGuard.db"   # SQL                        
 INSTALL_MIGRATE="N"                                # Migration from v3.0 to v4.0    # v4.01
 IMPORTED_PEER_NAME=                                # Global tacky!                  # v4.15
 
-# To support automatic script updates from AMTM #
-doScriptUpdateFromAMTM=false						# v4.19
-
-##-------------------------------------##
-## As per AMTM requirements v4.19      ##
-##-------------------------------------##
-ScriptUpdateFromAMTM()								# v4.19
-{
-    if ! "$doScriptUpdateFromAMTM"
-    then
-        printf "Automatic script updates via AMTM are currently disabled.\n\n"
-        return 1
-    fi
-    if [ $# -gt 0 ] && [ "$1" = "check" ]
-		then return 0
-    fi
-    Update_Version
-    return "$?"
-}
-
 readonly SCRIPT_WEBPAGE_DIR="$(readlink /www/user)"
 readonly SCRIPT_WEB_DIR="$SCRIPT_WEBPAGE_DIR/wireguard"                             # v4.17
 readonly SCRIPT_DIR="/jffs/addons/wireguard"
 installedMD5File="${INSTALL_DIR}www-installed.md5"  # Save md5 of last installed www ASP file so you can find it again later (in case of www ASP update)
 WEBUI_COLOUR_REINSTATE=                             # WebUI Service Events temporarily suppresses ANSI color Escape sequences # v4.17
 WEBUI_AUTOREPLY=                                    # WebUI Service Events must not prompt for reply by a Human!
+
+##-------------------------------------##
+## As per AMTM requirements v4.19      ##
+##-------------------------------------##
+# To support automatic script updates from AMTM #
+
+AMTM_SILENT_DOWNLOAD=								# v4.20
+
+ScriptUpdateFromAMTM() {							# v4.19
+
+	local AMTM_RC=0									# v4.20
+
+    if [ -f /jffs/addons/wireguard/NO_AMTMUPDATE ];then					# v4.20
+        printf "Automatic script updates via AMTM are currently disabled.\n\n"
+        return 1
+    fi
+    if [ $# -gt 0 ] && [ "$1" = "check" ]
+		then return 0
+    fi
+	
+	local JUNK=										# v4.20
+	local REMOTE_VERSION_NUMDOT="$(curl -${SILENT}fLN --retry 3 --connect-timeout 3 "${GITHUB_DIR}/wg_manager.sh" | grep -E "^VERSION=" | tr -d '"' | sed 's/VER.*\=//')" || REMOTE_VERSION_NUMDOT="?.??"   # v3.23
+	Parse "$REMOTE_VERSION_NUMDOT" " " REMOTE_VERSION_NUMDOT JUNK		# v4.20
+	SayT "AMTM update requested to version "$REMOTE_VERSION_NUMDOT		# v4.20
+	
+    #Check_Module_Versions "force"					# v4.20 Assume versions of Wireguard modules included in firmware are now ALWAYS used rather than 3rd Party modules
+	                              
+	# Protect against curl download failures i.e. Github DOWN
+	[ -f $0.uamtm ] && rm $0.uamtm					# v4.20
+	cp $0 $0.uamtm
+	
+	AMTM_SILENT_DOWNLOAD=Y							# v4.20
+	
+	Get_scripts amtmupdate $REMOTE_VERSION_NUMDOT	# v4.20
+	AMTM_RC=$?										# v4.20
+	Manage_Addon "wgmExpo.sh"       				# v4.15 @ZeMcKayhan's Addon	
+	local AMTM_RC2=$?								# v4.20
+	[ $AMTM_RC2 -eq 1 ] && AMTM_RC=1				# v4.20 
+	
+	[ -f $0.uamtm ] && rm $0.uamtm					# v4.20
+	
+	AMTM_SILENT_DOWNLOAD=							# v4.20
+	
+    return "$AMTM_RC"								# v4.20
+}
 
 Say() {
   # shellcheck disable=SC2068
@@ -486,6 +511,8 @@ Kill_Lock() {
 Manage_Addon() {
 
         # https://raw.githubusercontent.com/ZebMcKayhan/WireguardManager/main/wgmExpo.sh
+		
+		local DOWNLOAD_STATUS=0							# v4.20
 
         FN="$1"
         local BRANCH=$2
@@ -493,6 +520,7 @@ Manage_Addon() {
         if [ "$2" != "remove" ] && [ "$2" != "del" ];then
             [ -z "$BRANCH" ] && local BRANCH="main"
             download_file ${INSTALL_DIR} $FN zebmckayhan $BRANCH dos2unix 777
+			[ $? -ne 200 ] || DOWNLOAD_STATUS=1			# v4.20
             chmod +x ${INSTALL_DIR}$FN
             ln -s /jffs/addons/wireguard/$FN /opt/bin/${FN%.*} 2>/dev/null
             md5sum ${INSTALL_DIR}$FN      > ${INSTALL_DIR}${FN%.*}.md5
@@ -500,6 +528,8 @@ Manage_Addon() {
             rm ${INSTALL_DIR}$FN 2>/dev/null
             rm /opt/bin/$FN 2>/dev/null
         fi
+		
+		return $DOWNLOAD_STATUS							# v4.20
 }
 download_file() {
 
@@ -529,8 +559,11 @@ download_file() {
                 [ "$(which dos2unix)" == "/usr/bin/dos2unix" ] && dos2unix $DIR/$FILE || dos2unix -q $DIR/$FILE     # v4.12
             fi
 
-            printf '\t%b%s%b downloaded successfully %b\n' "$cBGRE" "$FILE" "$cRESET" "$DEVTXT"
+            [ "$AMTM_SILENT_DOWNLOAD" == "Y" ] || printf '\t%b%s%b downloaded successfully %b\n' "$cBGRE" "$FILE" "$cRESET" "$DEVTXT"		# v4.20
+			
             [ -n "$CHMOD" ] && chmod $CHMOD "$DIR/$FILE"
+			
+			return 0			# v4.20
         else
             printf '\n%b%s%b download FAILED with curl error %s\n\n' "\n\t\a$cRESET" "'${GITHUB_DIR}/${FILE}'" "$cBRED" "$STATUS"
             echo -e $cRESET"\a\n"
@@ -3577,7 +3610,6 @@ INITDELAY 20s
 #     Use command 'vx' to edit this setting
 WEBUI
 
-
 EOF
 
     if [ -f ${INSTALL_DIR}WireguardVPN.conf ];then
@@ -3815,31 +3847,54 @@ Manage_Stats() {
 
 }
 Get_scripts() {
+
+	local DOWNLOAD_STATUS=0									# v4.20
     local BRANCH="$1"
+	local REMOTE_VER_NUMDOT="$2"							# v4.20
+	[ "$BRANCH" == "amtmupdate" ] && BRANCH= 				# v4.20
+	
+	local JUNK=												# v4.20
+	local REMOTE_VER_NUMDOT="$(curl -${SILENT}fLN --retry 3 --connect-timeout 3 "${GITHUB_DIR}/wg_manager.sh" | grep -E "^VERSION=" | tr -d '"' | sed 's/VER.*\=//')" || REMOTE_VERSION_NUMDOT="?.??"   # v3.23
+	Parse "$REMOTE_VER_NUMDOT" " " REMOTE_VER_NUMDOT JUNK	# v4.20
 
-    echo -e $cBCYA"\tDownloading scripts"$cRESET 2>&1
+    [ "$AMTM_SILENT_DOWNLOAD" == "Y" ] || echo -e $cBCYA"\tDownloading Wireguard® Manager $REMOTE_VER_NUMDOT scripts"$cRESET 2>&1	# v4.20
 
-    # Allow use of custom script for debugging
-    [ "$(WireGuard_Installed)" == "Y" ] && download_file ${INSTALL_DIR} wg_manager.sh martineau $BRANCH dos2unix 777
-    download_file ${INSTALL_DIR} wg_client martineau $BRANCH dos2unix 777
-    download_file ${INSTALL_DIR} wg_server martineau $BRANCH dos2unix 777
-    download_file ${INSTALL_DIR} UDP_Updater.sh martineau $BRANCH dos2unix 777
-    download_file ${INSTALL_DIR} wg_ChkEndpointDDNS.sh martineau $BRANCH dos2unix 777   # v4.15
-    download_file ${INSTALL_DIR} wg_manager.asp martineau $BRANCH dos2unix              # v4.17
-    download_file ${INSTALL_DIR} Help.md martineau $BRANCH                              # v4.18
-    ln -s ${INSTALL_DIR}Help.md ${SCRIPT_WEB_DIR}/help.htm 2>/dev/null                  # v4.18
+    if [ "$(WireGuard_Installed)" == "Y" ];then
+		download_file ${INSTALL_DIR} Help.md martineau $BRANCH
+		[ $? -eq 1 ] && DOWNLOAD_STATUS=1					# v4.20
+		ln -s ${INSTALL_DIR}Help.md ${SCRIPT_WEB_DIR}/help.htm 2>/dev/null                  # v4.18				
+		download_file ${INSTALL_DIR} UDP_Updater.sh martineau $BRANCH dos2unix 777
+		[ $? -eq 1 ] && DOWNLOAD_STATUS=1					# v4.20			
+		download_file ${INSTALL_DIR} wg_ChkEndpointDDNS.sh martineau $BRANCH dos2unix 777	# 4.15
+		[ $? -eq 1 ] && DOWNLOAD_STATUS=1					# v4.20	
+		download_file ${INSTALL_DIR} wg_manager.asp martineau $BRANCH dos2unix				# v4.17
+		[ $? -eq 1 ] && DOWNLOAD_STATUS=1					# v4.20	
+		download_file ${INSTALL_DIR} wg_client martineau $BRANCH dos2unix 777
+		[ $? -eq 1 ] && DOWNLOAD_STATUS=1					# v4.20		
+		download_file ${INSTALL_DIR} wg_server martineau $BRANCH dos2unix 777
+		[ $? -eq 1 ] && DOWNLOAD_STATUS=1					# v4.20	
+		download_file ${INSTALL_DIR} wg_manager.sh martineau $BRANCH dos2unix 777
+		[ $? -eq 1 ] && DOWNLOAD_STATUS=1					# v4.20	
 
-    chmod +x ${INSTALL_DIR}wg_manager.sh
-    chmod +x ${INSTALL_DIR}wg_client
-    chmod +x ${INSTALL_DIR}wg_server
-    chmod +x ${INSTALL_DIR}UDP_Updater.sh                                                       # v4.01
-    chmod +x ${INSTALL_DIR}wg_ChkEndpointDDNS.sh                                                # v4.15
+		chmod +x ${INSTALL_DIR}wg_manager.sh
+		chmod +x ${INSTALL_DIR}wg_client
+		chmod +x ${INSTALL_DIR}wg_server
+		chmod +x ${INSTALL_DIR}UDP_Updater.sh                                                   # v4.01
+		chmod +x ${INSTALL_DIR}wg_ChkEndpointDDNS.sh                                            # v4.15
 
-    md5sum ${INSTALL_DIR}wg_manager.sh      > ${INSTALL_DIR}"wg_manager.md5"
-    md5sum ${INSTALL_DIR}wg_client          > ${INSTALL_DIR}"wg_client.md5"
-    md5sum ${INSTALL_DIR}wg_server          > ${INSTALL_DIR}"wg_server.md5"
-    md5sum ${INSTALL_DIR}UDP_Updater.sh     > ${INSTALL_DIR}"UDP_Updater.md5"                   # v4.01
-    md5sum ${INSTALL_DIR}wg_ChkEndpointDDNS.sh     > ${INSTALL_DIR}"wg_ChkEndpointDDNS.md5"     # v4.15
+		md5sum ${INSTALL_DIR}wg_manager.sh      	> ${INSTALL_DIR}"wg_manager.md5"
+		md5sum ${INSTALL_DIR}wg_client          	> ${INSTALL_DIR}"wg_client.md5"
+		md5sum ${INSTALL_DIR}wg_server          	> ${INSTALL_DIR}"wg_server.md5"
+		md5sum ${INSTALL_DIR}UDP_Updater.sh     	> ${INSTALL_DIR}"UDP_Updater.md5"           # v4.01
+		md5sum ${INSTALL_DIR}wg_ChkEndpointDDNS.sh	> ${INSTALL_DIR}"wg_ChkEndpointDDNS.md5"	# v4.15	
+	fi
+	
+	if [ "$AMTM_SILENT_DOWNLOAD" == "Y" ] && [ $DOWNLOAD_STATUS -eq 0 ];then													# v4.20
+		echo -e $cBCYA"\tAMTM requested Wireguard® Manager update to version $REMOTE_VER_NUMDOT was SUCCESSFULL"$cRESET 2>&1	# v4.20
+		SayT "AMTM requested Wireguard® Manager update to version $REMOTE_VER_NUMDOT was SUCCESSFULL"							# v4.20
+	fi
+	
+	return $DOWNLOAD_STATUS																		# v4.20
 }
 Read_INPUT() {
 
@@ -4177,19 +4232,20 @@ Show_Info() {
 
     echo -e $cBGRE"\n\t[ℹ ] ${cRESET}Speedtest link${cBYEL} https://fast.com/en/gb/ \n"$cRESET              # v4.12
 
-    echo -e $cBGRE"\t[ℹ ] ${cRESET}IPv6 Test link${cBYEL} https://ipv6-test.com/ \n"$cRESET             # v4.16
+    echo -e $cBGRE"\t[ℹ ] ${cRESET}IPv6 Test link${cBYEL} https://ipv6-test.com/ \n"$cRESET            	 # v4.16
 
     echo -e $cBGRE"\t[ℹ ] ${cRESET}WireGuard© Official Site ${cBYEL}https://www.wireguard.com/ \n"$cRESET   # v4.15
 
     echo -e $cBGRE"\t[ℹ ] ${cRESET}@ZebMcKayhan's$cBGRE Hint's and Tips Guide${cBYEL} https://github.com/ZebMcKayhan/WireguardManager/blob/main/README.md#table-of-content \n"$cRESET   # v4.13
 
     [ -f /opt/etc/init.d/S50wireguard ] && echo -e $cBRED"\t[✖] Warning ${cBWHT}'/opt/etc/init.d/S50wireguard'${cBRED} detected! ${aBLINK}***MAY***${cRESET}${cBRED} conflict with ${cRESET}wireguard_manager\n$cRESET" # v4.17
-	
-	if "$doScriptUpdateFromAMTM";then		
-		echo -e $cBGRE"\n\t[✔] ${cRESET}Allow AMTM to auto-update WG_Manager ENABLED\n"$cRESET				# v4.19
-    else
-		echo -e $cRED"\n\t[✖]${cBGRE} ${cRESET}Allow AMTM to auto-update WG_Manager ${cBRED}DISABLED\n"	# v4.19
+
+	if [ -f /jffs/addons/wireguard/NO_AMTMUPDATE ];then															# v4.20
+		echo -e $cRED"\n\t[✖] ${cRESET}Allow AMTM to auto-update Wireguard® Manager ${cBRED}DISABLED\n"		# v4.19
+	else
+		echo -e $cBGRE"\n\t[✔] ${cRESET}Allow AMTM to auto-update Wireguard® Manager ${cBGRE}ENABLED\n"$cRESET	# v4.19
 	fi
+	
 }
 exit_message() {
 
@@ -5160,7 +5216,7 @@ Check_Version_Update() {
     local localmd5="$(md5sum "$0" | awk '{print $1}')"
 
     if [ "$1" != "nochk" ];then
-        local REMOTE_VERSION_NUMDOT="$(curl -${SILENT}fLN --retry 3 --connect-timeout 3 "${GITHUB_DIR}/wg_manager.sh" | grep -E "^VERSION\=" | tr -d '"' | sed 's/VER.*\=//')" || REMOTE_VERSION_NUMDOT="?.??"   # v3.23
+        local REMOTE_VERSION_NUMDOT="$(curl -${SILENT}fLN --retry 3 --connect-timeout 3 "${GITHUB_DIR}/wg_manager.sh" | grep -E "^VERSION=" | tr -d '"' | sed 's/VER.*\=//')" || REMOTE_VERSION_NUMDOT="?.??"   # v3.23
         if [ -z "$REMOTE_VERSION_NUMDOT" ] || [ "$REMOTE_VERSION_NUMDOT" == "?.??" ];then
             echo -e ${cRESET}$cRED_"\a\t***ERROR Unable to verify Github version...check DNS/Internet access!\n\n"$cRESET
             local REMOTE_VERSION_NUMDOT=
@@ -5189,7 +5245,8 @@ Check_Version_Update() {
         if [ $REMOTE_VERSION_NUM -lt $LOCAL_VERSION_NUM ];then
             ALLOWUPGRADE="N"
             UPDATE_SCRIPT_ALERT="$(printf '%b[✔] Push to Github PENDING for %b(Major) %b%s%b UPDATE %b%s%b >>>> %b%s\n' "${cGRE}" "${cBGRE}" "$cRESET" "$(basename $0)" "$cBRED" "$cBMAG" "$VERSION" "$cRESET" "$cBGRE" "$REMOTE_VERSION_NUMDOT")"
-        else
+		else
+
             ALLOWUPGRADE="N"
             UPDATE_SCRIPT_ALERT="$(printf '%b[✔] Push to Github PENDING for %b(Minor Hotfix) %b%s update >>>> %b%s %b%s\n' "${cGRE}" "$cBRED" "$cBGRE" "$cRESET" "$(basename $0)" "$cRESET" "$cBMAG" "$VERSION")"
         fi
@@ -5205,9 +5262,9 @@ Check_Version_Update() {
         fi
     fi
 
-
     if [ -n "$UPDATE_SCRIPT_ALERT" ];then   # v1.03
         [ -z "$(echo "$UPDATE_SCRIPT_ALERT" | grep -F "Push to Github")" ] && local BEL="\a" || local BEL=
+		UPDATE_SCRIPT_ALERT=$(echo $UPDATE_SCRIPT_ALERT | cut -d' ' -f -12)		# v4.20 Hack!!!!!!
         echo -e "${BEL}\n\t"$UPDATE_SCRIPT_ALERT"\n"
         [ -n "$(echo "$UPDATE_SCRIPT_ALERT" | grep -o "Push to Github")" ] && return 2 || return 1 # v1.03
     else
@@ -5245,7 +5302,7 @@ Display_SplashBox() {
     printf '|                                                                      |\n'
 
     if [ "$EASYMENU" == "N" ];then                  # v2.07
-        printf '|   z  = Remove WireGuard/Wireguard_manager                                |\n'
+        printf '|   z  = Remove WireGuard®/Wireguard® Manager                              |\n'
         printf '|   ?  = About Configuration                                           |\n'
         printf '|   3  = Advanced Tools                                                |\n'
     fi
@@ -6742,7 +6799,7 @@ Process_User_Choice() {
 
                             if [ "$ACTION" == "mountX" ] || [ "$ACTION" == "mX" ] || [ "$ACTION" == "refreshX" ];then   # v4.18
                                 service restart_httpd >/dev/null        # WebUI v4.17
-                                echo -e $cBGRE"\t[✔]${cBWHT} Restarted service_httpd for WebUI"$cRESET
+                                echo -e $cBGRE"\n\t[✔]${cBWHT} Restarted service_httpd for WebUI"$cRESET
                                 SayT "Restarted service_httpd"
                             fi
 
@@ -7044,11 +7101,11 @@ Process_User_Choice() {
 
                 case "$ACTION" in
                     allow|on)
-                        doScriptUpdateFromAMTM=true
+						[ -f /jffs/addons/wireguard/NO_AMTMUPDATE ] && rm /jffs/addons/wireguard/NO_AMTMUPDATE	# v4.20
 						echo -e $cBGRE"\n\t[✔] Allow AMTM to auto-update WG_Manager ENABLED\n"$cRESET
                     ;;
                     deny|off)
-                        doScriptUpdateFromAMTM=false
+						echo "AMTM requested updates NOT allowed" > /jffs/addons/wireguard/NO_AMTMUPDATE		# v4.20
 						echo -e $cRED"\n\t[✖]${cBGRE} Allow AMTM to auto-update WG_Manager ${cBRED}DISABLED\n"
                     ;;
 					*)
@@ -8367,7 +8424,7 @@ if [ "$1" != "install" ];then   # v2.01
             ;;
             "")
             ;;
-			amtmupdate)				# v4.18
+			amtmupdate)				# v4.18				
 				shift
 				ScriptUpdateFromAMTM "$@"
 				exit "$?"
